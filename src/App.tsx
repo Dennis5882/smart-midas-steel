@@ -1,89 +1,91 @@
-import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { CODE_IDS, PROFILES, profileOf } from '@/codes'
-import { buildPortal } from '@/domain/portal'
-import { DEFAULT_SPEC, type ElementRole, type FactoryModel, type FactorySpec } from '@/domain/types'
-import { sendModel } from '@/actions/send'
-import { S } from '@/state/store'
-import { LANG_DEFS, normalizeLang, setLang, t, useLang } from '@/i18n'
+/* 앱 셸 — story 프로젝트와 같은 레이아웃: 헤더 / [가이드+채팅 | 분할선 | 탭 패널] / 하단 바 / 설정 드로어 */
+import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from 'react'
+import { Chat } from './components/Chat'
+import { Drawers } from './components/Drawers'
+import { Footer } from './components/Footer'
+import { Guide } from './components/Guide'
+import { Header } from './components/Header'
+import { LogPanel, ModelPanel, ResultsPanel } from './components/Panels'
+import { View3D } from './components/View3D'
+import { t, useLang, type I18nKey } from './i18n'
+import { useStore, type PanelId } from './state/store'
+import { addMsg, tab } from './state/ui'
 
-const ROLES: ElementRole[] = ['column', 'rafter', 'purlin', 'girt', 'strut']
-const selectCls = 'h-9 rounded-md border border-input bg-background px-2 text-sm'
+const TABS: { id: PanelId; key: I18nKey }[] = [
+  { id: 'logP', key: 'tab_log' },
+  { id: 'modelP', key: 'tab_model' },
+  { id: 'viewP', key: 'tab_3d' },
+  { id: 'resP', key: 'tab_res' },
+]
+
+let greeted = false
+
+/* 채팅|우측 패널 분할 비율(%) — 드래그로 조절, 더블클릭 = 기본값. 뷰어별 편의라 localStorage(실패해도 기본값) */
+const SPLIT_DEF = 49, SPLIT_MIN = 25, SPLIT_MAX = 75
+function readSplit(): number {
+  try { const v = parseFloat(localStorage.getItem('sms_split') || ''); return v >= SPLIT_MIN && v <= SPLIT_MAX ? v : SPLIT_DEF } catch { return SPLIT_DEF }
+}
+function saveSplit(v: number) { try { localStorage.setItem('sms_split', String(v)) } catch { /* 무시 */ } }
 
 export function App() {
+  const s = useStore()
   const lang = useLang()
-  const [spec, setSpec] = useState<FactorySpec>(DEFAULT_SPEC)
-  const [model, setModel] = useState<FactoryModel | null>(null)
-  const [key, setKey] = useState('')
-  const [status, setStatus] = useState('')
-  const profile = profileOf(spec.code)
+  const [drawer, setDrawer] = useState(false)
+  const [guideCollapsed, setGuideCollapsed] = useState(false)
+  const [split, setSplit] = useState(readSplit)
+  const [dragging, setDragging] = useState(false)
+  const mainRef = useRef<HTMLElement>(null)
 
-  const send = async () => {
-    if (!model) return
-    S.mapiKey = key
-    try {
-      await sendModel(spec, model, (step) => setStatus(t('sending', step)))
-      setStatus(t('sent'))
-    } catch (e) {
-      setStatus(t('send_fail', e instanceof Error ? e.message : String(e)))
-    }
+  const onSplitDown = (e: RPointerEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    setDragging(true)
   }
+  const onSplitMove = (e: RPointerEvent<HTMLDivElement>) => {
+    if (!dragging || !mainRef.current) return
+    const r = mainRef.current.getBoundingClientRect()
+    setSplit(Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, ((e.clientX - r.left) / r.width) * 100)))
+  }
+  const onSplitUp = () => {
+    if (!dragging) return
+    setDragging(false)
+    saveSplit(split)
+    window.dispatchEvent(new Event('resize')) // Plotly(responsive) 3D 뷰 재배치
+  }
+  const resetSplit = () => { setSplit(SPLIT_DEF); saveSplit(SPLIT_DEF); requestAnimationFrame(() => window.dispatchEvent(new Event('resize'))) }
+
+  useEffect(() => {
+    document.title = t('meta_title')
+    if (!greeted) { greeted = true; addMsg('bot', t('welcome')) } // StrictMode 이중 실행 방지
+  }, [lang])
 
   return (
-    <main className="mx-auto max-w-3xl space-y-4 p-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('app_title')}</CardTitle>
-          <CardDescription>{t('app_desc', __APP_VERSION__)}</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-4">
-          <label className="flex items-center gap-2 text-sm">
-            {t('lang_label')}
-            <select className={selectCls} value={lang} onChange={(e) => { const l = normalizeLang(e.target.value); if (l) setLang(l) }}>
-              {LANG_DEFS.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
-            </select>
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            {t('code_label')}
-            <select className={selectCls} value={spec.code} onChange={(e) => setSpec({ ...spec, code: e.target.value as FactorySpec['code'] })}>
-              {CODE_IDS.map((id) => <option key={id} value={id}>{t(PROFILES[id].labelKey)}</option>)}
-            </select>
-          </label>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="space-y-4">
-          <Button onClick={() => setModel(buildPortal(spec))}>{t('generate')}</Button>
-          {model && (
-            <div className="space-y-3 text-sm">
-              <div className="flex flex-wrap items-center gap-2">
-                <input type="password" autoComplete="off" className={selectCls + ' w-72'} placeholder={t('key_label')} value={key} onChange={(e) => setKey(e.target.value)} />
-                <Button variant="secondary" disabled={!key} onClick={send}>{t('send')}</Button>
-                {status && <span className="text-muted-foreground">{status}</span>}
+    <>
+      <Header onOpenMapi={() => setDrawer(true)} />
+      <main ref={mainRef} className={dragging ? 'splitting' : undefined} style={{ ['--split' as any]: `${split}%` }}>
+        <section className="chat">
+          <Guide collapsed={guideCollapsed} onToggle={() => setGuideCollapsed((c) => !c)} />
+          <Chat guideCollapsed={guideCollapsed} onOpenGuide={() => setGuideCollapsed(false)} />
+        </section>
+        <div className="splitter" title={t('split_tip')} onPointerDown={onSplitDown} onPointerMove={onSplitMove}
+          onPointerUp={onSplitUp} onPointerCancel={onSplitUp} onDoubleClick={resetSplit} />
+        <section className="right">
+          <div className="tabbar">
+            {TABS.map((tb) => (
+              <div key={tb.id} className={`tab${s.panel === tb.id ? ' on' : ''}`}
+                onClick={() => { tab(tb.id); if (tb.id === 'viewP') requestAnimationFrame(() => window.dispatchEvent(new Event('resize'))) }}>
+                {t(tb.key)}
               </div>
-              <p className="font-medium">{t('summary', model.nodes.length, model.elements.length)}</p>
-              <ul className="text-muted-foreground">
-                {ROLES.map((r) => (
-                  <li key={r}>{t(`role_${r}` as const)}: {model.elements.filter((e) => e.role === r).length}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader><CardTitle className="text-base">{t('combos_title')}</CardTitle></CardHeader>
-        <CardContent>
-          <ul className="space-y-1 font-mono text-sm">
-            {profile.combos({ heavyLive: false }).map((c) => (
-              <li key={c.ref}>({c.ref}) {c.terms.map(([k, f]) => `${f}${k}`).join(' + ')}</li>
             ))}
-          </ul>
-        </CardContent>
-      </Card>
-    </main>
+          </div>
+          <div id="logP" className={`panel${s.panel === 'logP' ? ' on' : ''}`}><LogPanel /></div>
+          <div id="modelP" className={`panel${s.panel === 'modelP' ? ' on' : ''}`}><ModelPanel /></div>
+          <div id="viewP" className={`panel${s.panel === 'viewP' ? ' on' : ''}`}><View3D /></div>
+          <div id="resP" className={`panel${s.panel === 'resP' ? ' on' : ''}`}><ResultsPanel /></div>
+        </section>
+      </main>
+      <Footer />
+      <Drawers open={drawer} onClose={() => setDrawer(false)} />
+    </>
   )
 }

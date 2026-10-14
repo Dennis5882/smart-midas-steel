@@ -39,6 +39,17 @@ export interface CodeProfile {
   defaultMaterial: string
   /** Gen NX 연동: 단면 DB 이름(db/SECT SECT_I.DB_NAME), 강재 설계 코드(db/DSTL DGNCODE) */
   gen: { sectionDb: string; designCode: string; shapeOf(sectionName: string): string }
+  /** 횡하중 식 (지진·풍). 기준별 구현은 <id>Lateral.ts */
+  lateral: {
+    period(kind: 'moment' | 'braced', hn: number): number
+    seismicCoef(o: { SDS: number; SD1: number; I: number; R: number; T: number }): { c: number; SaD: number; Fu: number; Ra: number; m: number; gov: string }
+    /** 풍속압 q(z) (kN/m²) */
+    windQ(z: number, o: { V10: number; I: number; exposure: string }): number
+    gust: number
+    gcpi(enclosure: 'enclosed' | 'partial'): number
+    wallCp: { windward: number; leeward(LB: number): number }
+    roofCp(o: { thetaDeg: number; hOverL: number }): { low: number; high: number; leeward: number }
+  }
   /** 지붕 활하중 (kN/m², 수평투영 면적 기준). slope = rise/run, tribArea = 부재의 부담 수평투영면적 (m²) */
   roofLive(opt: { slope: number; tribArea: number }): number
   /** 강도설계 하중조합. heavyLive = 차고·공중이용·활하중 > 0.5 tf/m² 여부(L 계수 1.0) */

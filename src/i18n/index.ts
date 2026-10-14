@@ -41,5 +41,6 @@ export function t<K extends keyof Dict>(key: K, ...args: Dict[K] extends (...a: 
   return typeof v === 'function' ? v(...args) : v
 }
 
-export { LANG_DEFS, normalizeLang, type Lang } from './types'
+export { LANG_DEFS, htmlLang, normalizeLang, type Lang } from './types'
 export type { Dict } from './dict/en'
+export type I18nKey = keyof Dict

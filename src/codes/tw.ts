@@ -5,6 +5,7 @@
    Gen NX 라이브 확인(2026-10-14): db/DSTL `TWN-LSD90` 수용, db/SECT DBUSER `CNS2020`(`RH 400x200x8x13`) 수용,
    db/MATL STEEL `CNS(S)`·`CNS06(S)` 의 DB = SS400·SM400·SM490·SM490Y·SM520·SM570·SN400·SN490 (SN400B 등 등급 접미사는 거부). */
 import type { CodeProfile } from './types'
+import * as L from './twLateral'
 
 export const TW: CodeProfile = {
   id: 'TW',
@@ -25,6 +26,15 @@ export const TW: CodeProfile = {
       const p = name.split(' ')[0]
       return p === 'RH' || p === 'BH' ? 'H' : p === 'BB' ? 'B' : p
     },
+  },
+  lateral: {
+    period: L.period,
+    seismicCoef: L.seismicCoef,
+    windQ: L.windQ,
+    gust: L.GUST,
+    gcpi: L.gcpi,
+    wallCp: { windward: L.WALL_CP_WINDWARD, leeward: L.wallCpLeeward },
+    roofCp: L.roofCp,
   },
   /* 建築技術規則 建築構造編 第26條 — 不作用途之屋頂 水平投影面活載重 (kgf/m²), 載重面積 ≤20 / 20~60 / >60 m².
      平頂(1/6 미만 경사로 간주) 100/80/60, 1/6~1/2 坡頂 80/70/60, 1/2 이상 60. 拱頂 행은 제외. */
