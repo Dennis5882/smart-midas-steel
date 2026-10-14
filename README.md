@@ -22,14 +22,25 @@ MIDAS Gen과 연동되는 강구조물(Steel Structure) 자동 모델링 도구.
 4. **해석 결과 후처리/보고서**
    - MIDAS Gen 해석 결과를 받아 보고서·검토 자료 생성
 
-## 3. 사용 대상
+## 3. 개발 환경
+
+```bash
+npm install
+npm run dev      # 개발 서버
+npm run build    # 타입체크 + 빌드
+```
+
+- 스택: Vite + TypeScript + React + Tailwind v4 + shadcn/ui (참고: story 프로젝트)
+- 브라우저가 로컬 MIDAS Gen의 MAPI를 `midas-nx` SDK로 직접 호출
+
+## 4. 사용 대상
 
 - 고객사 / 외부 제공용 제품 (MIDAS Gen 사용자)
 
-## 4. 미정 사항 (추후 논의)
+## 5. 미정 사항 (추후 논의)
 
 - [ ] 전체 아키텍처 (웹 서버 ↔ 로컬 MAPI 실행 방식)
-- [ ] 기술 스택 (프론트엔드/백엔드 언어·프레임워크)
+- [x] 기술 스택: Vite + TS + React + shadcn/ui (백엔드 없음, 브라우저 → MAPI 직접 호출)
 - [ ] 부재 자동 생성 입력 스펙 (격자/층 정보 형식)
 - [ ] 접합부 설계/체크 기준 (적용 코드, 국가별 기준 등)
 - [ ] 단면/재질 라이브러리 데이터 소스
