@@ -8,8 +8,10 @@ import type { LoadInfo } from './loads'
 import { portalGeometry } from './portal'
 import { sectionProps } from './sections'
 import { cnCCLoads } from './cnSecondary'
+import { validateDesignResults } from './resultValidation'
 
 export function runCnDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo, res: Results, roles?: readonly ElementRole[]): DesignResult {
+  validateDesignResults(spec, model, info, res, roles)
   const G = portalGeometry(spec), nodes = new Map(model.nodes.map((n) => [n.id, n]))
   const col = sectionProps(spec.sections.column), raf = sectionProps(spec.sections.rafter)
   const K = cnK((col.Ix / spec.eaveHeight) / (raf.Ix / (2 * G.slopeLen)), spec.baseFixity === 'fixed')

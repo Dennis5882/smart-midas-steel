@@ -7,6 +7,7 @@ import { buildLoadPayloads } from '../domain/loads'
 import { buildPortal } from '../domain/portal'
 import type { FactorySpec } from '../domain/types'
 import { checkScope } from '../domain/scope'
+import { isRecord, loadDifference } from '../domain/payloadValidation'
 import { scopeMsg } from '../components/ScopeBox'
 import { t } from '../i18n'
 import { mapi } from '../mapi/client'
@@ -79,21 +80,26 @@ function clearBuilt(): void {
   notify()
 }
 
-/* 전송 후 개수 확인 — Gen 이 일부를 조용히 버리면(오류 없이 개수 부족) 이후 해석이 틀린 모델로 진행되므로 막는다.
-   응답에 해당 키가 없으면(형식이 다른 버전) 경고만 남기고 넘어간다. */
-const VERIFY = ['MATL', 'SECT', 'NODE', 'ELEM', 'FRLS', 'CONS', 'STLD', 'LCOM-GEN'] as const
+/* Unknown response shapes fail closed. Load records also require matching
+   target IDs, item IDs, case names, directions, positions and values. */
+const VERIFY = ['MATL', 'SECT', 'NODE', 'ELEM', 'FRLS', 'CONS', 'STLD', 'LCOM-GEN', 'BODF', 'BMLD', 'CNLD'] as const
+const LOADS = new Set<string>(['BODF', 'BMLD', 'CNLD'])
 
 async function verifyCounts(sent: Record<string, Record<string, unknown>>): Promise<void> {
   stage('st_verify', VERIFY.length)
   const bad: string[] = []
   for (const name of VERIFY) {
     const want = Object.keys(sent[name] ?? {}).length
-    if (!want) continue
     const r = await mapi<Record<string, unknown>>('GET', name, undefined, String(want))
     const got = r?.[name]
-    if (!got || typeof got !== 'object') { log(t('log_verify_skip', name), 'warn'); continue }
+    if (!isRecord(got)) throw new Error(t('verify_fail', `${name}: invalid response`))
     const n = Object.keys(got).length
-    if (n !== want) bad.push(`${name} ${n}/${want}`)
+    if (n !== want) { bad.push(`${name} ${n}/${want}`); continue }
+    if (Object.keys(sent[name]).some((id) => !Object.hasOwn(got, id))) { bad.push(`${name}: target ID mismatch`); continue }
+    if (LOADS.has(name)) {
+      const difference = loadDifference(sent[name], got, name)
+      if (difference) bad.push(difference)
+    }
   }
   if (bad.length) throw new Error(t('verify_fail', bad.join(', ')))
   log(t('log_verify_ok', VERIFY.length), 'ok')

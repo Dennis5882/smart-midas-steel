@@ -29,6 +29,8 @@ export async function runAnalysis(): Promise<void> {
 export async function analyzeCore(): Promise<void> {
   stage('st_anal', 3)
   S.analyzed = false
+  S.results = null; S.design = null; S.connections = null; S.opt = null; S.reactions = null; S.ratioView = false
+  notify()
   await autoSave('model') // doc/new 직후 무제 문서는 해석이 거부되고 확인 창이 뜬다 → 먼저 저장
   const res = await mapi<{ message?: string }>('POST', '/doc/anal', {})
   if (NOT_ALLOWED.test(String(res?.message ?? ''))) throw new Error(String(res?.message))

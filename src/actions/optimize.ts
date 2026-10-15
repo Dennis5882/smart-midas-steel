@@ -9,7 +9,7 @@ import { proposeSections, roleTons, steelWeight, type OptControl, type OptIter, 
 import { sectionProps } from '../domain/sections'
 import { ROLES } from '../domain/types'
 import { t } from '../i18n'
-import { S } from '../state/store'
+import { S, notify } from '../state/store'
 import { addMsg, draw3D, log, tab } from '../state/ui'
 import { analyzeCore } from './analysis'
 import { sendModel } from './build'
@@ -24,6 +24,8 @@ export async function runOptimize(): Promise<void> {
   if (!S.built) { addMsg('bot', t('no_model')); return }
   if (!S.analyzed) { addMsg('bot', t('need_anal')); return }
   if (!beginJob('opt')) return
+  S.results = null; S.design = null; S.connections = null; S.opt = null; S.ratioView = false
+  notify()
   addMsg('bot', t(S.built.spec.code === 'CN' ? 'opt_start_CN' : 'opt_start', MAX_ITER))
   tab('logP')
   const start = S.built.spec
@@ -78,8 +80,9 @@ export async function runOptimize(): Promise<void> {
       d = runDesign(S.built!.spec, S.built!.model, S.built!.info, S.results)
     }
     const b = S.built!
+    const connections = runConnections(b.spec, b.model, b.info, S.results!)
     S.design = d!
-    S.connections = runConnections(b.spec, b.model, b.info, S.results!)
+    S.connections = connections
     const wB = steelWeight(start, b.model, start.sections), wA = steelWeight(b.spec, b.model)
     const tB = roleTons(start, b.model, start.sections), tA = roleTons(b.spec, b.model)
     S.opt = {

@@ -4,6 +4,7 @@
 import { t, type I18nKey } from '../i18n'
 import { S, notify, type Job, type JobKind } from '../state/store'
 import { addMsg } from '../state/ui'
+import { ResultValidationError } from '../domain/resultValidation'
 
 export class Cancelled extends Error {
   constructor() { super('cancelled') }
@@ -60,5 +61,6 @@ export function cancelJob(): void {
 /** 실패 메시지 — 취소면 취소 문구(모델이 중간 상태면 다시 생성 안내), 아니면 원래 실패 문구 */
 export function failMsg(e: unknown, failKey: (m: string) => string): string {
   if (e instanceof Cancelled) return S.built ? t('job_cancelled') : t('job_cancelled_model')
+  if (e instanceof ResultValidationError) return failKey(t('results_invalid', e.message))
   return failKey(e instanceof Error ? e.message : String(e))
 }

@@ -17,6 +17,7 @@ import type { LoadInfo } from './loads'
 import { portalGeometry } from './portal'
 import { cfCapacity, cfCheck } from '../codes/twColdFormed'
 import { ccLoads } from './secondary'
+import { validateDesignResults } from './resultValidation'
 import { sectionProps } from './sections'
 import type { ElementRole, FactoryModel, FactorySpec } from './types'
 
@@ -83,6 +84,7 @@ export function purlinDefl(spec: FactorySpec, info: LoadInfo, section: string): 
 /** roles 를 주면 그 역할 부재만 검토하고 사용성은 생략 (단면 최적화 후보 평가용) */
 export function runDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo, res: Results, roles?: readonly ElementRole[]): DesignResult {
   if (spec.code === 'CN') return runCnDesign(spec, model, info, res, roles)
+  validateDesignResults(spec, model, info, res, roles)
   const prof = profileOf(spec.code)
   const mat = prof.materials[spec.material]
   const G = portalGeometry(spec)

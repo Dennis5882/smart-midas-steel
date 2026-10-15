@@ -58,7 +58,7 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   const sum = summarizeStatus(design, connections, scope)
   const cnt = (c: Record<string, number>) => GRADES.filter((g) => c[g] > 0).map((g) => `${esc(t(`gr_${g}`))} ${c[g]}`).join(' · ') || '—'
   const used = GRADES.filter((g) => sum.members[g] + sum.conns[g] > 0 || (g === 'fail' && sum.service.ng) || (g === 'expert' && sum.scopeWarn))
-  parts.push(`<div class="status"><b>${L('res_status')}</b> ${grade({ grade: sum.overall, reasons: [] })}
+  parts.push(`<div class="status"><b>${L('res_status')}</b> ${design ? grade({ grade: sum.overall, reasons: [] }) : L('check_unavailable')}
     ${design ? `<br>${L('st_members')} (${design.members.length}): ${cnt(sum.members)} · ${L('st_service')}: ${sum.service.ng ? `NG ${sum.service.ng}` : 'OK'}` : ''}
     ${connections?.length ? `<br>${L('st_conns')} (${connections.length}): ${cnt(sum.conns)}` : ''}
     ${scope.issues.map((i) => `<br><span class="gr gr-expert">${L('sec_scope')}</span> ${esc(scopeMsg(i))}`).join('')}

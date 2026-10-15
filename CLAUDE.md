@@ -84,6 +84,14 @@ Vite 8 + TypeScript + React 19 + Tailwind v4 + shadcn/ui(new-york) + **Vercel Fu
 - 대만 샘플(라이브 결과): 부재 42.58 t + 판재 3.50 t = 순 46.08 t, 발주 48.56 t, 도장 1527 m², 볼트 M24 앵커 112·M27 112·M20 120.
 
 ## 작업 진행·취소·중복 실행·전송 확인 (2026-10-15, 평가 보고서 D단계, 라이브 검증)
+
+### 결과·백업·하중 무결성 보완 (v0.11.2)
+
+- `domain/resultValidation.ts`: TW/CN의 부재·모든 조합·5개 검토 위치·가새·층 안정 입력·사용성 변위 및 유한 수치 검증. 누락은 `ResultValidationError`로 검토 중단. 원시 표는 위치 라벨(I/J 포함)로 정렬하고 중복을 거부한다. 후보 단면 검토는 해당 역할의 부재력을 검증한다.
+- `save.ts`: HTTP 성공과 정확한 `MIDAS GEN NX command complete` 응답을 확인해야 다음 단계로 진행한다. 저장 실패·알 수 없는 응답은 중단하며 취소는 그대로 전달한다. 백업 실패 시 `doc/new`를 호출하지 않는다.
+- 전송 후 11개 DB(MATL/SECT/NODE/ELEM/FRLS/CONS/STLD/LCOM-GEN/BODF/BMLD/CNLD)의 개수·대상 ID를 확인한다. 하중은 보낸 필드를 수치 허용오차 1e-9로 비교한다. ITEMS는 ID로 대응하며 Gen이 추가한 기본 필드·배열 순서 변경은 허용한다. 응답 형식을 확인할 수 없으면 실패한다.
+- 재해석·재검토·최적화 시작 시 이전 설계·접합·최적화 결과를 비운다. 검토 결과가 없는 계산서는 통과 등급을 표시하지 않는다.
+- 오프라인: `node --import tsx scripts/verify-results.ts`(TW/CN 누락·오염·순서·중복 및 이전 결과 제거), `scripts/verify-job.ts`(백업 실패와 하중 변조 포함). 기존 `verify-tw.ts`, `verify-cn.ts`와 함께 실행한다.
 - `src/actions/job.ts`: `beginJob`(busy 동기 검사 — 연속 클릭도 거부)/`endJob`, `stage(키, 예상 호출 수)`, 최적화 `setIter`. `mapi()` 가 호출 직전 `jobCall` → step++·detail, 취소 플래그면 **보내기 전에** `Cancelled`. Gen 이 처리 중인 호출(해석)은 중단 API 가 없어 끝까지 기다린다. 메시지 `failMsg` — 모델이 중간 상태면 다시 생성 안내.
 - 화면 `JobBar`(입력창 위): 단계·n/N 막대(호출 수 모르면 불확정 막대)·경과 초·현재 호출·[취소]. 작업 중 결과 탭 출력 버튼·MAPI 드로어 입력 잠금, 채팅 명령 중 Gen·결과 사용 명령 거부(`BUSY_BLOCKED`), 새로고침 경고.
 - `sendModel`: `doc/new` 직후 이전 결과(`S.built` 등) 비움 — 중간 실패·취소 때 이전 모델로 해석·검토하지 않게. 전송 뒤 `MATL·SECT·NODE·ELEM·FRLS·CONS·STLD·LCOM-GEN` GET 개수 = 보낸 개수 확인(다르면 실패, 응답 형식이 다르면 경고만). 라이브: 8개 일치, 생성 6.9 s.

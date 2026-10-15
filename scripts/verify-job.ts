@@ -8,6 +8,7 @@ let calls: string[] = []
 let dropNode = false
 let onCall: ((n: number, path: string) => void) | null = null
 let analDelay = 0
+let fault = ''
 
 const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200, headers: { 'content-type': 'application/json' } })
 ;(globalThis as any).fetch = async (url: string, init?: RequestInit) => {
@@ -16,6 +17,12 @@ const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200, head
   calls.push(`${method} ${path}`)
   onCall?.(calls.length, path)
   const body = init?.body ? JSON.parse(String(init.body)) : {}
+  if (path === '/doc/saveas') {
+    if (fault === 'save-http') return new Response(JSON.stringify({ error: { message: 'save failed' } }), { status: 400 })
+    if (fault === 'save-message') return json({ message: 'Save not allowed' })
+    if (fault === 'save-unknown') return json({})
+    return json({ message: 'MIDAS GEN NX command complete' })
+  }
   if (path === '/doc/new') { db = {}; return json({}) }
   if (path === '/doc/anal') { if (analDelay) await new Promise((r) => setTimeout(r, analDelay)); return json({ message: 'ok' }) }
   if (path.startsWith('/doc/') || path.startsWith('/post/')) return json({})
@@ -26,12 +33,25 @@ const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200, head
     db[name] = { ...db[name], ...a }
     return json({ [name]: a })
   }
-  if (method === 'GET') return json({ [name]: db[name] ?? {} })
+  if (method === 'GET') {
+    if (fault === 'unknown-get') return json({})
+    const data = structuredClone(db[name] ?? {})
+    const first = Object.keys(data)[0], rec = data[first] as any
+    if (fault === 'target-id' && name === 'NODE') { data[999999] = data[first]; delete data[first] }
+    if (fault === 'body-force' && name === 'BODF') rec.FV[2] = 0
+    if (fault === 'beam-value' && name === 'BMLD') rec.ITEMS[0].P[0] += 10
+    if (fault === 'beam-item' && name === 'BMLD') rec.ITEMS.pop()
+    if (fault === 'node-direction' && name === 'CNLD') rec.ITEMS[0].FX += 1
+    if (fault === 'node-case' && name === 'CNLD') rec.ITEMS[0].LCNAME = 'wrong-case'
+    if (fault === 'duplicate-load' && name === 'BMLD') rec.ITEMS[1].ID = rec.ITEMS[0].ID
+    if (fault === 'defaults-reorder' && name === 'BMLD') for (const r of Object.values(data) as any[]) { r.ITEMS.reverse(); for (const item of r.ITEMS) item.USE_ADDITIONAL = false }
+    return json({ [name]: data })
+  }
   return json({})
 }
 
 const { S } = await import('../src/state/store')
-const { DEFAULT_SPEC } = await import('../src/domain/types')
+const { DEFAULT_SPEC, CN_DEFAULT_SPEC } = await import('../src/domain/types')
 const { buildFactory } = await import('../src/actions/build')
 const { runAnalysis } = await import('../src/actions/analysis')
 const { cancelJob } = await import('../src/actions/job')
@@ -42,15 +62,41 @@ S.code = 'TW'
 let fails = 0
 const ok = (cond: boolean, msg: string) => { console.log(`${cond ? 'OK ' : 'NG '} ${msg}`); if (!cond) fails++ }
 const lastBot = () => { const m = [...S.msgs].reverse().find((x) => x.role === 'bot' && x.kind === 'html'); return m && 'html' in m ? m.html : '' }
-const reset = () => { calls = []; dropNode = false; onCall = null; analDelay = 0 }
+const reset = () => { calls = []; dropNode = false; onCall = null; analDelay = 0; fault = '' }
 const spec = () => structuredClone(DEFAULT_SPEC)
 
 /* 1. 정상 전송 — 개수 확인 통과, 작업 정리 */
 reset()
 await buildFactory(spec())
 ok(!!S.built && S.job === null && !S.busy, `build ok (${calls.length} calls, built ${!!S.built}, job ${S.job})`)
-ok(calls.filter((c) => c.startsWith('GET')).length === 8, 'count check: 8 GETs after PUTs')
-ok(S.log.some((l) => l.html === t('log_verify_ok', 8)), 'log: counts verified')
+ok(calls.filter((c) => c.startsWith('GET')).length === 11, 'verification: 11 GETs including load tables')
+ok(S.log.some((l) => l.html === t('log_verify_ok', 11)), 'log: data verified')
+
+/* Backup failure must preserve the existing app/Gen model and prevent doc/new. */
+for (const f of ['save-http', 'save-message', 'save-unknown']) {
+  const before = S.built
+  reset(); fault = f
+  await buildFactory(spec())
+  ok(S.built === before && !calls.includes('POST /doc/new') && !calls.some((c) => c.startsWith('PUT')), `${f}: model replacement prevented`)
+  ok(!S.busy && S.job === null, `${f}: job cleaned up`)
+}
+reset(); await buildFactory(spec()); reset(); fault = 'save-message'
+await runAnalysis()
+ok(!calls.includes('POST /doc/anal') && !S.analyzed && !S.design && !S.connections, 'failed model save blocks analysis and removes stale design')
+
+/* Same record count must not hide changed IDs, missing load items or values. */
+for (const f of ['unknown-get', 'target-id', 'body-force', 'beam-value', 'beam-item', 'node-direction', 'node-case', 'duplicate-load']) {
+  reset(); fault = f
+  await buildFactory(spec())
+  ok(S.built === null && !S.analyzed && !S.design && !S.connections, `${f}: unverified model rejected`)
+}
+reset(); fault = 'defaults-reorder'
+await buildFactory(spec())
+ok(!!S.built, 'Gen default fields and reordered load items accepted by item ID')
+reset(); await buildFactory(structuredClone(CN_DEFAULT_SPEC))
+ok(S.built?.spec.code === 'CN' && !calls.includes('PUT /db/DSTL'), 'CN: strict model/load verification succeeds without legacy DSTL')
+reset(); fault = 'beam-value'; await buildFactory(structuredClone(CN_DEFAULT_SPEC))
+ok(S.built === null, 'CN: changed load value rejected')
 
 /* 2. Gen 이 절점 하나를 버림 → 실패, 이전 모델 정보 비움 */
 reset(); dropNode = true

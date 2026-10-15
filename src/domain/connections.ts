@@ -12,6 +12,8 @@
 import { anchorRod, concreteBearing, ellipse, f10t, filletPerMm, pickPlate } from '../codes/twConnection'
 import { profileOf } from '../codes'
 import { runCnConnections } from './cnConnections'
+import { validateDesignResults } from './resultValidation'
+import { ROLES } from './types'
 import type { Results } from '../actions/results'
 import type { LoadInfo } from './loads'
 import { portalGeometry } from './portal'
@@ -211,6 +213,7 @@ function endPlateFor(spec: FactorySpec, forces: EndForce[], boltD: number, beamN
 }
 
 export function runConnections(spec: FactorySpec, model: FactoryModel, info: LoadInfo, res: Results): ConnResult[] {
+  validateDesignResults(spec, model, info, res, ROLES)
   if (spec.code === 'CN') return runCnConnections(spec, model, res)
   const kind = (c: string) => info.comboKind?.[c] ?? 'basic'
   const basic = (c: string) => kind(c) === 'basic'

@@ -4,6 +4,8 @@
    파일명에 시각을 넣어 덮어쓰기 확인 창도 피한다. */
 import { mapi } from '../mapi/client'
 import { S } from '../state/store'
+import { t } from '../i18n'
+import { Cancelled } from './job'
 
 /** YYYYMMDD_hhmmss (브라우저 현지 시각) */
 function stamp(): string {
@@ -19,5 +21,12 @@ export function autoSavePath(tag: string): string {
 
 export async function autoSave(tag: 'backup' | 'model'): Promise<void> {
   const path = autoSavePath(tag)
-  try { await mapi('POST', '/doc/saveas', { Argument: path }, path) } catch { /* 저장 실패해도 다음 단계는 시도 */ }
+  try {
+    const res = await mapi<{ message?: string }>('POST', '/doc/saveas', { Argument: path }, path)
+    // HTTP 200 alone is insufficient: Gen also returns command refusals as messages.
+    if (res?.message !== 'MIDAS GEN NX command complete') throw new Error(String(res?.message ?? 'Unrecognized save response'))
+  } catch (e) {
+    if (e instanceof Cancelled) throw e
+    throw new Error(t('save_failed', path, e instanceof Error ? e.message : String(e)))
+  }
 }

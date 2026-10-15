@@ -3,10 +3,10 @@
    - TRUSSFORCE: 가새 축력
    - REACTIONG 합계 + DISPLACEMENTG 처마 절점: 조합별 B2 (8.2-5) 산정
    - DISPLACEMENTG 사용 하중(ST): 풍·지진 층간변위각, 지붕 활하중 처짐 */
-import { portalGeometry } from '../domain/portal'
 import type { Built } from '../state/store'
 import { mapi } from '../mapi/client'
 import { stage } from './job'
+import { requireResult, resultNumber, serviceNodes, validateDesignResults } from '../domain/resultValidation'
 
 export interface ForcePt { P: number; Vy: number; Vz: number; My: number; Mz: number }
 export interface Results {
@@ -21,7 +21,7 @@ export interface Results {
   combos: string[]
 }
 
-const num = (s: string) => +s
+const num = (s: unknown) => resultNumber(s, 'TABLE: blank or invalid numeric cell')
 
 async function table(type: string, name: string, keys: number[], loads: string[], extra: Record<string, unknown> = {}, components?: string[]) {
   const j = await mapi<any>('POST', '/post/TABLE', {
@@ -31,12 +31,15 @@ async function table(type: string, name: string, keys: number[], loads: string[]
       NODE_ELEMS: { KEYS: keys }, LOAD_CASE_NAMES: loads, ...extra,
     },
   }, `${type} · ${keys.length} × ${loads.length}`)
-  return j?.[name] as { HEAD: string[]; DATA: string[][]; SUB_TABLES?: any[] } | undefined
+  const out = j?.[name]
+  requireResult(out && typeof out === 'object' && (Array.isArray(out.DATA) || Array.isArray(out.SUB_TABLES)), `${type}: ${name}, invalid table response`)
+  return out as { HEAD: string[]; DATA: string[][]; SUB_TABLES?: any[] }
 }
 
 export async function fetchResults(b: Built): Promise<Results> {
   const { model, spec } = b
   const combos = b.comboNames
+  requireResult(combos.length > 0 && new Set(combos).size === combos.length, 'COMBINATIONS: empty or duplicated')
   const cb = combos.map((c) => `${c}(CB)`)
   const beamIds = model.elements.filter((e) => e.role !== 'brace').map((e) => e.id)
   const trussIds = model.elements.filter((e) => e.role === 'brace').map((e) => e.id)
@@ -49,16 +52,19 @@ export async function fetchResults(b: Built): Promise<Results> {
   for (let offset = 0; offset < cb.length; offset += batchSize) {
     const bf = await table('BEAMFORCE', spec.code === 'CN' ? `F${offset}` : 'F', beamIds, cb.slice(offset, offset + batchSize), { PARTS: ['PartI', 'Part1/4', 'Part2/4', 'Part3/4', 'PartJ'] },
       ['Elem', 'Load', 'Part', 'Axial', 'Shear-y', 'Shear-z', 'Moment-y', 'Moment-z'])
-    if (spec.code === 'CN' && !bf?.DATA?.length) throw new Error('GB: beam-force table is empty')
-    beamRows.push(...bf?.DATA ?? [])
+    requireResult(Array.isArray(bf.DATA) && bf.DATA.length > 0, 'BEAMFORCE: empty force table')
+    beamRows.push(...bf.DATA)
   }
   for (const r of beamRows) {
-    const [, el, lc, , P, Vy, Vz, My, Mz] = r
-    const m = beam.get(+el) ?? new Map<string, ForcePt[]>()
-    beam.set(+el, m)
+    const [, el, lc, part, P, Vy, Vz, My, Mz] = r
+    const id = num(el), station = ['I', '1/4', '2/4', '3/4', 'J'].indexOf(String(part).trim().replace(/\[\d+\]$/, ''))
+    requireResult(beamIds.includes(id) && combos.includes(lc) && station >= 0, `BEAMFORCE: unexpected element/load/station ${el}, ${lc}, ${part}`)
+    const m = beam.get(id) ?? new Map<string, ForcePt[]>()
+    beam.set(id, m)
     const arr = m.get(lc) ?? []
     m.set(lc, arr)
-    arr.push({ P: num(P), Vy: num(Vy), Vz: num(Vz), My: num(My), Mz: num(Mz) })
+    requireResult(!arr[station], `BEAMFORCE: duplicate station ${el}, ${lc}, ${part}`)
+    arr[station] = { P: num(P), Vy: num(Vy), Vz: num(Vz), My: num(My), Mz: num(Mz) }
   }
 
   /* 가새 축력 — 인장 +, I·J 중 절댓값 큰 쪽 */
@@ -67,28 +73,38 @@ export async function fetchResults(b: Built): Promise<Results> {
     const tf = await table('TRUSSFORCE', 'T', trussIds, cb)
     for (const [, el, lc, fi, fj] of tf?.DATA ?? []) {
       const m = truss.get(+el) ?? new Map<string, number>()
+      requireResult(trussIds.includes(+el) && combos.includes(lc) && !m.has(lc), `TRUSSFORCE: unexpected/duplicate element/load ${el}, ${lc}`)
       truss.set(+el, m)
       m.set(lc, Math.abs(num(fi)) > Math.abs(num(fj)) ? num(fi) : num(fj))
     }
   }
 
   /* B2 입력 — 조합별 반력 합(ΣPu = ΣFZ, ΣH = |ΣFX|·|ΣFY|), 처마 절점(기둥 상단) 평균 변위 */
-  const G = portalGeometry(spec)
-  const eaveNodes = model.nodes.filter((n) => Math.abs(n.z - spec.eaveHeight) < 1e-9 && (n.x === 0 || n.x === spec.span))
+  const { eaves: eaveNodes, nodes: svcNodes } = serviceNodes(spec, model)
   const base = model.nodes.find((n) => n.z === 0)!
   const rx = await table('REACTIONG', 'R', [base.id], cb, {}, ['Node', 'Load', 'FX', 'FY', 'FZ'])
   const sums = new Map<string, number[]>()
-  for (const [lc, fx, fy, fz] of (rx?.SUB_TABLES?.[0]?.['SUMMATION OF REACTION FORCES PRINTOUT']?.DATA ?? []) as string[][]) sums.set(lc, [num(fx), num(fy), num(fz)])
+  const reactionRows = rx.SUB_TABLES?.[0]?.['SUMMATION OF REACTION FORCES PRINTOUT']?.DATA
+  requireResult(Array.isArray(reactionRows), 'REACTIONG: missing reaction sums')
+  for (const [lc, fx, fy, fz] of reactionRows as string[][]) {
+    requireResult(combos.includes(lc) && !sums.has(lc), `REACTIONG: unexpected/duplicate load ${lc}`)
+    sums.set(lc, [num(fx), num(fy), num(fz)])
+  }
   const ux = await table('DISPLACEMENTG', 'U', eaveNodes.map((n) => n.id), cb, {}, ['Node', 'Load', 'DX', 'DY', 'DZ'])
   const dsum = new Map<string, number[]>()
-  for (const [, , lc, dx, dy] of ux?.DATA ?? []) {
+  const seenU = new Set<string>()
+  for (const [, nd, lc, dx, dy, dz] of ux.DATA ?? []) {
+    const key = `${lc}:${nd}`
+    requireResult(eaveNodes.some((n) => n.id === +nd) && combos.includes(lc) && !seenU.has(key), `DISPLACEMENTG: unexpected/duplicate node/load ${nd}, ${lc}`)
+    seenU.add(key); num(dz)
     const a = dsum.get(lc) ?? [0, 0, 0]
     a[0] += num(dx); a[1] += num(dy); a[2]++
     dsum.set(lc, a)
   }
   const sway = new Map<string, Record<'X' | 'Y', { sumPu: number; drift: number; sumH: number }>>()
   for (const c of combos) {
-    const s = sums.get(c) ?? [0, 0, 0], d = dsum.get(c) ?? [0, 0, 1]
+    const s = sums.get(c), d = dsum.get(c)
+    requireResult(s && d && d[2] === eaveNodes.length && eaveNodes.every((n) => seenU.has(`${c}:${n.id}`)), `SWAY: missing reactions/displacements for ${c}`)
     sway.set(c, {
       X: { sumPu: Math.abs(s[2]), drift: Math.abs(d[0] / d[2]), sumH: Math.abs(s[0]) },
       Y: { sumPu: Math.abs(s[2]), drift: Math.abs(d[1] / d[2]), sumH: Math.abs(s[1]) },
@@ -96,15 +112,17 @@ export async function fetchResults(b: Built): Promise<Results> {
   }
 
   /* 사용성 — 처마·마루 절점 변위 (사용 하중 케이스) */
-  const ridge = model.nodes.filter((n) => Math.abs(n.z - G.ridgeZ) < 1e-9 && Math.abs(n.x - spec.span / 2) < 1e-9)
-  const svcNodes = [...eaveNodes, ...ridge]
   const svcCases = b.cases.filter((c) => spec.code === 'CN' || c !== 'D')
   const us = await table('DISPLACEMENTG', 'S', svcNodes.map((n) => n.id), svcCases.map((c) => `${c}(ST)`), {}, ['Node', 'Load', 'DX', 'DY', 'DZ'])
   const disp = new Map<string, Map<number, { dx: number; dy: number; dz: number }>>()
   for (const [, nd, lc, dx, dy, dz] of us?.DATA ?? []) {
     const m = disp.get(lc) ?? new Map()
+    requireResult(svcCases.includes(lc) && svcNodes.some((n) => n.id === +nd) && !m.has(+nd), `DISPLACEMENTG: unexpected/duplicate service node/load ${nd}, ${lc}`)
     disp.set(lc, m)
     m.set(+nd, { dx: num(dx), dy: num(dy), dz: num(dz) })
   }
-  return { beam, truss, sway, disp, combos }
+  for (const c of svcCases) for (const n of svcNodes) requireResult(disp.get(c)?.has(n.id), `DISPLACEMENTG: missing service node/load ${n.id}, ${c}`)
+  const results = { beam, truss, sway, disp, combos }
+  validateDesignResults(spec, model, b.info, results)
+  return results
 }
