@@ -39,7 +39,8 @@ export interface Capacity {
   phiMny: number
   phiVn: number
   /** 지배 휨 한계상태 */
-  mxMode: 'Mp' | 'LTB-inelastic' | 'LTB-elastic' | 'FLB' | 'WLB' | 'elastic'
+  /** CF·CF-LTB = 냉간성형 단면 강도·횡비틀림 (twColdFormed) */
+  mxMode: 'Mp' | 'LTB-inelastic' | 'LTB-elastic' | 'FLB' | 'WLB' | 'elastic' | 'CF' | 'CF-LTB'
   lambdaC: number
   KLr: number
   compact: 'compact' | 'noncompact' | 'slender'

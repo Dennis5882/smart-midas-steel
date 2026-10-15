@@ -64,19 +64,27 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   parts.push(`<h3>${L('rep_seismic')}</h3>`)
   const si = spec.seismic
   parts.push(table(['', 'X', 'Y'], [
-    ['SDS / SD1 / I', `${si.SDS} / ${si.SD1} / ${si.I}`, ''],
+    ['site', `${esc(si.county ?? '')} ${esc(si.town ?? '')} · soil ${si.soil ?? '-'}`, ''],
+    ['SDS / SD1 / SMS / SM1 / I', `${si.SDS} / ${si.SD1} / ${si.SMS ?? '-'} / ${si.SM1 ?? '-'} / ${si.I}`, ''],
     ['R', si.Rx, si.Ry],
     ['T (s)', f(info.seismic.X.T, 3), f(info.seismic.Y.T, 3)],
     ['V/W', f(info.seismic.X.c, 4), f(info.seismic.Y.c, 4)],
     ['V*/W (I=1)', f(info.seismic.X.cStar, 4), f(info.seismic.Y.cStar, 4)],
     ['W (kN)', f(info.seismic.W, 1), f(info.seismic.W, 1)],
     ['V (kN)', f(info.seismic.X.V, 1), f(info.seismic.Y.V, 1)],
+    ...(info.seismic.X.cM !== undefined ? [
+      ['V/W · V*/W · V_M/W', `${f(info.seismic.X.cV, 4)} · ${f(info.seismic.X.cMin, 4)} · ${f(info.seismic.X.cM, 4)}`, `${f(info.seismic.Y.cV, 4)} · ${f(info.seismic.Y.cMin, 4)} · ${f(info.seismic.Y.cM, 4)}`],
+      ['gov.', info.seismic.X.gov, info.seismic.Y.gov],
+      ['M_t = 0.05·B·V (kN·m, 2.14)', f(info.seismic.X.Mt, 1), f(info.seismic.Y.Mt, 1)],
+    ] : []),
   ]))
   parts.push(`<p class="note">${esc(t('rep_seismic_txt'))}</p>`)
   parts.push(`<h3>${L('rep_wind')}</h3>`)
   const wi = spec.wind
   parts.push(`<p>V10 = ${wi.V10} m/s, I = ${wi.I}, ${L('f_exposure')} ${wi.exposure}, ${L(wi.enclosure === 'enclosed' ? 'encl_enclosed' : 'encl_partial')}, h = ${f(info.wind.hRef, 2)} m, q(h) = ${f(info.wind.qh, 3)} kN/m², G = ${prof.lateral.gust}</p>`)
   parts.push(table([t('res_lc'), 'X / Y', t('kv_cpRoof'), 'GCpi'], info.wind.cases.map((c) => [c.name, c.dir, f(c.roofCp, 3), f(c.gcpi, 3)])))
+  const ac = info.wind.across
+  if (ac) parts.push(`<p><b>${L('kv_across')}</b>: W<sub>D,X</sub> = ${f(ac.WDx, 1)} kN, W<sub>D,Y</sub> = ${f(ac.WDy, 1)} kN; W<sub>L</sub> = 0.87(L/B)W<sub>D</sub> → W<sub>L,X</sub> = ${f(ac.WLX, 1)} kN, W<sub>L,Y</sub> = ${f(ac.WLY, 1)} kN; M<sub>T</sub> = 0.28·max(B·W<sub>D</sub>) = ${f(ac.MT, 1)} kN·m; W = ${f(ac.kD, 3)}·W<sub>D</sub> + 0.7(W<sub>L</sub> ± W<sub>T</sub>) (2.12)</p>`)
   parts.push(`<p class="note">${esc(t('rep_wind_txt'))}</p>`)
 
   /* 4. 하중조합 */
@@ -106,6 +114,22 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
     parts.push(table([t('rd_elem'), t('rd_role'), t('rd_section'), t('rd_combo'), t('rd_eq'), t('rd_mode'), t('rd_ratio')],
       top.map((m) => [m.id, L(`role_${m.role}`), esc(m.section), esc(m.combo), m.eq, esc(m.cap.mxMode), ok(m.ratio)])))
 
+    if (design.cc?.length) {
+      parts.push(`<h3>${L('res_cc')}</h3>`)
+      parts.push(table([t('rd_role'), t('cc_zone'), t('cc_area'), 'p+ (kN/m²)', 'p− (kN/m²)', 'n'],
+        design.cc.map((c) => [L(`role_${c.role}`), c.zone, f(c.A, 1), f(c.pPos, 3), f(c.pNeg, 3), c.count])))
+      parts.push(`<p class="note">${esc(t('cc_note'))}</p>`)
+    }
+    if (design.col13 !== undefined) {
+      parts.push(`<h3>${L('res_seis13')}</h3>`)
+      const c = design.col13, om = info.omega
+      parts.push(table([t('sv_item'), t('sv_value')], [
+        [L('s13_omega'), `Ω<sub>X</sub> = ${f(om.X, 3)}, Ω<sub>Y</sub> = ${f(om.Y, 3)} (Fu<sub>X</sub> = ${f(info.seismic.X.Fu, 3)}, Fu<sub>Y</sub> = ${f(info.seismic.Y.Fu, 3)})`],
+        ...(c ? [[L('s13_col'), c.exempt ? esc(t('s13_exempt', f(c.puRatio, 3))) : `${f(c.P, 1)} / ${f(c.phiPn, 1)} kN = ${ok(c.ratio)} (${esc(c.combo)}, elem ${c.elem})`]] : []),
+        [L('s13_brace'), '✓'], [L('s13_base'), '✓'], [L('s13_knee'), '✓'],
+      ]))
+    }
+
     /* 7. 사용성 */
     h2('rep_s7')
     parts.push(table([t('sv_item'), t('sv_value'), t('sv_limit'), t('rd_ratio'), t('sv_clause'), t('res_lc')], design.service.map((s) => [
@@ -118,6 +142,7 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   for (const c of connections ?? []) {
     parts.push(`<h3>${L(`cn_type_${c.type}`)} — ${ok(c.ratio)} <span class="note">(${esc(c.combo)}, elem ${c.elem})</span></h3>`)
     parts.push(`<p>${Object.entries(c.dims).map(([k, v]) => `${esc(k)}: ${esc(v)}`).join(' · ')}</p>`)
+    if (c.notes.includes('rotTest')) parts.push(`<p class="note">${L('cn_note_rot')}</p>`)
     parts.push(table([t('sv_item'), t('cn_demand'), t('cn_capacity'), t('rd_ratio'), t('sv_clause')],
       c.checks.map((k) => [L(`cn_${k.item}` as I18nKey), `${f(k.demand)} ${k.unit}`, `${f(k.capacity)} ${k.unit}`,
         c.dims.stiffener && k.item === 'flangeBend' ? `${f(k.ratio, 3)} → ${L('cn_stiffener')}` : ok(k.ratio), esc(k.clause)])))

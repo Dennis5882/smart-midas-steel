@@ -18,6 +18,15 @@ export const TW: CodeProfile = {
     SM490A: { fy: 325, fu: 490, E: 200000, nu: 0.3, gamma: 77, gen: { standard: 'CNS(S)', db: 'SM490' } },
   },
   defaultMaterial: 'SN400B',
+  /* ⚠ 두께별 Fy — CNS 13812(SN)·2947(SM) = JIS G3136·G3106 통상값 (KB 에 표 없음, 원문 대조 전): SN 은 40 mm 초과 −20 MPa(400)·−30 MPa(490),
+     SM490A 는 16 / 40 mm 경계 */
+  fyAt: (m, t) => {
+    const T: Record<string, [number, number][]> = {
+      SN400B: [[40, 235], [100, 215]], SN490B: [[40, 325], [100, 295]], SM490A: [[16, 325], [40, 315], [100, 295]],
+    }
+    const row = T[m]?.find(([tm]) => t <= tm)
+    return row ? row[1] : T[m]?.at(-1)?.[1] ?? 235
+  },
   gen: {
     sectionDb: 'CNS2020',
     designCode: 'TWN-LSD90',
@@ -53,6 +62,16 @@ export const TW: CodeProfile = {
       { ref: '2.2-5', terms: [['D', 0.9], ['E', 1.0]] },
       { ref: '2.2-6', terms: [['D', 0.9], ['W', 1.6]] },
     ]
+  },
+  /* LRFD 13.3 放大設計地震力: E′ = 1.4·Fu·E (Fu ≤ 2.5), (13.3-1) 1.2D + 0.5L ± E′, (13.3-2) 0.9D ± E′ — 직교 방향 동시 고려 불요.
+     사용처: 13.4.1 기둥 축력, 13.4.5 주각·앵커, 13.8.4 저층 가새 구조 부재·접합. 13.6.1-2 접합 전단용 중력 조합 1.2D + 0.5L. */
+  seismicCombos: {
+    omega: (Fu) => 1.4 * Math.min(Fu, 2.5),
+    combos: ({ heavyLive }) => [
+      { ref: '13.3-1', kind: 'amplified', terms: [['D', 1.2], ['L', heavyLive ? 1.0 : 0.5], ['E', 1.0]] },
+      { ref: '13.3-2', kind: 'amplified', terms: [['D', 0.9], ['E', 1.0]] },
+      { ref: '13.6.1', kind: 'gravity', terms: [['D', 1.2], ['L', heavyLive ? 1.0 : 0.5]] },
+    ],
   },
   unverified: true,
 }

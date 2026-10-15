@@ -129,7 +129,8 @@ export function proposeSections(spec: FactorySpec, model: FactoryModel, info: Lo
     const m: FactoryModel = { nodes: model.nodes, elements: model.elements.map((e) => (e.role === r ? { ...e, section: sec } : e)) }
     const d = runDesign({ ...spec, sections }, m, info, res, [r])
     if (sectionProps(sec).kind === 'H' && d.members.some((x) => x.cap.compact === 'slender')) return Infinity
-    return d.maxRatio
+    /* 기둥: 13.4.1 축력(면제 아닐 때) 포함 */
+    return r === 'column' && d.col13 && !d.col13.exempt ? Math.max(d.maxRatio, d.col13.ratio) : d.maxRatio
   }
 
   const sections: Sections = { ...cur }

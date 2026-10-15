@@ -94,6 +94,7 @@ export function ModelPanel() {
         <KV k={t('kv_EY')} v={seis('Y')} hi />
         <KV k={t('kv_qh')} v={`${f3(info.wind.qh)} kN/m² (h = ${info.wind.hRef} m)`} />
         <KV k={t('kv_cpRoof')} v={`${f3(info.wind.windwardRoofCp.high)} / ${f3(info.wind.windwardRoofCp.low)}`} />
+        {info.wind.across && <KV k={t('kv_across')} v={`W_L ${f1(info.wind.across.WLX)} / ${f1(info.wind.across.WLY)} kN · M_T ${f1(info.wind.across.MT)} kN·m`} />}
         <KV k={t('kv_combos')} v={sh.combos} />
       </div>
     </div>
@@ -104,6 +105,20 @@ const ratioColor = (r: number) => (r > 1 ? 'var(--red)' : r > 0.9 ? 'var(--amber
 const PART = ['I', '1/4', '2/4', '3/4', 'J']
 /** 변위각은 1/n, 처짐은 mm */
 const svcVal = (k: string, v: number) => (k.endsWith('Defl') ? `${(v * 1000).toFixed(1)} mm` : `1/${Math.round(1 / Math.max(v, 1e-9))}`)
+
+function Seis13Card({ d }: { d: DesignResult }) {
+  const s = useStore()
+  const om = s.built?.info.omega
+  const c = d.col13
+  return (
+    <div className="scard"><h3>{t('res_seis13')}</h3>
+      {om && <KV k={t('s13_omega')} v={`Ω X ${om.X.toFixed(2)} · Y ${om.Y.toFixed(2)}`} />}
+      {c && <KV k={t('s13_col')} v={c.exempt ? t('s13_exempt', c.puRatio.toFixed(3)) : `${c.ratio.toFixed(3)} (${c.combo})`}
+        style={c.exempt ? { color: 'var(--muted)' } : { color: ratioColor(c.ratio), fontWeight: 700 }} />}
+      <div className="res-stat" style={{ marginTop: 8, marginBottom: 0 }}>· {t('s13_brace')}<br />· {t('s13_base')}<br />· {t('s13_knee')}</div>
+    </div>
+  )
+}
 
 function DesignTables({ d }: { d: DesignResult }) {
   const ngAll = d.members.filter((m) => m.ratio > 1).sort((a, b) => b.ratio - a.ratio)
@@ -143,6 +158,20 @@ function DesignTables({ d }: { d: DesignResult }) {
           </tbody>
         </table>
       </div>
+      {d.col13 !== undefined && <Seis13Card d={d} />}
+      {!!d.cc?.length && (
+        <div className="scard"><h3>{t('res_cc')}</h3>
+          <table>
+            <thead><tr><th>{t('rd_role')}</th><th>{t('cc_zone')}</th><th>{t('cc_area')}</th><th>p+ (kN/m²)</th><th>p− (kN/m²)</th><th>n</th></tr></thead>
+            <tbody>
+              {d.cc.map((c) => (
+                <tr key={`${c.role}${c.zone}`}><td>{t(`role_${c.role}`)}</td><td>{c.zone}</td><td>{c.A.toFixed(1)}</td><td>{c.pPos.toFixed(3)}</td><td>{c.pNeg.toFixed(3)}</td><td>{c.count}</td></tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="res-stat" style={{ marginTop: 10, marginBottom: 0 }}>{t('cc_note')}</div>
+        </div>
+      )}
       {ngAll.length > 0 && (
         <div className="scard"><h3>{t('res_ng')} ({ngAll.length})</h3>
           <table>
@@ -206,7 +235,7 @@ function ConnTables({ cs }: { cs: ConnResult[] }) {
             <span className="v" style={{ color: ratioColor(c.ratio), fontWeight: 700 }}>{c.ratio.toFixed(3)}</span></div>
           <div style={{ fontSize: '.78rem', color: 'var(--muted)', margin: '4px 0 6px' }}>
             {Object.values(c.dims).join(' · ')}
-            {c.notes.map((n) => <span key={n} style={{ color: 'var(--amber)' }}> · {n.startsWith('doubler') ? `${t('cn_note_doubler')} ${n.slice(8)}` : n === 'stiffeners' ? t('cn_note_stiffeners') : n}</span>)}
+            {c.notes.map((n) => <span key={n} style={{ color: 'var(--amber)' }}> · {n.startsWith('doubler') ? `${t('cn_note_doubler')} ${n.slice(8)}` : n === 'stiffeners' ? t('cn_note_stiffeners') : n === 'rotTest' ? t('cn_note_rot') : n}</span>)}
           </div>
           <table>
             <thead><tr><th>{t('sv_item')}</th><th>{t('cn_demand')}</th><th>{t('cn_capacity')}</th><th>{t('rd_ratio')}</th><th>{t('sv_clause')}</th></tr></thead>

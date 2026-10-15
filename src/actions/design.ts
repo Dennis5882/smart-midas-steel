@@ -18,7 +18,7 @@ export async function runDesignCheck(): Promise<void> {
     S.results = await fetchResults(b)
     log(t('log_results'), 'ok')
     S.design = runDesign(b.spec, b.model, b.info, S.results)
-    S.connections = runConnections(b.spec, b.model, S.results)
+    S.connections = runConnections(b.spec, b.model, b.info, S.results)
     const d = S.design
     log(t('log_design', d.members.length, d.ng), d.ng ? 'warn' : 'ok')
     S.ratioView = true

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { buildFactory } from '../actions/build'
 import { profileOf } from '../codes'
+import { counties, siteCoef, townsOf } from '../codes/twSites'
 import type { FactorySpec } from '../domain/types'
 import { t, type I18nKey } from '../i18n'
 import { S, useStore, type ChatMsg } from '../state/store'
@@ -19,6 +20,8 @@ interface Field {
   label: I18nKey
   unit?: string
   kind: 'num' | 'int' | 'text' | 'select'
+  /** select 값을 숫자로 저장 */
+  numeric?: boolean
   /** 허용 최솟값 (기본: 0 초과) */
   min?: number
   options?: (spec: FactorySpec) => { value: string; label: string }[]
@@ -60,8 +63,13 @@ const GROUPS: Group[] = [
     { path: 'anchorFu', label: 'f_anchorFu', unit: 'MPa', kind: 'num' },
   ] },
   { title: 'sec_seismic', fields: [
+    { path: 'seismic.county', label: 'f_county', kind: 'select', options: () => counties().map((c) => ({ value: c, label: c })) },
+    { path: 'seismic.town', label: 'f_town', kind: 'select', options: (sp) => townsOf(sp.seismic.county).map((c) => ({ value: c, label: c })) },
+    { path: 'seismic.soil', label: 'f_soil', kind: 'select', numeric: true, options: () => ([1, 2, 3] as const).map((v) => ({ value: String(v), label: t(`soil_${v}`) })) },
     { path: 'seismic.SDS', label: 'f_SDS', unit: 'g', kind: 'num' },
     { path: 'seismic.SD1', label: 'f_SD1', unit: 'g', kind: 'num' },
+    { path: 'seismic.SMS', label: 'f_SMS', unit: 'g', kind: 'num' },
+    { path: 'seismic.SM1', label: 'f_SM1', unit: 'g', kind: 'num' },
     { path: 'seismic.I', label: 'f_I', kind: 'num' },
     { path: 'seismic.Rx', label: 'f_Rx', kind: 'num' },
     { path: 'seismic.Ry', label: 'f_Ry', kind: 'num' },
@@ -90,7 +98,7 @@ function toSpec(base: FactorySpec, vals: Record<Path, string>): FactorySpec {
     if (f.kind === 'num' || f.kind === 'int') {
       const n = f.kind === 'int' ? Math.round(+raw) : +raw
       if (Number.isFinite(n) && (f.min !== undefined ? n >= f.min : n > 0)) sp = setPath(sp, f.path, n)
-    } else if (raw.trim()) sp = setPath(sp, f.path, raw.trim())
+    } else if (raw.trim()) sp = setPath(sp, f.path, f.numeric ? +raw : raw.trim())
   }
   return sp
 }
@@ -113,7 +121,20 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
     return () => clearTimeout(h)
   }, [spec])
 
-  const set = (p: Path, v: string) => { dirty.current = true; setVals((o) => ({ ...o, [p]: v })) }
+  const set = (p: Path, v: string) => {
+    dirty.current = true
+    setVals((o) => {
+      const n = { ...o, [p]: v }
+      /* 工址 선택 → 표2-1·2-4 로 SDS·SD1·SMS·SM1 채움 (군 변경 시 첫 鄉鎮) */
+      if (p === 'seismic.county' || p === 'seismic.town' || p === 'seismic.soil') {
+        if (p === 'seismic.county') n['seismic.town'] = townsOf(v)[0] ?? ''
+        const c = siteCoef(n['seismic.county'], n['seismic.town'], (+n['seismic.soil'] || 1) as 1 | 2 | 3)
+        if (c) for (const k of ['SDS', 'SD1', 'SMS', 'SM1'] as const) n[`seismic.${k}`] = String(c[k])
+      }
+      return n
+    })
+  }
+  const site = siteCoef(spec.seismic.county, spec.seismic.town, spec.seismic.soil)
 
   return (
     <>
@@ -138,6 +159,11 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
                 </div>
               ))}
             </div>
+            {g.title === 'sec_seismic' && site && (site.fault || site.basin || site.note) && (
+              <div className="pe-tip" style={{ color: site.fault ? 'var(--amber)' : undefined }}>
+                {site.fault ? t('site_fault', site.fault) : site.basin ? t('site_basin') : site.note}
+              </div>
+            )}
           </div>
         ))}
         <div className="pe-tip">{t('plan_tip')}</div>

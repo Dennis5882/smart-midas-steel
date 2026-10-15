@@ -24,8 +24,9 @@ export interface FactorySpec {
   postSpacing: number
   /** 퍼린·거트 새그로드(횡지지) 수 / 베이 — 설계 비지지길이 Lb = 베이 간격 / (n+1) */
   sagRods: number
-  /** 지진 입력 — SDS·SD1: 工址 설계 스펙트럼 계수, I: 용도계수, Rx/Ry: 구조계 R (표1-3) */
-  seismic: { SDS: number; SD1: number; I: number; Rx: number; Ry: number }
+  /** 지진 입력 — county·town·soil 로 표2-1/2-4 조회해 SDS·SD1·SMS·SM1 을 채움(직접 수정 가능). I: 용도계수, Rx/Ry: 구조계 R (표1-3).
+      county '臺北盆地' = 微分區 (地盤 放大 없음, Ra·V* 대북분지 식) */
+  seismic: { county: string; town: string; soil: 1 | 2 | 3; SDS: number; SD1: number; SMS: number; SM1: number; I: number; Rx: number; Ry: number }
   /** 풍 입력 — V10: 기본설계풍속(m/s), I: 풍 용도계수, exposure: 지표조도 A/B/C, enclosure: 封閉/部分封閉 */
   wind: { V10: number; I: number; exposure: 'A' | 'B' | 'C'; enclosure: 'enclosed' | 'partial' }
   /** 지붕 마감 고정하중 — 경사면 면적 기준 (kN/m²) */
@@ -55,9 +56,9 @@ export const DEFAULT_SPEC: FactorySpec = {
   code: 'TW',
   span: 24, bays: 6, baySpacing: 6, eaveHeight: 8, roofSlope: 0.1,
   baseFixity: 'fixed', purlinSpacing: 1.5, girtSpacing: 1.5, postSpacing: 6, sagRods: 2,
-  /* ⚠ 샘플값: SDS·SD1 은 임의(工址 표 조회 필요), Rx 3.2 = 部分韌性抗彎矩構架(鋼, h ≤ 12m, 표1-3), Ry 2.0 = 同心斜撐(h ≤ 12m).
+  /* 샘플 공지: 基隆市 中正區·第一類地盤 (표2-1: 0.60 / 0.35 / 0.80 / 0.50, Fa = Fv = 1). Rx 3.2 = 部分韌性抗彎矩構架(鋼, h ≤ 12m, 표1-3), Ry 2.0 = 同心斜撐(h ≤ 12m).
      V10 42.5 = 臺北市 (風力規範 2.4), 지표조도 B 가정 */
-  seismic: { SDS: 0.6, SD1: 0.35, I: 1.0, Rx: 3.2, Ry: 2.0 },
+  seismic: { county: '基隆市', town: '中正區', soil: 1, SDS: 0.6, SD1: 0.35, SMS: 0.8, SM1: 0.5, I: 1.0, Rx: 3.2, Ry: 2.0 },
   wind: { V10: 42.5, I: 1.0, exposure: 'B', enclosure: 'enclosed' },
   /* ⚠ 마감 하중은 가정값(금속 지붕 패널+단열 / 벽 패널) — 사용자 입력으로 대체 */
   roofDead: 0.15,
@@ -67,8 +68,9 @@ export const DEFAULT_SPEC: FactorySpec = {
   anchorFu: 400,
   /* Gen NX CNS2020.sdb 단면명 (RH = 압연 H, CC = 립 C형강 '치수/두께').
      샘플 단면은 라이브 설계 검토로 조정(2026-10-15): 핀 주각 RH500/RH450 은 풍 변위각 0.0109(> 0.005)·지붕보 처짐 L/235 로 NG.
-     스트럿은 KL/r ≤ 200 (ry ≥ 30mm) 위해 RH150x150. */
-  sections: { column: 'RH 600x200x11x17', rafter: 'RH 600x200x11x17', purlin: 'CC 200x75x20/4.0', girt: 'CC 150x65x20/3.2', strut: 'RH 150x150x7x10',
-    post: 'RH 250x125x6x9', brace: 'P 139.8x4.5' },
+     스트럿은 KL/r ≤ 200 (ry ≥ 30mm) 위해 RH150x150.
+     2026-10-15 국부 풍압(3장)·횡풍향/비틀림(2.10~2.12) 추가 후 라이브: 거트 CC150x65 1.23(모서리 부압)·풍주 RH250 1.17 NG → 거트 CC200x75x20/3.2, 풍주 RH298x149. */
+  sections: { column: 'RH 600x200x11x17', rafter: 'RH 600x200x11x17', purlin: 'CC 200x75x20/4.0', girt: 'CC 200x75x20/3.2', strut: 'RH 150x150x7x10',
+    post: 'RH 298x149x5.5x8', brace: 'P 139.8x4.5' },
   material: 'SN400B',
 }

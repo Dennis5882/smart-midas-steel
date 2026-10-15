@@ -2,7 +2,9 @@
    길이 가정 (보고서에 그대로 표기):
    - 기둥: 면내 K = 횡이동 골조 정렬도(4.8) · L = 처마높이, 면외 K = 1 · L = 거트 간격(거트 + 플라이브레이스가 양 플랜지 지지), Lb = 거트 간격
    - 지붕보: 면내 K = 1 · L = 처마~마루 경사길이, 면외 L = 퍼린 간격(퍼린 + 플라이브레이스), Lb = 퍼린 간격
-   - 퍼린·거트: 강축 L = 베이, 약축·Lb = 베이 / (새그로드 + 1), 약축 모멘트 × 1/(새그로드+1)² (해석 모델에 새그로드 없음)
+   - 퍼린·거트(냉간성형 CC): 冷軋型鋼 규범(AISI S100 유효폭법, twColdFormed) — 해석 부재력 + 국부 풍압(風力規範 3장, secondary.ts) 중 지배.
+     강축 L = 베이, 약축·Lb = 베이 / (새그로드 + 1), 약축 모멘트 × 1/(새그로드+1)² (해석 모델에 새그로드 없음).
+     해석 부재력의 압축 플랜지: 퍼린은 중력 처짐과 같은 부호면 외장재 쪽(구속), 반대면 자유 플랜지(횡비틀림). 거트는 보수적으로 자유 플랜지
    - 스트럿: L = Lb = 베이 / 풍주: 강축 L = 풍주 높이, 약축·Lb = 거트 간격
    - 가새: X 교차점에서 서로 지지 → KL = 대각선 길이 / 2 (해석 모델은 교차점 미연결)
    2차 효과: 골조 부재(기둥·지붕보) B = max(B1, B2), B2 = (8.2-5) 조합 방향(X: 횡풍·X 지진, Y: 종풍·Y 지진, 중력: 큰 쪽);
@@ -12,6 +14,8 @@ import { b1Of, b2Of, capacity, cbOf, check, kSway, SLENDER_LIMIT, type Capacity,
 import type { Results } from '../actions/results'
 import type { LoadInfo } from './loads'
 import { portalGeometry } from './portal'
+import { cfCapacity, cfCheck } from '../codes/twColdFormed'
+import { ccLoads } from './secondary'
 import { sectionProps } from './sections'
 import type { ElementRole, FactoryModel, FactorySpec } from './types'
 
@@ -23,7 +27,7 @@ export interface MemberCheck {
   combo: string
   /** 지배 지점 0..4 (I, 1/4, 2/4, 3/4, J), 가새는 -1 */
   part: number
-  eq: CheckResult['eq'] | 'KL/r'
+  eq: CheckResult['eq'] | 'KL/r' | 'C5' | 'C3.3'
   forces: { P: number; Mx: number; My: number; V: number }
   cap: Pick<Capacity, 'phiPnc' | 'phiPnt' | 'phiMnx' | 'phiMny' | 'phiVn' | 'mxMode' | 'compact' | 'KLr' | 'lambdaC'>
   B: number
@@ -42,7 +46,16 @@ export interface ServiceCheck {
   clause: string
 }
 
+/** LRFD 13.4.1 기둥 축력 — 휨 무시, 1.2PD + 0.5PL ± 1.4Fu·PE ≤ φPn. 일반 조합 Pu/φcPn ≤ 0.4 이면 면제 */
+export interface ColumnAxial13 { elem: number; puRatio: number; exempt: boolean; ratio: number; combo: string; P: number; phiPn: number }
+
+/** 국부 풍압 요약 (역할·구역별 대표) */
+export interface CCSummary { role: ElementRole; zone: number; A: number; pPos: number; pNeg: number; count: number }
+
 export interface DesignResult {
+  cc?: CCSummary[]
+  /** 13.4.1 지배 기둥 (내진 특별 조합이 있을 때) */
+  col13?: ColumnAxial13 | null
   members: MemberCheck[]
   service: ServiceCheck[]
   /** 역할별 최대 강도비 부재 */
@@ -89,9 +102,62 @@ export function runDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
     }
   }
 
+  /* 조합 용도: basic = 일반 검토, amplified(E′) = 가새 구조 부재(13.8.4)·기둥 축력(13.4.1)만, gravity = 접합부 용량 설계용 */
+  const kindOf = (c: string) => info.comboKind?.[c] ?? 'basic'
+  const usable = (role: ElementRole, c: string) => kindOf(c) === 'basic' || (role === 'brace' && kindOf(c) === 'amplified')
+  let col13: ColumnAxial13 | null = null
+
+  const cc = ccLoads(spec, model, info)
+  /** 두께별 Fy — 판 두께 max(tf, tw) (프로필 fyAt, 없으면 재료 fy) */
+  const fyOf = (sp: { tf: number; tw: number }) => prof.fyAt?.(spec.material, Math.max(sp.tf, sp.tw)) ?? mat.fy
+  /** 냉간성형 퍼린·거트 — 해석 부재력(일반 조합) + 국부 풍압 */
+  const coldFormedMember = (e: FactoryModel['elements'][number], Lel: number): MemberCheck | null => {
+    const sp = sectionProps(e.section)
+    const { KLx, KLy, Lb } = lengthsOf(e.role, Lel, e)
+    const cf = cfCapacity(e.section, sp, mat.fy, mat.E, { Lx: KLx, Ly: KLy, Lt: Lb, Lb }, 1)
+    const myScale = 1 / (spec.sagRods + 1) ** 2
+    let best: MemberCheck | null = null
+    const consider = (combo: string, part: number, f: MemberCheck['forces'], braced: boolean) => {
+      const r = cfCheck(cf, f, braced)
+      if (best && r.ratio <= best.ratio) return
+      best = {
+        id: e.id, role: e.role, section: e.section, ratio: r.ratio, combo, part, eq: r.eq, forces: f,
+        cap: { phiPnc: cf.phiPnc, phiPnt: cf.phiPnt, phiMnx: braced ? cf.phiMnxBraced : cf.phiMnxLTB, phiMny: cf.phiMny, phiVn: cf.phiVn,
+          mxMode: braced ? 'CF' : 'CF-LTB', compact: 'noncompact', KLr: cf.KLr, lambdaC: Math.sqrt(mat.fy / Math.max(cf.Fn, 1e-9)) },
+        B: 1, Cb: 1, lengths: { KLx, KLy, Lb }, slender: { value: 0, limit: 0 }, notes: cf.notes,
+      }
+    }
+    const beam = res.beam.get(e.id)
+    /* 퍼린 처짐 부호: 중력 조합(2.2-2, 없으면 첫 basic) 중앙 모멘트 부호 */
+    const grav = beam ? [...beam.entries()].find(([c]) => kindOf(c) === 'basic' && /2\.2-2/.test(c)) ?? [...beam.entries()].find(([c]) => kindOf(c) === 'basic') : undefined
+    const sag = grav ? Math.sign(grav[1][2]?.My ?? 0) || 1 : 1
+    let maxComp = 0
+    for (const [combo, pts] of beam ?? []) {
+      if (!usable(e.role, combo)) continue
+      const braced = e.role === 'purlin' && Math.sign(pts[2]?.My ?? 0) === sag
+      for (const [i, p] of pts.entries()) {
+        maxComp = Math.max(maxComp, -p.P)
+        consider(combo, i, { P: p.P, Mx: Math.abs(p.My), My: Math.abs(p.Mz) * myScale, V: Math.abs(p.Vz) }, braced)
+      }
+    }
+    for (const d of cc.get(e.id)?.demands ?? []) consider(d.combo, 2, d.f, d.braced)
+    if (!best) return null
+    const b = best as MemberCheck
+    const slender = maxComp > 1e-3
+      ? { value: Math.max(KLx / sp.rx, KLy / sp.ry), limit: SLENDER_LIMIT.compression }
+      : { value: Math.max(KLx, KLy) / Math.min(sp.rx, sp.ry), limit: SLENDER_LIMIT.tension }
+    b.slender = slender
+    if (slender.value / slender.limit > b.ratio) { b.ratio = slender.value / slender.limit; b.eq = 'KL/r' }
+    return b
+  }
   const members: MemberCheck[] = []
   for (const e of model.elements) {
     if (roles && !roles.includes(e.role)) continue
+    if ((e.role === 'purlin' || e.role === 'girt') && sectionProps(e.section).kind === 'CC') {
+      const m = coldFormedMember(e, dist(nodes.get(e.n1)!, nodes.get(e.n2)!))
+      if (m) members.push(m)
+      continue
+    }
     const sp = sectionProps(e.section)
     const Lel = dist(nodes.get(e.n1)!, nodes.get(e.n2)!)
     const { KLx, KLy, Lb } = lengthsOf(e.role, Lel, e)
@@ -112,16 +178,30 @@ export function runDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
 
     if (e.role === 'brace') {
       for (const [combo, P] of res.truss.get(e.id) ?? []) {
+        if (!usable(e.role, combo)) continue
         if (P < 0) maxComp = Math.max(maxComp, -P)
-        const cap = capacity(sp, mat.fy, mat.E, { KLx, KLy, Lb }, 1, Math.max(0, -P))
+        const cap = capacity(sp, fyOf(sp), mat.E, { KLx, KLy, Lb }, 1, Math.max(0, -P))
         consider(combo, -1, { P, Mx: 0, My: 0, V: 0 }, cap, 1, 1)
       }
     } else {
+      let puMax = 0, ampMax = 0, ampCombo = '', ampP = 0, ampCap = 0
       for (const [combo, pts] of res.beam.get(e.id) ?? []) {
+        if (e.role === 'column' && kindOf(combo) === 'amplified') {
+          /* 13.4.1: 휨 무시 축력만 — 압축 φcPn, 인장 φtPn */
+          const Pmin = Math.min(...pts.map((p) => p.P)), Pmax = Math.max(...pts.map((p) => p.P))
+          const capA = capacity(sp, fyOf(sp), mat.E, { KLx, KLy, Lb }, 1, Math.max(0, -Pmin))
+          for (const [P, cap] of [[Pmin, capA.phiPnc], [Pmax, capA.phiPnt]] as const) {
+            const r = (P < 0 ? -P : P) / cap
+            if (r > ampMax) { ampMax = r; ampCombo = combo; ampP = P; ampCap = cap }
+          }
+          continue
+        }
+        if (!usable(e.role, combo)) continue
         const Cb = cbOf(pts.map((p) => p.My))
         const Pc = Math.max(0, ...pts.map((p) => -p.P))
         maxComp = Math.max(maxComp, Pc)
-        const cap = capacity(sp, mat.fy, mat.E, { KLx, KLy, Lb }, Cb, Pc)
+        const cap = capacity(sp, fyOf(sp), mat.E, { KLx, KLy, Lb }, Cb, Pc)
+        puMax = Math.max(puMax, Pc / cap.phiPnc)
         const B1 = b1Of(Pc, sp, mat.E, KLx > 0 ? Math.min(KLx, mm(Lel)) : mm(Lel))
         let B = B1
         if (frame) {
@@ -133,6 +213,13 @@ export function runDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
         /* 퍼린·거트 약축: 해석 모델에 새그로드가 없어 베이 전체 경간으로 계산됨 → 경간 L/(n+1) 기준으로 1/(n+1)² 축소 */
         const myScale = e.role === 'purlin' || e.role === 'girt' ? 1 / (spec.sagRods + 1) ** 2 : 1
         pts.forEach((p, i) => consider(combo, i, { P: p.P, Mx: Math.abs(p.My), My: Math.abs(p.Mz) * myScale, V: Math.abs(p.Vz) }, cap, B, Cb))
+      }
+      if (e.role === 'column' && ampCombo) {
+        const exempt = puMax <= 0.4
+        const c13: ColumnAxial13 = { elem: e.id, puRatio: puMax, exempt, ratio: ampMax, combo: ampCombo, P: ampP, phiPn: ampCap }
+        /* 지배 = 면제 아닌 것 우선, 그다음 비율 */
+        const key = (x: ColumnAxial13) => (x.exempt ? 0 : 10) + x.ratio
+        if (!col13 || key(c13) > key(col13)) col13 = c13
       }
     }
     if (!best) continue
@@ -149,27 +236,29 @@ export function runDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
 
   /* ── 사용성 ── */
   const service: ServiceCheck[] = []
-  if (roles) return summarize(members, service)
+  if (roles) return { ...summarize(members, service), col13 }
   const eaveIds = model.nodes.filter((n) => Math.abs(n.z - spec.eaveHeight) < 1e-9 && (n.x === 0 || n.x === spec.span)).map((n) => n.id)
   const ridgeIds = model.nodes.filter((n) => Math.abs(n.x - spec.span / 2) < 1e-9 && Math.abs(n.z - G.ridgeZ) < 1e-9).map((n) => n.id)
-  const maxOver = (cases: string[], comp: 'dx' | 'dy', scale = 1) => {
+  /* 風力規範 4.2: 50년 풍 층간변위각 ≤ 5/1000 — 순풍향·횡풍향·비틀림을 2.12 로 조합 (info.wind.variants, 양 풍향 모두) */
+  const wv = info.wind.variants?.length ? info.wind.variants : [...res.disp.keys()].filter((c) => /^W[XY]\d/.test(c)).map((c) => ({ tag: c, dir: 'X' as const, parts: [{ lc: c, f: 1 }] }))
+  for (const [key, comp] of [['windDriftX', 'dx'], ['windDriftY', 'dy']] as const) {
     let v = 0, at = ''
-    for (const c of cases) {
-      const m = res.disp.get(c)
-      if (!m) continue
-      for (const id of eaveIds) { const d = Math.abs(m.get(id)?.[comp] ?? 0) * scale; if (d > v) { v = d; at = c } }
+    for (const w of wv) for (const id of eaveIds) {
+      const d = Math.abs(w.parts.reduce((s, p) => s + p.f * (res.disp.get(p.lc)?.get(id)?.[comp] ?? 0), 0))
+      if (d > v) { v = d; at = w.tag }
     }
-    return { v, at }
-  }
-  /* 風力規範 4.2: 50년 풍 층간변위각 ≤ 5/1000 */
-  for (const [key, comp, pre] of [['windDriftX', 'dx', 'WX'], ['windDriftY', 'dy', 'WY']] as const) {
-    const { v, at } = maxOver(res.disp.size ? [...res.disp.keys()].filter((c) => c.startsWith(pre)) : [], comp)
-    service.push({ key, value: v / spec.eaveHeight, limit: 0.005, ratio: v / spec.eaveHeight / 0.005, case: at, clause: '風力規範 4.2' })
+    service.push({ key, value: v / spec.eaveHeight, limit: 0.005, ratio: v / spec.eaveHeight / 0.005, case: at, clause: '風力規範 4.2·2.12' })
   }
   /* 耐震規範 2.16.1: V* (I = 1) 지진력 아래 층간변위각 ≤ 0.005 — EX/EY 변위 × cStar/c */
   for (const [key, comp, lc, d] of [['seisDriftX', 'dx', 'EX', 'X'], ['seisDriftY', 'dy', 'EY', 'Y']] as const) {
     const s = info.seismic[d]
-    const { v } = maxOver([lc], comp, s.cStar / s.c)
+    /* 2.16.1 "計算位移時應計及平移與扭轉位移" — E ± ET */
+    let v = 0
+    const dE = res.disp.get(lc), dT = res.disp.get(`ET${d}`)
+    for (const id of eaveIds) for (const sg of [1, -1]) {
+      const x = Math.abs((dE?.get(id)?.[comp] ?? 0) + sg * (dT?.get(id)?.[comp] ?? 0)) * (s.cStar / s.c)
+      if (x > v) v = x
+    }
     service.push({ key, value: v / spec.eaveHeight, limit: 0.005, ratio: v / spec.eaveHeight / 0.005, case: `${lc} × V*/V`, clause: '耐震規範 2.16.1' })
   }
   /* LRFD 11.5.3: 활하중 처짐 ≤ 스팬/360 — 지붕보: 마루 − 처마 평균 (LR), 퍼린: 단순보 5wL⁴/384EI */
@@ -183,7 +272,19 @@ export function runDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
   const Lp = spec.baySpacing
   const dPur = purlinDefl(spec, info, spec.sections.purlin)
   service.push({ key: 'purlinDefl', value: dPur, limit: Lp / 360, ratio: dPur / (Lp / 360), case: 'LR', clause: 'LRFD 11.5.3' })
-  return summarize(members, service)
+  const out = summarize(members, service)
+  const ccSum = new Map<string, CCSummary>()
+  for (const [id, c] of cc) {
+    const role = model.elements.find((x) => x.id === id)?.role ?? 'purlin'
+    const k = `${role}|${c.zone}`
+    const s = ccSum.get(k)
+    if (s) { s.count++; s.pNeg = Math.min(s.pNeg, c.pNeg); s.pPos = Math.max(s.pPos, c.pPos) }
+    else ccSum.set(k, { role, zone: c.zone, A: c.A, pPos: c.pPos, pNeg: c.pNeg, count: 1 })
+  }
+  out.cc = [...ccSum.values()].sort((x, y) => (x.role === y.role ? x.zone - y.zone : x.role === 'purlin' ? -1 : 1))
+  const c13 = col13 as ColumnAxial13 | null
+  if (c13 && !c13.exempt && c13.ratio > 1) out.ng++
+  return { ...out, col13: c13 }
 }
 
 function summarize(members: MemberCheck[], service: ServiceCheck[]): DesignResult {

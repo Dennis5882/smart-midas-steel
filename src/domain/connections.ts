@@ -3,10 +3,17 @@
    - knee : 기둥-지붕보 단부판 모멘트 접합 (4E 확장형, 양 플랜지 대칭 8본) — F10T 표10.3-2/3, 판 두께 AISC DG4 항복선, 패널존 7.3
    - apex : 마루 지붕보 이음 (같은 4E 상세)
    - brace: 가새 단부 F10T 1면 전단 볼트 + 거셋 지압 (10.3.9: φ = 0.75, 2.4·d·t·Fu)
-   판·용접 재질: 스펙 재료(fy·fu), 용접봉 E70 (F_EXX 490 MPa) — 가정. */
+   판·용접 재질: 스펙 재료(fy·fu), 용접봉 E70 (F_EXX 490 MPa) — 가정.
+   내진 특별 규정 (대만 LRFD 13장, 프로필에 seismicCombos 가 있을 때):
+   - 처마(梁柱接頭): 部分韌性 抗彎矩構架 13.7.2 → 13.6.1 — 소요 휨강도 Mu = 지붕보 Mp (1a(1), 패널존 한계 1a(2) 는 보수적으로 미적용),
+     소요 전단 = (1.2D + 0.5L) 전단 + 2Mp/Lh, 단 (13.3-1) E′ 조합 전단 이하. 소요 소성 회전각 = min(0.01, 1.1(R−1)θE) (13.7.2-3a) — 공급 회전각은 시험 근거 필요(13.6.1-3b)
+   - 주각: 13.4.5 — 증폭 지진력 E′ 조합 포함 (원문은 축압·축인장 검토, 앵커 파괴 방지 취지로 휨·전단까지 포함 — 보수적 해석)
+   - 가새 접합: 13.8.4 — E′ 조합 포함 */
 import { anchorRod, concreteBearing, ellipse, f10t, filletPerMm, pickPlate } from '../codes/twConnection'
 import { profileOf } from '../codes'
 import type { Results } from '../actions/results'
+import type { LoadInfo } from './loads'
+import { portalGeometry } from './portal'
 import { sectionProps } from './sections'
 import type { FactoryModel, FactorySpec } from './types'
 
@@ -38,14 +45,30 @@ const worst = (cs: ConnCheck[]) => Math.max(0, ...cs.map((c) => c.ratio))
 
 interface EndForce { elem: number; combo: string; P: number; M: number; V: number; Vw: number }
 
-/** 요소 끝(지점 0 = I, 4 = J) 의 조합별 부재력 */
-function endForces(res: Results, elem: number, part: 0 | 4): EndForce[] {
+/** 요소 끝(지점 0 = I, 4 = J) 의 조합별 부재력 — keep 으로 조합 거르기 */
+function endForces(res: Results, elem: number, part: 0 | 4, keep: (combo: string) => boolean = () => true): EndForce[] {
   const out: EndForce[] = []
   for (const [combo, pts] of res.beam.get(elem) ?? []) {
+    if (!keep(combo)) continue
     const p = pts[part]
     if (p) out.push({ elem, combo, P: p.P, M: Math.abs(p.My), V: Math.abs(p.Vz), Vw: Math.abs(p.Vy) })
   }
   return out
+}
+
+/** 판 두께 선정 — 소요 두께는 재료 Fy 기준으로 계산됨 → 고른 두께의 Fy(두께별)로 √(Fy/Fy(t)) 보정해 다시 고름 */
+function platePick(spec: FactorySpec, tReqAtFy: number) {
+  const prof = profileOf(spec.code)
+  const fy0 = prof.materials[spec.material].fy
+  let tp = pickPlate(tReqAtFy), tNeed = tReqAtFy
+  for (let i = 0; i < 3; i++) {
+    const fyT = prof.fyAt?.(spec.material, tp) ?? fy0
+    tNeed = tReqAtFy * Math.sqrt(fy0 / fyT)
+    const next = pickPlate(tNeed)
+    if (next === tp) break
+    tp = next
+  }
+  return { tp, tNeed }
 }
 
 /* ── 베이스플레이트 ── */
@@ -104,8 +127,8 @@ function baseFor(spec: FactorySpec, forces: EndForce[], anchorD: number, nSide: 
     if (!best || r > best.r) best = { r, checks, F }
   }
   if (!best) return null
-  const tp = pickPlate(tMax)
-  best.checks.push(chk('plateT', tMax, tp, 'mm', 'AISC DG1 3.3·3.4'))
+  const { tp, tNeed } = platePick(spec, tMax)
+  best.checks.push(chk('plateT', tNeed, tp, 'mm', 'AISC DG1 3.3·3.4'))
   /* 기둥-판 용접: 플랜지 완전용입(CJP, 모재 강도), 웨브 양면 필릿 — 전단 */
   const Vmax = Math.max(...forces.map((F) => Math.hypot(F.V, F.Vw)))
   const lw = 2 * (col.d - 2 * col.tf)
@@ -153,8 +176,8 @@ function endPlateFor(spec: FactorySpec, forces: EndForce[], boltD: number, beamN
     if (!best || r > best.r) best = { r, checks, F }
   }
   if (!best) return null
-  const tp = pickPlate(tMax)
-  best.checks.push(chk('plateT', tMax, tp, 'mm', 'AISC DG4 (4E)'))
+  const { tp, tNeed } = platePick(spec, tMax)
+  best.checks.push(chk('plateT', tNeed, tp, 'mm', 'AISC DG4 (4E)'))
   const Vmax = Math.max(...forces.map((F) => F.V))
   const lw = 2 * (bm.d - 2 * bm.tf)
   const w = Math.max(6, Math.ceil(Vmax / (lw * filletPerMm(1, FEXX))))
@@ -186,20 +209,48 @@ function endPlateFor(spec: FactorySpec, forces: EndForce[], boltD: number, beamN
   }
 }
 
-export function runConnections(spec: FactorySpec, model: FactoryModel, res: Results): ConnResult[] {
+export function runConnections(spec: FactorySpec, model: FactoryModel, info: LoadInfo, res: Results): ConnResult[] {
+  const kind = (c: string) => info.comboKind?.[c] ?? 'basic'
+  const basic = (c: string) => kind(c) === 'basic'
+  const withAmp = (c: string) => kind(c) !== 'gravity'
+  const seis13 = Object.values(info.comboKind ?? {}).includes('amplified')
   const nodes = new Map(model.nodes.map((n) => [n.id, n]))
   const out: ConnResult[] = []
   const at = (id: number) => nodes.get(id)!
 
   /* 주각: 기초 절점에서 시작하는 기둥 요소의 I 단 */
-  const baseF = model.elements.filter((e) => e.role === 'column' && at(e.n1).z === 0).flatMap((e) => endForces(res, e.id, 0))
+  const baseF = model.elements.filter((e) => e.role === 'column' && at(e.n1).z === 0).flatMap((e) => endForces(res, e.id, 0, withAmp)) // 13.4.5
   /* 처마: 처마 절점에 닿는 지붕보 끝 (x = 0 이면 I, x = 스팬이면 J) */
-  const kneeF = model.elements.filter((e) => e.role === 'rafter' && (at(e.n1).x === 0 || at(e.n2).x === spec.span))
-    .flatMap((e) => endForces(res, e.id, at(e.n1).x === 0 ? 0 : 4))
+  const kneeEls = model.elements.filter((e) => e.role === 'rafter' && (at(e.n1).x === 0 || at(e.n2).x === spec.span))
+  const kneePart = (e: (typeof kneeEls)[number]) => (at(e.n1).x === 0 ? 0 : 4) as 0 | 4
+  const kneeF = kneeEls.flatMap((e) => endForces(res, e.id, kneePart(e), basic))
+  /* 13.6.1 용량 설계 힘 — 지붕보 Mp, 전단 Vg + 2Mp/Lh ≤ V(13.3-1) */
+  const kneeNotes: string[] = []
+  const kneeDims: Record<string, string> = {}
+  if (seis13 && kneeEls.length) {
+    const mat = profileOf(spec.code).materials[spec.material]
+    const raf = sectionProps(spec.sections.rafter), col = sectionProps(spec.sections.column)
+    const Mp = (raf.Zx * (profileOf(spec.code).fyAt?.(spec.material, Math.max(raf.tf, raf.tw)) ?? mat.fy)) / 1e6 // kN·m
+    const Lh = 2 * portalGeometry(spec).slopeLen - col.d / 1000 // 처마~처마 기둥면 사이 지붕보 길이 (m)
+    const grav = kneeEls.flatMap((e) => endForces(res, e.id, kneePart(e), (c) => kind(c) === 'gravity'))
+    const amp1 = kneeEls.flatMap((e) => endForces(res, e.id, kneePart(e), (c) => kind(c) === 'amplified' && c.includes('13.3-1')))
+    const Vg = Math.max(0, ...grav.map((f) => f.V)), V13 = Math.max(0, ...amp1.map((f) => f.V))
+    const Vu = V13 > 0 ? Math.min(Vg + (2 * Mp) / Lh, V13) : Vg + (2 * Mp) / Lh
+    const Pg = grav.length ? grav.reduce((a, f) => (f.P > a.P ? f : a)).P : 0
+    kneeF.push({ elem: kneeEls[0].id, combo: '13.6.1 Mp', P: Pg, M: Mp, V: Vu, Vw: 0 })
+    /* 13.7.2-3a 소요 소성 회전각: min(0.01, 1.1(R − 1)θE), θE = 설계 지진 EX 처마 변위각 */
+    const ex = res.disp.get('EX')
+    const eave = model.nodes.filter((n) => Math.abs(n.z - spec.eaveHeight) < 1e-9 && (n.x === 0 || n.x === spec.span))
+    const thetaE = ex ? Math.max(0, ...eave.map((n) => Math.abs(ex.get(n.id)?.dx ?? 0))) / spec.eaveHeight : 0
+    const thetaP = Math.min(0.01, 1.1 * (info.seismic.X.R - 1) * thetaE)
+    kneeDims.Mu = `Mp = ${Mp.toFixed(1)} kN·m, Vu = ${Vu.toFixed(1)} kN (13.6.1)`
+    kneeDims.thetaP = `θp,req = ${thetaP.toFixed(4)} rad (13.7.2-3a, θE = ${thetaE.toFixed(5)})`
+    kneeNotes.push('rotTest')
+  }
   /* 마루: 마루 절점에 닿는 지붕보 끝 */
   const ridgeX = spec.span / 2
   const apexF = model.elements.filter((e) => e.role === 'rafter' && (Math.abs(at(e.n2).x - ridgeX) < 1e-9 || Math.abs(at(e.n1).x - ridgeX) < 1e-9))
-    .flatMap((e) => endForces(res, e.id, Math.abs(at(e.n2).x - ridgeX) < 1e-9 ? 4 : 0))
+    .flatMap((e) => endForces(res, e.id, Math.abs(at(e.n2).x - ridgeX) < 1e-9 ? 4 : 0, basic))
 
   /* 주각: 앵커 지름·개수 최소 조합 */
   for (const d of [24, 30, 36, 42]) {
@@ -218,7 +269,8 @@ export function runConnections(spec: FactorySpec, model: FactoryModel, res: Resu
     for (const d of [20, 22, 24, 27, 30]) {
       const r = endPlateFor(spec, forces, d, spec.sections.rafter, colName)
       if (r && (r.ratio <= 1 || d === 30)) {
-        out.push({ type, elem: r.F.elem, combo: r.F.combo, dims: r.dims, checks: r.checks, ratio: r.ratio, notes: r.notes })
+        const knee = type === 'knee'
+        out.push({ type, elem: r.F.elem, combo: r.F.combo, dims: knee ? { ...r.dims, ...kneeDims } : r.dims, checks: r.checks, ratio: r.ratio, notes: knee ? [...r.notes, ...kneeNotes] : r.notes })
         break
       }
     }
@@ -226,7 +278,7 @@ export function runConnections(spec: FactorySpec, model: FactoryModel, res: Resu
 
   /* 가새 단부: 최대 축력 → F10T 1면 전단 볼트 수, 거셋 지압 */
   let Nmax = 0, nE = 0, nC = ''
-  for (const [id, m] of res.truss) for (const [c, P] of m) if (Math.abs(P) > Nmax) { Nmax = Math.abs(P); nE = id; nC = c }
+  for (const [id, m] of res.truss) for (const [c, P] of m) if (withAmp(c) && Math.abs(P) > Nmax) { Nmax = Math.abs(P); nE = id; nC = c } // 13.8.4
   if (nE) {
     const mat = profileOf(spec.code).materials[spec.material]
     const d = 20, tg = 9

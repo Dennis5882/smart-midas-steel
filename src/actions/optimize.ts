@@ -75,7 +75,7 @@ export async function runOptimize(): Promise<void> {
     }
     const b = S.built!
     S.design = d!
-    S.connections = runConnections(b.spec, b.model, S.results!)
+    S.connections = runConnections(b.spec, b.model, b.info, S.results!)
     const wB = steelWeight(start, b.model, start.sections), wA = steelWeight(b.spec, b.model)
     const tB = roleTons(start, b.model, start.sections), tA = roleTons(b.spec, b.model)
     S.opt = {

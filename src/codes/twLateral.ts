@@ -38,19 +38,47 @@ export function period(kind: 'moment' | 'braced', hn: number): number {
   return (kind === 'moment' ? 0.085 : 0.05) * Math.pow(Math.max(hn, 0.1), 0.75)
 }
 
-export interface SeismicCoef { c: number; cV: number; cStar: number; SaD: number; Fu: number; Ra: number; m: number; gov: 'V' | 'V*' }
+export interface SeismicCoef {
+  /** 설계 V/W = max(V, V*, V_M) */
+  c: number; cV: number
+  /** 2.16.1 변위각 검토 하중 I·Fu/4.2·(SaD/Fu)m (2.10.1 일반 공학 V* 와 같은 식) */
+  cStar: number
+  /** 2.10.1 하한 (대북분지 /3.5), 2.10.2 하한 V_M */
+  cMin: number; cM: number
+  SaD: number; Fu: number; Ra: number; m: number; gov: 'V' | 'V*' | 'VM'
+}
 
-/** V/W 계수 — 2.2 V 와 2.10.1 하한 V* 중 큰 값 (일반 공학 지반; 대북분지·VM 은 미구현) */
-export function seismicCoef(o: { SDS: number; SD1: number; I: number; R: number; T: number }): SeismicCoef {
+/** V/W 계수 — 2.2 V, 2.10.1 V*, 2.10.2 V_M 중 큰 값. basin = 臺北盆地 (2-11 Ra, 2-13b V*) */
+export function seismicCoef(o: { SDS: number; SD1: number; SMS?: number; SM1?: number; basin?: boolean; I: number; R: number; T: number }): SeismicCoef {
   const T0D = o.SDS > 0 ? o.SD1 / o.SDS : 0
-  const Ra = 1 + (o.R - 1) / 1.5
+  const Ra = 1 + (o.R - 1) / (o.basin ? 2.0 : 1.5) // (2-10)·(2-11)
   const Sa = saD(o.T, o.SDS, T0D)
   const F = fu(o.T, Ra, T0D)
   const m = mod(Sa / F)
   const cV = (o.I / (1.4 * ALPHA_Y)) * m
   const cStar = (o.I * F * m) / (4.2 * ALPHA_Y)
-  return { c: Math.max(cV, cStar), cV, cStar, SaD: Sa, Fu: F, Ra, m, gov: cStar > cV ? 'V*' : 'V' }
+  const cMin = (o.I * F * m) / ((o.basin ? 3.5 : 4.2) * ALPHA_Y) // (2-13a)·(2-13b)
+  /* (2-13c) V_M = I/(1.4αy)·(SaM/FuM)m·W, FuM = (2-12) 에 Ra 대신 R, SaM 표2-5(b) */
+  let cM = 0
+  if (o.SMS && o.SM1) {
+    const T0M = o.SM1 / o.SMS
+    cM = (o.I / (1.4 * ALPHA_Y)) * mod(saD(o.T, o.SMS, T0M) / fu(o.T, o.R, T0M))
+  }
+  const c = Math.max(cV, cMin, cM)
+  return { c, cV, cStar, cMin, cM, SaD: Sa, Fu: F, Ra, m, gov: c === cM && cM > cV ? 'VM' : c === cMin && cMin > cV ? 'V*' : 'V' }
 }
+
+/* 표2-4 工址放大係數 (선형 보간) — 地盤 1 堅實 / 2 普通 / 3 軟弱 */
+const FA = { x: [0.5, 0.6, 0.7, 0.8, 0.9], 1: [1, 1, 1, 1, 1], 2: [1.1, 1.1, 1.0, 1.0, 1.0], 3: [1.2, 1.2, 1.1, 1.0, 1.0] }
+const FV = { x: [0.3, 0.35, 0.4, 0.45, 0.5], 1: [1, 1, 1, 1, 1], 2: [1.5, 1.4, 1.3, 1.2, 1.1], 3: [1.8, 1.7, 1.6, 1.5, 1.4] }
+const lin = (xs: number[], ys: number[], x: number) => {
+  if (x <= xs[0]) return ys[0]
+  if (x >= xs[xs.length - 1]) return ys[ys.length - 1]
+  const i = xs.findIndex((v) => v >= x)
+  return ys[i - 1] + ((ys[i] - ys[i - 1]) * (x - xs[i - 1])) / (xs[i] - xs[i - 1])
+}
+export const Fa = (soil: 1 | 2 | 3, Ss: number) => lin(FA.x, FA[soil], Ss)
+export const Fv = (soil: 1 | 2 | 3, S1: number) => lin(FV.x, FV[soil], S1)
 
 /* ── 풍 ── */
 const EXPO: Record<string, { a: number; zg: number }> = { A: { a: 0.32, zg: 500 }, B: { a: 0.25, zg: 400 }, C: { a: 0.15, zg: 300 } } // 표2.2
