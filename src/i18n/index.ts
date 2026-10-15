@@ -78,6 +78,20 @@ export function tc<K extends keyof Dict>(code: 'TW' | 'CN' | undefined, key: K, 
   return typeof v === 'function' ? v(...args) : v
 }
 
+/** 나중에 번역할 문구 — 키와 인자(지금 값)만 저장, 그릴 때 현재 언어로 (채팅 메시지: 언어를 바꾸면 지난 메시지도 바뀜) */
+export interface LText { k: keyof Dict; a: unknown[]; code?: 'TW' | 'CN' }
+export function lt<K extends keyof Dict>(key: K, ...args: Dict[K] extends (...a: infer A) => string ? A : []): LText {
+  return { k: key, a: args }
+}
+export function ltc<K extends keyof Dict>(code: 'TW' | 'CN' | undefined, key: K, ...args: Dict[K] extends (...a: infer A) => string ? A : []): LText {
+  return { k: key, a: args, code }
+}
+export const isLText = (v: unknown): v is LText => !!v && typeof v === 'object' && 'k' in v && 'a' in v
+/** 문자열 또는 LText → 현재 언어 문자열 */
+export function render(v: string | LText): string {
+  return typeof v === 'string' ? v : (tc as (c: unknown, k: unknown, ...a: unknown[]) => string)(v.code, v.k, ...v.a)
+}
+
 export { LANG_DEFS, htmlLang, normalizeLang, type Lang } from './types'
 export type { Dict } from './dict/en'
 export type I18nKey = keyof Dict

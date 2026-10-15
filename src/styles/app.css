@@ -307,10 +307,12 @@ main.splitting .right,main.splitting .chat{pointer-events:none}
 .chip{font-family:'IBM Plex Mono',var(--cjk);font-size:.82rem;padding:6px 13px;border:1px solid var(--border);border-radius:18px;
   color:var(--muted);cursor:pointer;background:transparent;transition:.2s}
 .chip:hover{border-color:var(--cyan);color:var(--cyan)}
-.modebar{display:flex;align-items:center;gap:8px;margin-bottom:11px;font-size:.82rem;color:var(--muted);font-family:'IBM Plex Mono',var(--cjk)}
-.modebar .tag{padding:3px 9px;border-radius:6px;border:1px solid var(--border)}
-.modebar .tag.llm{color:var(--violet);border-color:color-mix(in srgb,var(--violet) 35%,transparent)}
-.modebar .tag.local{color:var(--amber);border-color:color-mix(in srgb,var(--amber) 35%,transparent)}
+/* Plotly 도구 막대 — Tailwind preflight 의 svg{display:block} 때문에 아이콘이 세로로 쌓임 → 인라인으로 (story 는 Tailwind 미사용) */
+.js-plotly-plot .modebar-btn svg{display:inline-block;vertical-align:middle}
+.composer .modebar{display:flex;align-items:center;gap:8px;margin-bottom:11px;font-size:.82rem;color:var(--muted);font-family:'IBM Plex Mono',var(--cjk)}
+.composer .modebar .tag{padding:3px 9px;border-radius:6px;border:1px solid var(--border)}
+.composer .modebar .tag.llm{color:var(--violet);border-color:color-mix(in srgb,var(--violet) 35%,transparent)}
+.composer .modebar .tag.local{color:var(--amber);border-color:color-mix(in srgb,var(--amber) 35%,transparent)}
 .clearchat{font-family:'IBM Plex Mono',var(--cjk);font-size:.72rem;color:var(--muted);
   background:transparent;border:1px solid var(--border);border-radius:6px;padding:3px 9px;
   cursor:pointer;transition:.15s;white-space:nowrap;flex-shrink:0}
@@ -521,6 +523,12 @@ td.pos{color:var(--green)} td.neg{color:var(--red)}
   font-family:'IBM Plex Mono',var(--cjk);font-size:.63rem;color:var(--dim);letter-spacing:1.2px;
   text-transform:uppercase;margin-right:1px;flex-shrink:0;
 }
+.view-tb2{padding-top:0;border-top:0}
+.vtog .swatch.sw-line{width:16px;height:3px;border-radius:2px;margin-top:-2px}
+.vtog .swatch.sw-diamond{width:7px;height:7px;border-radius:1px;transform:rotate(45deg)}
+.vtog .swatch.sw-dot{width:5px;height:5px}
+.vcam.vicon{min-width:30px;font-weight:700}
+.vcam:disabled{opacity:.4;cursor:default}
 .view-tb .vsep{width:1px;height:16px;background:var(--border);margin:0 5px;flex-shrink:0}
 
 /* camera preset buttons */

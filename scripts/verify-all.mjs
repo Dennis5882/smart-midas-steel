@@ -1,5 +1,6 @@
 /* 품질 게이트 — 오프라인 회귀를 모두 실행 (Gen·키 불필요). npm run verify
-   하나라도 실패하면 종료 코드 1. 커밋 전에 실행 (빌드와 별도 — Vercel 빌드에는 넣지 않음). */
+   하나라도 실패하면 종료 코드 1. 커밋 전에 실행 (빌드와 별도 — Vercel 빌드에는 넣지 않음).
+   스택을 브라우저 수준(500 KB)으로 줄여 실행 — Node 기본(984 KB)에서는 큰 배열 펼치기(push(...11만 행))가 통과해 브라우저 전용 오류를 놓쳤다. */
 import { spawnSync } from 'node:child_process'
 
 const SUITES = [
@@ -12,6 +13,7 @@ const SUITES = [
   ['Input validation', 'verify-input.ts'],
   ['Workflow state', 'verify-workflow.ts'],
   ['Optimization pick', 'verify-opt.ts'],
+  ['3D solid sections', 'verify-solid.ts'],
   ['Quantities', 'verify-quantities.ts'],
   ['PDF + fonts', 'verify-pdf.ts'],
 ]
@@ -19,7 +21,7 @@ const t0 = Date.now()
 let failed = 0
 for (const [name, file] of SUITES) {
   const t = Date.now()
-  const r = spawnSync(process.execPath, ['--import', 'tsx', `scripts/${file}`], { encoding: 'utf8' })
+  const r = spawnSync(process.execPath, ['--stack-size=500', '--import', 'tsx', `scripts/${file}`], { encoding: 'utf8' })
   const ok = r.status === 0
   if (!ok) failed++
   const last = (ok ? r.stdout : r.stderr || r.stdout).trim().split('\n').filter(Boolean).at(-1) ?? ''

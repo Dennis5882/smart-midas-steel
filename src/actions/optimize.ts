@@ -8,7 +8,7 @@ import { runDesign, type DesignResult } from '../domain/design'
 import { pickBest, proposeSections, roleTons, steelWeight, type OptControl, type OptIter, type OptRow, type Sections } from '../domain/optimize'
 import { sectionProps } from '../domain/sections'
 import { ROLES } from '../domain/types'
-import { t } from '../i18n'
+import { t, lt } from '../i18n'
 import { S, notify } from '../state/store'
 import { addMsg, draw3D, log, tab } from '../state/ui'
 import { analyzeCore } from './analysis'
@@ -22,13 +22,13 @@ const MAX_ITER = 5
 const key = (s: Sections) => ROLES.map((r) => s[r]).join('|')
 
 export async function runOptimize(): Promise<void> {
-  if (S.busy) { addMsg('bot', t('busy')); return }
-  if (!S.built) { addMsg('bot', t('no_model')); return }
-  if (!S.analyzed) { addMsg('bot', t('need_anal')); return }
+  if (S.busy) { addMsg('bot', lt('busy')); return }
+  if (!S.built) { addMsg('bot', lt('no_model')); return }
+  if (!S.analyzed) { addMsg('bot', lt('need_anal')); return }
   if (!beginJob('opt')) return
   S.results = null; S.design = null; S.connections = null; S.opt = null; S.ratioView = false
   notify()
-  addMsg('bot', t(S.built.spec.code === 'CN' ? 'opt_start_CN' : 'opt_start', MAX_ITER))
+  addMsg('bot', lt(S.built.spec.code === 'CN' ? 'opt_start_CN' : 'opt_start', MAX_ITER))
   tab('logP')
   const start = S.built.spec
   const iters: OptIter[] = []

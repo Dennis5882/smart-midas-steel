@@ -9,7 +9,7 @@ import type { FactorySpec } from '../domain/types'
 import { checkScope } from '../domain/scope'
 import { isRecord, loadDifference } from '../domain/payloadValidation'
 import { scopeMsg } from '../components/ScopeBox'
-import { t } from '../i18n'
+import { t, lt } from '../i18n'
 import { mapi } from '../mapi/client'
 import { autoSave } from './save'
 import { beginJob, endJob, failMsg, stage } from './job'
@@ -17,19 +17,19 @@ import { S, notify } from '../state/store'
 import { addMsg, draw3D, log, tab } from '../state/ui'
 
 export async function buildFactory(spec: FactorySpec): Promise<void> {
-  if (S.busy) { addMsg('bot', t('busy')); return }
-  if (!S.mapiKey.trim()) { addMsg('bot', t('need_key')); return }
+  if (S.busy) { addMsg('bot', lt('busy')); return }
+  if (!S.mapiKey.trim()) { addMsg('bot', lt('need_key')); return }
   const scope = checkScope(spec)
   if (scope.blocked) { addMsg('bot', `${t('sc_blocked')}<br>${scope.issues.filter((i) => i.level === 'block').map((i) => `⛔ ${scopeMsg(i)}`).join('<br>')}`); return }
   if (!beginJob('build')) return
   S.buildEpoch++ // 이전 카드 버튼 잠금
   notify()
-  addMsg('bot', t('build_start'))
+  addMsg('bot', lt('build_start'))
   tab('logP')
   try {
     const model = await sendModel(spec)
     const b = S.built!
-    addMsg('bot', t('build_done', model.nodes.length, model.elements.length, b.cases.length, b.combos))
+    addMsg('bot', lt('build_done', model.nodes.length, model.elements.length, b.cases.length, b.combos))
     draw3D()
     tab('modelP')
   } catch (e) {
@@ -59,6 +59,9 @@ export async function sendModel(spec: FactorySpec) {
   for (const [name, assign] of steps) await mapi('PUT', name, { Assign: assign }, String(Object.keys(assign).length))
   if (designCode) await mapi('PUT', 'DSTL', { Assign: { 1: { DGNCODE: designCode } } })
   await verifyCounts(Object.fromEntries(steps))
+  /* Gen 화면을 ISO 전체 보기로 — 전송 직후엔 일부만 보이거나 비어 보임 (story 와 같은 값, 라이브 확정 H 30·V 15).
+     화면 조작이라 실패해도 모델 생성은 성공으로 둔다 */
+  try { await mapi('POST', '/view/ANGLE', { Argument: { HORIZONTAL: 30, VERTICAL: 15 } }, 'ISO') } catch { /* 화면만 */ }
 
   const cases = Object.values(l.STLD).map((c) => (c as { NAME: string }).NAME)
   const comboNames = Object.values(l['LCOM-GEN']).map((c) => (c as { NAME: string }).NAME)

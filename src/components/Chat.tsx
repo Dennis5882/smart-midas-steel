@@ -1,7 +1,7 @@
 /* 채팅 — 메시지 목록(작업 로그 행) + 입력창(모드바). plan 메시지는 PlanCard 로 렌더. */
 import { useEffect, useRef, useState } from 'react'
 import { clearChat, registerComposer, send } from '../agent/session'
-import { t } from '../i18n'
+import { render, t, useLang } from '../i18n'
 import { S, useStore, type ChatMsg } from '../state/store'
 import { PlanCard } from './PlanCard'
 import { JobBar } from './JobBar'
@@ -12,7 +12,7 @@ function Message({ m }: { m: ChatMsg }) {
   let body
   if (m.kind === 'thinking') body = <div className="bubble"><span className="typing"><span /><span /><span /></span></div>
   else if (m.kind === 'plan') body = <div className="bubble"><PlanCard msg={m} /></div>
-  else body = <div className="bubble" dangerouslySetInnerHTML={{ __html: m.html }} />
+  else body = <div className="bubble" dangerouslySetInnerHTML={{ __html: render(m.html) }} />
   return (
     <div className={`msg ${m.role}`}>
       {m.kind !== 'thinking' && <div className="who"><span className="who-n">{who}</span>{m.ts && <span className="who-t">{m.ts}</span>}</div>}
@@ -94,6 +94,7 @@ function Composer() {
 
 export function Chat({ guideCollapsed, onOpenGuide }: { guideCollapsed: boolean; onOpenGuide(): void }) {
   const s = useStore()
+  useLang() // 언어 변경 → 지난 메시지(lt) 다시 번역
   const msgsRef = useRef<HTMLDivElement>(null)
   const count = s.msgs.length
 

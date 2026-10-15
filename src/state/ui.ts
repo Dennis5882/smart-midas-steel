@@ -2,6 +2,7 @@
 import type { BuildMode } from '../agent/parse'
 import type { TemplateKey } from '../domain/templates'
 import type { FactorySpec } from '../domain/types'
+import { render, type LText } from '../i18n'
 import { S, nextId, notify, type LogType, type PanelId } from './store'
 
 const nowTs = () => new Date().toTimeString().slice(0, 8)
@@ -17,7 +18,8 @@ export function log(msg: string, type: LogType = 'api'): void {
   notify()
 }
 
-export function addMsg(role: 'user' | 'bot', html: string): void {
+/** html = 문자열(지금 언어로 확정) 또는 lt()/ltc() (그릴 때 번역 — 언어 변경 시 지난 메시지도 바뀜) */
+export function addMsg(role: 'user' | 'bot', html: string | LText): void {
   S.msgs.push({ id: nextId(), ts: hm(), role, kind: 'html', html })
   notify()
 }
@@ -48,3 +50,6 @@ export function draw3D(): void { S.preview = null; S.viewNonce++; notify() }
 
 /** 스펙 미리보기 (아직 Gen 에 보내지 않은 형상) */
 export function previewSpec(p: FactorySpec): void { S.preview = p; S.viewNonce++; notify() }
+
+/** 메시지 본문을 현재 언어 문자열로 (테스트·스크립트용) */
+export const msgText = (m: { kind: string; html?: string | LText }): string => (m.kind === 'html' && m.html !== undefined ? render(m.html) : '')

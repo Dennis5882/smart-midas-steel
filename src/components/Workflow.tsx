@@ -47,7 +47,7 @@ export function Workflow() {
       </ol>
       {(hint || main) && (
         <div className="wf-row">
-          {hint && <span className="wf-hint">{t(hint)}</span>}
+          {hint && <span className="wf-hint">{w.reason === 'failed' && s.lastFail?.msg ? s.lastFail.msg : t(hint)}</span>}
           {main && <button className="btn btn-c wf-go" disabled={s.busy} onClick={main.run}>{t(main.label)}</button>}
           {w.next === 'output' && <button className="btn btn-ghost wf-go" disabled={s.busy} onClick={cmd('g_design_4_cmd')}>{t('g_design_4')}</button>}
         </div>

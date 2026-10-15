@@ -51,6 +51,7 @@ const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200, head
 }
 
 const { S } = await import('../src/state/store')
+const { msgText } = await import('../src/state/ui')
 const { DEFAULT_SPEC, CN_DEFAULT_SPEC } = await import('../src/domain/types')
 const { buildFactory } = await import('../src/actions/build')
 const { runAnalysis } = await import('../src/actions/analysis')
@@ -61,7 +62,7 @@ S.mapiKey = 'offline-test'
 S.code = 'TW'
 let fails = 0
 const ok = (cond: boolean, msg: string) => { console.log(`${cond ? 'OK ' : 'NG '} ${msg}`); if (!cond) fails++ }
-const lastBot = () => { const m = [...S.msgs].reverse().find((x) => x.role === 'bot' && x.kind === 'html'); return m && 'html' in m ? m.html : '' }
+const lastBot = () => { const m = [...S.msgs].reverse().find((x) => x.role === 'bot' && x.kind === 'html'); return m ? msgText(m) : '' }
 const reset = () => { calls = []; dropNode = false; onCall = null; analDelay = 0; fault = '' }
 const spec = () => structuredClone(DEFAULT_SPEC)
 

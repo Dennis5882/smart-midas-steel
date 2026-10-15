@@ -17,6 +17,7 @@ import type { Built } from '../src/state/store'
 ;(globalThis as any).document = { documentElement: { lang: 'ko', dataset: {} } }
 const { fetchResults } = await import('../src/actions/results')
 const { S } = await import('../src/state/store')
+const { msgText } = await import('../src/state/ui')
 const { runDesignCheck } = await import('../src/actions/design')
 const { t } = await import('../src/i18n')
 const { buildReport } = await import('../src/report/report')
@@ -113,7 +114,7 @@ for (const cn of [false, true]) {
   fault = 'unknown schema'
   await runDesignCheck()
   assert.equal(S.design, null); assert.equal(S.connections, null); assert.equal(S.results, null)
-  assert.ok(S.msgs.some((m) => m.kind === 'html' && m.html.includes(t('results_invalid', '').split('(')[0])))
+  assert.ok(S.msgs.some((m) => m.kind === 'html' && msgText(m).includes(t('results_invalid', '').split('(')[0])))
   assert.equal(S.busy, false); assert.equal(S.job, null); passed++
   const report = buildReport({ built, reactions: null, design: S.design, connections: S.connections })
   assert.ok(report.includes(t('check_unavailable')))

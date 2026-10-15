@@ -53,7 +53,8 @@ export async function fetchResults(b: Built): Promise<Results> {
     const bf = await table('BEAMFORCE', spec.code === 'CN' ? `F${offset}` : 'F', beamIds, cb.slice(offset, offset + batchSize), { PARTS: ['PartI', 'Part1/4', 'Part2/4', 'Part3/4', 'PartJ'] },
       ['Elem', 'Load', 'Part', 'Axial', 'Shear-y', 'Shear-z', 'Moment-y', 'Moment-z'])
     requireResult(Array.isArray(bf.DATA) && bf.DATA.length > 0, 'BEAMFORCE: empty force table')
-    beamRows.push(...bf.DATA)
+    /* push(...DATA) 금지 — TW 는 410×55×5 ≈ 11만 행이라 브라우저(크롬)에서 인자 펼치기가 스택 초과 (Node 는 통과해서 늦게 발견, 2026-10-15) */
+    for (const row of bf.DATA) beamRows.push(row)
   }
   for (const r of beamRows) {
     const [, el, lc, part, P, Vy, Vz, My, Mz] = r

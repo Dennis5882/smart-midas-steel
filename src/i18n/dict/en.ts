@@ -349,6 +349,10 @@ export const en = {
   g_help_2: 'Release notes',
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v0_15_0_1: 'Fixed the Taiwan design check failing in the browser with "Maximum call stack size exceeded"; the workflow bar now shows the failure reason',
+  rn_v0_15_0_2: '3D view refresh — solid section shapes with real dimensions, zoom in/out, per-member legend toggles, node display, ISO view name',
+  rn_v0_15_0_3: 'Switching the language now also translates earlier messages in the chat',
+  rn_v0_15_0_4: 'After model creation the Gen NX window switches to a full ISO view',
   rn_v0_14_0_1: 'Detects model changes made in Gen — checked before analysis, design check and optimization; stops and shows what changed',
   rn_v0_14_0_2: 'Workflow bar — model → analysis → design check → outputs with a next-step button, retry after failure and out-of-date marking',
   rn_v0_14_0_3: 'China reference-model regression and a single quality gate that runs all regression checks',
@@ -494,10 +498,18 @@ export const en = {
   unknown: (txt: string) => `I didn't understand “${txt}”. Type <code>help</code> for the command list.`,
 
   /* ── 탭·패널 ── */
-  tab_log: 'Log',
-  tab_model: 'Model',
-  tab_3d: '3D',
-  tab_res: 'Results',
+  tab_log: '⬡ Activity',
+  tab_model: '▣ Model Summary',
+  tab_3d: '◈ 3D Preview',
+  tab_res: '∑ Results',
+  view_show: 'Show',
+  vis_node: 'Nodes',
+  view_toggle_tip: 'Click to show or hide',
+  view_line: 'Lines',
+  view_solid: 'Sections',
+  view_solid_tip: 'Draw members as solids with real section dimensions',
+  view_zoom_in: 'Zoom in',
+  view_zoom_out: 'Zoom out',
   log_empty: 'No activity yet.',
   model_empty: 'No model yet — start with “new factory”.',
   preview_tag: 'Preview (not sent)',
@@ -527,7 +539,7 @@ export const en = {
 
   /* ── 3D ── */
   view_cam: 'View',
-  cam_iso: 'Iso',
+  cam_iso: 'ISO',
   cam_front: 'Front',
   cam_side: 'Side',
   cam_top: 'Top',

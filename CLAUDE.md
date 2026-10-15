@@ -120,6 +120,11 @@ Vite 8 + TypeScript + React 19 + Tailwind v4 + shadcn/ui(new-york) + **Vercel Fu
 - **F7 품질 게이트**: `npm run verify`(scripts/verify-all.mjs) — 오프라인 회귀 11종(~25 s, Gen·키 불필요). **커밋 전에 실행.** 중국 기준 모델 `fixtures/cn-sample.json.gz`(라이브 1.1 MB, 최대 0.920 NG 0) → `verify-golden.ts`(418, Gen 반력 = LR·SN·EX·EY 손계산 포함). 캡처 `capture-tw-golden.ts --code CN`. 변이 시험(좌굴곡선 b 계수)으로 검출 확인.
 - 라이브 최적화(2026-10-15): 반복마다 접합 기록 — 1회 46.96 t·판재 3.52·접합 0.988 / 2회 42.58 t·3.50·0.941, ok = true.
 
+## 브라우저 전용 오류·채팅 다국어·3D 뷰 (2026-10-15)
+- **큰 배열 펼치기 금지**: `push(...arr)`·`Math.max(...arr)` 를 결과 표(TW BEAMFORCE 410×55×5 ≈ 11만 행)에 쓰면 크롬에서 'Maximum call stack size exceeded'(Node 기본 스택은 통과 → 늦게 발견). `results.ts` 는 행 단위 push. `npm run verify` 는 `--stack-size=500`(브라우저 수준)으로 실행해 재발을 잡는다.
+- **채팅 메시지 다국어**: 앱 메시지는 `addMsg('bot', lt(key, …args))`/`ltc(code, key, …)` — 키와 그 시점 인자만 저장, 그릴 때 현재 언어로(`render`). 언어를 바꾸면 지난 메시지도 바뀜. 다른 번역문이 섞인 메시지(상태 요약 포함 등)는 문자열 그대로(만든 언어 유지). 테스트는 `msgText(m)`.
+- **3D 뷰**(story 정리 방식): Plotly 아이콘 도구 막대(이미지·확대·이동·회전·홈)는 story 처럼 오른쪽 위 가로·투명, 우리 막대에는 아이콘에 없는 ＋/－(원근 = 카메라 거리, 정투영 = 축 비율). **범례 = 표시 토글 한 줄**(기둥·지붕보·퍼린·거트·스트럿·풍주·가새·지점·절점, 색 견본 선·마름모·점) — Plotly 범례는 강도비 보기의 색 구간에만. 절점은 번호·좌표 hover. 생성 직후 Gen 화면을 `POST /view/ANGLE {HORIZONTAL:30,VERTICAL:15}` 로 ISO (story 값, 실패해도 생성은 성공), **[선 | 단면]** — `drawing/solid.ts` 가 실제 단면 치수로 입체 메시(H 3상자·립 C 5상자·강관 12각, 춤 방향: 골조면·연직·지붕 법선·벽 법선 — 그리기용 근사). 정투영은 시선 방향 축 숨김 + 보이는 두 축으로 채움. `uirevision` 으로 토글 시 사용자 시점 유지. Tailwind preflight `svg{display:block}` 이 Plotly 아이콘을 세로로 쌓던 것·채팅 `.modebar` 클래스 충돌(`.composer .modebar` 로 한정) 수정. 회귀 `verify-solid.ts`.
+
 ## 단면 자동 최적화 (2026-10-15, 라이브 검증)
 명령 `단면 최적화` (설계 검토 다음). 반복: 결과 회수 → 검토 → `proposeSections` → `sendModel`(재전송) → `analyzeCore`(재해석), 최대 5회.
 - 후보 `src/domain/catalog.ts` = 설치본 `Dbase/CNS2020.sdb` 에서 추출한 이름 그대로(RH 150·CC 45·P 60~318.5 40개). 단면적 오름차순, 목표 강도비 0.95, H 세장 단면 제외.

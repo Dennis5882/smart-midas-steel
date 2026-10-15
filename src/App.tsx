@@ -7,7 +7,7 @@ import { Guide } from './components/Guide'
 import { Header } from './components/Header'
 import { LogPanel, ModelPanel, ResultsPanel } from './components/Panels'
 import { View3D } from './components/View3D'
-import { t, useLang, type I18nKey } from './i18n'
+import { t, useLang, type I18nKey, lt } from './i18n'
 import { useStore, type PanelId } from './state/store'
 import { addMsg, tab } from './state/ui'
 
@@ -56,7 +56,7 @@ export function App() {
 
   useEffect(() => {
     document.title = t('meta_title')
-    if (!greeted) { greeted = true; addMsg('bot', t('welcome')) } // StrictMode 이중 실행 방지
+    if (!greeted) { greeted = true; addMsg('bot', lt('welcome')) } // StrictMode 이중 실행 방지
   }, [lang])
 
   return (

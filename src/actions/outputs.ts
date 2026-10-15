@@ -1,7 +1,7 @@
 /* 산출물 (M5·M6) — 계산서(PDF 직접 다운로드 / HTML 새 창)·도면(DXF)·물량(CSV).
    브라우저 안에서 생성하며 PDF는 파일 생성·페이지 수 확인 후 다운로드한다. */
 import { buildDxf } from '../drawing/drawings'
-import { getLang, t } from '../i18n'
+import { getLang, t, lt } from '../i18n'
 import { buildReport } from '../report/report'
 import { LOSS, quantities } from '../domain/quantities'
 import type { I18nKey } from '../i18n'
@@ -27,7 +27,7 @@ function downloadBlob(name: string, blob: Blob): void {
 }
 
 export function openReport(): void {
-  if (!S.built) { addMsg('bot', t('no_model')); return }
+  if (!S.built) { addMsg('bot', lt('no_model')); return }
   const html = reportHtml()
   const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }))
   const w = window.open(url, '_blank')
@@ -40,7 +40,7 @@ const reportHtml = () => buildReport({ built: S.built!, reactions: S.reactions, 
 
 /** Generate and validate the PDF locally before starting the file download. */
 export async function downloadReportPdf(): Promise<void> {
-  if (!S.built) { addMsg('bot', t('no_model')); return }
+  if (!S.built) { addMsg('bot', lt('no_model')); return }
   if (!beginJob('pdf')) return
   try {
     stage('pdf_start')
@@ -52,7 +52,7 @@ export async function downloadReportPdf(): Promise<void> {
     checkCancel()
     downloadBlob(name, blob)
     log(t('log_report'), 'ok')
-    addMsg('bot', t('pdf_done', name, pages, (blob.size / 1024).toFixed(0), new Date().toLocaleString()))
+    addMsg('bot', lt('pdf_done', name, pages, (blob.size / 1024).toFixed(0), new Date().toLocaleString()))
   } catch (e) {
     addMsg('bot', failMsg(e, (m) => t('pdf_failed', m)))
   } finally {
@@ -62,7 +62,7 @@ export async function downloadReportPdf(): Promise<void> {
 
 /** 물량 CSV (UTF-8 BOM — 엑셀에서 바로 열림) */
 export function downloadQuantities(): void {
-  if (!S.built) { addMsg('bot', t('no_model')); return }
+  if (!S.built) { addMsg('bot', lt('no_model')); return }
   const { spec, model } = S.built
   const q = quantities(spec, model, S.connections)
   const L = (k: string) => t(k as I18nKey)
@@ -81,11 +81,11 @@ export function downloadQuantities(): void {
   ]
   download(`steel_quantities_${stamp()}.csv`, '\ufeff' + rows.map((r) => r.map(cell).join(',')).join('\r\n'), 'text/csv;charset=utf-8')
   log(t('log_csv'), 'ok')
-  addMsg('bot', t('csv_done', q.netT.toFixed(2), q.orderT.toFixed(2)))
+  addMsg('bot', lt('csv_done', q.netT.toFixed(2), q.orderT.toFixed(2)))
 }
 
 export function downloadDrawings(): void {
-  if (!S.built) { addMsg('bot', t('no_model')); return }
+  if (!S.built) { addMsg('bot', lt('no_model')); return }
   const dxf = buildDxf({ spec: S.built.spec, model: S.built.model, connections: S.connections, title: 'STEEL PORTAL FACTORY' })
   download(`steel_drawings_${stamp()}.dxf`, dxf, 'application/dxf')
   log(t('log_dxf'), 'ok')

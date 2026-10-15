@@ -4,6 +4,7 @@
    MAPI-Key 는 메모리에만(저장 금지). 언어는 i18n 모듈이 따로 관리(useLang).
 ════════════════════════════════════════════════════════════ */
 import { useSyncExternalStore } from 'react'
+import type { LText } from '../i18n'
 import { CODE_IDS, DEFAULT_CODE, type CodeId } from '../codes'
 import type { Results } from '../actions/results'
 import type { ConnResult } from '../domain/connections'
@@ -12,19 +13,21 @@ import type { LoadInfo } from '../domain/loads'
 import type { OptSummary } from '../domain/optimize'
 import type { TemplateKey } from '../domain/templates'
 import type { BuildMode } from '../agent/parse'
-import { DEFAULT_SPEC, type FactoryModel, type FactorySpec } from '../domain/types'
+import { DEFAULT_SPEC, type ElementRole, type FactoryModel, type FactorySpec } from '../domain/types'
 
 export const THEMES = ['navy', 'light', 'cyber'] as const
 export type Theme = (typeof THEMES)[number]
 export type PanelId = 'logP' | 'modelP' | 'viewP' | 'resP'
 export type LogType = 'api' | 'ok' | 'err' | 'info' | 'warn'
 export type CamId = 'iso' | 'front' | 'side' | 'top'
+/** 3D 표시 토글 — 주골조(기둥·지붕보)·2차부재(퍼린·거트·스트럿·풍주)·가새·지점 */
+export type Vis3D = Record<ElementRole | 'support' | 'node', boolean>
 
 export interface LogEntry { id: number; ts: string; type: LogType; html: string }
 
 /** 채팅 메시지 — html(일반) / plan(공장 스펙 편집 카드) / thinking(대기 표시). ts = 표시용 시각(HH:MM) */
 export type ChatMsg = { ts?: string } & (
-  | { id: number; role: 'user' | 'bot'; kind: 'html'; html: string }
+  | { id: number; role: 'user' | 'bot'; kind: 'html'; html: string | LText }
   | { id: number; role: 'bot'; kind: 'thinking' }
   | { id: number; role: 'bot'; kind: 'plan'; spec: FactorySpec; epoch: number; mode: BuildMode; tpl?: TemplateKey }
 )
@@ -70,13 +73,16 @@ export const S = {
   /** 진행 중 작업 (진행 표시·취소) — busy 와 함께 beginJob/endJob 이 관리 */
   job: null as Job | null,
   /** 마지막 작업 실패·취소 (작업 흐름 띠의 다시 시도) — beginJob 이 비움 */
-  lastFail: null as { kind: JobKind; cancelled: boolean } | null,
+  lastFail: null as { kind: JobKind; cancelled: boolean; msg?: string } | null,
   /** Gen 모델 변경 감지 건수 (0 = 같음) — assertGenSync 가 갱신, sendModel 이 비움 */
   genChanged: 0,
   theme: readTheme(),
   code: readCode(),
   panel: 'logP' as PanelId,
   cam: 'iso' as CamId,
+  vis3d: { column: true, rafter: true, purlin: true, girt: true, strut: true, post: true, brace: true, support: true, node: false } as Vis3D,
+  /** 3D 표시 방식 — 선 / 단면 형상(실제 치수 입체) */
+  render3d: 'line' as 'line' | 'solid',
   /** 3D 를 강도비 색상으로 표시 */
   ratioView: false,
   log: [] as LogEntry[],

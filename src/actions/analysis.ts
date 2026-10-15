@@ -1,5 +1,5 @@
 /* 해석 실행 · 결과 회수 */
-import { t } from '../i18n'
+import { t, lt } from '../i18n'
 import { mapi } from '../mapi/client'
 import { S, notify, type ReactionSum } from '../state/store'
 import { addMsg, log, tab } from '../state/ui'
@@ -11,14 +11,14 @@ import { assertGenSync } from './genSync'
 const NOT_ALLOWED = /not allowed|not permitted|허용되지|許可/i
 
 export async function runAnalysis(): Promise<void> {
-  if (S.busy) { addMsg('bot', t('busy')); return }
-  if (!S.built) { addMsg('bot', t('no_model')); return }
+  if (S.busy) { addMsg('bot', lt('busy')); return }
+  if (!S.built) { addMsg('bot', lt('no_model')); return }
   if (!beginJob('anal')) return
-  addMsg('bot', t('anal_start'))
+  addMsg('bot', lt('anal_start'))
   try {
     await assertGenSync() // Gen 에서 모델을 바꿨으면 해석하지 않음 (앱 정보와 다른 모델)
     await analyzeCore()
-    addMsg('bot', t('anal_done'))
+    addMsg('bot', lt('anal_done'))
     tab('resP')
   } catch (e) {
     addMsg('bot', failMsg(e, (m) => t('anal_fail', m)))

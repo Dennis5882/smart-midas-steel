@@ -7,7 +7,7 @@ import type { CodeId } from '../codes'
 import { portalGeometry } from '../domain/portal'
 import { TEMPLATES } from '../domain/templates'
 import { defaultSpecFor, normalizeBays, type FactorySpec } from '../domain/types'
-import { getLang, langUrl, t } from '../i18n'
+import { getLang, langUrl, t, lt } from '../i18n'
 import { verifyConn } from '../mapi/client'
 import { S, notify, type Theme } from '../state/store'
 import { addMsg, addPlanMsg, escapeHtml, previewSpec, tab } from '../state/ui'
@@ -22,15 +22,15 @@ export async function send(raw: string): Promise<void> {
   addMsg('user', escapeHtml(txt))
   const c = parseCommand(txt)
   /* 작업 중에는 Gen 호출·결과를 쓰는 명령을 막는다 (결과가 바뀌는 중이라 출력도 막음). 도움말·스펙 카드·상태는 허용 */
-  if (S.busy && BUSY_BLOCKED.has(c.intent)) { addMsg('bot', t('busy')); return }
+  if (S.busy && BUSY_BLOCKED.has(c.intent)) { addMsg('bot', lt('busy')); return }
   switch (c.intent) {
-    case 'help': addMsg('bot', t('help_html')); break
+    case 'help': addMsg('bot', lt('help_html')); break
     case 'clear': clearChat(); break
     case 'release_notes': S.rnOpen = true; notify(); break
     case 'copy_link': {
       const u = langUrl(getLang())
-      try { await navigator.clipboard.writeText(u); addMsg('bot', t('link_copied', escapeHtml(u))) }
-      catch { addMsg('bot', t('link_copy_fail', escapeHtml(u))) }
+      try { await navigator.clipboard.writeText(u); addMsg('bot', lt('link_copied', escapeHtml(u))) }
+      catch { addMsg('bot', lt('link_copy_fail', escapeHtml(u))) }
       break
     }
     case 'new': {
@@ -51,10 +51,10 @@ export async function send(raw: string): Promise<void> {
     case 'pdf': await downloadReportPdf(); break
     case 'quantities': downloadQuantities(); break
     case 'reactions': {
-      if (!S.built) { addMsg('bot', t('no_model')); break }
-      if (!S.analyzed) { addMsg('bot', t('need_anal')); break }
+      if (!S.built) { addMsg('bot', lt('no_model')); break }
+      if (!S.analyzed) { addMsg('bot', lt('need_anal')); break }
       await fetchReactions()
-      addMsg('bot', t('react_done'))
+      addMsg('bot', lt('react_done'))
       tab('resP')
       break
     }
@@ -70,13 +70,13 @@ export async function send(raw: string): Promise<void> {
       addMsg('bot', r.cls === 'ok' ? t('conn_ok', S.program || 'gen') : escapeHtml(r.text))
       break
     }
-    default: addMsg('bot', t('unknown', escapeHtml(txt)))
+    default: addMsg('bot', lt('unknown', escapeHtml(txt)))
   }
 }
 
 export function clearChat(): void {
   S.msgs = []
-  addMsg('bot', t('cleared'))
+  addMsg('bot', lt('cleared'))
 }
 
 export function setTheme(th: Theme): void {

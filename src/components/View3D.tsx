@@ -1,10 +1,14 @@
 /* 3D VIEW — Plotly 는 동적 import 로 첫 화면 번들에서 분리 (story View3D 와 같은 방식).
-   S.preview(편집 중 스펙)가 있으면 그 형상, 없으면 Gen 에 보낸 모델. S.viewNonce 변경 시 재플롯. */
+   S.preview(편집 중 스펙)가 있으면 그 형상, 없으면 Gen 에 보낸 모델. S.viewNonce 변경 시 재플롯.
+   story 와 같은 정리: 범례 위쪽 가로, 표시 토글(주골조·2차부재·가새·지점·절점), 정투영(정면·측면·평면)은 시선 방향 축을 숨기고 화면을 채움.
+   Plotly 아이콘 도구 막대(이미지·확대·이동·회전·홈)는 story 처럼 오른쪽 위 가로·투명, 우리 막대에는 아이콘에 없는 ＋/－ 와 [선 | 단면] (drawing/solid — 실제 단면 치수 입체).
+   토글·표시 방식을 바꿔도 사용자가 돌린 시점은 유지(uirevision = 시점). */
 import { useEffect, useMemo, useRef } from 'react'
+import { solidMeshes } from '../drawing/solid'
 import { buildPortal } from '../domain/portal'
-import { ROLES, type ElementRole, type FactoryModel } from '../domain/types'
-import { t, useLang } from '../i18n'
-import { S, notify, useStore, type CamId } from '../state/store'
+import { ROLES, type ElementRole, type FactoryModel, type FactorySpec } from '../domain/types'
+import { t, useLang, type I18nKey } from '../i18n'
+import { S, notify, useStore, type CamId, type Vis3D } from '../state/store'
 
 type Plotly = typeof import('plotly.js-dist-min')
 let plotlyP: Promise<Plotly> | null = null
@@ -22,11 +26,12 @@ function palette() {
   const v = (n: string, fb: string) => cs.getPropertyValue(n).trim() || fb
   return {
     role: Object.fromEntries(ROLES.map((r) => [r, v(ROLE_VAR[r][0], ROLE_VAR[r][1])])) as Record<ElementRole, string>,
-    sup: v('--p-sup', '#ff6b6b'), supBd: v('--p-sup-bd', '#ff9999'),
+    sup: v('--p-sup', '#ff6b6b'), supBd: v('--p-sup-bd', '#ff9999'), node: v('--p-node', '#445069'),
     axis: v('--p-axis', '#445069'), grid: v('--p-grid', '#1a2538'), scene: v('--p-scene', 'rgba(10,14,26,0.4)'),
     legend: v('--p-legend', 'rgba(0,0,0,0.85)'), legendBd: v('--p-legend-bd', 'rgba(31,42,61,0.5)'), txt: v('--p-txt', '#c9d4e8'),
   }
 }
+type Pal = ReturnType<typeof palette>
 
 const CAMS: Record<CamId, { eye: { x: number; y: number; z: number }; up?: { x: number; y: number; z: number } }> = {
   iso: { eye: { x: 1.5, y: -1.7, z: 1.0 } },
@@ -36,48 +41,75 @@ const CAMS: Record<CamId, { eye: { x: number; y: number; z: number }; up?: { x: 
 }
 const FONT = 'IBM Plex Mono, Noto Sans KR, Noto Sans TC, Noto Sans SC'
 
-/** 강도비 색상 구간 — 상한, 색 토큰, 대체색 */
-const BANDS: [number, string, string][] = [[0.5, '--blue', '#4cc2ff'], [0.7, '--green', '#5ee6a8'], [0.9, '--cyan', '#38e1d6'], [1.0, '--amber', '#ffb454'], [Infinity, '--red', '#ff6b6b']]
+/** 범례 겸 표시 토글 — 부재 종류별 + 지점·절점 (Plotly 범례는 쓰지 않음: 같은 정보가 두 번 나오던 것 정리) */
+type Mark = 'line' | 'diamond' | 'dot'
+const TOGGLES: [keyof Vis3D, string, I18nKey, Mark][] = [
+  ...ROLES.map((r): [keyof Vis3D, string, I18nKey, Mark] => [r, ROLE_VAR[r][0], `role_${r}`, 'line']),
+  ['support', '--p-sup', 'support', 'diamond'], ['node', '--p-node', 'vis_node', 'dot'],
+]
 
-function ratioTraces(m: FactoryModel, ratio: Map<number, number>) {
-  const cs = getComputedStyle(document.documentElement)
-  const byId = new Map(m.nodes.map((n) => [n.id, n]))
-  return BANDS.map(([hi, v, fb], i) => {
-    const lo = i ? BANDS[i - 1][0] : -Infinity
-    const x: (number | null)[] = [], y: (number | null)[] = [], z: (number | null)[] = []
-    for (const e of m.elements) {
-      const r = ratio.get(e.id) ?? 0
-      if (r <= lo || r > hi) continue
-      const a = byId.get(e.n1)!, b = byId.get(e.n2)!
-      x.push(a.x, b.x, null); y.push(a.y, b.y, null); z.push(a.z, b.z, null)
-    }
-    const name = hi === Infinity ? `> ${lo.toFixed(1)}` : `${lo === -Infinity ? '0' : lo.toFixed(1)} – ${hi.toFixed(1)}`
-    return { type: 'scatter3d', mode: 'lines', name, x, y, z, line: { color: cs.getPropertyValue(v).trim() || fb, width: 4 }, hoverinfo: 'skip' }
-  }).filter((tr) => tr.x.length)
+/** 정투영에서 시선 방향 축 — 한 점으로 눌려 제목·눈금이 겹침 → 전부 끈다 (story 와 같음) */
+const HIDDEN_AX = { visible: false, title: { text: '' }, showticklabels: false, showgrid: false, showline: false, zeroline: false, ticks: '', showbackground: false, showspikes: false }
+
+/** 축 비율 — iso 는 data 비율, 정투영은 보이는 두 축으로 화면을 채움 × zoom (정투영은 카메라 거리를 무시) */
+function sceneOf(m: FactoryModel, c: CamId, zoom: number): Record<string, unknown> {
+  if (c === 'iso') return { aspectmode: 'data' }
+  const ext = (k: 'x' | 'y' | 'z') => { const v = m.nodes.map((n) => n[k]); return Math.max(...v) - Math.min(...v) || 1 }
+  const d = { x: ext('x'), y: ext('y'), z: ext('z') }, k = 1.6 * zoom
+  const mx = c === 'front' ? Math.max(d.x, d.z) : c === 'side' ? Math.max(d.y, d.z) : Math.max(d.x, d.y)
+  return { aspectmode: 'manual', aspectratio: { x: (d.x / mx) * k, y: (d.y / mx) * k, z: (d.z / mx) * k } }
+}
+const camOf = (c: CamId, zoom: number) => {
+  const e = CAMS[c].eye
+  return { eye: { x: e.x / zoom, y: e.y / zoom, z: e.z / zoom }, up: CAMS[c].up ?? { x: 0, y: 0, z: 1 }, projection: { type: c === 'iso' ? 'perspective' : 'orthographic' } }
 }
 
-function traces(m: FactoryModel, P: ReturnType<typeof palette>, ratio: Map<number, number> | null) {
+/** 강도비 색상 구간 — 상한, 색 토큰, 대체색 */
+const BANDS: [number, string, string][] = [[0.5, '--blue', '#4cc2ff'], [0.7, '--green', '#5ee6a8'], [0.9, '--cyan', '#38e1d6'], [1.0, '--amber', '#ffb454'], [Infinity, '--red', '#ff6b6b']]
+const bandOf = (r: number) => BANDS.findIndex(([hi]) => r <= hi)
+const bandName = (i: number) => { const hi = BANDS[i][0], lo = i ? BANDS[i - 1][0] : 0; return hi === Infinity ? `> ${lo.toFixed(1)}` : `${lo ? lo.toFixed(1) : '0'} – ${hi.toFixed(1)}` }
+
+const LIGHT = { ambient: 0.55, diffuse: 0.8, specular: 0.15, roughness: 0.6 }
+
+function traces(m: FactoryModel, spec: FactorySpec, P: Pal, ratio: Map<number, number> | null, vis: Vis3D, solid: boolean) {
+  const cs = getComputedStyle(document.documentElement)
   const byId = new Map(m.nodes.map((n) => [n.id, n]))
-  const out: any[] = ratio ? ratioTraces(m, ratio) : []
-  for (const r of ratio ? [] : ROLES) {
-    const x: (number | null)[] = [], y: (number | null)[] = [], z: (number | null)[] = []
-    for (const e of m.elements) {
-      if (e.role !== r) continue
-      const a = byId.get(e.n1)!, b = byId.get(e.n2)!
-      x.push(a.x, b.x, null); y.push(a.y, b.y, null); z.push(a.z, b.z, null)
+  const out: any[] = []
+  /* 묶음: 강도비 보기 = 구간, 아니면 부재 종류 */
+  const groups: { key: string; name: string; color: string; width: number; visible: boolean; has: (id: number, role: ElementRole) => boolean }[] = ratio
+    ? BANDS.map(([, v, fb], i) => ({ key: `b${i}`, name: bandName(i), color: cs.getPropertyValue(v).trim() || fb, width: 4, visible: true, has: (id: number) => bandOf(ratio.get(id) ?? 0) === i }))
+    : ROLES.map((r) => ({ key: r, name: t(`role_${r}`), color: P.role[r], width: ROLE_VAR[r][2], visible: vis[r], has: (_: number, role: ElementRole) => role === r }))
+  if (solid) {
+    const meshes = solidMeshes(m, spec.span, spec.roofSlope, (e) => groups.find((g) => g.has(e.id, e.role))?.key ?? null)
+    for (const g of groups) {
+      const mesh = meshes.get(g.key)
+      if (mesh) out.push({ type: 'mesh3d', name: g.name, ...mesh, color: g.color, visible: g.visible, flatshading: true, lighting: LIGHT, showlegend: true, hoverinfo: 'skip' })
     }
-    if (x.length) out.push({ type: 'scatter3d', mode: 'lines', name: t(`role_${r}`), x, y, z,
-      line: { color: P.role[r], width: ROLE_VAR[r][2] }, hoverinfo: 'skip' })
+  } else {
+    for (const g of groups) {
+      const x: (number | null)[] = [], y: (number | null)[] = [], z: (number | null)[] = []
+      for (const e of m.elements) {
+        if (!g.has(e.id, e.role)) continue
+        const a = byId.get(e.n1)!, b = byId.get(e.n2)!
+        x.push(a.x, b.x, null); y.push(a.y, b.y, null); z.push(a.z, b.z, null)
+      }
+      if (x.length) out.push({ type: 'scatter3d', mode: 'lines', name: g.name, x, y, z, visible: g.visible, line: { color: g.color, width: g.width }, hoverinfo: 'skip' })
+    }
   }
-  const sup = m.nodes.filter((n) => n.z === 0)
-  out.push({ type: 'scatter3d', mode: 'markers', name: t('support'),
+  const sup = m.nodes.filter((n) => n.z === 0), free = m.nodes.filter((n) => n.z !== 0)
+  out.push({ type: 'scatter3d', mode: 'markers', name: t('support'), visible: vis.support,
     x: sup.map((n) => n.x), y: sup.map((n) => n.y), z: sup.map((n) => n.z),
     text: sup.map((n) => `N${n.id}  (${n.x}, ${n.y}, 0) m`), hovertemplate: '%{text}<extra></extra>',
     marker: { size: 4, color: P.sup, symbol: 'diamond', line: { color: P.supBd, width: 1 } } })
+  /* 절점 — 마우스를 올리면 번호·좌표 */
+  out.push({ type: 'scatter3d', mode: 'markers', name: t('vis_node'), visible: vis.node,
+    x: free.map((n) => n.x), y: free.map((n) => n.y), z: free.map((n) => n.z),
+    text: free.map((n) => `N${n.id}  (${+n.x.toFixed(3)}, ${+n.y.toFixed(3)}, ${+n.z.toFixed(3)}) m`), hovertemplate: '%{text}<extra></extra>',
+    marker: { size: 2.5, color: P.node, opacity: 0.9 } })
   return out
 }
 
-function axis(title: string, P: ReturnType<typeof palette>) {
+function axis(title: string, P: Pal) {
   return {
     title: { text: title, font: { color: P.axis, size: 12, family: FONT } },
     color: P.axis, gridcolor: P.grid, zerolinecolor: P.grid, backgroundcolor: P.scene, showbackground: true,
@@ -85,36 +117,63 @@ function axis(title: string, P: ReturnType<typeof palette>) {
   }
 }
 
+const ZOOM_STEP = 1.25
+
 export function View3D() {
   const s = useStore()
   const lang = useLang()
   const ref = useRef<HTMLDivElement>(null)
+  const spec = s.preview ?? s.built?.spec ?? null
   const model = useMemo(() => (s.preview ? buildPortal(s.preview) : s.built?.model ?? null), [s.viewNonce, s.built])
   /* 강도비 색상 — 설계 검토 결과가 있고 미리보기가 아닐 때만 */
   const ratio = useMemo(() => (s.ratioView && !s.preview && s.design ? new Map(s.design.members.map((m) => [m.id, m.ratio])) : null), [s.ratioView, s.preview, s.design])
+  const solid = s.render3d === 'solid'
 
   useEffect(() => {
     const el = ref.current
-    if (!el || !model) return
+    if (!el || !model || !spec) return
     let alive = true
     void loadPlotly().then((Plotly) => {
       if (!alive) return
       const P = palette()
-      const cam = CAMS[S.cam]
-      void Plotly.react(el, traces(model, P, ratio), {
-        paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', margin: { l: 0, r: 0, t: 0, b: 0 },
-        font: { family: FONT, color: P.txt },
-        legend: { bgcolor: P.legend, bordercolor: P.legendBd, borderwidth: 1, font: { size: 11, color: P.txt }, x: 0.01, y: 0.99 },
+      const c = S.cam
+      const ax = (hide: boolean, title: string) => (hide ? { ...axis(title, P), ...HIDDEN_AX } : axis(title, P))
+      void Plotly.react(el, traces(model, spec, P, ratio, S.vis3d, solid), {
+        paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', margin: { l: 0, r: 0, t: ratio ? 28 : 0, b: 0 },
+        font: { family: FONT, color: P.txt }, showlegend: !!ratio,
+        /* 시점 버튼·맞춤을 누를 때만 카메라를 다시 적용 — 토글·표시 방식 변경은 사용자 시점 유지 */
+        uirevision: c,
+        modebar: { orientation: 'h', bgcolor: 'rgba(0,0,0,0)', color: P.axis, activecolor: P.txt },
+        /* 범례: 위쪽 가로 한 줄 (story) — 모델을 가리지 않음 */
+        /* 강도비 보기에만 색 구간 범례 (부재 종류는 위 토글 줄이 범례) */
+        legend: { orientation: 'h', x: 0, y: 1.03, itemclick: false, itemdoubleclick: false, bgcolor: P.legend, bordercolor: P.legendBd, borderwidth: 1, font: { size: 11, color: P.txt, family: FONT } },
         scene: {
-          aspectmode: 'data',
-          xaxis: axis('X (m)', P), yaxis: axis('Y (m)', P), zaxis: axis('Z (m)', P),
-          camera: { eye: cam.eye, up: cam.up ?? { x: 0, y: 0, z: 1 }, projection: { type: S.cam === 'iso' ? 'perspective' : 'orthographic' } },
+          ...sceneOf(model, c, 1),
+          /* 정투영은 시선 방향 축을 숨김 — 정면(X–Z) Y, 측면(Y–Z) X, 평면 Z */
+          xaxis: ax(c === 'side', 'X (m)'), yaxis: ax(c === 'front', 'Y (m)'), zaxis: ax(c === 'top', 'Z (m)'),
+          camera: camOf(c, 1),
         },
-      } as any, { responsive: true, displaylogo: false })
+      } as any, {
+        responsive: true, displaylogo: false, displayModeBar: true, modeBarButtonsToRemove: ['resetCameraLastSave3d', 'hoverClosest3d'],
+        toImageButtonOptions: { format: 'png', filename: 'steel_factory_3d', scale: 2 },
+      } as any)
     })
     return () => { alive = false }
-  }, [model, ratio, s.cam, s.theme, lang])
+  }, [model, spec, ratio, s.cam, s.theme, lang, s.vis3d, solid])
 
+  /** 확대·축소 — 지금 시점 기준 (원근: 카메라 거리, 정투영: 축 비율) */
+  const zoom = (f: number) => void loadPlotly().then((Plotly) => {
+    const el = ref.current as any
+    const sc = el?._fullLayout?.scene
+    if (!sc || !model) return
+    const cam = sc.camera, ortho = cam.projection?.type === 'orthographic'
+    if (ortho) {
+      const a = sc.aspectratio
+      void Plotly.relayout(el, { 'scene.aspectmode': 'manual', 'scene.aspectratio': { x: a.x * f, y: a.y * f, z: a.z * f } } as any)
+    } else {
+      void Plotly.relayout(el, { 'scene.camera.eye': { x: cam.eye.x / f, y: cam.eye.y / f, z: cam.eye.z / f } } as any)
+    }
+  })
   const setCam = (c: CamId) => { S.cam = c; notify() }
   const len = model ? Math.max(...model.nodes.map((n) => n.y)) : 0
   const span = model ? Math.max(...model.nodes.map((n) => n.x)) : 0
@@ -126,12 +185,27 @@ export function View3D() {
         {(['iso', 'front', 'side', 'top'] as const).map((c) => (
           <button key={c} className={`vcam${s.cam === c ? ' on' : ''}`} onClick={() => setCam(c)}>{t(`cam_${c}`)}</button>
         ))}
+        <span className="vsep" />
+        <button className={`vcam${!solid ? ' on' : ''}`} aria-pressed={!solid} onClick={() => { S.render3d = 'line'; notify() }}>{t('view_line')}</button>
+        <button className={`vcam${solid ? ' on' : ''}`} aria-pressed={solid} title={t('view_solid_tip')} onClick={() => { S.render3d = 'solid'; notify() }}>{t('view_solid')}</button>
         {s.design && !s.preview && <>
           <span className="vsep" />
           <button className={`vcam${!s.ratioView ? ' on' : ''}`} onClick={() => { S.ratioView = false; notify() }}>{t('view_role')}</button>
           <button className={`vcam${s.ratioView ? ' on' : ''}`} onClick={() => { S.ratioView = true; notify() }}>{t('view_ratio')}</button>
         </>}
+        <span className="vsep" />
+        <button className="vcam vicon" title={t('view_zoom_in')} aria-label={t('view_zoom_in')} disabled={!model} onClick={() => zoom(ZOOM_STEP)}>＋</button>
+        <button className="vcam vicon" title={t('view_zoom_out')} aria-label={t('view_zoom_out')} disabled={!model} onClick={() => zoom(1 / ZOOM_STEP)}>－</button>
         {s.preview && <><span className="vsep" /><span className="vlbl" style={{ color: 'var(--amber)' }}>{t('preview_tag')}</span></>}
+      </div>
+      <div className="view-tb view-tb2">
+        <span className="vlbl">{t('view_show')}</span>
+        {TOGGLES.filter(([k]) => (!ratio || k === 'support' || k === 'node') && (k === 'support' || k === 'node' || model?.elements.some((e) => e.role === k))).map(([k, color, label, mark]) => (
+          <button key={k} className={`vtog ${s.vis3d[k] ? 'on' : 'off'}`} aria-pressed={s.vis3d[k]} title={t('view_toggle_tip')}
+            onClick={() => { S.vis3d = { ...S.vis3d, [k]: !S.vis3d[k] }; notify() }}>
+            <span className={`swatch sw-${mark}`} style={{ background: `var(${color})` }} /><span>{t(label)}</span>
+          </button>
+        ))}
       </div>
       {model
         ? <div id="plot" ref={ref} />
