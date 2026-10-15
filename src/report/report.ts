@@ -6,7 +6,9 @@ import type { DesignResult } from '../domain/design'
 import type { OptSummary } from '../domain/optimize'
 import { portalGeometry } from '../domain/portal'
 import { memberSchedule } from '../domain/schedule'
-import { connGrade, GRADES, roleGrade, summarizeStatus, type Graded } from '../domain/status'
+import { buildDrawingSvgs } from '../drawing/drawings'
+import { isoSvg, RATIO_BANDS, ratioColor, ROLE_COLOR } from '../drawing/iso'
+import { connGrade, GRADES, roleGrade, summarizeStatus, type Grade, type Graded } from '../domain/status'
 import { siteSourceText } from '../components/Status'
 import { scopeMsg } from '../components/ScopeBox'
 import { checkScope } from '../domain/scope'
@@ -19,13 +21,17 @@ import { APP_VERSION } from '../version'
 const esc = (s: unknown) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!)
 const f = (x: number, d = 2) => (Number.isFinite(x) ? x.toFixed(d) : '—')
 const row = (cells: unknown[], th = false) => `<tr>${cells.map((c) => (th ? `<th>${esc(c)}</th>` : `<td>${c}</td>`)).join('')}</tr>`
-const table = (head: unknown[], rows: unknown[][]) => `<table>${row(head, true)}${rows.map((r) => row(r)).join('')}</table>`
+const table = (head: unknown[], rows: unknown[][], cls = '') => `<table${cls ? ` class="${cls}"` : ''}>${row(head, true)}${rows.map((r) => row(r)).join('')}</table>`
 const ok = (r: number) => `<b class="${r > 1 ? 'ng' : 'ok'}">${f(r, 3)}</b>`
+/** 등급 칩만 (좁은 표 칸) */
+const chip = (g: Grade) => `<span class="gr gr-${g}">${esc(t(`gr_${g}`))}</span>`
 /** 등급 칩 — 사유는 괄호로 */
 const grade = (g: Graded) => {
   const why = g.reasons.filter((r) => r !== 'ng').map((r) => t(`rs_${r}`)).join(', ')
   return `<span class="gr gr-${g.grade}">${esc(t(`gr_${g.grade}`))}</span>${why ? ` <span class="note">(${esc(why)})</span>` : ''}`
 }
+
+const fig = (svg: string, cap: string) => `<figure>${svg}<figcaption>${esc(cap)}</figcaption></figure>`
 
 export interface ReportInput {
   built: Built
@@ -68,6 +74,8 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
     [L('f_purlinSp'), `${f(G.sRoof, 3)} m`], [L('f_girtSp'), `${f(G.gWall, 3)} m`], [L('f_postSp'), `${spec.postSpacing} m`], [L('f_sagRods'), spec.sagRods],
     [L('st_node'), model.nodes.length], [L('st_elem'), model.elements.length],
   ]))
+  const rolesIn = ROLES.filter((r) => model.elements.some((e) => e.role === r))
+  parts.push(fig(isoSvg(model, { legend: rolesIn.map((r) => [ROLE_COLOR[r], t(`role_${r}`)]) }), t('rep_fig_model')))
 
   /* 2. 재료·단면 */
   h2('rep_s2')
@@ -137,9 +145,14 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
         const m = design.byRole[r]!
         const phiPn = m.forces.P >= 0 ? m.cap.phiPnt : m.cap.phiPnc
         return [L(`role_${r}`), esc(m.section), m.id, esc(m.combo), f(m.forces.P, 1), f(m.forces.Mx, 1), f(m.forces.My, 1), f(m.forces.V, 1),
-          f(phiPn, 0), f(m.cap.phiMnx, 1), f(m.cap.phiMny, 1), f(m.cap.phiVn, 0), f(m.Cb, 2), f(m.B, 3), f(m.slender.value, 0), m.eq, ok(m.ratio), grade(roleGrade(design, r))]
-      })))
+          f(phiPn, 0), f(m.cap.phiMnx, 1), f(m.cap.phiMny, 1), f(m.cap.phiVn, 0), f(m.Cb, 2), f(m.B, 3), f(m.slender.value, 0), m.eq, ok(m.ratio), chip(roleGrade(design, r).grade)]
+      }), 'wide'))
+    const why = ROLES.filter((r) => design.byRole[r]).map((r) => ({ r, g: roleGrade(design, r) })).filter((x) => x.g.reasons.some((k) => k !== 'ng'))
+    if (why.length) parts.push(`<p class="note">${why.map((x) => `${L(`role_${x.r}`)}: ${grade(x.g)}`).join(' · ')}</p>`)
     parts.push(`<p class="note">${esc(t('rep_units_kn'))}</p>`)
+    const ratioOf = new Map(design.members.map((m) => [m.id, m.ratio]))
+    const bandLbl = RATIO_BANDS.map(([hi, c], i): [string, string] => [c, hi === Infinity ? `> ${RATIO_BANDS[i - 1][0].toFixed(1)}` : `${i ? RATIO_BANDS[i - 1][0].toFixed(1) : '0'} – ${hi.toFixed(1)}`])
+    parts.push(fig(isoSvg(model, { color: (id) => ratioColor(ratioOf.get(id) ?? 0), legend: bandLbl }), t('rep_fig_ratio')))
     const top = [...design.members].sort((a, b) => b.ratio - a.ratio).slice(0, 40)
     parts.push(`<h3>${L('rep_top')}</h3>`)
     parts.push(table([t('rd_elem'), t('rd_role'), t('rd_section'), t('rd_combo'), t('rd_eq'), t('rd_mode'), t('rd_ratio')],
@@ -202,6 +215,11 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   if (spec.code === 'CN') parts.push(`<p>${L('cn_scope_note')}</p><p>${L('rd_assump_CN')}</p><p>${L('cn_note_foundation')}</p><p>${L('cn_note_joint')}</p><p>${L('cn_note_brace')}</p>`)
   else parts.push(t('rep_assump_html'))
 
+  /* 부록. 도면 — DXF 와 같은 시트 (SVG) */
+  parts.push(`<section class="dwg"><h2>${esc(tc(spec.code, 'rep_s11'))}</h2><p class="note">${L('rep_dwg_note')}</p>`)
+  for (const sh of buildDrawingSvgs({ spec, model, connections, title: t('rep_title') })) parts.push(fig(sh.svg, sh.name))
+  parts.push('</section>')
+
   const title = t('rep_title')
   return `<!doctype html><html lang="${htmlLang(getLang())}"><head><meta charset="utf-8"><title>${esc(title)}</title>
 <style>
@@ -210,10 +228,12 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   h3{font-size:13px;margin:14px 0 6px} table{border-collapse:collapse;width:100%;margin:6px 0 10px;font-size:11px}
   th,td{border:1px solid #c8ccd4;padding:3px 6px;text-align:left} th{background:#eef1f7}
   .status{border:1px solid #c8ccd4;border-radius:4px;padding:8px 12px;margin:10px 0;background:#f7f8fb}
-  .gr{display:inline-block;padding:0 6px;border:1px solid currentColor;border-radius:8px;font-size:10.5px;font-weight:600}
+  .gr{display:inline-block;padding:0 6px;border:1px solid currentColor;border-radius:8px;font-size:10.5px;font-weight:600;white-space:nowrap}
+  table.wide{font-size:9.5px} table.wide th,table.wide td{padding:2px 3px}
   .gr-fail{color:#c43030}.gr-expert{color:#5a45c6}.gr-prelim{color:#b56d00}.gr-reinforced{color:#2f55c9}.gr-pass{color:#1d8653}
   .ok{color:#1d8653}.ng{color:#c43030}.note{color:#555;font-size:11px} .meta{color:#555} ul{margin:4px 0 0 18px}
-  @media print{body{margin:0} h2{break-after:avoid} table{break-inside:auto} tr{break-inside:avoid}}
+  figure{margin:10px 0 14px;text-align:center;break-inside:avoid} figure svg{border:1px solid #e1e4ea;background:#fff} figcaption{font-size:11px;color:#444;margin-top:4px}
+  @media print{body{margin:0} h2{break-after:avoid} table{break-inside:auto} tr{break-inside:avoid} .dwg{break-before:page} .dwg figure{break-inside:avoid}}
 </style></head><body>
 <h1>${esc(title)}</h1>
 <div class="meta">${esc(t('rep_project'))} · ${today} · Smart MIDAS Steel v${esc(APP_VERSION)} · MIDAS Gen NX</div>

@@ -71,6 +71,13 @@ Vite 8 + TypeScript + React 19 + Tailwind v4 + shadcn/ui(new-york) + **Vercel Fu
 - 건물 특성 답은 `spec.features`(크레인·메자닌·다경간·큰 개구부). 스펙 카드 맨 위 `ScopeBox`(체크 + 판정), block 이면 [실행] 비활성 + `buildFactory` 도 거부. warn 은 결과 상태를 최소 `전문가 검토 필요`로 올리고 결과 탭·계산서 상태 상자에 남김.
 - 템플릿 4종은 TW·CN 모두 범위 안(물류창고 처마 11 m — 평균 높이 11.9 m).
 
+## 계산서 그림·도면 (2026-10-15, C단계 1)
+- 계산서 HTML 에 SVG 로 직접 그림 (캡처·라이브러리 없음, 인쇄/PDF 벡터 유지): 1장 3D 모델(`drawing/iso.ts` 등각 정투상, 3D 탭 iso 카메라 방향, 부재 종류 색 + 지점), 6장 강도비 분포(3D 탭 BANDS 와 같은 경계), 부록 도면 S1~S5.
+- 도면은 DXF 와 한 코드: `Dxf` 가 시트별로 그리기 명령을 기록(`beginSheet`) → `toSvgSheets`. `drawSheets()` 하나로 `buildDxf`(문자열)·`buildDrawingSvgs`(계산서) 둘 다. 도면을 고치면 양쪽 반영.
+- 대만 라이브: `printf '<key>
+' | node --import tsx scripts/live-tw.ts --optimize --out <접두사>` (키는 stdin 만) → html·dxf·-summary.json. 계산서 양식만 고칠 땐 `scripts/report-from-summary.ts <summary.json> <out.html> [lang]` 로 Gen 없이 재생성. 2026-10-15 라이브: 해석 15 케이스·55 조합, 기본 최대 0.912 NG 0, 최적화 2회 46.96→42.58 t 최대 0.917, API 오류 0, A4 14쪽.
+- 확인: 헤드리스 Chrome `--print-to-pdf` 로 A4 13쪽, 도면은 부록에서 새 페이지 시작. S2 아래 주석이 테두리 밖이던 것(시트 `below` 여백)·S5 접합 일람 비율 열 겹침 수정 — DXF 에도 적용.
+
 ## 단면 자동 최적화 (2026-10-15, 라이브 검증)
 명령 `단면 최적화` (설계 검토 다음). 반복: 결과 회수 → 검토 → `proposeSections` → `sendModel`(재전송) → `analyzeCore`(재해석), 최대 5회.
 - 후보 `src/domain/catalog.ts` = 설치본 `Dbase/CNS2020.sdb` 에서 추출한 이름 그대로(RH 150·CC 45·P 60~318.5 40개). 단면적 오름차순, 목표 강도비 0.95, H 세장 단면 제외.
