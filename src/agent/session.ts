@@ -4,7 +4,7 @@ import { runDesignCheck } from '../actions/design'
 import { runOptimize } from '../actions/optimize'
 import { downloadDrawings, openReport } from '../actions/outputs'
 import type { CodeId } from '../codes'
-import { DEFAULT_SPEC, type FactorySpec } from '../domain/types'
+import { defaultSpecFor, type FactorySpec } from '../domain/types'
 import { getLang, langUrl, t } from '../i18n'
 import { verifyConn } from '../mapi/client'
 import { S, notify, type Theme } from '../state/store'
@@ -28,7 +28,7 @@ export async function send(raw: string): Promise<void> {
       break
     }
     case 'new': {
-      const spec: FactorySpec = { ...DEFAULT_SPEC, ...S.lastSpec, ...c.params, code: S.code }
+      const spec: FactorySpec = { ...defaultSpecFor(S.code), ...(S.lastSpec.code === S.code ? S.lastSpec : {}), ...c.params, code: S.code }
       addPlanMsg(spec)
       tab('viewP')
       previewSpec(spec)
@@ -78,7 +78,9 @@ export function setTheme(th: Theme): void {
 
 /** 설계기준 — 이후 새로 만드는 스펙에 적용 */
 export function setCode(id: CodeId): void {
+  if (S.code !== id) S.buildEpoch++
   S.code = id
+  if (S.lastSpec.code !== id) S.lastSpec = defaultSpecFor(id)
   try { localStorage.setItem('sms_code', id) } catch { /* 무시 */ }
   notify()
 }

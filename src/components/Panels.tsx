@@ -8,7 +8,7 @@ import type { ConnResult } from '../domain/connections'
 import type { DesignResult } from '../domain/design'
 import type { OptSummary } from '../domain/optimize'
 import { ROLES, type FactoryModel, type FactorySpec } from '../domain/types'
-import { t, type I18nKey } from '../i18n'
+import { t, tc, type I18nKey } from '../i18n'
 import { useStore, type AppState } from '../state/store'
 
 export function LogPanel() {
@@ -94,7 +94,8 @@ export function ModelPanel() {
         <KV k={t('kv_EY')} v={seis('Y')} hi />
         <KV k={t('kv_qh')} v={`${f3(info.wind.qh)} kN/m² (h = ${info.wind.hRef} m)`} />
         <KV k={t('kv_cpRoof')} v={`${f3(info.wind.windwardRoofCp.high)} / ${f3(info.wind.windwardRoofCp.low)}`} />
-        {info.wind.across && <KV k={t('kv_across')} v={`W_L ${f1(info.wind.across.WLX)} / ${f1(info.wind.across.WLY)} kN · M_T ${f1(info.wind.across.MT)} kN·m`} />}
+        {sp.code === 'CN' && <KV k={t('f_cn_snow')} v={`${f3(info.snow ?? 0)} kN/m²`} />}
+        {sp.code === 'TW' && info.wind.across && <KV k={t('kv_across')} v={`W_L ${f1(info.wind.across.WLX)} / ${f1(info.wind.across.WLY)} kN · M_T ${f1(info.wind.across.MT)} kN·m`} />}
         <KV k={t('kv_combos')} v={sh.combos} />
       </div>
     </div>
@@ -121,10 +122,11 @@ function Seis13Card({ d }: { d: DesignResult }) {
 }
 
 function DesignTables({ d }: { d: DesignResult }) {
+  const code = useStore().built?.spec.code
   const ngAll = d.members.filter((m) => m.ratio > 1).sort((a, b) => b.ratio - a.ratio)
   return (
     <>
-      <div className="scard"><h3>{t('res_design')}</h3>
+      <div className="scard"><h3>{tc(code, 'res_design')}</h3>
         <div style={{ overflow: 'auto' }}>
           <table>
             <thead><tr><th>{t('rd_role')}</th><th>{t('rd_section')}</th><th>{t('rd_elem')}</th><th>{t('rd_ratio')}</th><th>{t('rd_eq')}</th><th>{t('rd_combo')}</th><th>{t('rd_mode')}</th></tr></thead>
@@ -143,7 +145,7 @@ function DesignTables({ d }: { d: DesignResult }) {
             </tbody>
           </table>
         </div>
-        <div className="res-stat" style={{ marginTop: 10, marginBottom: 0 }}>{t('rd_assump')}</div>
+        <div className="res-stat" style={{ marginTop: 10, marginBottom: 0 }}>{t(code === 'CN' ? 'rd_assump_CN' : 'rd_assump')}</div>
       </div>
       <div className="scard"><h3>{t('res_service')}</h3>
         <table>
@@ -169,7 +171,7 @@ function DesignTables({ d }: { d: DesignResult }) {
               ))}
             </tbody>
           </table>
-          <div className="res-stat" style={{ marginTop: 10, marginBottom: 0 }}>{t('cc_note')}</div>
+          <div className="res-stat" style={{ marginTop: 10, marginBottom: 0 }}>{t(code === 'CN' ? 'cc_note_CN' : 'cc_note')}</div>
         </div>
       )}
       {ngAll.length > 0 && (
@@ -190,6 +192,7 @@ function DesignTables({ d }: { d: DesignResult }) {
 }
 
 function OptTables({ o }: { o: OptSummary }) {
+  const code = useStore().built?.spec.code
   const f2 = (x: number) => x.toFixed(2)
   return (
     <div className="scard"><h3>{t('res_opt')}</h3>
@@ -221,7 +224,7 @@ function OptTables({ o }: { o: OptSummary }) {
           ))}
         </tbody>
       </table>
-      <div className="res-stat" style={{ marginTop: 10, marginBottom: 0 }}>{t('opt_note')}</div>
+      <div className="res-stat" style={{ marginTop: 10, marginBottom: 0 }}>{t(code === 'CN' ? 'opt_note_CN' : 'opt_note')}</div>
     </div>
   )
 }
@@ -235,7 +238,7 @@ function ConnTables({ cs }: { cs: ConnResult[] }) {
             <span className="v" style={{ color: ratioColor(c.ratio), fontWeight: 700 }}>{c.ratio.toFixed(3)}</span></div>
           <div style={{ fontSize: '.78rem', color: 'var(--muted)', margin: '4px 0 6px' }}>
             {Object.values(c.dims).join(' · ')}
-            {c.notes.map((n) => <span key={n} style={{ color: 'var(--amber)' }}> · {n.startsWith('doubler') ? `${t('cn_note_doubler')} ${n.slice(8)}` : n === 'stiffeners' ? t('cn_note_stiffeners') : n === 'rotTest' ? t('cn_note_rot') : n}</span>)}
+            {c.notes.map((n) => <span key={n} style={{ color: 'var(--amber)' }}> · {n === 'gbFoundation' ? t('cn_note_foundation') : n === 'gbJointDetail' ? t('cn_note_joint') : n === 'gbBraceDetail' ? t('cn_note_brace') : n.startsWith('doubler') ? `${t('cn_note_doubler')} ${n.slice(8)}` : n === 'stiffeners' ? t('cn_note_stiffeners') : n === 'rotTest' ? t('cn_note_rot') : n}</span>)}
           </div>
           <table>
             <thead><tr><th>{t('sv_item')}</th><th>{t('cn_demand')}</th><th>{t('cn_capacity')}</th><th>{t('rd_ratio')}</th><th>{t('sv_clause')}</th></tr></thead>

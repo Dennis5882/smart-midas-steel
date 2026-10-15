@@ -10,6 +10,7 @@
    2차 효과: 골조 부재(기둥·지붕보) B = max(B1, B2), B2 = (8.2-5) 조합 방향(X: 횡풍·X 지진, Y: 종풍·Y 지진, 중력: 큰 쪽);
    그 외 B = B1 (Cm = 1.0, 보수적). */
 import { profileOf } from '../codes'
+import { runCnDesign } from './cnDesign'
 import { b1Of, b2Of, capacity, cbOf, check, kSway, SLENDER_LIMIT, type Capacity, type CheckResult } from '../codes/twSteel'
 import type { Results } from '../actions/results'
 import type { LoadInfo } from './loads'
@@ -27,7 +28,7 @@ export interface MemberCheck {
   combo: string
   /** 지배 지점 0..4 (I, 1/4, 2/4, 3/4, J), 가새는 -1 */
   part: number
-  eq: CheckResult['eq'] | 'KL/r' | 'C5' | 'C3.3'
+  eq: CheckResult['eq'] | 'KL/r' | 'C5' | 'C3.3' | `GB ${string}`
   forces: { P: number; Mx: number; My: number; V: number }
   cap: Pick<Capacity, 'phiPnc' | 'phiPnt' | 'phiMnx' | 'phiMny' | 'phiVn' | 'mxMode' | 'compact' | 'KLr' | 'lambdaC'>
   B: number
@@ -73,12 +74,15 @@ const comboDir = (c: string): 'X' | 'Y' | null => (/(W|E)X/.test(c) ? 'X' : /(W|
 export function purlinDefl(spec: FactorySpec, info: LoadInfo, section: string): number {
   const mat = profileOf(spec.code).materials[spec.material]
   const G = portalGeometry(spec)
-  const wLR = info.roofLive * G.sRoof * Math.cos(G.theta) // kN/m
+  const wLR = spec.code === 'CN'
+    ? (spec.roofDead + Math.max(info.roofLive * Math.cos(G.theta), (info.snow ?? 0) * Math.cos(G.theta))) * G.sRoof + mat.gamma * sectionProps(section).A * 1e-6
+    : info.roofLive * G.sRoof * Math.cos(G.theta) // kN/m
   return (5 * wLR * spec.baySpacing ** 4) / (384 * mat.E * 1e3 * (sectionProps(section).Ix * 1e-12)) // m (E kPa, I m⁴)
 }
 
 /** roles 를 주면 그 역할 부재만 검토하고 사용성은 생략 (단면 최적화 후보 평가용) */
 export function runDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo, res: Results, roles?: readonly ElementRole[]): DesignResult {
+  if (spec.code === 'CN') return runCnDesign(spec, model, info, res, roles)
   const prof = profileOf(spec.code)
   const mat = prof.materials[spec.material]
   const G = portalGeometry(spec)

@@ -70,6 +70,14 @@ export function t<K extends keyof Dict>(key: K, ...args: Dict[K] extends (...a: 
   return typeof v === 'function' ? v(...args) : v
 }
 
+/** Code-specific wording; engineering code remains independent of UI language. */
+export function tc<K extends keyof Dict>(code: 'TW' | 'CN' | undefined, key: K, ...args: Dict[K] extends (...a: infer A) => string ? A : []): string {
+  const alt = `${key}_CN` as keyof Dict
+  const chosen = code === 'CN' && Object.hasOwn(en, alt) ? alt : key
+  const v = (DICTS[current][chosen] ?? en[chosen]) as string | ((...a: unknown[]) => string)
+  return typeof v === 'function' ? v(...args) : v
+}
+
 export { LANG_DEFS, htmlLang, normalizeLang, type Lang } from './types'
 export type { Dict } from './dict/en'
 export type I18nKey = keyof Dict

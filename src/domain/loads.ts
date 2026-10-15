@@ -11,8 +11,10 @@ import { portalGeometry } from './portal'
 import type { Face, FactoryModel, FactorySpec, Node } from './types'
 import { nodeWeights } from './weights'
 import { BASIN } from '../codes/twSites'
+import { buildCnLoads } from './cnLoads'
 
 export interface LoadInfo {
+  snow?: number
   /** 지붕 활하중 (kN/m², 수평투영) */
   roofLive: number
   seismic: Record<'X' | 'Y', { T: number; c: number; cStar: number; cV: number; cMin: number; cM: number; gov: string; V: number; Fu: number; R: number; Mt: number }> & { W: number }
@@ -46,6 +48,7 @@ interface Variant { parts: { lc: string; f: number }[]; tag: string }
 const OUT: Record<Exclude<Face, 'roof'>, [number, number]> = { x0: [-1, 0], xL: [1, 0], y0: [0, -1], yL: [0, 1] }
 
 export function buildLoadPayloads(spec: FactorySpec, model: FactoryModel): LoadPayloads {
+  if (spec.code === 'CN') return buildCnLoads(spec, model)
   const prof = profileOf(spec.code)
   const lat = prof.lateral
   const { span, eaveHeight, roofSlope, baySpacing } = spec
@@ -233,6 +236,7 @@ export function buildLoadPayloads(spec: FactorySpec, model: FactoryModel): LoadP
     }))),
   ]
   const variants: Record<LoadCaseType, Variant[]> = {
+    S: [],
     D: [{ parts: [{ lc: 'D', f: 1 }], tag: '' }],
     L: [{ parts: [{ lc: 'LR', f: 1 }], tag: '' }],
     W: windVariants,

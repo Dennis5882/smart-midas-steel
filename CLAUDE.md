@@ -28,6 +28,8 @@ Vite 8 + TypeScript + React 19 + Tailwind v4 + shadcn/ui(new-york) + **Vercel Fu
 - **자동 저장으로 Gen 확인 창 방지** (`src/actions/save.ts`): `doc/new` 직전(`sms_backup_*`)과 `doc/anal` 직전(`sms_model_*`)에 항상 `doc/saveas {Argument:"<S.saveDir>/sms_<tag>_<YYYYMMDD_hhmmss>.mgbx"}`. 저장 안 된 문서로 해석하면 실패 + Gen 대화상자가 남아 **API 전체가 응답 없음**(2026-10-15 관찰). 폴더 기본 `C:/temp`(Gen PC 기준, 드로어에서 변경, 없으면 "잘못된 경로" 창), 시각을 파일명에 넣어 덮어쓰기 창 회피. 라이브: 생성→해석 연속 2회 창 없이 각 ~10s. 해석 1회당 C:/temp 에 ~10MB(.GAX1) 누적.
 
 ## 설계기준·다국어
+- **중국(CN) 추가(2026-10-15)**: 전체 흐름 및 적용 제한은 `docs/china_code_implementation.md` 참조. 중국 전용 구현은 `codes/cn*.ts`, `domain/cn*.ts`. 현재 GB 55001/55002 하중계수, GB 50009 풍·적설, GB/T 50011 수평지진, GB 50017-2017 및 GB/T 50018-2025 검토. 공개 Gen 설계 API는 구판이므로 CN에서 DSTL을 보내지 않는다. 모델의 `spec.code`로 검토·출력을 분기하고, 선택 변경 시 새 입력 카드만 해당 국가 기본값으로 초기화한다. TW 수치식·입력 항목을 CN에 적용하지 않는다.
+- 국가별 문구는 `tc(code, key)`로 `_CN` 키를 선택한다. UI 언어는 국가와 독립적이다. CN 오프라인 회귀: `node --import tsx scripts/verify-cn.ts`. 라이브: `scripts/live-cn.ts`(키는 stdin, 파일에 저장 금지).
 - **코드 프로필** `src/codes/` — `CodeProfile`(재료·하중조합·Gen 연동명). UI 언어와 독립. 기준 추가 = `<id>.ts` + `PROFILES` 한 줄 + `CodeId`. 기준 의존 로직은 `profileOf()`를 거친다.
 - **다국어** `src/i18n/` — ko/en/zh-TW/zh-CN. 사전 `dict/en.ts`가 키 기준, 나머지는 `Dict` 타입이라 **키 누락·인자 불일치는 컴파일 오류**. UI 문구는 `t('key')`로만 (인라인 다국어 객체 금지). 언어 추가 = `types.ts` `LANG_DEFS` 한 줄 + 사전 파일.
 - 중국어 용어: zh-TW는 대만 규범 용어(屋樑·檁條·牆樑), zh-CN은 대륙 용어(屋面梁·檩条·墙梁). 참고 오라클은 story CLAUDE.md의 i18n 절.

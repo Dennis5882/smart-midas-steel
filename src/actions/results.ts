@@ -42,9 +42,15 @@ export async function fetchResults(b: Built): Promise<Results> {
 
   /* 보 부재력 */
   const beam = new Map<number, Map<string, ForcePt[]>>()
-  const bf = await table('BEAMFORCE', 'F', beamIds, cb, { PARTS: ['PartI', 'Part1/4', 'Part2/4', 'Part3/4', 'PartJ'] },
-    ['Elem', 'Load', 'Part', 'Axial', 'Shear-y', 'Shear-z', 'Moment-y', 'Moment-z'])
-  for (const r of bf?.DATA ?? []) {
+  const beamRows: string[][] = []
+  const batchSize = spec.code === 'CN' ? 4 : cb.length
+  for (let offset = 0; offset < cb.length; offset += batchSize) {
+    const bf = await table('BEAMFORCE', spec.code === 'CN' ? `F${offset}` : 'F', beamIds, cb.slice(offset, offset + batchSize), { PARTS: ['PartI', 'Part1/4', 'Part2/4', 'Part3/4', 'PartJ'] },
+      ['Elem', 'Load', 'Part', 'Axial', 'Shear-y', 'Shear-z', 'Moment-y', 'Moment-z'])
+    if (spec.code === 'CN' && !bf?.DATA?.length) throw new Error('GB: beam-force table is empty')
+    beamRows.push(...bf?.DATA ?? [])
+  }
+  for (const r of beamRows) {
     const [, el, lc, , P, Vy, Vz, My, Mz] = r
     const m = beam.get(+el) ?? new Map<string, ForcePt[]>()
     beam.set(+el, m)
@@ -90,7 +96,7 @@ export async function fetchResults(b: Built): Promise<Results> {
   /* 사용성 — 처마·마루 절점 변위 (사용 하중 케이스) */
   const ridge = model.nodes.filter((n) => Math.abs(n.z - G.ridgeZ) < 1e-9 && Math.abs(n.x - spec.span / 2) < 1e-9)
   const svcNodes = [...eaveNodes, ...ridge]
-  const svcCases = b.cases.filter((c) => c !== 'D')
+  const svcCases = b.cases.filter((c) => spec.code === 'CN' || c !== 'D')
   const us = await table('DISPLACEMENTG', 'S', svcNodes.map((n) => n.id), svcCases.map((c) => `${c}(ST)`), {}, ['Node', 'Load', 'DX', 'DY', 'DZ'])
   const disp = new Map<string, Map<number, { dx: number; dy: number; dz: number }>>()
   for (const [, nd, lc, dx, dy, dz] of us?.DATA ?? []) {

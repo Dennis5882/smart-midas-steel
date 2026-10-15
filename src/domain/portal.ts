@@ -101,13 +101,21 @@ export function buildPortal(spec: FactorySpec): FactoryModel {
      베이가 4 이상이면 끝에서 두 번째 베이에 둔다: 박공 프레임은 중력하중이 절반이라 내부 프레임과 처짐이 달라,
      끝 베이 지붕 가새가 중력에서 큰 축력(라이브: 187 kN 압축)을 받는다. 박공 풍하중은 끝 베이 스트럿이 가새 베이로 전달. */
   const braceBays = [...new Set(bays >= 4 ? [1, bays - 2] : [0, bays - 1])].filter((b) => b >= 0)
-  for (const b of braceBays) {
+  // GB/T 50011 9.2: wall bracing in the middle of the temperature unit;
+  // roof bracing at the ends and aligned with the wall bracing.
+  const cnWall = [...new Set(G.length > 60 ? [Math.floor(bays / 3), Math.floor(2 * bays / 3)] : [Math.floor((bays - 1) / 2)])].map((b) => Math.min(bays - 1, b))
+  const wallBays = spec.code === 'CN' ? cnWall : braceBays
+  const roofBays = spec.code === 'CN' ? [...new Set([0, ...cnWall, bays - 1])] : braceBays
+  for (const b of wallBays) {
     const y0 = yOf(b), y1 = yOf(b + 1)
     for (const x of [0, span]) {
       const f: Face = x === 0 ? 'x0' : 'xL'
       elem(node(x, y0, 0), node(x, y1, eaveHeight), 'brace', sec.brace, f)
       elem(node(x, y1, 0), node(x, y0, eaveHeight), 'brace', sec.brace, f)
     }
+  }
+  for (const b of roofBays) {
+    const y0 = yOf(b), y1 = yOf(b + 1)
     for (const x of [0, span]) {
       elem(node(x, y0, eaveHeight), node(span / 2, y1, G.ridgeZ), 'brace', sec.brace, 'roof')
       elem(node(x, y1, eaveHeight), node(span / 2, y0, G.ridgeZ), 'brace', sec.brace, 'roof')

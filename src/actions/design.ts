@@ -1,7 +1,7 @@
 /* 설계 검토 실행 (M3) — 결과 회수(M2) → 대만 LRFD 부재·사용성 검토 */
 import { runConnections } from '../domain/connections'
 import { runDesign } from '../domain/design'
-import { t } from '../i18n'
+import { t, tc } from '../i18n'
 import { S, notify } from '../state/store'
 import { addMsg, log, tab } from '../state/ui'
 import { fetchResults } from './results'
@@ -12,7 +12,7 @@ export async function runDesignCheck(): Promise<void> {
   if (!S.analyzed) { addMsg('bot', t('need_anal')); return }
   S.busy = true
   notify()
-  addMsg('bot', t('design_start'))
+  addMsg('bot', tc(S.built.spec.code, 'design_start'))
   try {
     const b = S.built
     S.results = await fetchResults(b)

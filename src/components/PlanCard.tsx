@@ -5,7 +5,7 @@ import { buildFactory } from '../actions/build'
 import { profileOf } from '../codes'
 import { counties, siteCoef, townsOf } from '../codes/twSites'
 import type { FactorySpec } from '../domain/types'
-import { t, type I18nKey } from '../i18n'
+import { t, tc, type I18nKey } from '../i18n'
 import { S, useStore, type ChatMsg } from '../state/store'
 import { draw3D, previewSpec, tab } from '../state/ui'
 
@@ -82,7 +82,32 @@ const GROUPS: Group[] = [
       { value: 'enclosed', label: t('encl_enclosed') }, { value: 'partial', label: t('encl_partial') }] },
   ] },
 ]
-const FIELDS = GROUPS.flatMap((g) => g.fields)
+const CN_GROUPS: Group[] = [
+  { title: 'sec_wind', fields: [
+    { path: 'china.w0', label: 'f_cn_w0', unit: 'kN/m²', kind: 'num', min: .3 },
+    { path: 'china.terrain', label: 'f_exposure', kind: 'select', options: () => ['A', 'B', 'C', 'D'].map((v) => ({ value: v, label: v })) },
+    { path: 'china.betaZ', label: 'f_cn_beta', kind: 'num', min: 1 },
+    { path: 'china.topography', label: 'f_cn_topo', kind: 'num', min: .75 },
+  ] },
+  { title: 'sec_seismic', fields: [
+    { path: 'china.alphaMax', label: 'f_cn_alpha', kind: 'select', numeric: true, options: () => [.04, .08, .12, .16, .24, .32].map((n) => ({ value: String(n), label: String(n) })) },
+    { path: 'china.Tg', label: 'f_cn_Tg', unit: 's', kind: 'num', min: .1 },
+    { path: 'china.Tx', label: 'f_cn_Tx', unit: 's', kind: 'num' },
+    { path: 'china.Ty', label: 'f_cn_Ty', unit: 's', kind: 'num' },
+    { path: 'china.damping', label: 'f_cn_damping', kind: 'num', min: .045 },
+  ] },
+  { title: 'sec_cn_snow', fields: [
+    { path: 'china.snow', label: 'f_cn_snow', unit: 'kN/m²', kind: 'num', min: 0 },
+    { path: 'china.snowMu', label: 'f_cn_snowMu', kind: 'num', min: .9 },
+    { path: 'china.gamma0', label: 'f_cn_gamma0', kind: 'num', min: 1 },
+  ] },
+  { title: 'sec_conn', fields: [
+    { path: 'china.concreteBearing', label: 'f_cn_concrete', unit: 'MPa', kind: 'num' },
+    { path: 'china.anchorFt', label: 'f_cn_anchor', unit: 'MPa', kind: 'select', numeric: true, options: () => [140, 180].map((n) => ({ value: String(n), label: `${n}` })) },
+  ] },
+]
+const groupsFor = (code: FactorySpec['code']) => code === 'CN' ? [...GROUPS.filter((g) => !['sec_wind', 'sec_seismic', 'sec_conn'].includes(g.title)), ...CN_GROUPS] : GROUPS
+const FIELDS = [...GROUPS, ...CN_GROUPS].flatMap((g) => g.fields)
 
 const getPath = (o: any, p: Path): unknown => p.split('.').reduce((a, k) => a?.[k], o)
 function setPath<T>(o: T, p: Path, v: unknown): T {
@@ -93,7 +118,7 @@ function setPath<T>(o: T, p: Path, v: unknown): T {
 /** 입력 문자열 → 스펙. 숫자가 아니거나 0 이하면 기존 값 유지 */
 function toSpec(base: FactorySpec, vals: Record<Path, string>): FactorySpec {
   let sp = base
-  for (const f of FIELDS) {
+  for (const f of groupsFor(base.code).flatMap((g) => g.fields)) {
     const raw = vals[f.path]
     if (f.kind === 'num' || f.kind === 'int') {
       const n = f.kind === 'int' ? Math.round(+raw) : +raw
@@ -126,7 +151,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
     setVals((o) => {
       const n = { ...o, [p]: v }
       /* 工址 선택 → 표2-1·2-4 로 SDS·SD1·SMS·SM1 채움 (군 변경 시 첫 鄉鎮) */
-      if (p === 'seismic.county' || p === 'seismic.town' || p === 'seismic.soil') {
+      if (msg.spec.code === 'TW' && (p === 'seismic.county' || p === 'seismic.town' || p === 'seismic.soil')) {
         if (p === 'seismic.county') n['seismic.town'] = townsOf(v)[0] ?? ''
         const c = siteCoef(n['seismic.county'], n['seismic.town'], (+n['seismic.soil'] || 1) as 1 | 2 | 3)
         if (c) for (const k of ['SDS', 'SD1', 'SMS', 'SM1'] as const) n[`seismic.${k}`] = String(c[k])
@@ -134,13 +159,14 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
       return n
     })
   }
-  const site = siteCoef(spec.seismic.county, spec.seismic.town, spec.seismic.soil)
+  const site = spec.code === 'TW' ? siteCoef(spec.seismic.county, spec.seismic.town, spec.seismic.soil) : null
 
   return (
     <>
       <span dangerouslySetInnerHTML={{ __html: t('plan_intro') }} />
       <div className="plan-editor">
-        {GROUPS.map((g) => (
+        {spec.code === 'CN' && <div className="pe-tip">{t('cn_scope_note')}</div>}
+        {groupsFor(spec.code).map((g) => (
           <div key={g.title} style={{ marginBottom: 12 }}>
             <div className="sec-divider" style={{ margin: '4px 0 10px' }}>{t(g.title)}</div>
             <div className="pe-grid">
@@ -166,7 +192,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
             )}
           </div>
         ))}
-        <div className="pe-tip">{t('plan_tip')}</div>
+        <div className="pe-tip">{tc(spec.code, 'plan_tip')}</div>
       </div>
       {live && (
         <div className="confirm-row">

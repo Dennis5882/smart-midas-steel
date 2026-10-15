@@ -21,7 +21,7 @@ export async function runOptimize(): Promise<void> {
   if (!S.analyzed) { addMsg('bot', t('need_anal')); return }
   S.busy = true
   notify()
-  addMsg('bot', t('opt_start', MAX_ITER))
+  addMsg('bot', t(S.built.spec.code === 'CN' ? 'opt_start_CN' : 'opt_start', MAX_ITER))
   tab('logP')
   const start = S.built.spec
   const iters: OptIter[] = []
@@ -79,7 +79,8 @@ export async function runOptimize(): Promise<void> {
     const wB = steelWeight(start, b.model, start.sections), wA = steelWeight(b.spec, b.model)
     const tB = roleTons(start, b.model, start.sections), tA = roleTons(b.spec, b.model)
     S.opt = {
-      before: start.sections, after: b.spec.sections, iters, weightBefore: wB, weightAfter: wA, converged, ok: S.design.ng === 0,
+      before: start.sections, after: b.spec.sections, iters, weightBefore: wB, weightAfter: wA, converged,
+      ok: S.design.ng === 0 && (b.spec.code !== 'CN' || S.connections.every((c) => c.ratio <= 1)),
       rows: ROLES.filter((r) => b.model.elements.some((e) => e.role === r)).map((r) => ({
         role: r, before: start.sections[r], after: b.spec.sections[r], ratio: S.design!.byRole[r]?.ratio ?? 0,
         governs: lastRows.find((x) => x.role === r)?.governs ?? 'strength', tBefore: tB[r], tAfter: tA[r],

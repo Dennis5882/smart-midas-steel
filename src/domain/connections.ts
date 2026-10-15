@@ -11,6 +11,7 @@
    - 가새 접합: 13.8.4 — E′ 조합 포함 */
 import { anchorRod, concreteBearing, ellipse, f10t, filletPerMm, pickPlate } from '../codes/twConnection'
 import { profileOf } from '../codes'
+import { runCnConnections } from './cnConnections'
 import type { Results } from '../actions/results'
 import type { LoadInfo } from './loads'
 import { portalGeometry } from './portal'
@@ -210,6 +211,7 @@ function endPlateFor(spec: FactorySpec, forces: EndForce[], boltD: number, beamN
 }
 
 export function runConnections(spec: FactorySpec, model: FactoryModel, info: LoadInfo, res: Results): ConnResult[] {
+  if (spec.code === 'CN') return runCnConnections(spec, model, res)
   const kind = (c: string) => info.comboKind?.[c] ?? 'basic'
   const basic = (c: string) => kind(c) === 'basic'
   const withAmp = (c: string) => kind(c) !== 'gravity'

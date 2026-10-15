@@ -8,7 +8,7 @@ import { portalGeometry } from '../domain/portal'
 import { memberSchedule } from '../domain/schedule'
 import { sectionProps } from '../domain/sections'
 import { ROLES } from '../domain/types'
-import { getLang, htmlLang, t, type I18nKey } from '../i18n'
+import { getLang, htmlLang, t, tc, type I18nKey } from '../i18n'
 import type { Built, ReactionSum } from '../state/store'
 import { APP_VERSION } from '../version'
 
@@ -35,12 +35,12 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   const today = new Date().toISOString().slice(0, 10)
   const L = (k: I18nKey) => esc(t(k))
   const parts: string[] = []
-  const h2 = (k: I18nKey) => parts.push(`<h2>${L(k)}</h2>`)
+  const h2 = (k: I18nKey) => parts.push(`<h2>${esc(tc(spec.code, k))}</h2>`)
 
   /* 1. 설계 개요 */
   h2('rep_s1')
   parts.push(table([t('sv_item'), t('sv_value')], [
-    [L('kv_code'), `${esc(t(prof.labelKey))} — ${esc(t('rep_code_refs'))}`],
+    [L('kv_code'), `${esc(t(prof.labelKey))} — ${esc(t(spec.code === 'CN' ? 'rep_code_refs_CN' : 'rep_code_refs'))}`],
     [L('kv_span'), `${spec.span} m`], [L('kv_length'), `${spec.bays} × ${spec.baySpacing} = ${f(G.length, 1)} m`],
     [L('kv_eave'), `${spec.eaveHeight} m`], [L('kv_slope'), `${spec.roofSlope} (${f((G.theta * 180) / Math.PI, 1)}°)`],
     [L('kv_base'), L(spec.baseFixity === 'fixed' ? 'base_fixed' : 'base_pinned')],
@@ -60,10 +60,11 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   /* 3. 하중 */
   h2('rep_s3')
   parts.push(`<h3>${L('rep_dead')}</h3><p>${esc(t('rep_dead_txt', spec.roofDead, spec.wallDead))}</p>`)
-  parts.push(`<h3>${L('rep_live')}</h3><p>${esc(t('rep_live_txt', f(info.roofLive, 3)))}</p>`)
+  parts.push(`<h3>${L('rep_live')}</h3><p>${spec.code === 'CN' ? `GB 55001-2021 4.2.8 / GB 50009-2012 5.3: ${f(info.roofLive, 3)} kN/m²` : esc(t('rep_live_txt', f(info.roofLive, 3)))}</p>`)
+  if (spec.code === 'CN') parts.push(`<p>${L('f_cn_snow')}: s0=${spec.china!.snow} kN/m²; roof=${f(info.snow ?? 0, 3)} kN/m² (GB 50009 table 7.2.1)</p>`)
   parts.push(`<h3>${L('rep_seismic')}</h3>`)
   const si = spec.seismic
-  parts.push(table(['', 'X', 'Y'], [
+  if (spec.code === 'TW') parts.push(table(['', 'X', 'Y'], [
     ['site', `${esc(si.county ?? '')} ${esc(si.town ?? '')} · soil ${si.soil ?? '-'}`, ''],
     ['SDS / SD1 / SMS / SM1 / I', `${si.SDS} / ${si.SD1} / ${si.SMS ?? '-'} / ${si.SM1 ?? '-'} / ${si.I}`, ''],
     ['R', si.Rx, si.Ry],
@@ -78,19 +79,26 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
       ['M_t = 0.05·B·V (kN·m, 2.14)', f(info.seismic.X.Mt, 1), f(info.seismic.Y.Mt, 1)],
     ] : []),
   ]))
-  parts.push(`<p class="note">${esc(t('rep_seismic_txt'))}</p>`)
+  if (spec.code === 'CN') parts.push(table(['GB/T 50011', 'X', 'Y'], [
+    ['αmax / Tg / ζ', `${spec.china!.alphaMax} / ${spec.china!.Tg} / ${spec.china!.damping}`, ''],
+    ['T (s)', f(info.seismic.X.T, 3), f(info.seismic.Y.T, 3)],
+    ['α(T)', f(info.seismic.X.c, 4), f(info.seismic.Y.c, 4)],
+    ['G = D+0.5S (kN)', f(info.seismic.W, 1), ''],
+    ['FEk (kN)', f(info.seismic.X.V, 1), f(info.seismic.Y.V, 1)],
+  ]))
+  parts.push(`<p class="note">${esc(t(spec.code === 'CN' ? 'rep_seismic_txt_CN' : 'rep_seismic_txt'))}</p>`)
   parts.push(`<h3>${L('rep_wind')}</h3>`)
   const wi = spec.wind
-  parts.push(`<p>V10 = ${wi.V10} m/s, I = ${wi.I}, ${L('f_exposure')} ${wi.exposure}, ${L(wi.enclosure === 'enclosed' ? 'encl_enclosed' : 'encl_partial')}, h = ${f(info.wind.hRef, 2)} m, q(h) = ${f(info.wind.qh, 3)} kN/m², G = ${prof.lateral.gust}</p>`)
+  parts.push(spec.code === 'CN' ? `<p>w0=${spec.china!.w0} kN/m²; terrain ${spec.china!.terrain}; βz=${spec.china!.betaZ}; topography=${spec.china!.topography}; h=${f(info.wind.hRef, 2)} m; μz·w0=${f(info.wind.qh, 3)} kN/m²</p>` : `<p>V10 = ${wi.V10} m/s, I = ${wi.I}, ${L('f_exposure')} ${wi.exposure}, ${L(wi.enclosure === 'enclosed' ? 'encl_enclosed' : 'encl_partial')}, h = ${f(info.wind.hRef, 2)} m, q(h) = ${f(info.wind.qh, 3)} kN/m², G = ${prof.lateral.gust}</p>`)
   parts.push(table([t('res_lc'), 'X / Y', t('kv_cpRoof'), 'GCpi'], info.wind.cases.map((c) => [c.name, c.dir, f(c.roofCp, 3), f(c.gcpi, 3)])))
   const ac = info.wind.across
-  if (ac) parts.push(`<p><b>${L('kv_across')}</b>: W<sub>D,X</sub> = ${f(ac.WDx, 1)} kN, W<sub>D,Y</sub> = ${f(ac.WDy, 1)} kN; W<sub>L</sub> = 0.87(L/B)W<sub>D</sub> → W<sub>L,X</sub> = ${f(ac.WLX, 1)} kN, W<sub>L,Y</sub> = ${f(ac.WLY, 1)} kN; M<sub>T</sub> = 0.28·max(B·W<sub>D</sub>) = ${f(ac.MT, 1)} kN·m; W = ${f(ac.kD, 3)}·W<sub>D</sub> + 0.7(W<sub>L</sub> ± W<sub>T</sub>) (2.12)</p>`)
-  parts.push(`<p class="note">${esc(t('rep_wind_txt'))}</p>`)
+  if (ac && spec.code === 'TW') parts.push(`<p><b>${L('kv_across')}</b>: W<sub>D,X</sub> = ${f(ac.WDx, 1)} kN, W<sub>D,Y</sub> = ${f(ac.WDy, 1)} kN; W<sub>L</sub> = 0.87(L/B)W<sub>D</sub> → W<sub>L,X</sub> = ${f(ac.WLX, 1)} kN, W<sub>L,Y</sub> = ${f(ac.WLY, 1)} kN; M<sub>T</sub> = 0.28·max(B·W<sub>D</sub>) = ${f(ac.MT, 1)} kN·m; W = ${f(ac.kD, 3)}·W<sub>D</sub> + 0.7(W<sub>L</sub> ± W<sub>T</sub>) (2.12)</p>`)
+  parts.push(`<p class="note">${esc(t(spec.code === 'CN' ? 'rep_wind_txt_CN' : 'rep_wind_txt'))}</p>`)
 
   /* 4. 하중조합 */
   h2('rep_s4')
   parts.push(table(['#', t('rd_combo')], built.comboNames.map((n, i) => [i + 1, esc(n)])))
-  parts.push(`<p class="note">${esc(t('rep_combo_txt'))}</p>`)
+  parts.push(`<p class="note">${esc(t(spec.code === 'CN' ? 'rep_combo_txt_CN' : 'rep_combo_txt'))}</p>`)
 
   /* 5. 해석 결과 */
   h2('rep_s5')
@@ -100,7 +108,7 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   /* 6. 부재 설계 */
   h2('rep_s6')
   if (design) {
-    parts.push(`<p class="note">${esc(t('rd_assump'))}</p>`)
+    parts.push(`<p class="note">${esc(t(spec.code === 'CN' ? 'rd_assump_CN' : 'rd_assump'))}</p>`)
     parts.push(table([t('rd_role'), t('rd_section'), t('rd_elem'), t('rd_combo'), 'Pu', 'Mux', 'Muy', 'Vu', 'φPn', 'φMnx', 'φMny', 'φVn', 'Cb', 'B', 'KL/r', t('rd_eq'), t('rd_ratio')],
       ROLES.filter((r) => design.byRole[r]).map((r) => {
         const m = design.byRole[r]!
@@ -118,7 +126,7 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
       parts.push(`<h3>${L('res_cc')}</h3>`)
       parts.push(table([t('rd_role'), t('cc_zone'), t('cc_area'), 'p+ (kN/m²)', 'p− (kN/m²)', 'n'],
         design.cc.map((c) => [L(`role_${c.role}`), c.zone, f(c.A, 1), f(c.pPos, 3), f(c.pNeg, 3), c.count])))
-      parts.push(`<p class="note">${esc(t('cc_note'))}</p>`)
+      parts.push(`<p class="note">${esc(t(spec.code === 'CN' ? 'cc_note_CN' : 'cc_note'))}</p>`)
     }
     if (design.col13 !== undefined) {
       parts.push(`<h3>${L('res_seis13')}</h3>`)
@@ -143,6 +151,7 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
     parts.push(`<h3>${L(`cn_type_${c.type}`)} — ${ok(c.ratio)} <span class="note">(${esc(c.combo)}, elem ${c.elem})</span></h3>`)
     parts.push(`<p>${Object.entries(c.dims).map(([k, v]) => `${esc(k)}: ${esc(v)}`).join(' · ')}</p>`)
     if (c.notes.includes('rotTest')) parts.push(`<p class="note">${L('cn_note_rot')}</p>`)
+    for (const [note, key] of [['gbFoundation', 'cn_note_foundation'], ['gbJointDetail', 'cn_note_joint'], ['gbBraceDetail', 'cn_note_brace']] as const) if (c.notes.includes(note)) parts.push(`<p class="note">${L(key)}</p>`)
     parts.push(table([t('sv_item'), t('cn_demand'), t('cn_capacity'), t('rd_ratio'), t('sv_clause')],
       c.checks.map((k) => [L(`cn_${k.item}` as I18nKey), `${f(k.demand)} ${k.unit}`, `${f(k.capacity)} ${k.unit}`,
         c.dims.stiffener && k.item === 'flangeBend' ? `${f(k.ratio, 3)} → ${L('cn_stiffener')}` : ok(k.ratio), esc(k.clause)])))
@@ -162,12 +171,13 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
       [...opt.rows.map((r) => [L(`role_${r.role}`), esc(r.before), r.after !== r.before ? `<b>${esc(r.after)}</b>` : esc(r.after), ok(r.ratio),
         L(`op_gov_${r.governs}`), `${f(r.tBefore)} → ${f(r.tAfter)}`]),
        [`<b>${L('op_total')}</b>`, '', '', '', '', `<b>${f(opt.weightBefore)} → ${f(opt.weightAfter)}</b>`]]))
-    parts.push(`<p class="note">${esc(t('opt_note'))}</p>`)
+    parts.push(`<p class="note">${esc(t(spec.code === 'CN' ? 'opt_note_CN' : 'opt_note'))}</p>`)
   }
 
   /* 10. 가정·한계 */
   h2('rep_s10')
-  parts.push(t('rep_assump_html'))
+  if (spec.code === 'CN') parts.push(`<p>${L('cn_scope_note')}</p><p>${L('rd_assump_CN')}</p><p>${L('cn_note_foundation')}</p><p>${L('cn_note_joint')}</p><p>${L('cn_note_brace')}</p>`)
+  else parts.push(t('rep_assump_html'))
 
   const title = t('rep_title')
   return `<!doctype html><html lang="${htmlLang(getLang())}"><head><meta charset="utf-8"><title>${esc(title)}</title>

@@ -5,6 +5,7 @@
    플랜지 구속: 정압(외장재 쪽 플랜지 압축) = 구속, 부압(자유 플랜지 압축) = 새그로드 간격 횡비틀림.
    약축: 중력(지붕 경사 성분·벽 자중)을 새그로드 경간 L/(n+1) 단순보로 — wt·(L/(n+1))²/8. */
 import { profileOf } from '../codes'
+import { cnCCLoads } from './cnSecondary'
 import { effArea, gcpCC, zoneWidth, type CCZone } from '../codes/twWindCC'
 import type { LoadInfo } from './loads'
 import { portalGeometry } from './portal'
@@ -20,6 +21,7 @@ export interface CCDemand {
 export interface CCLoad { zone: CCZone; A: number; pPos: number; pNeg: number; demands: CCDemand[] }
 
 export function ccLoads(spec: FactorySpec, model: FactoryModel, info: LoadInfo): Map<number, CCLoad> {
+  if (spec.code === 'CN') return cnCCLoads(spec, model, info)
   const out = new Map<number, CCLoad>()
   const G = portalGeometry(spec)
   const gamma = profileOf(spec.code).materials[spec.material].gamma

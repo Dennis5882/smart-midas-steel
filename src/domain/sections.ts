@@ -34,14 +34,14 @@ const num = (s: string) => s.split('x').map(Number)
 
 export function sectionProps(name: string): SectionProps {
   const [kind, dims] = name.trim().split(/\s+/)
-  if (kind === 'RH' || kind === 'BH') {
-    const [H, B, tw, tf] = num(dims)
+  if (['RH', 'BH', 'HN', 'HW', 'HM', 'HT'].includes(kind)) {
+    const [H, B, tw, tf] = num(dims.replace('/', 'x'))
     const hw = H - 2 * tf
     const A = 2 * B * tf + hw * tw
     const Ix = (B * H ** 3 - (B - tw) * hw ** 3) / 12
     const Iy = (2 * tf * B ** 3 + hw * tw ** 3) / 12
     return {
-      name, kind: 'H', rolled: kind === 'RH', d: H, bf: B, tw, tf, h: hw, A, Ix, Iy,
+      name, kind: 'H', rolled: kind !== 'BH', d: H, bf: B, tw, tf, h: hw, A, Ix, Iy,
       Sx: (2 * Ix) / H, Sy: (2 * Iy) / B,
       Zx: B * tf * (H - tf) + (tw * hw ** 2) / 4, Zy: (tf * B ** 2) / 2 + (hw * tw ** 2) / 4,
       rx: Math.sqrt(Ix / A), ry: Math.sqrt(Iy / A),
@@ -50,8 +50,8 @@ export function sectionProps(name: string): SectionProps {
   }
   if (kind === 'CC') {
     const [size, ts] = dims.split('/')
-    const [H, B, c] = num(size)
-    const t = +ts
+    const [H, B, c, tc] = num(size)
+    const t = ts === undefined ? tc : +ts
     const h = H - t, b = B - t, cl = c - t / 2 // 중심선 치수
     const A = t * (h + 2 * b + 2 * cl)
     const Ix = (t * h ** 3) / 12 + 2 * b * t * (h / 2) ** 2 + 2 * ((t * cl ** 3) / 12 + cl * t * (h / 2 - cl / 2) ** 2)

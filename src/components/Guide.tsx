@@ -2,10 +2,11 @@
 import { useRef, useState } from 'react'
 import { GUIDE, type GuideSection } from '../agent/guide'
 import { runCmd } from '../agent/session'
-import { t } from '../i18n'
+import { t, tc } from '../i18n'
 import { S, useStore } from '../state/store'
 
 function Section({ sec, running, onRun }: { sec: GuideSection; running: string | null; onRun(key: string, cmd: string): void }) {
+  const code = useStore().code
   const [open, setOpen] = useState(sec.open)
   const itemsRef = useRef<HTMLDivElement>(null)
   const maxH = open ? `${itemsRef.current?.scrollHeight ?? 2000}px` : '0'
@@ -20,7 +21,7 @@ function Section({ sec, running, onRun }: { sec: GuideSection; running: string |
         {sec.items.map((it, i) => {
           if ('div' in it) return <div key={i} className="gsec-div" />
           if ('note' in it) return <div key={i} className="gsec-note">{t(it.note)}</div>
-          const label = t(it.key), cmd = t(`${it.key}_cmd`)
+          const label = tc(code, it.key), cmd = t(`${it.key}_cmd`)
           return (
             <button key={i} className={`gcmd${running === it.key ? ' running' : ''}`} title={`↵ ${cmd}`} onClick={() => onRun(it.key, cmd)}>
               <i className="gicon">{it.icon}</i><span className="glabel">{label}</span>

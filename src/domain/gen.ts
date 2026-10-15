@@ -40,7 +40,7 @@ export function buildGenPayloads(spec: FactorySpec, model: FactoryModel): GenPay
         USE_SHEAR_DEFORM: true, USE_WARPING_EFFECT: !trussSects.has(name),
         SHAPE: prof.gen.shapeOf(name),
         DATATYPE: 1,
-        SECT_I: { DB_NAME: prof.gen.sectionDb, SECT_NAME: name },
+        SECT_I: { DB_NAME: prof.gen.sectionDbOf?.(name) ?? prof.gen.sectionDb, SECT_NAME: name },
       },
     }
   }
@@ -50,7 +50,7 @@ export function buildGenPayloads(spec: FactorySpec, model: FactoryModel): GenPay
 
   const ELEM: Record<string, unknown> = {}
   for (const e of model.elements) {
-    ELEM[e.id] = { TYPE: e.role === 'brace' ? 'TRUSS' : 'BEAM', MATL: 1, SECT: sectId.get(e.section), NODE: [e.n1, e.n2], ANGLE: ANGLE[e.role] ?? 0 }
+    ELEM[e.id] = { TYPE: e.role === 'brace' ? 'TRUSS' : 'BEAM', MATL: spec.code === 'CN' && (e.role === 'purlin' || e.role === 'girt') ? 2 : 1, SECT: sectId.get(e.section), NODE: [e.n1, e.n2], ANGLE: ANGLE[e.role] ?? 0 }
   }
 
   /* 단부 해제: 2차부재 양단 핀, 풍주는 지붕보에 닿는 상단만 핀(기초는 핀 지점이라 해제 불필요 — 양단 해제 시 기초 절점 회전 불안정) */
@@ -70,9 +70,14 @@ export function buildGenPayloads(spec: FactorySpec, model: FactoryModel): GenPay
     if (n.z === 0) CONS[n.id] = { ITEMS: [{ ID: n.id, CONSTRAINT: code }] }
   }
 
+  const material = (name: string) => {
+    const m = prof.materials[name]
+    if (!m) throw new Error(`unknown material: ${name}`)
+    return { TYPE: 'STEEL', NAME: name, DAMP_RAT: spec.code === 'CN' ? spec.china?.damping ?? 0.05 : 0.02, PARAM: [{ P_TYPE: 1, STANDARD: m.gen.standard, CODE: '', DB: m.gen.db, bELAST: false }] }
+  }
   return {
     UNIT: { 1: { FORCE: 'KN', DIST: 'M', HEAT: 'KJ', TEMPER: 'C' } },
-    MATL: { 1: { TYPE: 'STEEL', NAME: spec.material, DAMP_RAT: 0.02, PARAM: [{ P_TYPE: 1, STANDARD: mat.gen.standard, CODE: '', DB: mat.gen.db, bELAST: false }] } },
+    MATL: { 1: material(spec.material), ...(spec.code === 'CN' ? { 2: material(spec.secondaryMaterial ?? 'Q235B') } : {}) },
     SECT, NODE, ELEM, CONS, FRLS,
   }
 }

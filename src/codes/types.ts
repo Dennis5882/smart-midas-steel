@@ -6,7 +6,7 @@
 ════════════════════════════════════════════════════════════ */
 import type { Dict } from '../i18n'
 
-export type CodeId = 'TW'
+export type CodeId = 'TW' | 'CN'
 
 export interface SteelMaterial {
   /** 항복강도 Fy, 인장강도 Fu (MPa) */
@@ -20,7 +20,7 @@ export interface SteelMaterial {
   gen: { standard: string; db: string }
 }
 
-export type LoadCaseType = 'D' | 'L' | 'W' | 'E'
+export type LoadCaseType = 'D' | 'L' | 'W' | 'E' | 'S'
 
 /** 조합 용도 — basic: 일반 강도 검토 / amplified: 내진 특별 규정의 증폭 지진력 E′ 조합 / gravity: 용량 설계용 중력 조합 */
 export type ComboKind = 'basic' | 'amplified' | 'gravity'
@@ -36,12 +36,12 @@ export interface CodeProfile {
   id: CodeId
   labelKey: keyof Dict
   /** 설계법 */
-  method: 'LRFD' | 'ASD'
+  method: 'LRFD' | 'ASD' | 'LSD'
   /** 재료 카탈로그 (이름 → 물성) */
   materials: Record<string, SteelMaterial>
   defaultMaterial: string
   /** Gen NX 연동: 단면 DB 이름(db/SECT SECT_I.DB_NAME), 강재 설계 코드(db/DSTL DGNCODE) */
-  gen: { sectionDb: string; designCode: string; shapeOf(sectionName: string): string }
+  gen: { sectionDb: string; designCode?: string; shapeOf(sectionName: string): string; sectionDbOf?(sectionName: string): string }
   /** 횡하중 식 (지진·풍). 기준별 구현은 <id>Lateral.ts */
   lateral: {
     period(kind: 'moment' | 'braced', hn: number): number

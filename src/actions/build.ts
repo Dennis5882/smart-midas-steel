@@ -47,7 +47,8 @@ export async function sendModel(spec: FactorySpec) {
     ['STLD', l.STLD], ['BODF', l.BODF], ['BMLD', l.BMLD], ['CNLD', l.CNLD], ['LCOM-GEN', l['LCOM-GEN']],
   ]
   for (const [name, assign] of steps) await mapi('PUT', name, { Assign: assign }, String(Object.keys(assign).length))
-  await mapi('PUT', 'DSTL', { Assign: { 1: { DGNCODE: profileOf(spec.code).gen.designCode } } })
+  const designCode = profileOf(spec.code).gen.designCode
+  if (designCode) await mapi('PUT', 'DSTL', { Assign: { 1: { DGNCODE: designCode } } })
 
   const cases = Object.values(l.STLD).map((c) => (c as { NAME: string }).NAME)
   const comboNames = Object.values(l['LCOM-GEN']).map((c) => (c as { NAME: string }).NAME)

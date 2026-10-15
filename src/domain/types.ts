@@ -39,6 +39,10 @@ export interface FactorySpec {
   anchorFu: number
   sections: { column: string; rafter: string; purlin: string; girt: string; strut: string; post: string; brace: string }
   material: string
+  /** China: secondary members may use a different certified steel grade. */
+  secondaryMaterial?: string
+  /** GB inputs, used only when code === CN. Pressures kN/m², periods s. */
+  china?: { w0: number; terrain: 'A' | 'B' | 'C' | 'D'; betaZ: number; topography: number; alphaMax: number; Tg: number; Tx: number; Ty: number; damping: number; snow: number; snowMu: number; gamma0: number; concreteBearing: number; anchorFt: number }
 }
 
 export interface Node { id: number; x: number; y: number; z: number }
@@ -73,4 +77,15 @@ export const DEFAULT_SPEC: FactorySpec = {
   sections: { column: 'RH 600x200x11x17', rafter: 'RH 600x200x11x17', purlin: 'CC 200x75x20/4.0', girt: 'CC 200x75x20/3.2', strut: 'RH 150x150x7x10',
     post: 'RH 298x149x5.5x8', brace: 'P 139.8x4.5' },
   material: 'SN400B',
+}
+
+export const CN_DEFAULT_SPEC: FactorySpec = {
+  ...DEFAULT_SPEC, code: 'CN', material: 'Q235B', secondaryMaterial: 'Q235B',
+  // Gen NX live sizing: CC candidates failed local wind/LTB; use rolled H.
+  sections: { column: 'HM 390x300x10/16', rafter: 'HM 390x300x10/16', purlin: 'HN 198x99x4.5/7', girt: 'HN 150x75x5/7', strut: 'HW 175x175x7.5/11', post: 'HN 248x124x5/8', brace: 'P 219x6' },
+  china: { w0: 0.45, terrain: 'B', betaZ: 1, topography: 1, alphaMax: 0.08, Tg: 0.35, Tx: 0.5, Ty: 0.3, damping: 0.05, snow: 0.3, snowMu: 1, gamma0: 1, concreteBearing: 14.3, anchorFt: 140 },
+}
+
+export function defaultSpecFor(code: CodeId): FactorySpec {
+  return structuredClone(code === 'CN' ? CN_DEFAULT_SPEC : DEFAULT_SPEC)
 }
