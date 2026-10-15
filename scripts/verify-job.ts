@@ -51,6 +51,8 @@ const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200, head
 }
 
 const { S } = await import('../src/state/store')
+const { setConfirmHandler } = await import('../src/components/ConfirmDialog')
+setConfirmHandler(() => true) // 화면 없음 — 모델 교체 확인 자동 승인
 const { msgText } = await import('../src/state/ui')
 const { DEFAULT_SPEC, CN_DEFAULT_SPEC } = await import('../src/domain/types')
 const { buildFactory } = await import('../src/actions/build')

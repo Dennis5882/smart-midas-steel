@@ -17,6 +17,8 @@ import type { Built } from '../src/state/store'
 ;(globalThis as any).document = { documentElement: { lang: 'ko', dataset: {} } }
 const { fetchResults } = await import('../src/actions/results')
 const { S } = await import('../src/state/store')
+const { setConfirmHandler } = await import('../src/components/ConfirmDialog')
+setConfirmHandler(() => true) // 화면 없음 — 모델 교체 확인 자동 승인
 const { msgText } = await import('../src/state/ui')
 const { runDesignCheck } = await import('../src/actions/design')
 const { t } = await import('../src/i18n')

@@ -37,7 +37,7 @@ export type ChatMsg = { ts?: string } & (
 export interface Built { spec: FactorySpec; model: FactoryModel; info: LoadInfo; cases: string[]; combos: number; comboNames: string[]; sent?: Record<string, Record<string, unknown>> }
 
 /** 진행 중 작업 — stage = 문구 키, step/total = 이 단계 MAPI 호출 수, iter = 최적화 반복 [n, 최대] */
-export type JobKind = 'build' | 'anal' | 'design' | 'opt' | 'pdf'
+export type JobKind = 'build' | 'anal' | 'design' | 'opt' | 'pdf' | 'restore'
 export interface Job { kind: JobKind; stage: string; step: number; total: number; detail: string; t0: number; cancel: boolean; iter?: [number, number] }
 
 /** 반력 합계 (하중 케이스별) */
@@ -76,6 +76,10 @@ export const S = {
   lastFail: null as { kind: JobKind; cancelled: boolean; msg?: string } | null,
   /** Gen 모델 변경 감지 건수 (0 = 같음) — assertGenSync 가 갱신, sendModel 이 비움 */
   genChanged: 0,
+  /** 확인 창 요청 (ConfirmDialog) */
+  confirm: null as (import('../components/ConfirmDialog').ConfirmReq & { resolve(ok: boolean): void }) | null,
+  /** 마지막 [공장 생성] 직전 Gen 문서 백업 (Gen PC 경로) — [이전 모델로 복원] 대상 */
+  restorePoint: null as string | null,
   theme: readTheme(),
   code: readCode(),
   panel: 'logP' as PanelId,

@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { cancelJob } from '../actions/job'
 import { t, type I18nKey } from '../i18n'
 import { useStore } from '../state/store'
+import { jobSteps } from '../state/jobSteps'
+import { tab } from '../state/ui'
 
 export function JobBar() {
   const s = useStore()
@@ -38,7 +40,18 @@ export function JobBar() {
         aria-valuenow={pct ?? undefined}>
         <div className={`jb-fill${pct === null ? ' ind' : ''}`} style={pct === null ? undefined : { width: `${pct}%` }} />
       </div>
-      {j.detail && <div className="jb-detail">{j.detail}</div>}
+      {/* 단계 목록 — 색만이 아니라 기호(✓ ● ○)와 글자로 상태 표시 */}
+      <ol className="jb-steps" aria-label={t('job_steps')}>
+        {jobSteps(j).map((st) => (
+          <li key={st.key} className={`jbs-${st.status}`} aria-current={st.status === 'now' ? 'step' : undefined}>
+            <span aria-hidden>{st.status === 'done' ? '✓' : st.status === 'now' ? '●' : '○'}</span> {t(st.key)}
+          </li>
+        ))}
+      </ol>
+      <div className="jb-detail">
+        {j.detail}
+        <button className="jb-log" onClick={() => tab('logP')}>{t('job_log')}</button>
+      </div>
     </div>
   )
 }

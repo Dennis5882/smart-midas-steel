@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict'
 import { workflow, specChanged, type WorkflowInput } from '../src/state/workflow'
 import { DEFAULT_SPEC } from '../src/domain/types'
+import { jobSteps } from '../src/state/jobSteps'
 
 const built = { spec: DEFAULT_SPEC } as WorkflowInput['built']
 const base: WorkflowInput = { built: null, analyzed: false, hasDesign: false, ngCount: 0, preview: null, genChanged: 0, job: null, lastFail: null }
@@ -33,4 +34,13 @@ is(w({ built: null, lastFail: { kind: 'build', cancelled: true } }).next, 'start
 /* 실행 중 → 버튼 없음 */
 const r = w({ built, job: 'anal' })
 is([r.steps.anal, r.next], ['running', null], 'running → no next button')
+/* 작업 단계 목록 — 생성은 MAPI 경로로 세분 */
+const st = (kind: any, stage: string, detail: string) => jobSteps({ kind, stage, detail }).map((x) => x.status[0]).join('')
+is(st('build', 'st_send', 'POST /doc/saveas'), 'nttttt', 'build: backup now')
+is(st('build', 'st_send', 'PUT /db/SECT'), 'ddnttt', 'build: materials/sections')
+is(st('build', 'st_send', 'PUT /db/ELEM'), 'dddntt', 'build: nodes/elements')
+is(st('build', 'st_send', 'PUT /db/LCOM-GEN'), 'ddddnt', 'build: loads/combos')
+is(st('build', 'st_verify', 'GET /db/NODE'), 'dddddn', 'build: verify')
+is(st('anal', 'st_anal', 'POST /doc/anal'), 'ddnt', 'analysis running')
+is(st('design', 'st_check', ''), 'ddn', 'design checking')
 console.log(`Workflow: ${n} checks passed`)

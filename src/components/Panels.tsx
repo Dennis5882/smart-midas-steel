@@ -11,6 +11,7 @@ import { connGrade, roleGrade } from '../domain/status'
 import { GradeChip, siteSourceText, StatusCard } from './Status'
 import { dimValue } from '../report/dims'
 import { StaleBanner } from './Workflow'
+import { MemberTable, SummaryCards } from './MemberTable'
 import { lengthText, ROLES, type FactoryModel, type FactorySpec } from '../domain/types'
 import { t, tc, type I18nKey } from '../i18n'
 import { useStore, type AppState } from '../state/store'
@@ -131,7 +132,6 @@ function Seis13Card({ d }: { d: DesignResult }) {
 
 function DesignTables({ d }: { d: DesignResult }) {
   const code = useStore().built?.spec.code
-  const ngAll = d.members.filter((m) => m.ratio > 1).sort((a, b) => b.ratio - a.ratio)
   return (
     <>
       <div className="scard"><h3>{tc(code, 'res_design')}</h3>
@@ -181,19 +181,6 @@ function DesignTables({ d }: { d: DesignResult }) {
             </tbody>
           </table>
           <div className="res-stat" style={{ marginTop: 10, marginBottom: 0 }}>{t(code === 'CN' ? 'cc_note_CN' : 'cc_note')}</div>
-        </div>
-      )}
-      {ngAll.length > 0 && (
-        <div className="scard"><h3>{t('res_ng')} ({ngAll.length})</h3>
-          <table>
-            <thead><tr><th>{t('rd_elem')}</th><th>{t('rd_role')}</th><th>{t('rd_section')}</th><th>{t('rd_ratio')}</th><th>{t('rd_combo')}</th></tr></thead>
-            <tbody>
-              {ngAll.slice(0, 30).map((m) => (
-                <tr key={m.id}><td>{m.id}</td><td>{t(`role_${m.role}`)}</td><td>{m.section}</td>
-                  <td style={{ color: 'var(--red)', fontWeight: 700 }}>{m.ratio.toFixed(3)}</td><td>{m.combo}</td></tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       )}
     </>
@@ -246,6 +233,14 @@ function ConnTables({ cs }: { cs: ConnResult[] }) {
         <div key={c.type} style={{ marginBottom: 12 }}>
           <div className="kv"><span className="k"><b style={{ color: 'var(--txt-hi)' }}>{t(`cn_type_${c.type}`)}</b> · {c.combo}</span>
             <span className="v" style={{ color: ratioColor(c.ratio), fontWeight: 700 }}>{c.ratio.toFixed(3)} {(() => { const g = connGrade(c); return <GradeChip g={g.grade} reasons={g.reasons} /> })()}</span></div>
+          {(() => {
+            /* 보강 후 만족 — 최종값만 보이면 보강 과정이 가려지므로 원래 검토비와 보강 내용을 함께 (색 외에 문장으로) */
+            const worst = c.checks.reduce((a, k) => (k.ratio > a.ratio ? k : a), c.checks[0])
+            const fix = [c.dims.stiffener || c.notes.includes('stiffeners') ? t('cn_note_stiffeners') : '', c.notes.find((n) => n.startsWith('doubler')) ? t('cn_note_doubler') : ''].filter(Boolean).join(' · ')
+            return fix && worst && worst.ratio > c.ratio + 1e-9 && c.ratio <= 1
+              ? <div className="reinf-note" role="note">✓ {t('reinf_line', c.ratio.toFixed(3), t(`cn_${worst.item}` as I18nKey), worst.ratio.toFixed(3), fix)}</div>
+              : null
+          })()}
           <div style={{ fontSize: '.78rem', color: 'var(--muted)', margin: '4px 0 6px' }}>
             {Object.values(c.dims).map(dimValue).join(' · ')}
             {c.notes.map((n) => <span key={n} style={{ color: 'var(--amber)' }}> · {n === 'gbFoundation' ? t('cn_note_foundation') : n === 'gbJointDetail' ? t('cn_note_joint') : n === 'gbBraceDetail' ? t('cn_note_brace') : n.startsWith('doubler') ? `${t('cn_note_doubler')} ${n.slice(8)}` : n === 'stiffeners' ? t('cn_note_stiffeners') : n === 'rotTest' ? t('cn_note_rot') : n}</span>)}
@@ -284,9 +279,11 @@ export function ResultsPanel() {
           <button className="btn btn-ghost" disabled={s.busy} onClick={downloadQuantities}>{t('g_design_6')}</button>
         </div>
       )}
+      <SummaryCards />
       {s.built && (s.design || !!s.connections?.length) && <StatusCard d={s.design} cs={s.connections} spec={s.built.spec} />}
       {s.opt && <OptTables o={s.opt} />}
       {s.design && <DesignTables d={s.design} />}
+      {s.design && <MemberTable d={s.design} />}
       {!!s.connections?.length && <ConnTables cs={s.connections} />}
       {!!s.reactions?.length && (
         <div className="scard"><h3>{t('res_react')}</h3>

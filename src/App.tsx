@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from 'react'
 import { Chat } from './components/Chat'
 import { Drawers } from './components/Drawers'
+import { ConfirmDialog } from './components/ConfirmDialog'
 import { Footer } from './components/Footer'
 import { Guide } from './components/Guide'
 import { Header } from './components/Header'
@@ -86,6 +87,7 @@ export function App() {
       </main>
       <Footer />
       <Drawers open={drawer} onClose={() => setDrawer(false)} />
+      <ConfirmDialog />
     </>
   )
 }

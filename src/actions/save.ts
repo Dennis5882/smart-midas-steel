@@ -19,12 +19,14 @@ export function autoSavePath(tag: string): string {
   return `${dir || 'C:/temp'}/sms_${tag}_${stamp()}.mgbx`
 }
 
-export async function autoSave(tag: 'backup' | 'model'): Promise<void> {
+/** 저장한 경로를 돌려준다 (Gen PC 기준) */
+export async function autoSave(tag: 'backup' | 'model'): Promise<string> {
   const path = autoSavePath(tag)
   try {
     const res = await mapi<{ message?: string }>('POST', '/doc/saveas', { Argument: path }, path)
     // HTTP 200 alone is insufficient: Gen also returns command refusals as messages.
     if (res?.message !== 'MIDAS GEN NX command complete') throw new Error(String(res?.message ?? 'Unrecognized save response'))
+    return path
   } catch (e) {
     if (e instanceof Cancelled) throw e
     throw new Error(t('save_failed', path, e instanceof Error ? e.message : String(e)))

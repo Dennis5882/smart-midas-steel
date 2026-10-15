@@ -12,15 +12,18 @@ import { scopeMsg } from '../components/ScopeBox'
 import { t, lt } from '../i18n'
 import { mapi } from '../mapi/client'
 import { autoSave } from './save'
+import { confirmAction } from '../components/ConfirmDialog'
 import { beginJob, endJob, failMsg, stage } from './job'
 import { S, notify } from '../state/store'
-import { addMsg, draw3D, log, tab } from '../state/ui'
+import { addMsg, draw3D, escapeHtml, log, tab } from '../state/ui'
 
 export async function buildFactory(spec: FactorySpec): Promise<void> {
   if (S.busy) { addMsg('bot', lt('busy')); return }
   if (!S.mapiKey.trim()) { addMsg('bot', lt('need_key')); return }
   const scope = checkScope(spec)
   if (scope.blocked) { addMsg('bot', `${t('sc_blocked')}<br>${scope.issues.filter((i) => i.level === 'block').map((i) => `⛔ ${scopeMsg(i)}`).join('<br>')}`); return }
+  /* Gen 문서 교체 확인 (AlertDialog) — 열린 문서는 자동 백업, 생성 후 [이전 모델로 복원] 가능 */
+  if (!await confirmAction({ title: t('cfm_build_title'), body: t('cfm_build_body', escapeHtml(S.saveDir || 'C:/temp')), ok: t('cfm_build_ok'), skipKey: 'build' })) return
   if (!beginJob('build')) return
   S.buildEpoch++ // 이전 카드 버튼 잠금
   notify()
@@ -28,12 +31,38 @@ export async function buildFactory(spec: FactorySpec): Promise<void> {
   tab('logP')
   try {
     const model = await sendModel(spec)
+    S.restorePoint = lastBackup
     const b = S.built!
     addMsg('bot', lt('build_done', model.nodes.length, model.elements.length, b.cases.length, b.combos))
     draw3D()
     tab('modelP')
   } catch (e) {
     addMsg('bot', failMsg(e, (m) => t('build_fail', m)))
+  } finally {
+    endJob()
+  }
+}
+
+let lastBackup: string | null = null
+
+/** [이전 모델로 복원] — 마지막 [공장 생성] 직전 백업을 Gen 에서 다시 연다 (현재 문서는 sms_model_* 로 먼저 저장). 앱의 모델·결과는 비운다 */
+export async function restoreBackup(): Promise<void> {
+  const path = S.restorePoint
+  if (!path || S.busy) return
+  if (!await confirmAction({ title: t('cfm_restore_title'), body: t('cfm_restore_body', escapeHtml(path)), ok: t('cfm_restore_ok'), danger: true })) return
+  if (!beginJob('restore')) return
+  try {
+    stage('st_restore', 2)
+    await autoSave('model')
+    const res = await mapi<{ message?: string }>('POST', '/doc/open', { Argument: path }, path)
+    if (res?.message !== 'MIDAS GEN NX command complete') throw new Error(String(res?.message ?? 'open failed'))
+    clearBuilt()
+    S.restorePoint = null
+    S.buildEpoch++
+    draw3D()
+    addMsg('bot', lt('restore_done', escapeHtml(path)))
+  } catch (e) {
+    addMsg('bot', failMsg(e, (m) => t('restore_fail', m)))
   } finally {
     endJob()
   }
@@ -51,7 +80,7 @@ export async function sendModel(spec: FactorySpec) {
   const designCode = profileOf(spec.code).gen.designCode
   stage('st_send', 2 + steps.length + (designCode ? 1 : 0))
   /* 열린 문서를 먼저 임시 저장 → doc/new 가 "저장할까요?" 창을 띄우지 않게 (사용자 원본 파일은 건드리지 않음) */
-  await autoSave('backup')
+  lastBackup = await autoSave('backup')
   /* 전체 문서를 doc/new 로 초기화 — 항목별 DELETE 의 경고·잔여 데이터 방지 (story 와 같은 방식) */
   await mapi('POST', '/doc/new', {})
   /* 여기부터 Gen 문서는 이전 모델이 아니다 — 중간 실패·취소 때 이전 결과로 해석·검토하지 않게 먼저 비운다 */

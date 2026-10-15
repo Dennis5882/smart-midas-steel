@@ -1,6 +1,7 @@
 /* 작업 흐름 띠 — 입력창 위. 모델 → 해석 → 설계 검토 → 출력 상태와 '다음' 버튼 하나(+ 보조).
    명령을 몰라도 생성부터 출력까지 진행하고, Gen 변경·입력 변경으로 이전 결과가 된 단계는 '이전 결과' 로 표시 (state/workflow). */
 import { runCmd } from '../agent/session'
+import { restoreBackup } from '../actions/build'
 import { t, type I18nKey } from '../i18n'
 import { S, useStore } from '../state/store'
 import { addPlanMsg, previewSpec, tab } from '../state/ui'
@@ -45,10 +46,11 @@ export function Workflow() {
           </li>
         ))}
       </ol>
-      {(hint || main) && (
+      {(hint || main || s.restorePoint) && (
         <div className="wf-row">
           {hint && <span className="wf-hint">{w.reason === 'failed' && s.lastFail?.msg ? s.lastFail.msg : t(hint)}</span>}
           {main && <button className="btn btn-c wf-go" disabled={s.busy} onClick={main.run}>{t(main.label)}</button>}
+          {s.restorePoint && <button className="btn btn-ghost wf-go" disabled={s.busy} title={s.restorePoint} onClick={() => void restoreBackup()}>{t('wf_restore')}</button>}
           {w.next === 'output' && <button className="btn btn-ghost wf-go" disabled={s.busy} onClick={cmd('g_design_4_cmd')}>{t('g_design_4')}</button>}
         </div>
       )}

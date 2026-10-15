@@ -59,6 +59,11 @@ function sceneOf(m: FactoryModel, c: CamId, zoom: number): Record<string, unknow
   const mx = c === 'front' ? Math.max(d.x, d.z) : c === 'side' ? Math.max(d.y, d.z) : Math.max(d.x, d.y)
   return { aspectmode: 'manual', aspectratio: { x: (d.x / mx) * k, y: (d.y / mx) * k, z: (d.z / mx) * k } }
 }
+/** ISO(원근) 기본 거리 — 패널이 정사각형·세로형이면 가로로 넘치므로 가로/세로 비에 맞춰 멀리 (1.22 에서 딱 맞음, 2026-10-15 캡처) */
+const isoFit = (el: HTMLElement) => {
+  const r = el.clientWidth / Math.max(1, el.clientHeight)
+  return 1 / Math.max(1.1, 1.35 / (r || 1.35))
+}
 const camOf = (c: CamId, zoom: number) => {
   const e = CAMS[c].eye
   return { eye: { x: e.x / zoom, y: e.y / zoom, z: e.z / zoom }, up: CAMS[c].up ?? { x: 0, y: 0, z: 1 }, projection: { type: c === 'iso' ? 'perspective' : 'orthographic' } }
@@ -151,7 +156,7 @@ export function View3D() {
           ...sceneOf(model, c, 1),
           /* 정투영은 시선 방향 축을 숨김 — 정면(X–Z) Y, 측면(Y–Z) X, 평면 Z */
           xaxis: ax(c === 'side', 'X (m)'), yaxis: ax(c === 'front', 'Y (m)'), zaxis: ax(c === 'top', 'Z (m)'),
-          camera: camOf(c, 1),
+          camera: camOf(c, isoFit(el)),
         },
       } as any, {
         responsive: true, displaylogo: false, displayModeBar: true, modeBarButtonsToRemove: ['resetCameraLastSave3d', 'hoverClosest3d'],

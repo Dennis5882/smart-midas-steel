@@ -125,6 +125,12 @@ Vite 8 + TypeScript + React 19 + Tailwind v4 + shadcn/ui(new-york) + **Vercel Fu
 - **채팅 메시지 다국어**: 앱 메시지는 `addMsg('bot', lt(key, …args))`/`ltc(code, key, …)` — 키와 그 시점 인자만 저장, 그릴 때 현재 언어로(`render`). 언어를 바꾸면 지난 메시지도 바뀜. 다른 번역문이 섞인 메시지(상태 요약 포함 등)는 문자열 그대로(만든 언어 유지). 테스트는 `msgText(m)`.
 - **3D 뷰**(story 정리 방식): Plotly 아이콘 도구 막대(이미지·확대·이동·회전·홈)는 story 처럼 오른쪽 위 가로·투명, 우리 막대에는 아이콘에 없는 ＋/－(원근 = 카메라 거리, 정투영 = 축 비율). **범례 = 표시 토글 한 줄**(기둥·지붕보·퍼린·거트·스트럿·풍주·가새·지점·절점, 색 견본 선·마름모·점) — Plotly 범례는 강도비 보기의 색 구간에만. 절점은 번호·좌표 hover. 생성 직후 Gen 화면을 `POST /view/ANGLE {HORIZONTAL:30,VERTICAL:15}` 로 ISO (story 값, 실패해도 생성은 성공), **[선 | 단면]** — `drawing/solid.ts` 가 실제 단면 치수로 입체 메시(H 3상자·립 C 5상자·강관 12각, 춤 방향: 골조면·연직·지붕 법선·벽 법선 — 그리기용 근사). 정투영은 시선 방향 축 숨김 + 보이는 두 축으로 채움. `uirevision` 으로 토글 시 사용자 시점 유지. Tailwind preflight `svg{display:block}` 이 Plotly 아이콘을 세로로 쌓던 것·채팅 `.modebar` 클래스 충돌(`.composer .modebar` 로 한정) 수정. 회귀 `verify-solid.ts`.
 
+## shadcn UI 권고 반영 (2026-10-15, docs/smart-midas-steel-shadcn-ui-recommendations.md — 라이브·실화면 확인)
+- **Gen 모델 교체 확인·복원** (P0): [공장 생성] 전 `confirmAction`(components/ConfirmDialog — 네이티브 `<dialog>` alertdialog, 포커스 복귀, '이번 세션에서 다시 묻지 않기'). 열린 문서는 `autoSave('backup')`(경로 반환) → `S.restorePoint`. 흐름 띠 [이전 모델로 복원] = `restoreBackup()`: 현재 문서 sms_model_* 저장 → `POST /doc/open {Argument: 경로}`(라이브: 응답 'MIDAS GEN NX command complete', 절점 219 → 165 로 복귀) → 앱 모델·결과 비움. 화면 없는 실행은 `setConfirmHandler(() => true)`(verify-job·results·라이브 스크립트).
+- **작업 단계 목록**: `state/jobSteps.ts`(순수) — 진행 막대 아래 ✓ ● ○ (생성: 백업 → 새 문서 → 재료·단면 → 절점·요소·지점 → 하중·조합 → 전송 확인, MAPI 경로로 판정) + [로그 보기].
+- **결과 탭**: `SummaryCards`(강재량·최대 강도비·NG·최적화 절감) + `MemberTable`(부재 전체 Data Table: 종류·NG 만·0.9 이상 필터, 검색, 열 정렬 aria-sort, 50행씩, CSV BOM) — 기존 NG 상위 30 표 대체. 접합부 **보강 후 만족** 문장: 최종 검토비 + 원래 최대 항목 검토비 + 보강 내용(예: 처마 0.988 ← 기둥 플랜지 휨 3.021, 스티프너·더블러).
+- 남은 권고: 계산 근거 Sheet(입력 칸별 조항·출처), 베이별 예외 프레임 표, Gen 부재 선택 연동, Toast, 프리셋·최근 프로젝트(F6 보류와 연관).
+
 ## 단면 자동 최적화 (2026-10-15, 라이브 검증)
 명령 `단면 최적화` (설계 검토 다음). 반복: 결과 회수 → 검토 → `proposeSections` → `sendModel`(재전송) → `analyzeCore`(재해석), 최대 5회.
 - 후보 `src/domain/catalog.ts` = 설치본 `Dbase/CNS2020.sdb` 에서 추출한 이름 그대로(RH 150·CC 45·P 60~318.5 40개). 단면적 오름차순, 목표 강도비 0.95, H 세장 단면 제외.

@@ -14,7 +14,7 @@ export interface WorkflowInput {
 }
 export interface Workflow { steps: Record<StepId, StepStatus>; next: NextAction | null; reason: 'none' | 'gen' | 'edited' | 'failed' | 'cancelled' }
 
-const STEP_OF: Record<JobKind, StepId> = { build: 'build', anal: 'anal', design: 'design', opt: 'design', pdf: 'output' }
+const STEP_OF: Record<JobKind, StepId> = { build: 'build', anal: 'anal', design: 'design', opt: 'design', pdf: 'output', restore: 'build' }
 
 /** 키 순서·undefined 와 무관한 비교 (카드의 toSpec·normalizeBays 가 키 순서를 바꿀 수 있음) */
 const canon = (v: unknown): unknown => Array.isArray(v) ? v.map(canon)
