@@ -5,6 +5,9 @@
 ════════════════════════════════════════════════════════════ */
 import { useSyncExternalStore } from 'react'
 import { CODE_IDS, DEFAULT_CODE, type CodeId } from '../codes'
+import type { Results } from '../actions/results'
+import type { ConnResult } from '../domain/connections'
+import type { DesignResult } from '../domain/design'
 import type { LoadInfo } from '../domain/loads'
 import { DEFAULT_SPEC, type FactoryModel, type FactorySpec } from '../domain/types'
 
@@ -24,7 +27,7 @@ export type ChatMsg = { ts?: string } & (
 )
 
 /** Gen 에 보낸 모델 — 스펙·형상·하중 요약 */
-export interface Built { spec: FactorySpec; model: FactoryModel; info: LoadInfo; cases: string[]; combos: number }
+export interface Built { spec: FactorySpec; model: FactoryModel; info: LoadInfo; cases: string[]; combos: number; comboNames: string[] }
 
 /** 반력 합계 (하중 케이스별) */
 export interface ReactionSum { lc: string; fx: number; fy: number; fz: number }
@@ -60,6 +63,8 @@ export const S = {
   code: readCode(),
   panel: 'logP' as PanelId,
   cam: 'iso' as CamId,
+  /** 3D 를 강도비 색상으로 표시 */
+  ratioView: false,
   log: [] as LogEntry[],
   msgs: [] as ChatMsg[],
   /** 실행되면 증가 — 이전 계획 카드의 버튼을 모두 잠근다 */
@@ -70,6 +75,10 @@ export const S = {
   built: null as Built | null,
   analyzed: false,
   reactions: null as ReactionSum[] | null,
+  /** 해석 결과 원자료 (설계 검토 입력) */
+  results: null as Results | null,
+  design: null as DesignResult | null,
+  connections: null as ConnResult[] | null,
   /** 마지막으로 쓴 스펙 — 새 계획 카드의 출발점 */
   lastSpec: DEFAULT_SPEC as FactorySpec,
 }

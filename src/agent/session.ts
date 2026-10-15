@@ -1,5 +1,7 @@
 /* 세션 — 채팅 입력 처리, 설정(테마·기준), 연결 테스트, 입력창 제어 */
 import { fetchReactions, runAnalysis } from '../actions/analysis'
+import { runDesignCheck } from '../actions/design'
+import { downloadDrawings, openReport } from '../actions/outputs'
 import type { CodeId } from '../codes'
 import { DEFAULT_SPEC, type FactorySpec } from '../domain/types'
 import { t } from '../i18n'
@@ -25,6 +27,9 @@ export async function send(raw: string): Promise<void> {
       break
     }
     case 'analyze': await runAnalysis(); break
+    case 'design': await runDesignCheck(); break
+    case 'report': openReport(); break
+    case 'drawings': downloadDrawings(); break
     case 'reactions': {
       if (!S.built) { addMsg('bot', t('no_model')); break }
       if (!S.analyzed) { addMsg('bot', t('need_anal')); break }

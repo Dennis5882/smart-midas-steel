@@ -9,10 +9,14 @@ export interface GenPayloads {
   NODE: Record<string, unknown>
   ELEM: Record<string, unknown>
   CONS: Record<string, unknown>
+  FRLS: Record<string, unknown>
 }
 
-/* 요소 국부축 회전각(beta). 거트는 웹이 수평(전역 X)이 되도록 90°. 퍼린은 경사 지붕 면 정렬을 M1 에서는 생략(0°). */
-const ANGLE: Partial<Record<ElementRole, number>> = { girt: 90 }
+/* 요소 국부축 회전각(beta). 거트·풍주는 강축이 벽면에 수직(풍압 방향)이 되도록 90°. 퍼린은 경사 지붕 면 정렬 생략(0°). */
+const ANGLE: Partial<Record<ElementRole, number>> = { girt: 90, post: 90 }
+/** 양단 핀(My·Mz 해제, 비틀림은 연결해 불안정 방지) — 단순보로 거동하는 2차부재 */
+const PINNED_BOTH: ElementRole[] = ['purlin', 'girt', 'strut']
+const PIN = '0000110', FIX = '0000000'
 
 export function buildGenPayloads(spec: FactorySpec, model: FactoryModel): GenPayloads {
   const prof = profileOf(spec.code)
@@ -23,6 +27,8 @@ export function buildGenPayloads(spec: FactorySpec, model: FactoryModel): GenPay
   const sectId = new Map<string, number>()
   for (const e of model.elements) if (!sectId.has(e.section)) sectId.set(e.section, sectId.size + 1)
 
+  /* TRUSS 요소에 쓰는 단면은 뒴(7번째 자유도) 옵션 불가 — "Section property considering 7th DOF ... only to the beam elements" (라이브 2026-10-15) */
+  const trussSects = new Set(model.elements.filter((e) => e.role === 'brace').map((e) => e.section))
   const SECT: Record<string, unknown> = {}
   for (const [name, id] of sectId) {
     SECT[id] = {
@@ -31,7 +37,7 @@ export function buildGenPayloads(spec: FactorySpec, model: FactoryModel): GenPay
       SECT_BEFORE: {
         OFFSET_PT: 'CC', OFFSET_CENTER: 0, USER_OFFSET_REF: 0,
         HORZ_OFFSET_OPT: 0, USERDEF_OFFSET_YI: 0, VERT_OFFSET_OPT: 0, USERDEF_OFFSET_ZI: 0,
-        USE_SHEAR_DEFORM: true, USE_WARPING_EFFECT: true,
+        USE_SHEAR_DEFORM: true, USE_WARPING_EFFECT: !trussSects.has(name),
         SHAPE: prof.gen.shapeOf(name),
         DATATYPE: 1,
         SECT_I: { DB_NAME: prof.gen.sectionDb, SECT_NAME: name },
@@ -44,7 +50,17 @@ export function buildGenPayloads(spec: FactorySpec, model: FactoryModel): GenPay
 
   const ELEM: Record<string, unknown> = {}
   for (const e of model.elements) {
-    ELEM[e.id] = { TYPE: 'BEAM', MATL: 1, SECT: sectId.get(e.section), NODE: [e.n1, e.n2], ANGLE: ANGLE[e.role] ?? 0 }
+    ELEM[e.id] = { TYPE: e.role === 'brace' ? 'TRUSS' : 'BEAM', MATL: 1, SECT: sectId.get(e.section), NODE: [e.n1, e.n2], ANGLE: ANGLE[e.role] ?? 0 }
+  }
+
+  /* 단부 해제: 2차부재 양단 핀, 풍주는 지붕보에 닿는 상단만 핀(기초는 핀 지점이라 해제 불필요 — 양단 해제 시 기초 절점 회전 불안정) */
+  const FRLS: Record<string, unknown> = {}
+  const postStarts = new Set(model.elements.filter((e) => e.role === 'post').map((e) => e.n1))
+  for (const e of model.elements) {
+    const both = PINNED_BOTH.includes(e.role)
+    const postTop = e.role === 'post' && !postStarts.has(e.n2)
+    if (!both && !postTop) continue
+    FRLS[e.id] = { ITEMS: [{ ID: 1, bVALUE: false, FLAG_I: both ? PIN : FIX, VALUE_I: [0, 0, 0, 0, 0, 0, 0], FLAG_J: PIN, VALUE_J: [0, 0, 0, 0, 0, 0, 0] }] }
   }
 
   const code = spec.baseFixity === 'fixed' ? '1111111' : '1110000'
@@ -57,6 +73,6 @@ export function buildGenPayloads(spec: FactorySpec, model: FactoryModel): GenPay
   return {
     UNIT: { 1: { FORCE: 'KN', DIST: 'M', HEAT: 'KJ', TEMPER: 'C' } },
     MATL: { 1: { TYPE: 'STEEL', NAME: spec.material, DAMP_RAT: 0.02, PARAM: [{ P_TYPE: 1, STANDARD: mat.gen.standard, CODE: '', DB: mat.gen.db, bELAST: false }] } },
-    SECT, NODE, ELEM, CONS,
+    SECT, NODE, ELEM, CONS, FRLS,
   }
 }

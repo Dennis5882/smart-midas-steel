@@ -6,13 +6,16 @@ export type Intent =
   | { intent: 'new'; params: Partial<FactorySpec> }
   | { intent: 'analyze' }
   | { intent: 'reactions' }
+  | { intent: 'design' }
+  | { intent: 'report' }
+  | { intent: 'drawings' }
   | { intent: 'status' }
   | { intent: 'conn' }
   | { intent: 'clear' }
   | { intent: 'unknown' }
 
 /* 간체 → 번체 (명령에 쓰이는 글자만) */
-const S2T: Record<string, string> = { 创: '創', 厂: '廠', 帮: '幫', 助: '助', 檐: '簷', 开: '開', 间: '間', 数: '數', 状: '狀', 态: '態', 连: '連', 接: '接', 检: '檢', 查: '查', 析: '析', 反: '反', 力: '力', 除: '除', 说: '說', 线: '線', 认: '認', 确: '確', 跨: '跨', 距: '距', 柱: '柱' }
+const S2T: Record<string, string> = { 创: '創', 厂: '廠', 帮: '幫', 助: '助', 檐: '簷', 开: '開', 间: '間', 数: '數', 状: '狀', 设: '設', 计: '計', 验: '驗', 书: '書', 图: '圖', 纸: '紙', 态: '態', 连: '連', 接: '接', 检: '檢', 查: '查', 析: '析', 反: '反', 力: '力', 除: '除', 说: '說', 线: '線', 认: '認', 确: '確', 跨: '跨', 距: '距', 柱: '柱' }
 const normalizeZh = (s: string) => s.replace(/[一-鿿]/g, (c) => S2T[c] ?? c)
 
 const NUM = '(\\d+(?:\\.\\d+)?)'
@@ -31,6 +34,9 @@ export function parseCommand(raw: string): Intent {
   if (/(connection|연결\s*확인|연결|連線確認|連接檢查|連線|連接)/i.test(txt)) return { intent: 'conn' }
   if (/(status|상태|狀態)/i.test(txt)) return { intent: 'status' }
   if (/(reaction|반력|反力)/i.test(txt)) return { intent: 'reactions' }
+  if (/(report|계산서|보고서|計算書)/i.test(txt)) return { intent: 'report' }
+  if (/(drawing|dxf|도면|圖說|圖紙|圖)/i.test(txt)) return { intent: 'drawings' }
+  if (/(design|설계|검토|設計|檢核|驗算)/i.test(txt)) return { intent: 'design' }
   if (/(analy[sz]|해석|分析)/i.test(txt)) return { intent: 'analyze' }
   if (/(factory|portal|공장|포털|廠房)/i.test(txt)) {
     const params: Partial<FactorySpec> = {}

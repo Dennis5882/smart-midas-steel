@@ -2,7 +2,7 @@
    S.preview(편집 중 스펙)가 있으면 그 형상, 없으면 Gen 에 보낸 모델. S.viewNonce 변경 시 재플롯. */
 import { useEffect, useMemo, useRef } from 'react'
 import { buildPortal } from '../domain/portal'
-import type { ElementRole, FactoryModel } from '../domain/types'
+import { ROLES, type ElementRole, type FactoryModel } from '../domain/types'
 import { t, useLang } from '../i18n'
 import { S, notify, useStore, type CamId } from '../state/store'
 
@@ -10,10 +10,10 @@ type Plotly = typeof import('plotly.js-dist-min')
 let plotlyP: Promise<Plotly> | null = null
 const loadPlotly = () => (plotlyP ??= import('plotly.js-dist-min').then((m) => ((m as any).default ?? m) as Plotly))
 
-const ROLES: ElementRole[] = ['column', 'rafter', 'purlin', 'girt', 'strut']
 const ROLE_VAR: Record<ElementRole, [string, string, number]> = {
   column: ['--p-col', '#4cc2ff', 5], rafter: ['--p-raf', '#5ee6a8', 5],
   purlin: ['--p-pur', '#9b8cff', 2], girt: ['--p-girt', '#ffb454', 2], strut: ['--p-strut', '#ff6b6b', 3],
+  post: ['--p-post', '#4cc2ff', 3], brace: ['--p-brace', '#ff6bd5', 2],
 }
 
 /* 3D 색 = 현재 테마의 CSS 변수(app.css --p-*) — 플롯할 때마다 읽어 테마 전환에 따라감 */
@@ -36,10 +36,30 @@ const CAMS: Record<CamId, { eye: { x: number; y: number; z: number }; up?: { x: 
 }
 const FONT = 'IBM Plex Mono, Noto Sans KR, Noto Sans TC, Noto Sans SC'
 
-function traces(m: FactoryModel, P: ReturnType<typeof palette>) {
+/** 강도비 색상 구간 — 상한, 색 토큰, 대체색 */
+const BANDS: [number, string, string][] = [[0.5, '--blue', '#4cc2ff'], [0.7, '--green', '#5ee6a8'], [0.9, '--cyan', '#38e1d6'], [1.0, '--amber', '#ffb454'], [Infinity, '--red', '#ff6b6b']]
+
+function ratioTraces(m: FactoryModel, ratio: Map<number, number>) {
+  const cs = getComputedStyle(document.documentElement)
   const byId = new Map(m.nodes.map((n) => [n.id, n]))
-  const out: any[] = []
-  for (const r of ROLES) {
+  return BANDS.map(([hi, v, fb], i) => {
+    const lo = i ? BANDS[i - 1][0] : -Infinity
+    const x: (number | null)[] = [], y: (number | null)[] = [], z: (number | null)[] = []
+    for (const e of m.elements) {
+      const r = ratio.get(e.id) ?? 0
+      if (r <= lo || r > hi) continue
+      const a = byId.get(e.n1)!, b = byId.get(e.n2)!
+      x.push(a.x, b.x, null); y.push(a.y, b.y, null); z.push(a.z, b.z, null)
+    }
+    const name = hi === Infinity ? `> ${lo.toFixed(1)}` : `${lo === -Infinity ? '0' : lo.toFixed(1)} – ${hi.toFixed(1)}`
+    return { type: 'scatter3d', mode: 'lines', name, x, y, z, line: { color: cs.getPropertyValue(v).trim() || fb, width: 4 }, hoverinfo: 'skip' }
+  }).filter((tr) => tr.x.length)
+}
+
+function traces(m: FactoryModel, P: ReturnType<typeof palette>, ratio: Map<number, number> | null) {
+  const byId = new Map(m.nodes.map((n) => [n.id, n]))
+  const out: any[] = ratio ? ratioTraces(m, ratio) : []
+  for (const r of ratio ? [] : ROLES) {
     const x: (number | null)[] = [], y: (number | null)[] = [], z: (number | null)[] = []
     for (const e of m.elements) {
       if (e.role !== r) continue
@@ -70,6 +90,8 @@ export function View3D() {
   const lang = useLang()
   const ref = useRef<HTMLDivElement>(null)
   const model = useMemo(() => (s.preview ? buildPortal(s.preview) : s.built?.model ?? null), [s.viewNonce, s.built])
+  /* 강도비 색상 — 설계 검토 결과가 있고 미리보기가 아닐 때만 */
+  const ratio = useMemo(() => (s.ratioView && !s.preview && s.design ? new Map(s.design.members.map((m) => [m.id, m.ratio])) : null), [s.ratioView, s.preview, s.design])
 
   useEffect(() => {
     const el = ref.current
@@ -79,7 +101,7 @@ export function View3D() {
       if (!alive) return
       const P = palette()
       const cam = CAMS[S.cam]
-      void Plotly.react(el, traces(model, P), {
+      void Plotly.react(el, traces(model, P, ratio), {
         paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', margin: { l: 0, r: 0, t: 0, b: 0 },
         font: { family: FONT, color: P.txt },
         legend: { bgcolor: P.legend, bordercolor: P.legendBd, borderwidth: 1, font: { size: 11, color: P.txt }, x: 0.01, y: 0.99 },
@@ -91,7 +113,7 @@ export function View3D() {
       } as any, { responsive: true, displaylogo: false })
     })
     return () => { alive = false }
-  }, [model, s.cam, s.theme, lang])
+  }, [model, ratio, s.cam, s.theme, lang])
 
   const setCam = (c: CamId) => { S.cam = c; notify() }
   const len = model ? Math.max(...model.nodes.map((n) => n.y)) : 0
@@ -104,6 +126,11 @@ export function View3D() {
         {(['iso', 'front', 'side', 'top'] as const).map((c) => (
           <button key={c} className={`vcam${s.cam === c ? ' on' : ''}`} onClick={() => setCam(c)}>{t(`cam_${c}`)}</button>
         ))}
+        {s.design && !s.preview && <>
+          <span className="vsep" />
+          <button className={`vcam${!s.ratioView ? ' on' : ''}`} onClick={() => { S.ratioView = false; notify() }}>{t('view_role')}</button>
+          <button className={`vcam${s.ratioView ? ' on' : ''}`} onClick={() => { S.ratioView = true; notify() }}>{t('view_ratio')}</button>
+        </>}
         {s.preview && <><span className="vsep" /><span className="vlbl" style={{ color: 'var(--amber)' }}>{t('preview_tag')}</span></>}
       </div>
       {model

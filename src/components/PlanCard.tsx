@@ -19,6 +19,8 @@ interface Field {
   label: I18nKey
   unit?: string
   kind: 'num' | 'int' | 'text' | 'select'
+  /** 허용 최솟값 (기본: 0 초과) */
+  min?: number
   options?: (spec: FactorySpec) => { value: string; label: string }[]
   full?: boolean
 }
@@ -35,6 +37,8 @@ const GROUPS: Group[] = [
       { value: 'pinned', label: t('base_pinned') }, { value: 'fixed', label: t('base_fixed') }] },
     { path: 'purlinSpacing', label: 'f_purlinSp', unit: 'm', kind: 'num' },
     { path: 'girtSpacing', label: 'f_girtSp', unit: 'm', kind: 'num' },
+    { path: 'postSpacing', label: 'f_postSp', unit: 'm', kind: 'num' },
+    { path: 'sagRods', label: 'f_sagRods', kind: 'int', min: 0 },
   ] },
   { title: 'sec_sections', fields: [
     { path: 'sections.column', label: 'f_column', kind: 'text' },
@@ -42,12 +46,18 @@ const GROUPS: Group[] = [
     { path: 'sections.purlin', label: 'f_purlin', kind: 'text' },
     { path: 'sections.girt', label: 'f_girt', kind: 'text' },
     { path: 'sections.strut', label: 'f_strut', kind: 'text' },
+    { path: 'sections.post', label: 'f_post', kind: 'text' },
+    { path: 'sections.brace', label: 'f_brace', kind: 'text' },
     { path: 'material', label: 'f_material', kind: 'select', options: (sp) =>
       Object.keys(profileOf(sp.code).materials).map((m) => ({ value: m, label: m })) },
   ] },
   { title: 'sec_dead', fields: [
     { path: 'roofDead', label: 'f_roofDead', unit: 'kN/m²', kind: 'num' },
     { path: 'wallDead', label: 'f_wallDead', unit: 'kN/m²', kind: 'num' },
+  ] },
+  { title: 'sec_conn', fields: [
+    { path: 'fc', label: 'f_fc', unit: 'MPa', kind: 'num' },
+    { path: 'anchorFu', label: 'f_anchorFu', unit: 'MPa', kind: 'num' },
   ] },
   { title: 'sec_seismic', fields: [
     { path: 'seismic.SDS', label: 'f_SDS', unit: 'g', kind: 'num' },
@@ -79,7 +89,7 @@ function toSpec(base: FactorySpec, vals: Record<Path, string>): FactorySpec {
     const raw = vals[f.path]
     if (f.kind === 'num' || f.kind === 'int') {
       const n = f.kind === 'int' ? Math.round(+raw) : +raw
-      if (Number.isFinite(n) && n > 0) sp = setPath(sp, f.path, n)
+      if (Number.isFinite(n) && (f.min !== undefined ? n >= f.min : n > 0)) sp = setPath(sp, f.path, n)
     } else if (raw.trim()) sp = setPath(sp, f.path, raw.trim())
   }
   return sp

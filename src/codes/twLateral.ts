@@ -38,7 +38,7 @@ export function period(kind: 'moment' | 'braced', hn: number): number {
   return (kind === 'moment' ? 0.085 : 0.05) * Math.pow(Math.max(hn, 0.1), 0.75)
 }
 
-export interface SeismicCoef { c: number; SaD: number; Fu: number; Ra: number; m: number; gov: 'V' | 'V*' }
+export interface SeismicCoef { c: number; cV: number; cStar: number; SaD: number; Fu: number; Ra: number; m: number; gov: 'V' | 'V*' }
 
 /** V/W 계수 — 2.2 V 와 2.10.1 하한 V* 중 큰 값 (일반 공학 지반; 대북분지·VM 은 미구현) */
 export function seismicCoef(o: { SDS: number; SD1: number; I: number; R: number; T: number }): SeismicCoef {
@@ -49,7 +49,7 @@ export function seismicCoef(o: { SDS: number; SD1: number; I: number; R: number;
   const m = mod(Sa / F)
   const cV = (o.I / (1.4 * ALPHA_Y)) * m
   const cStar = (o.I * F * m) / (4.2 * ALPHA_Y)
-  return { c: Math.max(cV, cStar), SaD: Sa, Fu: F, Ra, m, gov: cStar > cV ? 'V*' : 'V' }
+  return { c: Math.max(cV, cStar), cV, cStar, SaD: Sa, Fu: F, Ra, m, gov: cStar > cV ? 'V*' : 'V' }
 }
 
 /* ── 풍 ── */

@@ -15,7 +15,7 @@
   --tile:rgba(255,255,255,.035); --tile-bd:rgba(255,255,255,.05);
   --user-bg:linear-gradient(135deg,#16324a,#143a52); --user-bd:#1f4a66; --user-txt:#dff3ff;
   --scrim:rgba(4,7,14,.6); --shadow:rgba(0,0,0,.4);
-  --p-col:#4cc2ff; --p-raf:#5ee6a8; --p-pur:#9b8cff; --p-girt:#ffb454; --p-strut:#ff6b6b;
+  --p-col:#4cc2ff; --p-raf:#5ee6a8; --p-pur:#9b8cff; --p-girt:#ffb454; --p-strut:#ff6b6b; --p-post:#4cc2ff; --p-brace:#ff6bd5;
   --p-typ:#4cc2ff; --p-pod:#ffb454; --p-roof:#5ee6a8; --p-trans:#ff6b6b; --p-base:#9b8cff;
   --p-node:#445069; --p-sup:#ff6b6b; --p-sup-bd:#ff9999; --p-floor:rgba(68,80,105,.35);
   --p-axis:#445069; --p-grid:#1a2538; --p-scene:rgba(10,14,26,.4);
@@ -35,7 +35,7 @@
   --tile:rgba(255,255,255,.04); --tile-bd:rgba(255,255,255,.06);
   --user-bg:linear-gradient(135deg,#1c2c66,#213578); --user-bd:#2e4596; --user-txt:#eef1ff;
   --scrim:rgba(0,0,0,.6); --shadow:rgba(0,0,0,.5);
-  --p-col:#e6e9f0; --p-raf:#7f9cff; --p-pur:#a094f0; --p-girt:#e0a456; --p-strut:#62c08f;
+  --p-col:#e6e9f0; --p-raf:#7f9cff; --p-pur:#a094f0; --p-girt:#e0a456; --p-strut:#62c08f; --p-post:#b5bbc6; --p-brace:#e07bc8;
   --p-typ:#e6e9f0; --p-pod:#e0a456; --p-roof:#7f9cff; --p-trans:#e06b6b; --p-base:#a094f0;
   --p-node:#5d636f; --p-sup:#e06b6b; --p-sup-bd:#f0a0a0; --p-floor:rgba(139,145,157,.3);
   --p-axis:#6b717d; --p-grid:#1f232b; --p-scene:rgba(20,22,28,.5);
@@ -55,7 +55,7 @@
   --tile:rgba(0,0,0,.035); --tile-bd:rgba(0,0,0,.07);
   --user-bg:linear-gradient(135deg,#1f3a8a,#26449c); --user-bd:#1f3a8a; --user-txt:#ffffff;
   --scrim:rgba(20,24,32,.3); --shadow:rgba(0,0,0,.14);
-  --p-col:#1f3a8a; --p-raf:#1d8653; --p-pur:#5a45c6; --p-girt:#c27a16; --p-strut:#c43030;
+  --p-col:#1f3a8a; --p-raf:#1d8653; --p-pur:#5a45c6; --p-girt:#c27a16; --p-strut:#c43030; --p-post:#3a404c; --p-brace:#b0328f;
   --p-typ:#1f3a8a; --p-pod:#c27a16; --p-roof:#1d8653; --p-trans:#c43030; --p-base:#5a45c6;
   --p-node:#9097a3; --p-sup:#c43030; --p-sup-bd:#e08080; --p-floor:rgba(31,58,138,.22);
   --p-axis:#5d6472; --p-grid:#e1e4ea; --p-scene:rgba(244,246,249,.7);

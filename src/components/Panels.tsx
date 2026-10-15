@@ -1,10 +1,13 @@
 /* 우측 패널 — 활동 로그 · 모델 상태 · 해석 결과 */
 import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from 'react'
+import { downloadDrawings, openReport } from '../actions/outputs'
 import { profileOf } from '../codes'
 import { buildLoadPayloads, type LoadInfo } from '../domain/loads'
 import { buildPortal } from '../domain/portal'
-import type { FactoryModel, FactorySpec } from '../domain/types'
-import { t } from '../i18n'
+import type { ConnResult } from '../domain/connections'
+import type { DesignResult } from '../domain/design'
+import { ROLES, type FactoryModel, type FactorySpec } from '../domain/types'
+import { t, type I18nKey } from '../i18n'
 import { useStore, type AppState } from '../state/store'
 
 export function LogPanel() {
@@ -69,7 +72,7 @@ export function ModelPanel() {
         <KV k={t('kv_eave')} v={`${sp.eaveHeight} m`} />
         <KV k={t('kv_slope')} v={`${sp.roofSlope} (${f1((Math.atan(sp.roofSlope) * 180) / Math.PI)}°)`} />
         <KV k={t('kv_base')} v={t(sp.baseFixity === 'fixed' ? 'base_fixed' : 'base_pinned')} />
-        {(['column', 'rafter', 'purlin', 'girt', 'strut'] as const).map((r) => (
+        {ROLES.map((r) => (
           <KV key={r} k={t(`role_${r}`)} v={count(r)} />
         ))}
       </div>
@@ -80,6 +83,8 @@ export function ModelPanel() {
         <KV k={t('f_purlin')} v={sp.sections.purlin} />
         <KV k={t('f_girt')} v={sp.sections.girt} />
         <KV k={t('f_strut')} v={sp.sections.strut} />
+        <KV k={t('f_post')} v={sp.sections.post} />
+        <KV k={t('f_brace')} v={sp.sections.brace} />
       </div>
       <div className="scard"><h3>{t('sec_load')}</h3>
         <KV k={t('kv_roofLive')} v={`${f3(info.roofLive)} kN/m²`} />
@@ -94,21 +99,122 @@ export function ModelPanel() {
   )
 }
 
-export function ResultsPanel() {
-  const s = useStore()
-  if (!s.reactions?.length) return <div className="res-empty">{t('res_empty')}</div>
+const ratioColor = (r: number) => (r > 1 ? 'var(--red)' : r > 0.9 ? 'var(--amber)' : 'var(--green)')
+const PART = ['I', '1/4', '2/4', '3/4', 'J']
+/** 변위각은 1/n, 처짐은 mm */
+const svcVal = (k: string, v: number) => (k.endsWith('Defl') ? `${(v * 1000).toFixed(1)} mm` : `1/${Math.round(1 / Math.max(v, 1e-9))}`)
+
+function DesignTables({ d }: { d: DesignResult }) {
+  const ngAll = d.members.filter((m) => m.ratio > 1).sort((a, b) => b.ratio - a.ratio)
   return (
-    <div>
-      <div className="scard"><h3>{t('res_react')}</h3>
+    <>
+      <div className="scard"><h3>{t('res_design')}</h3>
+        <div style={{ overflow: 'auto' }}>
+          <table>
+            <thead><tr><th>{t('rd_role')}</th><th>{t('rd_section')}</th><th>{t('rd_elem')}</th><th>{t('rd_ratio')}</th><th>{t('rd_eq')}</th><th>{t('rd_combo')}</th><th>{t('rd_mode')}</th></tr></thead>
+            <tbody>
+              {ROLES.filter((r) => d.byRole[r]).map((r) => {
+                const m = d.byRole[r]!
+                return (
+                  <tr key={r} title={m.notes.join(' / ')}>
+                    <td>{t(`role_${r}`)}</td><td>{m.section}</td><td>{m.id}{m.part >= 0 ? ` (${PART[m.part]})` : ''}</td>
+                    <td style={{ color: ratioColor(m.ratio), fontWeight: 700 }}>{m.ratio.toFixed(3)}</td>
+                    <td>{m.eq}</td><td>{m.combo}</td>
+                    <td style={{ color: 'var(--muted)' }}>{m.eq === 'KL/r' ? `KL/r ${m.slender.value.toFixed(0)}/${m.slender.limit}` : m.cap.mxMode}{m.notes.length ? ' *' : ''}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="res-stat" style={{ marginTop: 10, marginBottom: 0 }}>{t('rd_assump')}</div>
+      </div>
+      <div className="scard"><h3>{t('res_service')}</h3>
         <table>
-          <thead><tr><th>{t('res_lc')}</th><th>FX (kN)</th><th>FY (kN)</th><th>FZ (kN)</th></tr></thead>
+          <thead><tr><th>{t('sv_item')}</th><th>{t('sv_value')}</th><th>{t('sv_limit')}</th><th>{t('rd_ratio')}</th><th>{t('sv_clause')}</th></tr></thead>
           <tbody>
-            {s.reactions.map((r) => (
-              <tr key={r.lc}><td>{r.lc}</td><td>{f3(r.fx)}</td><td>{f3(r.fy)}</td><td>{f3(r.fz)}</td></tr>
+            {d.service.map((sv) => (
+              <tr key={sv.key}>
+                <td>{t(`sv_${sv.key}`)}</td><td>{svcVal(sv.key, sv.value)}</td><td>{svcVal(sv.key, sv.limit)}</td>
+                <td style={{ color: ratioColor(sv.ratio), fontWeight: 700 }}>{sv.ratio.toFixed(3)}</td><td style={{ color: 'var(--muted)' }}>{sv.clause}</td>
+              </tr>
             ))}
           </tbody>
         </table>
       </div>
+      {ngAll.length > 0 && (
+        <div className="scard"><h3>{t('res_ng')} ({ngAll.length})</h3>
+          <table>
+            <thead><tr><th>{t('rd_elem')}</th><th>{t('rd_role')}</th><th>{t('rd_section')}</th><th>{t('rd_ratio')}</th><th>{t('rd_combo')}</th></tr></thead>
+            <tbody>
+              {ngAll.slice(0, 30).map((m) => (
+                <tr key={m.id}><td>{m.id}</td><td>{t(`role_${m.role}`)}</td><td>{m.section}</td>
+                  <td style={{ color: 'var(--red)', fontWeight: 700 }}>{m.ratio.toFixed(3)}</td><td>{m.combo}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
+  )
+}
+
+function ConnTables({ cs }: { cs: ConnResult[] }) {
+  return (
+    <div className="scard"><h3>{t('res_conn')}</h3>
+      {cs.map((c) => (
+        <div key={c.type} style={{ marginBottom: 12 }}>
+          <div className="kv"><span className="k"><b style={{ color: 'var(--txt-hi)' }}>{t(`cn_type_${c.type}`)}</b> · {c.combo}</span>
+            <span className="v" style={{ color: ratioColor(c.ratio), fontWeight: 700 }}>{c.ratio.toFixed(3)}</span></div>
+          <div style={{ fontSize: '.78rem', color: 'var(--muted)', margin: '4px 0 6px' }}>
+            {Object.values(c.dims).join(' · ')}
+            {c.notes.map((n) => <span key={n} style={{ color: 'var(--amber)' }}> · {n.startsWith('doubler') ? `${t('cn_note_doubler')} ${n.slice(8)}` : n === 'stiffeners' ? t('cn_note_stiffeners') : n}</span>)}
+          </div>
+          <table>
+            <thead><tr><th>{t('sv_item')}</th><th>{t('cn_demand')}</th><th>{t('cn_capacity')}</th><th>{t('rd_ratio')}</th><th>{t('sv_clause')}</th></tr></thead>
+            <tbody>
+              {c.checks.map((k) => (
+                <tr key={k.item}>
+                  <td>{t(`cn_${k.item}` as I18nKey)}</td><td>{k.demand.toFixed(2)} {k.unit}</td><td>{k.capacity.toFixed(2)} {k.unit}</td>
+                  {c.dims.stiffener && k.item === 'flangeBend'
+                    ? <td style={{ color: 'var(--muted)' }}>{k.ratio.toFixed(3)} → {t('cn_stiffener')}</td>
+                    : <td style={{ color: ratioColor(k.ratio), fontWeight: 700 }}>{k.ratio.toFixed(3)}</td>}
+                  <td style={{ color: 'var(--muted)' }}>{k.clause}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function ResultsPanel() {
+  const s = useStore()
+  if (!s.reactions?.length && !s.design) return <div className="res-empty">{t('res_empty')}</div>
+  return (
+    <div>
+      {s.built && (
+        <div className="confirm-row" style={{ marginTop: 0, marginBottom: 12 }}>
+          <button className="btn btn-c" onClick={openReport}>{t('g_design_2')}</button>
+          <button className="btn btn-ghost" onClick={downloadDrawings}>{t('g_design_3')}</button>
+        </div>
+      )}
+      {s.design && <DesignTables d={s.design} />}
+      {!!s.connections?.length && <ConnTables cs={s.connections} />}
+      {!!s.reactions?.length && (
+        <div className="scard"><h3>{t('res_react')}</h3>
+          <table>
+            <thead><tr><th>{t('res_lc')}</th><th>FX (kN)</th><th>FY (kN)</th><th>FZ (kN)</th></tr></thead>
+            <tbody>
+              {s.reactions.map((r) => (
+                <tr key={r.lc}><td>{r.lc}</td><td>{f3(r.fx)}</td><td>{f3(r.fy)}</td><td>{f3(r.fz)}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }

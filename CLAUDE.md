@@ -17,7 +17,9 @@ Vite 8 + TypeScript + React 19 + Tailwind v4 + shadcn/ui(new-york) + **Vercel Fu
 - `src/styles/app.css` — story `shared/app.css` 사본 + 강구조 3D 토큰(`--p-col/raf/pur/girt/strut`). 색은 전부 테마 토큰. Tailwind(`index.css`)는 유지하되 화면은 app.css 클래스로 그린다.
 - `src/state/store.ts` — story 식 mutable `S` + `notify()`/`useStore()`. `ui.ts` — log·addMsg·addPlanMsg·thinking·tab·previewSpec·draw3D.
 - `src/agent/` — `guide.ts`(GUIDE 섹션, 문구 키 `g_<sec>_<n>`·`_cmd`), `parse.ts`(로컬 명령 ko/en/zh, 간체→번체 정규화), `session.ts`(send·testConn·setTheme·setCode·runCmd).
-- `src/actions/` — `build.ts`(doc/new → 모델·하중 PUT → DSTL), `analysis.ts`(doc/saveas `C:/temp` → doc/anal → 반력 합계).
+- `src/actions/` — `build.ts`(자동저장 → doc/new → 모델·단부해제·하중 PUT → DSTL), `analysis.ts`(자동저장 → doc/anal → 반력 합계), `results.ts`(M2 결과 회수), `design.ts`(M3·M4 실행), `outputs.ts`(M5 계산서 HTML·M6 DXF).
+- `src/domain/` — `portal.ts`(형상: 프레임·2차부재·박공 풍주/거트·X-가새), `gen.ts`(Gen 페이로드), `loads.ts`(하중·조합), `weights.ts`·`sections.ts`(단면 성질), `design.ts`(부재·사용성 검토), `connections.ts`(접합부 자동 산정), `schedule.ts`(물량).
+- `src/report/report.ts` 계산서, `src/drawing/` DXF(R12) 작성기·시트.
 - `src/components/` — Header·Footer·Drawers·Guide·Chat·PlanCard(스펙 편집 카드, 디바운스 3D 미리보기)·Panels(로그·모델·결과)·View3D(Plotly 동적 import).
 - `src/mapi/client.ts` — `mapi(method, path, body, note)` 호출·실패를 활동 로그에 기록. `verifyConn()`.
 - `api/` — Vercel 서버리스 함수 (`/api/health` 등), `src/lib/api.ts` — 프론트 호출 헬퍼
@@ -40,6 +42,16 @@ Vite 8 + TypeScript + React 19 + Tailwind v4 + shadcn/ui(new-york) + **Vercel Fu
 - **횡하중 라이브 검증(2026-10-15)**: 식 `src/codes/twLateral.ts`(story tw.ts 원문 대조판 기반 + 강구조 값). 지진 = 정적 등가 V = c·W, T = 0.085hn^¾(X 모멘트골조)·0.050hn^¾(Y 가새), hn = 처마+rise/2, R 표1-3(Rx 3.2 部分韌性 鋼 h≤12m, Ry 2.0 同心斜撐 h≤12m), αy 1.0(LRFD 2.2). W = 절점 무게(단면명 치수로 면적 계산 `weights.ts` + 마감) — Gen D 반력 492.12 vs 오프라인 492.68 kN(0.1%). 2.11 분배 w·h → `db/CNLD`. 풍 = MWFRS p = qGCp − q_i(GCpi), 표2.4 벽·표2.5 지붕(θ<10° 이면 h = 처마높이, θ 0~10 은 직선보간, ≤0.3 행의 +0.2/−0.9 두 값 → high/low)·표2.17 ±GCpi → WX1~4, 퍼린·거트에 GX·GZ 선하중. 반력 합 EX 98.552·EY 122.555·WX1~4 FX/FZ 전부 계산값과 일치. 조합 18개(E ±, W 는 케이스가 변형).
 - **횡하중 미구현**: 종방향 풍(용마루 평행, 박공벽)·우발편심(2.14)·수직지진(2.18)·대북분지/VM·工址 SDS/SD1 표 조회(현재 샘플 0.6/0.35). W ±(반대 방향)은 대칭 구조라 미러로 대체 — 비대칭 모델이면 추가 필요.
 - Gen 오류 메시지는 허용 값 목록을 주지 않는다 — 정확한 문자열은 설치 폴더 `Dbase/*.sdb`·DLL 문자열에서 찾아 시험 PUT 후 DELETE로 원복.
+
+## 전체 프로세스 (2026-10-15 완료, 라이브 검증)
+화면 명령 순서: `공장 생성`(스펙 카드 → 실행) → `해석` → `설계 검토` → `계산서` / `도면`. 샘플 1회 전체 ≈ 26 s.
+- **모델**: 절점 219·요소 410 (풍주 30·박공 거트 32·가새 16 TRUSS). 퍼린·거트·스트럿 양단 핀(FRLS My·Mz), 풍주 상단 핀. TRUSS 단면은 `USE_WARPING_EFFECT:false` 필수(아니면 "7th DOF" 오류). 가새는 끝에서 두 번째 베이(끝 베이는 박공 프레임 처짐 차로 중력 축력 187 kN 발생 — 라이브).
+- **하중**: WY1·2(종방향 풍: 박공 풍상 0.8q(z)·풍하 Cp(L/B)·측벽 −0.7·지붕 −0.7) 추가 → 케이스 10·조합 22. 반력 합 전부 계산값 일치(D 586.4 vs 오프라인 584.7).
+- **M2 결과**: `BEAMFORCE`(조합 `(CB)`, PARTS I·1/4·2/4·3/4·J, 410 요소 × 22 조합 ≈ 4.3만 행 11 s), `TRUSSFORCE`, 조합별 반력 합·처마 변위(B2), 사용 하중 변위.
+- **M3 부재 검토** `src/codes/twSteel.ts`(LRFD 4.4·4.5·5·6.2·7.2·7.3·8.2 원문식, tf·cm) + `domain/design.ts`. 강축 = 국부 `Moment-y`/`Shear-z`. 교과서 대조: 정렬도 K, Cb(1.667·1.136), φMp. 샘플 최대 0.90(거트), 사용성: 풍 변위각 0.24·지붕보 처짐 0.64.
+- **M4 접합부** `src/codes/twConnection.ts`(LRFD 10장: F10T 표10.3-2/3, 앵커 0.75Fu/0.40Fu, 지압 10.9, 필릿 표10.2-5) + `domain/connections.ts`(주각 DG1, 4E 단부판 DG4, 패널존, 스티프너 J10, 가새 볼트). 샘플: 주각 8-M24·PL45 0.97, 처마 8-M22·PL25 + 스티프너 0.98, 마루 8-M20·PL19 0.95.
+- **Gen 설계 API**: `post/STEELCODECHECK`·`DESIGN/STEEL/<code>/CODE-ANAL` 은 KDS 만 — TWN 404 → 설계 검토는 자체 구현.
+- **M5 계산서**: 10장 HTML(화면 언어), 새 창 → 인쇄 PDF. **M6 DXF**: R12 5시트, ezdxf 검증 오류 0. 문자 ASCII 만.
 
 ## 명령
 `npm run dev`(프론트) + `npm run dev:api`(백엔드, vercel CLI 필요) / `npm run build`(= `tsc -b && vite build`) / `npm run typecheck`

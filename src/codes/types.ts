@@ -42,7 +42,8 @@ export interface CodeProfile {
   /** 횡하중 식 (지진·풍). 기준별 구현은 <id>Lateral.ts */
   lateral: {
     period(kind: 'moment' | 'braced', hn: number): number
-    seismicCoef(o: { SDS: number; SD1: number; I: number; R: number; T: number }): { c: number; SaD: number; Fu: number; Ra: number; m: number; gov: string }
+    /** c = max(V, V*) 계수, cStar = 2.10.1 V* 계수 (2.16.1 변위각 검토용 하중 수준) */
+    seismicCoef(o: { SDS: number; SD1: number; I: number; R: number; T: number }): { c: number; cV: number; cStar: number; SaD: number; Fu: number; Ra: number; m: number; gov: string }
     /** 풍속압 q(z) (kN/m²) */
     windQ(z: number, o: { V10: number; I: number; exposure: string }): number
     gust: number
