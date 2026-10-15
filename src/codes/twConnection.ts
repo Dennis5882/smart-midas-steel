@@ -9,7 +9,7 @@
    - 단부판 DG4 4E 항복선: t ≥ √(1.11·Mu / (φb·Fy·Y)) */
 
 const KN_TF = 1 / 9.80665
-export const MPA_TFCM2 = 0.0101972
+export const MPA_TFCM2 = 1 / 98.0665 // MPa → tf/cm² (정확값 — 반올림 0.0101972 는 +4e-6 오차)
 
 export const F10T = { phi: 0.75, Fnt: 7.5, Fnv: 4.0 } // tf/cm²
 /** 볼트 공칭 단면적 cm² */

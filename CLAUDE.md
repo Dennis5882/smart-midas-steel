@@ -89,6 +89,12 @@ Vite 8 + TypeScript + React 19 + Tailwind v4 + shadcn/ui(new-york) + **Vercel Fu
 - `sendModel`: `doc/new` 직후 이전 결과(`S.built` 등) 비움 — 중간 실패·취소 때 이전 모델로 해석·검토하지 않게. 전송 뒤 `MATL·SECT·NODE·ELEM·FRLS·CONS·STLD·LCOM-GEN` GET 개수 = 보낸 개수 확인(다르면 실패, 응답 형식이 다르면 경고만). 라이브: 8개 일치, 생성 6.9 s.
 - 오프라인 회귀 `node --import tsx scripts/verify-job.ts`(가짜 Gen = fetch 대체): 정상·개수 불일치·전송 중 취소·해석 중 취소·중복 실행 10항목.
 
+## 대만 회귀·손계산 대조 (2026-10-15, 평가 보고서 E단계)
+- `node --import tsx scripts/verify-tw.ts` (Gen·키 불필요, 479 검사): ① 손계산 55 — 원문 식을 SI 로 따로 계산해 앱(tf·cm 내부)과 대조 + 고정점(RH400x200 A 8192·Zx·φMp 271.98·φVn 406.08·φPn ≈ 700, 8.2-1a/b, Cb 1.136/1.667, K(1,1) 1.32, B2, F10T M22 209.7/111.8·표10.3-3, 앵커 M24, 필릿, 지압 상한, SaD·Fu·(SaD/Fu)m·V/W, q(z)·표2.4·2.5) ② 하중 평형 — LR 합 = q·B·L, EX/EY 절점하중 합 = V, 케이스 15·조합 55 ③ **기준 모델 정답 세트** `scripts/fixtures/tw-sample.json.gz`(라이브 Gen 결과 1.2 MB) → 설계·접합 재계산, 부재 410개 강도비·지배 조합·식, 사용성, 접합 치수·항목별 비 대조 + Gen 반력 합 = 손계산.
+- 설계식을 **의도적으로** 바꾸면 `verify-tw.ts --update`(정답만 갱신, Gen 결과 유지). `DEFAULT_SPEC`·형상·하중을 바꾸면 Gen 결과가 달라지므로 `printf '<key>
+' | node --import tsx scripts/capture-tw-golden.ts` 로 다시 캡처(키는 stdin). 형식은 `scripts/tw-golden.ts`.
+- 손계산으로 찾은 것: 단위 상수 `MPA_TFCM2 = 0.0101972`(반올림) → `1/98.0665` — 강도가 +4e-6 과대(실무 영향 없음, 지배 조합·접합 치수 변화 없음). 변이 시험(전단 0.6→0.61)으로 회귀가 잡는 것 확인.
+
 ## 단면 자동 최적화 (2026-10-15, 라이브 검증)
 명령 `단면 최적화` (설계 검토 다음). 반복: 결과 회수 → 검토 → `proposeSections` → `sendModel`(재전송) → `analyzeCore`(재해석), 최대 5회.
 - 후보 `src/domain/catalog.ts` = 설치본 `Dbase/CNS2020.sdb` 에서 추출한 이름 그대로(RH 150·CC 45·P 60~318.5 40개). 단면적 오름차순, 목표 강도비 0.95, H 세장 단면 제외.

@@ -11,7 +11,7 @@
 import type { SectionProps } from '../domain/sections'
 
 const KN_TF = 1 / 9.80665 // kN → tf
-const MPA_TFCM2 = 0.0101972 // MPa → tf/cm²
+const MPA_TFCM2 = 1 / 98.0665 // MPa → tf/cm² (정확값)
 
 export interface MemberLengths {
   /** 유효좌굴길이 KL (mm) — x = 강축 휨 평면(강축 좌굴), y = 약축 */

@@ -317,6 +317,7 @@ export const en = {
   g_help_2: 'Release notes',
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v0_11_1_1: 'Taiwan design checks use the exact unit conversion (strength was 0.0004% high — no effect on results); added hand-calculation and reference-model regression checks',
   rn_v0_11_0_1: 'Task progress bar — stage, progress, elapsed time and current Gen call; Cancel stops before the next call',
   rn_v0_11_0_2: 'Duplicate runs, outputs and connection changes are blocked while a task runs; reload warning',
   rn_v0_11_0_3: 'After sending, node/element and other counts in Gen are checked — stops on mismatch; a failed send never reuses old results',
