@@ -1,7 +1,8 @@
 /* 하단 상태 바 — 개발자·버전·업데이트일(왼쪽) + 테마 빠른 전환 버튼(오른쪽) */
 import { setTheme } from '../agent/session'
 import { t } from '../i18n'
-import { THEMES, useStore } from '../state/store'
+import { S, THEMES, notify, useStore } from '../state/store'
+import { ReleaseNotes } from './ReleaseNotes'
 import { APP_VERSION, BUILD_DATE } from '../version'
 
 /* 버튼 견본색 = 각 테마의 배경 + 강조색 (app.css 토큰과 같은 값) */
@@ -14,7 +15,8 @@ export function Footer() {
   return (
     <footer className="appfoot">
       <span className="byline">
-        <span className="by-x">{t('dev')} <b>Dennis</b> · </span>v{APP_VERSION}
+        <span className="by-x">{t('dev')} <b>Dennis</b> · </span>
+        <button className="ver-btn" onClick={() => { S.rnOpen = true; notify() }} title={t('rn_title')}>v{APP_VERSION}</button>
         <span className="by-x">{BUILD_DATE && ` (${t('updated')} : ${BUILD_DATE})`}</span>
       </span>
       <span style={{ flex: 1 }} />
@@ -28,6 +30,7 @@ export function Footer() {
           </button>
         ))}
       </div>
+      {s.rnOpen && <ReleaseNotes onClose={() => { S.rnOpen = false; notify() }} />}
     </footer>
   )
 }

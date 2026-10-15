@@ -5,7 +5,7 @@ import { runOptimize } from '../actions/optimize'
 import { downloadDrawings, openReport } from '../actions/outputs'
 import type { CodeId } from '../codes'
 import { DEFAULT_SPEC, type FactorySpec } from '../domain/types'
-import { t } from '../i18n'
+import { getLang, langUrl, t } from '../i18n'
 import { verifyConn } from '../mapi/client'
 import { S, notify, type Theme } from '../state/store'
 import { addMsg, addPlanMsg, escapeHtml, previewSpec, tab } from '../state/ui'
@@ -20,6 +20,13 @@ export async function send(raw: string): Promise<void> {
   switch (c.intent) {
     case 'help': addMsg('bot', t('help_html')); break
     case 'clear': clearChat(); break
+    case 'release_notes': S.rnOpen = true; notify(); break
+    case 'copy_link': {
+      const u = langUrl(getLang())
+      try { await navigator.clipboard.writeText(u); addMsg('bot', t('link_copied', escapeHtml(u))) }
+      catch { addMsg('bot', t('link_copy_fail', escapeHtml(u))) }
+      break
+    }
     case 'new': {
       const spec: FactorySpec = { ...DEFAULT_SPEC, ...S.lastSpec, ...c.params, code: S.code }
       addPlanMsg(spec)

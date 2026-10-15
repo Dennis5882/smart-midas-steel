@@ -69,8 +69,16 @@ Vite 8 + TypeScript + React 19 + Tailwind v4 + shadcn/ui(new-york) + **Vercel Fu
 4. **보완** — 표2-1(327)·표2-6(b)·臺北盆地 → `codes/twSites.ts`(자동 생성, 縣市 병합 셀은 공식 鄉鎮 수로 배정·불일치 0), 표2-4 Fa·Fv, 스펙 `seismic.county/town/soil/SMS/SM1`, 근단층(2.4)은 경고만. V_M(2.10.2) 하한·대북분지 Ra(2-11)·V*(2-13b) → 샘플은 **V_M 지배**(X 0.221 > 0.200). 우발 비틀림 2.14 ETX·ETY(0.05·B⊥·V, 스트럿 우력, E 와 같은 부호 조합, 2.16.1 변위에 포함). 두께별 Fy `fyAt`(CNS 통상값, 원문 미대조) — 주각 PL45 → PL50.
 - 라이브 결과(샘플): 조합 55·케이스 15, 기존 단면 NG 83(거트 C&C 1.23·풍주 1.17) → 최적화 2회 42.58 t NG 0 → 기본 단면 갱신(거트 CC200x75x20/3.2, 풍주 RH298x149x5.5x8).
 
+## 배포·도메인
+**https://steel.midasapi.space** (Vercel 프로젝트 `smart-midas-steel`, repo `Dennis5882/smart-midas-steel` `main` → 자동 배포). 2026-10-15: Cloudflare **DNS only** CNAME `steel` → `9dfc409e370e822e.vercel-dns-017.com` (프록시 켜면 Vercel 인증서 발급 실패 — rebar 와 같은 규칙), `smart-midas-steel.vercel.app` 은 308 → 커스텀 도메인 (Vercel 도메인 설정 `redirect`).
+
+**언어별 공유 링크** (story 와 같은 방식): 빌드 시 `vite.config.ts` langPages 가 `dist/{ko,en,zh-TW,zh-CN}/index.html`(+ 소문자 경로) 생성 — `<title>`·og 메타 = 사전 `meta_title`/`meta_desc`(메신저 미리보기는 JS 미실행이라 정적 메타 필수), 루트 `/` = ko. 시작 언어: 링크 경로·`?lang=` > 저장값(`sms_lang`) > 브라우저. 언어를 바꾸면 주소도 `/<lang>/`(루트에서 ko 는 `/` 유지, `?lang=` 은 경로로 옮김, 해시 보존) — `src/i18n/index.ts` `langUrl`·`syncUrl`. GUIDE 기타 `링크 복사` = 현재 언어 링크를 클립보드로.
+
+## 버전·릴리즈 노트 (사용자 규칙, 2026-10-15 — rebar-repair 와 같은 방식)
+**사용자에게 보이는 변경을 푸시할 때마다 버전을 올리고, 그 버전의 릴리즈 노트를 같은 커밋에 넣는다 — 묻지 않고 자동으로.** 커밋 전에 `npm run release -- minor`(새 기능) 또는 `patch`(수정·문구·사용자에게 보이는 문서), `major` 는 사용자가 말할 때만. 스크립트(`scripts/release.mjs`)가 `package.json`(+ lock) version 을 올리고 `src/data/releases.json` 맨 앞에 `{version,date(KST),id,items}` 추가, 네 사전(`src/i18n/dict/*.ts`)의 `@release-notes` 앵커 아래에 빈 키 `rn_<id>_1..N` 을 넣는다 → 노트를 ko 먼저, en·zh-TW·zh-CN 순으로 사용자 언어로 한 줄씩 채운다(항목 수는 `--items N`). `release-check`(= `npm run build` 첫 단계, Vercel 빌드에도 적용)는 package.json version ≠ 최신 항목이거나 노트가 하나라도 비면 실패 — **version·키를 손으로 고치지 말 것**. 내부 변경(테스트·리팩터·CLAUDE.md)만이면 버전업 불필요. 화면: 하단 바 `v{APP_VERSION}`(vite define, package.json 단일 출처) 클릭·GUIDE 도움말·명령 `릴리즈 노트` → `ReleaseNotes.tsx`(`.rn` 모달, `S.rnOpen`). 0.1.0~0.5.0 은 기존 커밋에 소급 번호(모두 2026-10-15).
+
 ## 명령
-`npm run dev`(프론트) + `npm run dev:api`(백엔드, vercel CLI 필요) / `npm run build`(= `tsc -b && vite build`) / `npm run typecheck`
+`npm run dev`(프론트) + `npm run dev:api`(백엔드, vercel CLI 필요) / `npm run build`(= release-check + `tsc -b` + `vite build`) / `npm run typecheck` / `npm run release -- patch|minor|major [--items N]`
 
 ## 보안·커밋 규칙
 1. **MAPI-Key는 코드/커밋에 포함 금지**, 메모리(state)에만 보관 — 저장 금지.

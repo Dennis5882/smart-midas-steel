@@ -13,6 +13,8 @@ export type Intent =
   | { intent: 'status' }
   | { intent: 'conn' }
   | { intent: 'clear' }
+  | { intent: 'release_notes' }
+  | { intent: 'copy_link' }
   | { intent: 'unknown' }
 
 /* 간체 → 번체 (명령에 쓰이는 글자만) */
@@ -31,6 +33,8 @@ const num = (txt: string, ...words: string[]): number | undefined => {
 export function parseCommand(raw: string): Intent {
   const txt = normalizeZh(raw.trim())
   if (/^(help|\?|도움말?|명령어|說明|幫助)$/i.test(txt)) return { intent: 'help' }
+  if (/(copy\s*link|share\s*link|링크\s*(복사|공유)|複製連結|分享連結|复制链接|分享链接)/i.test(txt)) return { intent: 'copy_link' }
+  if (/(release\s*notes?|changelog|릴리즈|릴리스|업데이트\s*내역|版本說明|更新說明)/i.test(txt)) return { intent: 'release_notes' }
   if (/^(clear|지우기|대화\s*지우기|清除|清除對話)$/i.test(txt)) return { intent: 'clear' }
   if (/(connection|연결\s*확인|연결|連線確認|連接檢查|連線|連接)/i.test(txt)) return { intent: 'conn' }
   if (/(status|상태|狀態)/i.test(txt)) return { intent: 'status' }

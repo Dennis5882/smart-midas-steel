@@ -80,6 +80,8 @@ export const S = {
   results: null as Results | null,
   design: null as DesignResult | null,
   connections: null as ConnResult[] | null,
+  /** 릴리즈 노트 창 열림 */
+  rnOpen: false,
   /** 단면 자동 최적화 결과 */
   opt: null as OptSummary | null,
   /** 마지막으로 쓴 스펙 — 새 계획 카드의 출발점 */
