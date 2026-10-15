@@ -5,7 +5,7 @@ import { summarizeStatus } from '../domain/status'
 import { checkScope } from '../domain/scope'
 import { statusLine } from '../components/Status'
 import { runDesign, type DesignResult } from '../domain/design'
-import { proposeSections, roleTons, steelWeight, type OptControl, type OptIter, type OptRow, type Sections } from '../domain/optimize'
+import { pickBest, proposeSections, roleTons, steelWeight, type OptControl, type OptIter, type OptRow, type Sections } from '../domain/optimize'
 import { sectionProps } from '../domain/sections'
 import { ROLES } from '../domain/types'
 import { t } from '../i18n'
@@ -14,6 +14,7 @@ import { addMsg, draw3D, log, tab } from '../state/ui'
 import { analyzeCore } from './analysis'
 import { sendModel } from './build'
 import { fetchResults } from './results'
+import { quantities } from '../domain/quantities'
 import { beginJob, endJob, failMsg, setIter } from './job'
 
 const MAX_ITER = 5
@@ -41,9 +42,12 @@ export async function runOptimize(): Promise<void> {
       S.results = await fetchResults(b)
       d = runDesign(b.spec, b.model, b.info, S.results)
       const svcMax = Math.max(0, ...d.service.map((s) => s.ratio))
-      const rec: OptIter = { it, sections: b.spec.sections, weight: steelWeight(b.spec, b.model), maxRatio: d.maxRatio, svcMax, ng: d.ng }
+      /* 접합부도 반복마다 산정 — 부재만 통과하고 접합이 NG 인 안을 최종안으로 고르지 않게 */
+      const cs = runConnections(b.spec, b.model, b.info, S.results)
+      const rec: OptIter = { it, sections: b.spec.sections, weight: steelWeight(b.spec, b.model), plateT: quantities(b.spec, b.model, cs).plateT,
+        maxRatio: d.maxRatio, svcMax, ng: d.ng, connMax: Math.max(0, ...cs.map((c) => c.ratio)), connNg: cs.filter((c) => c.ratio > 1).length }
       iters.push(rec)
-      log(t('log_opt_iter', it, rec.weight.toFixed(2), d.maxRatio.toFixed(3), svcMax.toFixed(3), d.ng), d.ng ? 'warn' : 'ok')
+      log(t('log_opt_iter', it, rec.weight.toFixed(2), d.maxRatio.toFixed(3), svcMax.toFixed(3), d.ng) + t('log_opt_conn', rec.connMax.toFixed(3), rec.connNg), d.ng || rec.connNg ? 'warn' : 'ok')
       /* 재해석 NG 를 하한·금지로 기록 — 다음 제안이 같은(또는 더 가벼운) 단면으로 되돌아가지 않게 */
       for (const r of ROLES) {
         const m = d.byRole[r]
@@ -67,11 +71,8 @@ export async function runOptimize(): Promise<void> {
       await analyzeCore()
     }
 
-    /* 최종 — OK 상태 중 최경량, 없으면 NG 최소 → 최대비 최소 */
-    const ok = iters.filter((x) => x.ng === 0)
-    const best = ok.length
-      ? ok.reduce((a, x) => (x.weight < a.weight ? x : a))
-      : iters.reduce((a, x) => (x.ng < a.ng || (x.ng === a.ng && x.maxRatio < a.maxRatio) ? x : a))
+    /* 최종 — 부재·사용성·접합 모두 OK 인 안 중 (부재 + 판재) 최경량, 없으면 NG 최소 (pickBest) */
+    const { best, valid } = pickBest(iters)
     if (key(best.sections) !== key(S.built!.spec.sections)) {
       log(t('log_opt_restore', best.it), 'info')
       await sendModel({ ...start, sections: best.sections })
@@ -87,7 +88,7 @@ export async function runOptimize(): Promise<void> {
     const tB = roleTons(start, b.model, start.sections), tA = roleTons(b.spec, b.model)
     S.opt = {
       before: start.sections, after: b.spec.sections, iters, weightBefore: wB, weightAfter: wA, converged,
-      ok: S.design.ng === 0 && (b.spec.code !== 'CN' || S.connections.every((c) => c.ratio <= 1)),
+      ok: valid && S.design.ng === 0 && S.connections.every((c) => c.ratio <= 1),
       rows: ROLES.filter((r) => b.model.elements.some((e) => e.role === r)).map((r) => ({
         role: r, before: start.sections[r], after: b.spec.sections[r], ratio: S.design!.byRole[r]?.ratio ?? 0,
         governs: lastRows.find((x) => x.role === r)?.governs ?? 'strength', tBefore: tB[r], tAfter: tA[r],
@@ -95,7 +96,8 @@ export async function runOptimize(): Promise<void> {
     }
     S.ratioView = true
     const pct = wB > 0 ? ((wB - wA) / wB) * 100 : 0
-    addMsg('bot', t('opt_done', wB.toFixed(2), wA.toFixed(2), pct.toFixed(1), S.design.maxRatio.toFixed(2), statusLine(summarizeStatus(S.design, S.connections, checkScope(S.built!.spec))), iters.length))
+    addMsg('bot', t('opt_done', wB.toFixed(2), wA.toFixed(2), pct.toFixed(1), S.design.maxRatio.toFixed(2), statusLine(summarizeStatus(S.design, S.connections, checkScope(S.built!.spec))), iters.length)
+      + (S.opt.ok ? '' : `<br>⚠ ${t('opt_no_valid')}`))
     draw3D()
     tab('resP')
   } catch (e) {

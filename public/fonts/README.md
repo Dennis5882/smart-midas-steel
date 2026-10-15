@@ -1,12 +1,20 @@
-# Report font
+# Report fonts
 
-Noto Sans CJK KR Regular 2.004, unmodified upstream OpenType file.
+Subsets of Noto Sans CJK 2.004 Regular (SIL Open Font License 1.1, `OFL.txt`):
 
-Source: https://github.com/notofonts/noto-cjk/blob/Sans2.004/Sans/OTF/Korean/NotoSansCJKkr-Regular.otf
+| File | Source | Used for |
+|---|---|---|
+| `report-kr.otf` | `Sans/OTF/Korean/NotoSansCJKkr-Regular.otf` | ko, en reports |
+| `report-tc.otf` | `Sans/OTF/TraditionalChinese/NotoSansCJKtc-Regular.otf` | zh-TW reports |
+| `report-sc.otf` | `Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf` | zh-CN reports |
 
-License: SIL Open Font License 1.1, included as `OFL.txt`.
+Source: https://github.com/notofonts/noto-cjk/tree/Sans2.004/Sans/OTF
 
-The report downloads this same-origin font on first PDF export, then embeds
-only the used glyphs in each PDF. It includes Latin, Hangul and Chinese glyphs.
-The single regular font is used for all styles to keep the download to one
-font file; hierarchy also uses size, color and spacing.
+Each subset keeps only the characters that appear in the app source (dictionaries,
+code notes, Taiwan site table, section names), about 0.8 MB instead of 16 MB.
+The PDF export downloads only the font for the report language and embeds the
+used glyphs. After adding text with new characters, regenerate:
+
+    python scripts/subset-fonts.py <folder with the three source OTF files>
+
+`scripts/verify-pdf.ts` fails if any report character is missing from its font.

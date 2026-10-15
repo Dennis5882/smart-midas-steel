@@ -223,12 +223,13 @@ function OptTables({ o }: { o: OptSummary }) {
         </table>
       </div>
       <table style={{ marginTop: 10 }}>
-        <thead><tr><th>{t('op_iter')}</th><th>{t('op_tons')}</th><th>{t('rd_ratio')}</th><th>{t('op_svc')}</th><th>NG</th></tr></thead>
+        <thead><tr><th>{t('op_iter')}</th><th>{t('op_tons')}</th><th>{t('rd_ratio')}</th><th>{t('op_svc')}</th><th>{t('op_conn')}</th><th>NG</th></tr></thead>
         <tbody>
           {o.iters.map((x) => (
             <tr key={x.it}><td>{x.it}</td><td>{f2(x.weight)}</td>
               <td style={{ color: ratioColor(x.maxRatio) }}>{x.maxRatio.toFixed(3)}</td>
-              <td style={{ color: ratioColor(x.svcMax) }}>{x.svcMax.toFixed(3)}</td><td>{x.ng}</td></tr>
+              <td style={{ color: ratioColor(x.svcMax) }}>{x.svcMax.toFixed(3)}</td>
+              <td style={{ color: ratioColor(x.connMax ?? 0) }}>{x.connMax?.toFixed(3) ?? '-'}</td><td>{x.ng + (x.connNg ?? 0)}</td></tr>
           ))}
         </tbody>
       </table>

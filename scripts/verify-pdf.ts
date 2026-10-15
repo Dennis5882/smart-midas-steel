@@ -7,7 +7,8 @@ import assert from 'node:assert/strict'
 import { DOMParser, XMLSerializer } from '@xmldom/xmldom'
 import pdfMake from 'pdfmake'
 import { PDFDocument } from 'pdf-lib'
-import { reportPdfDefinition } from '../src/report/pdf'
+import { reportFontFile, reportPdfDefinition } from '../src/report/pdf'
+import * as fontkit from 'fontkit'
 import { buildPortal } from '../src/domain/portal'
 import { buildLoadPayloads } from '../src/domain/loads'
 import { runConnections } from '../src/domain/connections'
@@ -18,10 +19,8 @@ import type { ReportInput } from '../src/report/report'
 ;(globalThis as any).document = { documentElement: { lang: 'ko', dataset: {} } }
 const { buildReport } = await import('../src/report/report')
 const { setLang } = await import('../src/i18n')
-const font = resolve('public/fonts/NotoSansCJKkr-Regular.otf')
-pdfMake.setLocalAccessPolicy((path) => path === font)
+pdfMake.setLocalAccessPolicy((path) => path.startsWith(resolve('public/fonts')))
 pdfMake.setUrlAccessPolicy(() => false)
-pdfMake.addFonts({ Report: { normal: font, bold: font, italics: font, bolditalics: font } })
 mkdirSync('output/pdf', { recursive: true })
 const fx = JSON.parse(gunzipSync(readFileSync(FIXTURE)).toString())
 const model = buildPortal(fx.spec), loads = buildLoadPayloads(fx.spec, model), results = decodeResults(fx.results)
@@ -30,11 +29,20 @@ for (const lang of ['ko', 'en', 'zh-TW', 'zh-CN'] as const) {
   setLang(lang)
   const html = buildReport(input)
   const doc = new DOMParser().parseFromString(html, 'text/html')
+  /* 언어별 글꼴 + 계산서의 모든 글자가 축소 글꼴에 있는지 (없으면 PDF 에 빈 네모) */
+  const htmlLang = (doc as any).documentElement.getAttribute('lang') ?? ''
+  const font = resolve('public/fonts', reportFontFile(htmlLang))
+  pdfMake.addFonts({ Report: { normal: font, bold: font, italics: font, bolditalics: font } })
+  const face = (fontkit as any).openSync ? (fontkit as any).openSync(font) : (fontkit as any).default.openSync(font)
+  const text = String((doc as any).documentElement.textContent ?? '')
+  const missing = [...new Set([...text].filter((ch) => ch.codePointAt(0)! > 0x20 && !face.hasGlyphForCodePoint(ch.codePointAt(0)!)))]
+  assert.deepEqual(missing, [], `${lang}: glyphs missing from ${font}`)
+  assert.equal(reportFontFile(htmlLang), lang === 'zh-TW' ? 'report-tc.otf' : lang === 'zh-CN' ? 'report-sc.otf' : 'report-kr.otf', `${lang} (${htmlLang}) font`)
   const def = reportPdfDefinition(doc as unknown as Document, (el) => new XMLSerializer().serializeToString(el as any))
   const buffer = await pdfMake.createPdf(def).getBuffer()
   const pdf = await PDFDocument.load(buffer)
   assert.ok(pdf.getPageCount() >= 8)
   const path = `output/pdf/steel-report-TW-${lang}.pdf`
   writeFileSync(path, buffer)
-  console.log(JSON.stringify({ path, pages: pdf.getPageCount(), bytes: buffer.length }))
+  console.log(JSON.stringify({ path, font: font.split(/[\\/]/).pop(), pages: pdf.getPageCount(), bytes: buffer.length }))
 }

@@ -82,7 +82,7 @@ Vite 8 + TypeScript + React 19 + Tailwind v4 + shadcn/ui(new-york) + **Vercel Fu
 
 ### v0.12.0 보완
 
-- PDF는 `actions/outputs.ts`의 `downloadReportPdf()` → `report/pdf.ts`로 직접 파일을 생성한다. pdfmake/pdf-lib는 지연 로딩하며 보고서 데이터는 서버로 전송하지 않는다. 정적 `public/fonts/NotoSansCJKkr-Regular.otf`(OFL, 원문 URL·버전은 같은 폴더 README)를 최초 출력 때 로드하고 PDF에는 사용한 글리프만 포함한다. 표·SVG를 벡터로 저장하고 넓은 표는 식별열을 반복해 분리한다. 실제 PDF의 페이지 수·크기를 확인한 뒤 다운로드 시작을 알린다. 취소 시 PDF 생성 완료 후 파일 다운로드를 중단한다.
+- PDF는 `actions/outputs.ts`의 `downloadReportPdf()` → `report/pdf.ts`로 직접 파일을 생성한다. pdfmake/pdf-lib는 지연 로딩하며 보고서 데이터는 서버로 전송하지 않는다. 글꼴은 계산서 언어별 축소본 `public/fonts/report-{kr,tc,sc}.otf`(Noto Sans CJK OFL, 앱 소스 글자 2034자만, 각 ~0.8 MB — 원본 16 MB) 중 하나만 로드: 번체 TC·간체 SC·그 밖 KR(한자 자형이 지역별로 다름). 문구에 새 글자가 생기면 `python scripts/subset-fonts.py <원본 OTF 폴더>` 재실행 — `verify-pdf.ts` 가 계산서 글자가 글꼴에 모두 있는지 확인(없으면 실패). 표·SVG를 벡터로 저장하고 넓은 표는 식별열을 반복해 분리한다. 실제 PDF의 페이지 수·크기를 확인한 뒤 다운로드 시작을 알린다. 취소 시 PDF 생성 완료 후 파일 다운로드를 중단한다.
 - 새 TW/CN 접합 결과의 `parts`에 판재 치수·수량과 볼트/앵커 치수를 숫자로 전달한다. `quantities.ts`는 이를 사용하고 구형 결과만 문자열 파서로 복원한다. 전단키와 소수 치수 스티프너를 포함하며 추정 치수 표시는 유지한다.
 - 설정은 네이티브 `dialog.showModal()`로 표시한다. 닫힌 대화상자는 접근성 트리에서 제외되고 배경은 inert가 된다. 최초 포커스, Tab 순환, Esc 및 열기 버튼으로 포커스 복귀를 처리한다. 접힌 가이드는 inert/aria-hidden이다.
 - 검증: `scripts/verify-quantities.ts`, `scripts/verify-pdf.ts`(4개 언어 PDF를 `output/pdf/`에 생성). 생성 PDF와 PNG는 Git에서 제외한다.
@@ -109,6 +109,10 @@ Vite 8 + TypeScript + React 19 + Tailwind v4 + shadcn/ui(new-york) + **Vercel Fu
 - 설계식을 **의도적으로** 바꾸면 `verify-tw.ts --update`(정답만 갱신, Gen 결과 유지). `DEFAULT_SPEC`·형상·하중을 바꾸면 Gen 결과가 달라지므로 `printf '<key>
 ' | node --import tsx scripts/capture-tw-golden.ts` 로 다시 캡처(키는 stdin). 형식은 `scripts/tw-golden.ts`.
 - 손계산으로 찾은 것: 단위 상수 `MPA_TFCM2 = 0.0101972`(반올림) → `1/98.0665` — 강도가 +4e-6 과대(실무 영향 없음, 지배 조합·접합 치수 변화 없음). 변이 시험(전단 0.6→0.61)으로 회귀가 잡는 것 확인.
+
+## 입력 검증·최적화 접합 판정 (2026-10-15, 재평가 11.4 의 2·3)
+- 스펙 입력 칸 정의·검증은 `src/components/planFields.ts`(순수): `invalidFields(spec, vals, free)` 를 **기본 모델링·자유골조 공통** 적용 — 빈 값·음수·비숫자·정수 칸 소수·베이 목록(`listError`)·선택값·단면명. 잘못된 칸이 있으면 두 모드 모두 실행 불가(자유골조는 오류를 바로 표시 + [실행] 비활성). `toSpec` 의 기존 값 대체는 미리보기용일 뿐 전송되지 않는다. 회귀 `scripts/verify-input.ts`(80).
+- 최적화: 반복마다 접합부 산정(`OptIter.connMax·connNg·plateT`), 최종안 `pickBest`(domain/optimize, TW·CN 공통) = 부재·사용성·접합 NG 0 중 (부재 + 접합 판재) 최경량, 유효안이 없으면 NG 최소안을 남기고 `opt.ok = false` + 경고 문구. 결과 탭 반복 표에 접합 최대비. 회귀 `scripts/verify-opt.ts`. **Gen 라이브 미재검증.**
 
 ## 단면 자동 최적화 (2026-10-15, 라이브 검증)
 명령 `단면 최적화` (설계 검토 다음). 반복: 결과 회수 → 검토 → `proposeSections` → `sendModel`(재전송) → `analyzeCore`(재해석), 최대 5회.

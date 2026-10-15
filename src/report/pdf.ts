@@ -107,12 +107,19 @@ export function reportPdfDefinition(doc: Document, serialize: (el: Element) => s
   }
 }
 
+/** 계산서 언어(<html lang>) → 글꼴: 번체 = TC, 간체 = SC, 그 밖 = KR (한자 자형이 지역별로 다름).
+    글꼴은 앱 소스의 글자만 남긴 축소본(scripts/subset-fonts.py, 각 ~0.8 MB) */
+export function reportFontFile(lang: string): string {
+  const l = lang.toLowerCase()
+  return `report-${/^zh-(hant|tw|hk)/.test(l) ? 'tc' : /^zh/.test(l) ? 'sc' : 'kr'}.otf`
+}
+
 export async function createReportPdf(html: string): Promise<{ blob: Blob; pages: number }> {
   const [pdfMakeModule, { PDFDocument }] = await Promise.all([import('pdfmake/build/pdfmake'), import('pdf-lib')])
   const pdfMake = pdfMakeModule.default
-  const font = new URL('/fonts/NotoSansCJKkr-Regular.otf', window.location.origin).href
-  pdfMake.addFonts({ [FONT]: { normal: font, bold: font, italics: font, bolditalics: font } })
   const doc = new DOMParser().parseFromString(html, 'text/html')
+  const font = new URL(`/fonts/${reportFontFile(doc.documentElement.getAttribute('lang') ?? '')}`, window.location.origin).href
+  pdfMake.addFonts({ [FONT]: { normal: font, bold: font, italics: font, bolditalics: font } })
   const definition = reportPdfDefinition(doc, (el) => new XMLSerializer().serializeToString(el))
   const blob = await pdfMake.createPdf(definition).getBlob()
   const bytes = await blob.arrayBuffer()

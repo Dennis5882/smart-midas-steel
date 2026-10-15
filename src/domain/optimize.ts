@@ -46,7 +46,18 @@ export interface OptProposal {
 }
 
 /** 반복 1회 기록 — 액션이 쌓는다 */
-export interface OptIter { it: number; sections: Sections; weight: number; maxRatio: number; svcMax: number; ng: number }
+/** 반복 기록 — weight = 부재 강재량, plateT = 접합 판재, connMax·connNg = 그 반복 결과로 산정한 접합부 */
+export interface OptIter { it: number; sections: Sections; weight: number; plateT: number; maxRatio: number; svcMax: number; ng: number; connMax: number; connNg: number }
+
+/** 최종안 선택 (TW·CN 공통) — 유효 = 부재·사용성 NG 0 이고 접합부 NG 0. 유효안 중 (부재 + 접합 판재) 최경량.
+    유효안이 없으면 NG 합(부재·사용성 + 접합) 최소 → 최대비 최소, valid = false 로 알린다. */
+export function pickBest(iters: OptIter[]): { best: OptIter; valid: boolean } {
+  const valid = iters.filter((x) => x.ng === 0 && x.connNg === 0)
+  const total = (x: OptIter) => x.weight + x.plateT
+  if (valid.length) return { best: valid.reduce((a, x) => (total(x) < total(a) ? x : a)), valid: true }
+  const bad = (x: OptIter) => x.ng + x.connNg
+  return { best: iters.reduce((a, x) => (bad(x) < bad(a) || (bad(x) === bad(a) && Math.max(x.maxRatio, x.connMax) < Math.max(a.maxRatio, a.connMax)) ? x : a)), valid: false }
+}
 
 export interface OptSummary {
   before: Sections
@@ -57,7 +68,7 @@ export interface OptSummary {
   weightAfter: number
   /** 마지막 제안이 현재 단면과 같아 수렴 */
   converged: boolean
-  /** 최종 단면이 강도·사용성 모두 OK */
+  /** 최종 단면이 강도·사용성·접합부 모두 OK (TW·CN 공통) */
   ok: boolean
 }
 
