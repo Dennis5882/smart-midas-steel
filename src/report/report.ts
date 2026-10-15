@@ -3,6 +3,7 @@
 import { profileOf } from '../codes'
 import type { ConnResult } from '../domain/connections'
 import type { DesignResult } from '../domain/design'
+import type { OptSummary } from '../domain/optimize'
 import { portalGeometry } from '../domain/portal'
 import { memberSchedule } from '../domain/schedule'
 import { sectionProps } from '../domain/sections'
@@ -22,9 +23,11 @@ export interface ReportInput {
   reactions: ReactionSum[] | null
   design: DesignResult | null
   connections: ConnResult[] | null
+  /** 단면 자동 최적화를 했으면 물량 장에 변경 전후 표 */
+  opt?: OptSummary | null
 }
 
-export function buildReport({ built, reactions, design, connections }: ReportInput): string {
+export function buildReport({ built, reactions, design, connections, opt }: ReportInput): string {
   const { spec, model, info } = built
   const prof = profileOf(spec.code)
   const mat = prof.materials[spec.material]
@@ -128,6 +131,14 @@ export function buildReport({ built, reactions, design, connections }: ReportInp
     [...sch.rows.map((r) => [L(`role_${r.role}`), esc(r.section), r.count, f(r.length, 1), f(r.kgPerM, 1), f(r.weight, 2)]),
      [`<b>${L('rep_total')}</b>`, '', '', '', '', `<b>${f(sch.total, 2)}</b>`]]))
   parts.push(`<p class="note">${esc(t('rep_wt_note', f((sch.total * 1000) / (spec.span * G.length), 1)))}</p>`)
+  if (opt) {
+    parts.push(`<h3>${L('res_opt')}</h3>`)
+    parts.push(table([t('rd_role'), t('op_before'), t('op_after'), t('rd_ratio'), t('op_gov'), t('op_tons')],
+      [...opt.rows.map((r) => [L(`role_${r.role}`), esc(r.before), r.after !== r.before ? `<b>${esc(r.after)}</b>` : esc(r.after), ok(r.ratio),
+        L(`op_gov_${r.governs}`), `${f(r.tBefore)} → ${f(r.tAfter)}`]),
+       [`<b>${L('op_total')}</b>`, '', '', '', '', `<b>${f(opt.weightBefore)} → ${f(opt.weightAfter)}</b>`]]))
+    parts.push(`<p class="note">${esc(t('opt_note'))}</p>`)
+  }
 
   /* 10. 가정·한계 */
   h2('rep_s10')

@@ -15,12 +15,7 @@ export async function runAnalysis(): Promise<void> {
   notify()
   addMsg('bot', t('anal_start'))
   try {
-    await autoSave('model') // doc/new 직후 무제 문서는 해석이 거부되고 확인 창이 뜬다 → 먼저 저장
-    const res = await mapi<{ message?: string }>('POST', '/doc/anal', {})
-    if (NOT_ALLOWED.test(String(res?.message ?? ''))) throw new Error(String(res?.message))
-    S.analyzed = true
-    log(t('log_anal'), 'ok')
-    await fetchReactions()
+    await analyzeCore()
     addMsg('bot', t('anal_done'))
     tab('resP')
   } catch (e) {
@@ -29,6 +24,16 @@ export async function runAnalysis(): Promise<void> {
     S.busy = false
     notify()
   }
+}
+
+/** 해석 본체 (busy·메시지 없음) — 단면 최적화 반복에서도 사용 */
+export async function analyzeCore(): Promise<void> {
+  await autoSave('model') // doc/new 직후 무제 문서는 해석이 거부되고 확인 창이 뜬다 → 먼저 저장
+  const res = await mapi<{ message?: string }>('POST', '/doc/anal', {})
+  if (NOT_ALLOWED.test(String(res?.message ?? ''))) throw new Error(String(res?.message))
+  S.analyzed = true
+  log(t('log_anal'), 'ok')
+  await fetchReactions()
 }
 
 /** 하중 케이스별 반력 합계 — post/table REACTIONG 의 'SUMMATION OF REACTION FORCES PRINTOUT' */

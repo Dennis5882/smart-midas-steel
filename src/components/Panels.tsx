@@ -6,6 +6,7 @@ import { buildLoadPayloads, type LoadInfo } from '../domain/loads'
 import { buildPortal } from '../domain/portal'
 import type { ConnResult } from '../domain/connections'
 import type { DesignResult } from '../domain/design'
+import type { OptSummary } from '../domain/optimize'
 import { ROLES, type FactoryModel, type FactorySpec } from '../domain/types'
 import { t, type I18nKey } from '../i18n'
 import { useStore, type AppState } from '../state/store'
@@ -159,6 +160,43 @@ function DesignTables({ d }: { d: DesignResult }) {
   )
 }
 
+function OptTables({ o }: { o: OptSummary }) {
+  const f2 = (x: number) => x.toFixed(2)
+  return (
+    <div className="scard"><h3>{t('res_opt')}</h3>
+      <div style={{ overflow: 'auto' }}>
+        <table>
+          <thead><tr><th>{t('rd_role')}</th><th>{t('op_before')}</th><th>{t('op_after')}</th><th>{t('rd_ratio')}</th><th>{t('op_gov')}</th><th>{t('op_tons')}</th></tr></thead>
+          <tbody>
+            {o.rows.map((r) => (
+              <tr key={r.role}>
+                <td>{t(`role_${r.role}`)}</td>
+                <td style={{ color: 'var(--muted)' }}>{r.before}</td>
+                <td style={r.after !== r.before ? { color: 'var(--txt-hi)', fontWeight: 700 } : undefined}>{r.after}</td>
+                <td style={{ color: ratioColor(r.ratio), fontWeight: 700 }}>{r.ratio.toFixed(3)}</td>
+                <td style={{ color: 'var(--muted)' }}>{t(`op_gov_${r.governs}`)}</td>
+                <td>{f2(r.tBefore)} → {f2(r.tAfter)}</td>
+              </tr>
+            ))}
+            <tr><td colSpan={5}><b>{t('op_total')}</b></td><td><b>{f2(o.weightBefore)} → {f2(o.weightAfter)}</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <table style={{ marginTop: 10 }}>
+        <thead><tr><th>{t('op_iter')}</th><th>{t('op_tons')}</th><th>{t('rd_ratio')}</th><th>{t('op_svc')}</th><th>NG</th></tr></thead>
+        <tbody>
+          {o.iters.map((x) => (
+            <tr key={x.it}><td>{x.it}</td><td>{f2(x.weight)}</td>
+              <td style={{ color: ratioColor(x.maxRatio) }}>{x.maxRatio.toFixed(3)}</td>
+              <td style={{ color: ratioColor(x.svcMax) }}>{x.svcMax.toFixed(3)}</td><td>{x.ng}</td></tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="res-stat" style={{ marginTop: 10, marginBottom: 0 }}>{t('opt_note')}</div>
+    </div>
+  )
+}
+
 function ConnTables({ cs }: { cs: ConnResult[] }) {
   return (
     <div className="scard"><h3>{t('res_conn')}</h3>
@@ -201,6 +239,7 @@ export function ResultsPanel() {
           <button className="btn btn-ghost" onClick={downloadDrawings}>{t('g_design_3')}</button>
         </div>
       )}
+      {s.opt && <OptTables o={s.opt} />}
       {s.design && <DesignTables d={s.design} />}
       {!!s.connections?.length && <ConnTables cs={s.connections} />}
       {!!s.reactions?.length && (

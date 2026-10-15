@@ -1,6 +1,7 @@
 /* 세션 — 채팅 입력 처리, 설정(테마·기준), 연결 테스트, 입력창 제어 */
 import { fetchReactions, runAnalysis } from '../actions/analysis'
 import { runDesignCheck } from '../actions/design'
+import { runOptimize } from '../actions/optimize'
 import { downloadDrawings, openReport } from '../actions/outputs'
 import type { CodeId } from '../codes'
 import { DEFAULT_SPEC, type FactorySpec } from '../domain/types'
@@ -28,6 +29,7 @@ export async function send(raw: string): Promise<void> {
     }
     case 'analyze': await runAnalysis(); break
     case 'design': await runDesignCheck(); break
+    case 'optimize': await runOptimize(); break
     case 'report': openReport(); break
     case 'drawings': downloadDrawings(); break
     case 'reactions': {

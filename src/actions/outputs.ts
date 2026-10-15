@@ -20,7 +20,7 @@ function download(name: string, text: string, type: string): void {
 
 export function openReport(): void {
   if (!S.built) { addMsg('bot', t('no_model')); return }
-  const html = buildReport({ built: S.built, reactions: S.reactions, design: S.design, connections: S.connections })
+  const html = buildReport({ built: S.built, reactions: S.reactions, design: S.design, connections: S.connections, opt: S.opt })
   const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }))
   const w = window.open(url, '_blank')
   if (!w) download(`steel_report_${stamp()}.html`, html, 'text/html') // 팝업 차단 시 파일로

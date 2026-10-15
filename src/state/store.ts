@@ -9,6 +9,7 @@ import type { Results } from '../actions/results'
 import type { ConnResult } from '../domain/connections'
 import type { DesignResult } from '../domain/design'
 import type { LoadInfo } from '../domain/loads'
+import type { OptSummary } from '../domain/optimize'
 import { DEFAULT_SPEC, type FactoryModel, type FactorySpec } from '../domain/types'
 
 export const THEMES = ['navy', 'light', 'cyber'] as const
@@ -37,7 +38,7 @@ function readTheme(): Theme {
     const t = localStorage.getItem('sms_theme')
     if ((THEMES as readonly string[]).includes(t ?? '')) return t as Theme
   } catch { /* storage 차단 */ }
-  return 'navy'
+  return 'light'
 }
 
 function readCode(): CodeId {
@@ -79,6 +80,8 @@ export const S = {
   results: null as Results | null,
   design: null as DesignResult | null,
   connections: null as ConnResult[] | null,
+  /** 단면 자동 최적화 결과 */
+  opt: null as OptSummary | null,
   /** 마지막으로 쓴 스펙 — 새 계획 카드의 출발점 */
   lastSpec: DEFAULT_SPEC as FactorySpec,
 }

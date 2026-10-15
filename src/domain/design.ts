@@ -56,7 +56,16 @@ const dist = (a: { x: number; y: number; z: number }, b: { x: number; y: number;
 /** 조합 이름에서 횡력 방향 — 'WX…', '±EX' → X / 'WY…', '±EY' → Y / 중력 → null */
 const comboDir = (c: string): 'X' | 'Y' | null => (/(W|E)X/.test(c) ? 'X' : /(W|E)Y/.test(c) ? 'Y' : null)
 
-export function runDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo, res: Results): DesignResult {
+/** 퍼린 활하중 처짐 (m) — 단순보 5wL⁴/384EI, w = 지붕 활하중 × 퍼린 간격 × cosθ */
+export function purlinDefl(spec: FactorySpec, info: LoadInfo, section: string): number {
+  const mat = profileOf(spec.code).materials[spec.material]
+  const G = portalGeometry(spec)
+  const wLR = info.roofLive * G.sRoof * Math.cos(G.theta) // kN/m
+  return (5 * wLR * spec.baySpacing ** 4) / (384 * mat.E * 1e3 * (sectionProps(section).Ix * 1e-12)) // m (E kPa, I m⁴)
+}
+
+/** roles 를 주면 그 역할 부재만 검토하고 사용성은 생략 (단면 최적화 후보 평가용) */
+export function runDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo, res: Results, roles?: readonly ElementRole[]): DesignResult {
   const prof = profileOf(spec.code)
   const mat = prof.materials[spec.material]
   const G = portalGeometry(spec)
@@ -82,6 +91,7 @@ export function runDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
 
   const members: MemberCheck[] = []
   for (const e of model.elements) {
+    if (roles && !roles.includes(e.role)) continue
     const sp = sectionProps(e.section)
     const Lel = dist(nodes.get(e.n1)!, nodes.get(e.n2)!)
     const { KLx, KLy, Lb } = lengthsOf(e.role, Lel, e)
@@ -139,6 +149,7 @@ export function runDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
 
   /* ── 사용성 ── */
   const service: ServiceCheck[] = []
+  if (roles) return summarize(members, service)
   const eaveIds = model.nodes.filter((n) => Math.abs(n.z - spec.eaveHeight) < 1e-9 && (n.x === 0 || n.x === spec.span)).map((n) => n.id)
   const ridgeIds = model.nodes.filter((n) => Math.abs(n.x - spec.span / 2) < 1e-9 && Math.abs(n.z - G.ridgeZ) < 1e-9).map((n) => n.id)
   const maxOver = (cases: string[], comp: 'dx' | 'dy', scale = 1) => {
@@ -169,12 +180,13 @@ export function runDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
     const d = Math.abs(ridgeDz - eaveDz)
     service.push({ key: 'rafterDefl', value: d, limit: spec.span / 360, ratio: d / (spec.span / 360), case: 'LR', clause: 'LRFD 11.5.3' })
   }
-  const pur = sectionProps(spec.sections.purlin)
-  const wLR = info.roofLive * G.sRoof * Math.cos(G.theta) // kN/m
   const Lp = spec.baySpacing
-  const dPur = (5 * wLR * Lp ** 4) / (384 * mat.E * 1e3 * (pur.Ix * 1e-12)) // m (E kPa, I m⁴)
+  const dPur = purlinDefl(spec, info, spec.sections.purlin)
   service.push({ key: 'purlinDefl', value: dPur, limit: Lp / 360, ratio: dPur / (Lp / 360), case: 'LR', clause: 'LRFD 11.5.3' })
+  return summarize(members, service)
+}
 
+function summarize(members: MemberCheck[], service: ServiceCheck[]): DesignResult {
   const byRole: DesignResult['byRole'] = {}
   for (const m of members) if (!byRole[m.role] || m.ratio > byRole[m.role]!.ratio) byRole[m.role] = m
   const maxRatio = Math.max(0, ...members.map((m) => m.ratio))

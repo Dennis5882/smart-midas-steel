@@ -17,8 +17,8 @@ Vite 8 + TypeScript + React 19 + Tailwind v4 + shadcn/ui(new-york) + **Vercel Fu
 - `src/styles/app.css` — story `shared/app.css` 사본 + 강구조 3D 토큰(`--p-col/raf/pur/girt/strut`). 색은 전부 테마 토큰. Tailwind(`index.css`)는 유지하되 화면은 app.css 클래스로 그린다.
 - `src/state/store.ts` — story 식 mutable `S` + `notify()`/`useStore()`. `ui.ts` — log·addMsg·addPlanMsg·thinking·tab·previewSpec·draw3D.
 - `src/agent/` — `guide.ts`(GUIDE 섹션, 문구 키 `g_<sec>_<n>`·`_cmd`), `parse.ts`(로컬 명령 ko/en/zh, 간체→번체 정규화), `session.ts`(send·testConn·setTheme·setCode·runCmd).
-- `src/actions/` — `build.ts`(자동저장 → doc/new → 모델·단부해제·하중 PUT → DSTL), `analysis.ts`(자동저장 → doc/anal → 반력 합계), `results.ts`(M2 결과 회수), `design.ts`(M3·M4 실행), `outputs.ts`(M5 계산서 HTML·M6 DXF).
-- `src/domain/` — `portal.ts`(형상: 프레임·2차부재·박공 풍주/거트·X-가새), `gen.ts`(Gen 페이로드), `loads.ts`(하중·조합), `weights.ts`·`sections.ts`(단면 성질), `design.ts`(부재·사용성 검토), `connections.ts`(접합부 자동 산정), `schedule.ts`(물량).
+- `src/actions/` — `build.ts`(자동저장 → doc/new → 모델·단부해제·하중 PUT → DSTL), `analysis.ts`(자동저장 → doc/anal → 반력 합계), `results.ts`(M2 결과 회수), `design.ts`(M3·M4 실행), `optimize.ts`(단면 최적화 반복), `outputs.ts`(M5 계산서 HTML·M6 DXF).
+- `src/domain/` — `portal.ts`(형상: 프레임·2차부재·박공 풍주/거트·X-가새), `gen.ts`(Gen 페이로드), `loads.ts`(하중·조합), `weights.ts`·`sections.ts`(단면 성질), `design.ts`(부재·사용성 검토), `connections.ts`(접합부 자동 산정), `schedule.ts`(물량), `catalog.ts`(CNS2020 후보 단면)·`optimize.ts`(단면 제안, 순수).
 - `src/report/report.ts` 계산서, `src/drawing/` DXF(R12) 작성기·시트.
 - `src/components/` — Header·Footer·Drawers·Guide·Chat·PlanCard(스펙 편집 카드, 디바운스 3D 미리보기)·Panels(로그·모델·결과)·View3D(Plotly 동적 import).
 - `src/mapi/client.ts` — `mapi(method, path, body, note)` 호출·실패를 활동 로그에 기록. `verifyConn()`.
@@ -52,6 +52,14 @@ Vite 8 + TypeScript + React 19 + Tailwind v4 + shadcn/ui(new-york) + **Vercel Fu
 - **M4 접합부** `src/codes/twConnection.ts`(LRFD 10장: F10T 표10.3-2/3, 앵커 0.75Fu/0.40Fu, 지압 10.9, 필릿 표10.2-5) + `domain/connections.ts`(주각 DG1, 4E 단부판 DG4, 패널존, 스티프너 J10, 가새 볼트). 샘플: 주각 8-M24·PL45 0.97, 처마 8-M22·PL25 + 스티프너 0.98, 마루 8-M20·PL19 0.95.
 - **Gen 설계 API**: `post/STEELCODECHECK`·`DESIGN/STEEL/<code>/CODE-ANAL` 은 KDS 만 — TWN 404 → 설계 검토는 자체 구현.
 - **M5 계산서**: 10장 HTML(화면 언어), 새 창 → 인쇄 PDF. **M6 DXF**: R12 5시트, ezdxf 검증 오류 0. 문자 ASCII 만.
+
+## 단면 자동 최적화 (2026-10-15, 오프라인·모의 MAPI 검증 — 라이브 미검증)
+명령 `단면 최적화` (설계 검토 다음). 반복: 결과 회수 → 검토 → `proposeSections` → `sendModel`(재전송) → `analyzeCore`(재해석), 최대 5회.
+- 후보 `src/domain/catalog.ts` = 설치본 `Dbase/CNS2020.sdb` 에서 추출한 이름 그대로(RH 150·CC 45·P 60~318.5 40개). 단면적 오름차순, 목표 강도비 0.95, H 세장 단면 제외.
+- 2차부재(퍼린·거트·스트럿·풍주·가새)는 핀 → 부재력이 자기 단면과 무관 → 한 번에 확정. 퍼린 처짐 L/360, 가새는 종방향 변위 ∝ 1/A 로 함께 제한.
+- 골조: 강도 통과 기둥 × 지붕보 쌍 중 추정 사용성(문형 라멘 횡강성 Chopra 1.3·단부 고정도 처짐식으로 현재 해석값 환산) ≤ 0.95 인 최소 강재량.
+- 진동 방지(`OptControl`): 재해석 강도 NG 단면 이하 면적 금지(floors), 사용성 NG 골조 쌍 이하 금지(bans), 실제/추정 강도비로 증폭 학습(amp) → 현재보다 가벼운 후보에만 목표 target/amp.
+- 종료: 수렴 / 이미 거친 조합 / 최대 반복. 최종 = 거친 상태 중 NG 0 최경량(현재가 아니면 재전송·재해석). 이후 접합부 재산정, `S.lastSpec` 갱신, 결과 탭·계산서 9장에 변경 전후 표.
 
 ## 명령
 `npm run dev`(프론트) + `npm run dev:api`(백엔드, vercel CLI 필요) / `npm run build`(= `tsc -b && vite build`) / `npm run typecheck`
