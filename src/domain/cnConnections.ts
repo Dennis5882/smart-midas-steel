@@ -8,7 +8,7 @@
 import { cnStrength } from '../codes/cn'
 import type { Results } from '../actions/results'
 import type { FactorySpec, FactoryModel } from './types'
-import type { ConnCheck, ConnResult } from './connections'
+import type { ConnCheck, ConnResult, ConnectionParts } from './connections'
 import { sectionProps } from './sections'
 
 const PLATES = [10, 12, 14, 16, 18, 20, 22, 25, 28, 30, 32, 36, 40, 45, 50, 55, 60, 65, 70, 80, 90, 100]
@@ -48,6 +48,7 @@ export function runCnConnections(spec: FactorySpec, model: FactoryModel, res: Re
     const w = Math.max(6, Math.ceil(maxV * 1000 / (.7 * weldF * 2 * col.h)))
     checks.push(check('plateT', tReq, tp, 'mm', 'GB 50017 12.7.5, elastic cantilever'), check('shearKey', maxKey, Math.min(100 * keyT * cnStrength(spec.material, keyT).fv, keyW * 100 * c.concreteBearing) / 1000, 'kN', 'GB 50017 12.7.4'), check('weldWeb', maxV, .7 * w * 2 * col.h * weldF / 1000, 'kN', 'GB 50017 11.2.2'))
     selected = { type: 'base', elem: worstF.elem, combo: worstF.combo, dims: { plate: `PL ${B}x${N}x${tp}`, anchors: `${2 * nSide}-M${d} Q235/Q345, ft=${c.anchorFt} MPa`, anchorLayout: `${nSide}/side; edge ${edge} mm`, shearKey: `PL ${keyW}x100x${keyT}; embedded 100 mm`, weld: `web ${w} mm; flanges CJP` }, checks, ratio: ratio(checks), notes: ['gbFoundation'] }
+    selected.parts = { plates: [{ part: 'plate', width: B, length: N, thickness: tp, count: 1, estimated: false }, { part: 'shearKey', width: keyW, length: 100, thickness: keyT, count: 1, estimated: false }], fasteners: [{ kind: 'anchor', diameter: d, count: 2 * nSide }] }
     if (selected.ratio <= 1) break
   }
   out.push(selected!)
@@ -72,13 +73,15 @@ export function runCnConnections(spec: FactorySpec, model: FactoryModel, res: Re
       const tp = pick(Math.max(16, maxPlate)), w = Math.max(6, Math.ceil(maxV * 1000 / (.7 * 2 * raf.h * weldF)))
       checks.push(check('plateT', maxPlate, tp, 'mm', 'GB 50017 12.3, elastic cantilever'), check('weldWeb', maxV, .7 * w * 2 * raf.h * weldF / 1000, 'kN', 'GB 50017 11.2.2'))
       const dims: ConnResult['dims'] = { plate: `PL ${bp}x${Math.max(raf.d + 4 * pf, (count / 2 - 1) * 3 * d + 4 * d)}x${tp}`, bolts: `${count}-M${d} 10.9 friction, mu=0.40`, pitch: `${3 * d} mm minimum, edge ${2 * d} mm`, weld: `web ${w} mm; flanges CJP` }
+      const parts: ConnectionParts = { plates: [{ part: 'plate', width: bp, length: Math.max(raf.d + 4 * pf, (count / 2 - 1) * 3 * d + 4 * d), thickness: tp, count: type === 'apex' ? 2 : 1, estimated: false }], fasteners: [{ kind: 'bolt', diameter: d, count }] }
       if (type === 'knee') {
         const doubler = pick(Math.max(0, maxFlange * 1000 / (col.h * cnStrength(spec.material, 100).fv) - col.tw))
         const stiffWidth = (col.bf - col.tw) / 2, stiffT = pick(Math.max(col.tf, maxFlange * 1000 / (2 * stiffWidth * plateF(100)), stiffWidth / 13))
         dims.doubler = `PL ${doubler}`; dims.stiffener = `2-PL ${stiffWidth}x${stiffT}`
+        parts.plates.push({ part: 'doubler', width: col.h, length: raf.d, thickness: doubler, count: 1, estimated: true }, { part: 'stiffener', width: stiffWidth, length: col.h, thickness: stiffT, count: 2, estimated: true })
         checks.push(check('panel', maxFlange, col.h * (col.tw + doubler) * cnStrength(spec.material, Math.max(col.tw, doubler)).fv / 1000, 'kN', 'GB 50017 12.3; web shear equilibrium'), check('stiffener', maxFlange, 2 * stiffWidth * stiffT * plateF(stiffT) / 1000, 'kN', 'GB 50017 12.3, flange-force continuity'))
       }
-      result = { type, elem: worstF.elem, combo: worstF.combo, dims, checks, ratio: ratio(checks), notes: ['gbJointDetail'] }
+      result = { type, elem: worstF.elem, combo: worstF.combo, dims, checks, ratio: ratio(checks), notes: ['gbJointDetail'], parts }
       if (result.ratio <= 1) break boltSearch
     }
     out.push(result!)
@@ -92,7 +95,7 @@ export function runCnConnections(spec: FactorySpec, model: FactoryModel, res: Re
     const width = Math.max(200, 4 * d), net = width - (d + 2)
     const t = pick(Math.max(10, N * 1000 / (net * plateF(100))))
     const checks = [check('boltV', N / n, b.shear, 'kN', 'GB 50017 11.4.2-1'), check('bearingPl', N, net * t * plateF(t) / 1000, 'kN', 'GB 50017 7.1.1 (net section)')]
-    out.push({ type: 'brace', elem, combo: force >= 1.1 * yieldForce ? combo : 'GB brace capacity envelope 1.1FyAg', dims: { bolts: `${n}-M${d} 10.9 friction mu=.40`, gusset: `PL ${width}x${t}`, pitch: `${3 * d} mm; edge ${2 * d} mm` }, checks, ratio: ratio(checks), notes: ['gbBraceDetail'] })
+    out.push({ type: 'brace', elem, combo: force >= 1.1 * yieldForce ? combo : 'GB brace capacity envelope 1.1FyAg', dims: { bolts: `${n}-M${d} 10.9 friction mu=.40`, gusset: `PL ${width}x${t}`, pitch: `${3 * d} mm; edge ${2 * d} mm` }, checks, ratio: ratio(checks), notes: ['gbBraceDetail'], parts: { plates: [{ part: 'gusset', width, length: width, thickness: t, count: 1, estimated: true }], fasteners: [{ kind: 'bolt', diameter: d, count: n }] } })
   }
   return out
 }

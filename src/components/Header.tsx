@@ -27,11 +27,11 @@ export function Header({ onOpenMapi }: { onOpenMapi(): void }) {
           {CODE_IDS.map((id) => <option key={id} value={id}>{t(PROFILES[id].labelKey)}</option>)}
         </select>
       </div>
-      <div className={`pill${s.connected ? ' on' : ''}${s.connErr ? ' err' : ''}`} onClick={onOpenMapi}>
+      <button type="button" className={`pill${s.connected ? ' on' : ''}${s.connErr ? ' err' : ''}`} onClick={onOpenMapi} aria-haspopup="dialog">
         <span className="dot" />
         <span>{connTxt}</span>
-      </div>
-      <div className="gear" onClick={onOpenMapi} title={t('settings')}>⚙</div>
+      </button>
+      <button type="button" className="gear" onClick={onOpenMapi} aria-label={t('settings')} aria-haspopup="dialog">⚙</button>
     </header>
   )
 }

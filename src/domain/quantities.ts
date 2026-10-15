@@ -1,10 +1,10 @@
 /* 물량 산출 (순수 함수, 평가 보고서 C단계) — 부재 + 접합재(판·볼트·앵커) + 용접 길이(추정) + 도장 면적 + 로스 포함 발주 중량.
-   접합재는 접합부 결과 dims 의 규격 문자열을 읽는다 (TW connections.ts / CN cnConnections.ts 공통 형식):
+   새 접합재는 TW/CN 결과 parts 의 숫자 치수로 산출하며, 이전 결과만 dims 문자열에서 복원한다:
      판 'PL B×N×t' (x 도 허용) · 볼트/앵커 'n-M d' · 스티프너 '2-PL b×t' · 더블러 TW note 'doubler t mm' / CN dims 'PL t' · 가새 거셋 TW 'PL t' / CN 'PL w×t'.
    접합 개수(모델에서): 주각·처마 = 골조 기둥 수(2 × 골조 수), 마루 = 골조 수, 가새 단부 = 가새 요소 × 2.
    추정(est) 항목: 스티프너 길이 = 기둥 웨브 순높이, 더블러 = 기둥 웨브 순높이 × 지붕보 춤, 거셋 크기(TW 는 두께만 → 200×200 가정),
    용접 = 단부판 접합 1 곳당 플랜지 CJP 2·bf + 웨브 필렛 2·h. 풍주 주각·퍼린/거트 클립·새그로드·마감재는 제외. */
-import type { ConnResult } from './connections'
+import type { ConnResult, ConnectionParts, PlatePart } from './connections'
 import { memberSchedule, type ScheduleRow } from './schedule'
 import { sectionProps } from './sections'
 import { ROLES, type ElementRole, type FactoryModel, type FactorySpec } from './types'
@@ -14,7 +14,7 @@ export const LOSS = { member: 0.05, plate: 0.1 }
 const STEEL_KG_MM3 = 7.85e-6
 
 export type ConnType = ConnResult['type']
-export interface PlateRow { type: ConnType; part: 'plate' | 'stiffener' | 'doubler' | 'gusset'; size: string; perConn: number; conns: number; kg: number; est: boolean }
+export interface PlateRow { type: ConnType; part: PlatePart; size: string; perConn: number; conns: number; kg: number; est: boolean }
 export interface BoltRow { type: ConnType; kind: 'bolt' | 'anchor'; size: string; perConn: number; conns: number; total: number }
 export interface WeldRow { type: ConnType; cjp: number; fillet: number; conns: number }
 export interface PaintRow { role: ElementRole; section: string; area: number }
@@ -29,6 +29,33 @@ export interface Quantities {
 
 const plateRe = /PL\s*(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)/
 const nM = /(\d+)-M(\d+)/
+
+/** Compatibility for older saved reports. New connection calculations supply
+    numeric parts directly. A present but unreadable size must never vanish. */
+function legacyParts(c: ConnResult, colH: number, rafD: number): ConnectionParts {
+  const p: ConnectionParts = { plates: [], fasteners: [] }, d = c.dims
+  const read = (key: string, pattern: RegExp) => {
+    if (d[key] === undefined) return null
+    const m = String(d[key]).match(pattern)
+    if (!m) throw new Error(`Invalid connection quantity: ${c.type}.${key}`)
+    return m
+  }
+  for (const key of ['plate', 'shearKey'] as const) {
+    const m = read(key, plateRe)
+    if (m) p.plates.push({ part: key, width: +m[1], length: +m[2], thickness: +m[3], count: key === 'plate' && c.type === 'apex' ? 2 : 1, estimated: false })
+  }
+  const st = read('stiffener', /(\d+)-PL\s*(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)/)
+  if (st) p.plates.push({ part: 'stiffener', width: +st[2], length: colH, thickness: +st[3], count: +st[1], estimated: true })
+  const dbl = read('doubler', /PL\s*(\d+(?:\.\d+)?)/)?.[1] ?? c.notes.find((n) => n.startsWith('doubler'))?.match(/(\d+(?:\.\d+)?)/)?.[1]
+  if (dbl) p.plates.push({ part: 'doubler', width: colH, length: rafD, thickness: +dbl, count: 1, estimated: true })
+  const g = read('gusset', /PL\s*(\d+(?:\.\d+)?)(?:\s*[x×]\s*(\d+(?:\.\d+)?))?/)
+  if (g) p.plates.push({ part: 'gusset', width: g[2] ? +g[1] : 200, length: g[2] ? +g[1] : 200, thickness: +(g[2] ?? g[1]), count: 1, estimated: true })
+  for (const [key, kind] of [['anchors', 'anchor'], ['bolts', 'bolt']] as const) {
+    const m = read(key, nM)
+    if (m) p.fasteners.push({ kind, diameter: +m[2], count: +m[1] })
+  }
+  return p
+}
 
 /** 단면 둘레(mm) — 도장 면적용. H: 외곽 2d + 4bf − 2tw, CC: 판 양면(중심선 전개 × 2), P: 외면 πD */
 function perimeter(section: string): number {
@@ -48,27 +75,18 @@ export function quantities(spec: FactorySpec, model: FactoryModel, conns: ConnRe
   }
   const col = sectionProps(spec.sections.column), raf = sectionProps(spec.sections.rafter)
   const plates: PlateRow[] = [], bolts: BoltRow[] = [], welds: WeldRow[] = []
-  const addPlate = (type: ConnType, part: PlateRow['part'], b: number, l: number, t: number, perConn: number, est: boolean) =>
-    plates.push({ type, part, size: `PL ${Math.round(b)}×${Math.round(l)}×${t}`, perConn, conns: countOf[type], kg: b * l * t * STEEL_KG_MM3 * perConn * countOf[type], est })
-  const addBolt = (type: ConnType, kind: BoltRow['kind'], s: unknown) => {
-    const m = String(s ?? '').match(nM)
-    if (m) bolts.push({ type, kind, size: `M${m[2]}`, perConn: +m[1], conns: countOf[type], total: +m[1] * countOf[type] })
+  const fmt = (n: number) => +n.toFixed(3)
+  const addPlate = (type: ConnType, part: PlateRow['part'], b: number, l: number, t: number, perConn: number, est: boolean) => {
+    if (![b, l, t, perConn].every((n) => Number.isFinite(n) && n > 0) || !Number.isInteger(perConn)) throw new Error(`Invalid connection quantity: ${type}.${part}`)
+    plates.push({ type, part, size: `PL ${fmt(b)}×${fmt(l)}×${fmt(t)}`, perConn, conns: countOf[type], kg: b * l * t * STEEL_KG_MM3 * perConn * countOf[type], est })
   }
 
   for (const c of conns ?? []) {
-    const d = c.dims
-    const pl = String(d.plate ?? '').match(plateRe)
-    /* 단부판·베이스플레이트: 마루 이음은 양쪽 지붕보 끝에 1 장씩 */
-    if (pl) addPlate(c.type, 'plate', +pl[1], +pl[2], +pl[3], c.type === 'apex' ? 2 : 1, false)
-    if (c.type === 'base') addBolt('base', 'anchor', d.anchors)
-    else addBolt(c.type, 'bolt', d.bolts)
-    const st = String(d.stiffener ?? '').match(/(\d+)-PL\s*(\d+)\s*[x×]\s*(\d+)/)
-    if (st) addPlate(c.type, 'stiffener', +st[2], col.h, +st[3], +st[1], true)
-    const dbl = c.notes.find((n) => n.startsWith('doubler'))?.match(/(\d+)/)?.[1] ?? String(d.doubler ?? '').match(/PL\s*(\d+)/)?.[1]
-    if (dbl && +dbl > 0) addPlate(c.type, 'doubler', col.h, raf.d, +dbl, 1, true)
-    if (c.type === 'brace') {
-      const g = String(d.gusset ?? '').match(/PL\s*(\d+)(?:\s*[x×]\s*(\d+))?/)
-      if (g) { const [w, t] = g[2] ? [+g[1], +g[2]] : [200, +g[1]]; addPlate('brace', 'gusset', w, w, t, 1, true) }
+    const parts = c.parts ?? legacyParts(c, col.h, raf.d)
+    for (const p of parts.plates) addPlate(c.type, p.part, p.width, p.length, p.thickness, p.count, p.estimated)
+    for (const f of parts.fasteners) {
+      if (!(Number.isFinite(f.diameter) && f.diameter > 0 && Number.isInteger(f.count) && f.count > 0)) throw new Error(`Invalid connection quantity: ${c.type}.${f.kind}`)
+      bolts.push({ type: c.type, kind: f.kind, size: `M${f.diameter}`, perConn: f.count, conns: countOf[c.type], total: f.count * countOf[c.type] })
     }
     /* 용접 (단부판 접합): 주각 = 기둥–베이스판, 처마 = 지붕보–단부판, 마루 = 양쪽 지붕보–단부판 */
     const mem = c.type === 'base' ? col : raf
@@ -79,11 +97,12 @@ export function quantities(spec: FactorySpec, model: FactoryModel, conns: ConnRe
   }
 
   const paint: PaintRow[] = sch.rows.map((r) => ({ role: r.role, section: r.section, area: (perimeter(r.section) / 1000) * r.length }))
+  plates.sort((a, b) => ['base', 'knee', 'apex', 'brace'].indexOf(a.type) - ['base', 'knee', 'apex', 'brace'].indexOf(b.type) || ['plate', 'shearKey', 'stiffener', 'doubler', 'gusset'].indexOf(a.part) - ['plate', 'shearKey', 'stiffener', 'doubler', 'gusset'].indexOf(b.part))
   const plateT = plates.reduce((s, p) => s + p.kg, 0) / 1000
   const netT = sch.total + plateT
   return {
     members: sch.rows, memberT: sch.total,
-    plates: plates.sort((a, b) => ['base', 'knee', 'apex', 'brace'].indexOf(a.type) - ['base', 'knee', 'apex', 'brace'].indexOf(b.type)), plateT,
+    plates, plateT,
     bolts,
     welds, cjpM: welds.reduce((s, w) => s + w.cjp * w.conns, 0), filletM: welds.reduce((s, w) => s + w.fillet * w.conns, 0),
     paint: paint.sort((a, b) => ROLES.indexOf(a.role) - ROLES.indexOf(b.role)), paintM2: paint.reduce((s, p) => s + p.area, 0),

@@ -33,7 +33,7 @@ export type ChatMsg = { ts?: string } & (
 export interface Built { spec: FactorySpec; model: FactoryModel; info: LoadInfo; cases: string[]; combos: number; comboNames: string[] }
 
 /** 진행 중 작업 — stage = 문구 키, step/total = 이 단계 MAPI 호출 수, iter = 최적화 반복 [n, 최대] */
-export type JobKind = 'build' | 'anal' | 'design' | 'opt'
+export type JobKind = 'build' | 'anal' | 'design' | 'opt' | 'pdf'
 export interface Job { kind: JobKind; stage: string; step: number; total: number; detail: string; t0: number; cancel: boolean; iter?: [number, number] }
 
 /** 반력 합계 (하중 케이스별) */

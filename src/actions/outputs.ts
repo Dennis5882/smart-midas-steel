@@ -1,17 +1,22 @@
-/* 산출물 (M5·M6) — 계산서(PDF 인쇄 / HTML 새 창)·도면(DXF)·물량(CSV). 브라우저 안에서 생성(서버 불필요).
-   PDF: 숨긴 iframe 에 계산서를 넣고 바로 인쇄 창 — 새 창이 아니라 팝업 차단과 무관, 벡터·글자 선택 유지. 파일명 = 문서 제목. */
+/* 산출물 (M5·M6) — 계산서(PDF 직접 다운로드 / HTML 새 창)·도면(DXF)·물량(CSV).
+   브라우저 안에서 생성하며 PDF는 파일 생성·페이지 수 확인 후 다운로드한다. */
 import { buildDxf } from '../drawing/drawings'
-import { t } from '../i18n'
+import { getLang, t } from '../i18n'
 import { buildReport } from '../report/report'
 import { LOSS, quantities } from '../domain/quantities'
 import type { I18nKey } from '../i18n'
 import { S } from '../state/store'
 import { addMsg, log } from '../state/ui'
+import { beginJob, checkCancel, endJob, failMsg, stage } from './job'
 
 const stamp = () => new Date().toISOString().slice(0, 10).split('-').join('')
 
 function download(name: string, text: string, type: string): void {
-  const url = URL.createObjectURL(new Blob([text], { type }))
+  downloadBlob(name, new Blob([text], { type }))
+}
+
+function downloadBlob(name: string, blob: Blob): void {
+  const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
   a.download = name
@@ -33,26 +38,26 @@ export function openReport(): void {
 
 const reportHtml = () => buildReport({ built: S.built!, reactions: S.reactions, design: S.design, connections: S.connections, opt: S.opt })
 
-/** 계산서 PDF — 인쇄 창의 대상을 'PDF로 저장' 으로 두면 steel_report_<날짜>.pdf 로 저장 */
-export function printReport(): void {
+/** Generate and validate the PDF locally before starting the file download. */
+export async function downloadReportPdf(): Promise<void> {
   if (!S.built) { addMsg('bot', t('no_model')); return }
-  const name = `steel_report_${stamp()}`
-  const html = reportHtml().replace(/<title>[^<]*<\/title>/, `<title>${name}</title>`)
-  const fr = document.createElement('iframe')
-  fr.setAttribute('aria-hidden', 'true')
-  fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden'
-  fr.srcdoc = html
-  const prevTitle = document.title
-  fr.onload = () => {
-    document.title = name // 일부 브라우저는 최상위 문서 제목을 파일명으로 씀
-    const w = fr.contentWindow!
-    w.onafterprint = () => { document.title = prevTitle; setTimeout(() => fr.remove(), 500) }
-    w.focus(); w.print()
-    setTimeout(() => { document.title = prevTitle }, 60_000)
+  if (!beginJob('pdf')) return
+  try {
+    stage('pdf_start')
+    const name = `steel_report_${S.built.spec.code}_${getLang()}_${stamp()}.pdf`
+    const html = reportHtml()
+    const { createReportPdf } = await import('../report/pdf')
+    checkCancel()
+    const { blob, pages } = await createReportPdf(html)
+    checkCancel()
+    downloadBlob(name, blob)
+    log(t('log_report'), 'ok')
+    addMsg('bot', t('pdf_done', name, pages, (blob.size / 1024).toFixed(0), new Date().toLocaleString()))
+  } catch (e) {
+    addMsg('bot', failMsg(e, (m) => t('pdf_failed', m)))
+  } finally {
+    endJob()
   }
-  document.body.appendChild(fr)
-  log(t('log_report'), 'ok')
-  addMsg('bot', t('pdf_done', `${name}.pdf`))
 }
 
 /** 물량 CSV (UTF-8 BOM — 엑셀에서 바로 열림) */

@@ -13,11 +13,11 @@ function Section({ sec, running, onRun }: { sec: GuideSection; running: string |
 
   return (
     <div className={`gsec${open ? '' : ' closed'}`} data-acc={sec.acc}>
-      <div className="gsec-hd" onClick={() => setOpen((o) => !o)}>
+      <button type="button" className="gsec-hd" aria-expanded={open} aria-controls={`guide-${sec.id}`} onClick={() => setOpen((o) => !o)}>
         <span className="gsec-ic">{sec.icon}</span><span style={{ flex: 1 }}>{t(`g_${sec.id}`)}</span>
         <span className="garrow" aria-hidden />
-      </div>
-      <div className="gsec-items" ref={itemsRef} style={{ maxHeight: maxH }}>
+      </button>
+      <div id={`guide-${sec.id}`} className="gsec-items" ref={itemsRef} inert={!open} aria-hidden={!open} style={{ maxHeight: maxH }}>
         {sec.items.map((it, i) => {
           if ('div' in it) return <div key={i} className="gsec-div" />
           if ('note' in it) return <div key={i} className="gsec-note">{t(it.note)}</div>
@@ -50,7 +50,7 @@ export function Guide({ collapsed, onToggle }: { collapsed: boolean; onToggle():
           {collapsed ? '⟩' : '⟨'}
         </button>
       </div>
-      <div className="guide-body">
+      <div className="guide-body" inert={collapsed} aria-hidden={collapsed}>
         {GUIDE.map((sec) => <Section key={sec.id} sec={sec} running={running} onRun={onRun} />)}
       </div>
     </aside>

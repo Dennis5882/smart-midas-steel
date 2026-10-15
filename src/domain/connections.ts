@@ -31,6 +31,12 @@ export interface ConnCheck {
   ratio: number
   clause: string
 }
+export type PlatePart = 'plate' | 'stiffener' | 'doubler' | 'gusset' | 'shearKey'
+export interface ConnectionParts {
+  /** All dimensions in mm; count is per physical connection. */
+  plates: { part: PlatePart; width: number; length: number; thickness: number; count: number; estimated: boolean }[]
+  fasteners: { kind: 'bolt' | 'anchor'; diameter: number; count: number }[]
+}
 export interface ConnResult {
   type: 'base' | 'knee' | 'apex' | 'brace'
   /** 지배 요소·조합 */
@@ -40,6 +46,8 @@ export interface ConnResult {
   checks: ConnCheck[]
   ratio: number
   notes: string[]
+  /** Numeric takeoff data. Optional for reports saved before v0.12. */
+  parts?: ConnectionParts
 }
 
 const chk = (item: string, demand: number, capacity: number, unit: string, clause: string): ConnCheck =>
@@ -140,6 +148,7 @@ function baseFor(spec: FactorySpec, forces: EndForce[], anchorD: number, nSide: 
   return {
     ratio: worst(best.checks), F: best.F, checks: best.checks,
     dims: { plate: `PL ${B}×${N}×${tp}`, anchors: `${nTot}-M${anchorD} (Fu ${spec.anchorFu} MPa)`, anchorLayout: `${nSide} / side, ${edge} mm edge`, weld: `web fillet ${w} mm, flanges CJP`, pedestal: `${B + 300}×${N + 300}`, fc: `${spec.fc} MPa` },
+    parts: { plates: [{ part: 'plate', width: B, length: N, thickness: tp, count: 1, estimated: false }], fasteners: [{ kind: 'anchor', diameter: anchorD, count: nTot }] } satisfies ConnectionParts,
   }
 }
 
@@ -186,11 +195,13 @@ function endPlateFor(spec: FactorySpec, forces: EndForce[], boltD: number, beamN
   const w = Math.max(6, Math.ceil(Vmax / (lw * filletPerMm(1, FEXX))))
   best.checks.push(chk('weldWeb', Vmax, lw * filletPerMm(w, FEXX), 'kN', 'LRFD 表10.2-5'))
   const notes: string[] = []
+  const parts: ConnectionParts = { plates: [{ part: 'plate', width: Math.round(bp), length: Math.round(h0 + pf + bm.tf / 2), thickness: tp, count: col ? 1 : 2, estimated: false }], fasteners: [{ kind: 'bolt', diameter: boltD, count: 8 }] }
   const panel = best.checks.find((c) => c.item === 'panel')
   if (panel && panel.ratio > 1) {
     /* 더블러: 부족분 / (0.9·0.6·Fy·dc) */
     const td = Math.ceil(((panel.demand - panel.capacity) * 1e3) / (0.9 * 0.6 * mat.fy * col!.d))
     notes.push(`doubler ${pickPlate(td)} mm`)
+    parts.plates.push({ part: 'doubler', width: col!.h, length: bm.d, thickness: pickPlate(td), count: 1, estimated: true })
     panel.capacity += (0.9 * 0.6 * mat.fy * col!.d * pickPlate(td)) / 1e3
     panel.ratio = panel.demand / panel.capacity
   }
@@ -204,10 +215,11 @@ function endPlateFor(spec: FactorySpec, forces: EndForce[], boltD: number, beamN
     stiff = `2-PL ${bs}×${ts}`
     best.checks.push(chk('stiffener', AsReq, 2 * bs * ts, 'mm²', 'AISC J10.7'))
     notes.push('stiffeners')
+    parts.plates.push({ part: 'stiffener', width: bs, length: col.h, thickness: ts, count: 2, estimated: true })
   }
   const governing = best.checks.filter((c) => !(stiff && c.item === 'flangeBend'))
   return {
-    ratio: worst(governing), F: best.F, checks: best.checks, notes,
+    ratio: worst(governing), F: best.F, checks: best.checks, notes, parts,
     dims: { plate: `PL ${Math.round(bp)}×${Math.round(h0 + pf + bm.tf / 2)}×${tp}`, bolts: `8-M${boltD} F10T`, gauge: `${Math.round(g)} mm`, pitch: `${Math.round(pf)} mm`, weld: `web fillet ${w} mm, flanges CJP`, ...(stiff ? { stiffener: stiff } : {}) },
   }
 }
@@ -263,7 +275,7 @@ export function runConnections(spec: FactorySpec, model: FactoryModel, info: Loa
     for (const nSide of [2, 3, 4]) {
       const r = baseFor(spec, baseF, d, nSide)
       if (r && (r.ratio <= 1 || (d === 42 && nSide === 4))) {
-        out.push({ type: 'base', elem: r.F.elem, combo: r.F.combo, dims: r.dims, checks: r.checks, ratio: r.ratio, notes: spec.baseFixity === 'fixed' ? [] : ['pinned'] })
+        out.push({ type: 'base', elem: r.F.elem, combo: r.F.combo, dims: r.dims, checks: r.checks, ratio: r.ratio, parts: r.parts, notes: spec.baseFixity === 'fixed' ? [] : ['pinned'] })
         done = true
         break
       }
@@ -275,7 +287,7 @@ export function runConnections(spec: FactorySpec, model: FactoryModel, info: Loa
       const r = endPlateFor(spec, forces, d, spec.sections.rafter, colName)
       if (r && (r.ratio <= 1 || d === 30)) {
         const knee = type === 'knee'
-        out.push({ type, elem: r.F.elem, combo: r.F.combo, dims: knee ? { ...r.dims, ...kneeDims } : r.dims, checks: r.checks, ratio: r.ratio, notes: knee ? [...r.notes, ...kneeNotes] : r.notes })
+        out.push({ type, elem: r.F.elem, combo: r.F.combo, dims: knee ? { ...r.dims, ...kneeDims } : r.dims, checks: r.checks, ratio: r.ratio, parts: r.parts, notes: knee ? [...r.notes, ...kneeNotes] : r.notes })
         break
       }
     }
@@ -292,7 +304,7 @@ export function runConnections(spec: FactorySpec, model: FactoryModel, info: Loa
     const per = Math.min(bolt.phiRv, bearing)
     const n = Math.max(2, Math.ceil(Nmax / per))
     const checks = [chk('boltV', Nmax / n, bolt.phiRv, 'kN', 'LRFD 表10.3-2'), chk('bearingPl', Nmax / n, bearing, 'kN', 'LRFD 10.3.9')]
-    out.push({ type: 'brace', elem: nE, combo: nC, dims: { bolts: `${n}-M${d} F10T`, gusset: `PL ${tg}` }, checks, ratio: worst(checks), notes: [] })
+    out.push({ type: 'brace', elem: nE, combo: nC, dims: { bolts: `${n}-M${d} F10T`, gusset: `PL ${tg}` }, checks, ratio: worst(checks), notes: [], parts: { plates: [{ part: 'gusset', width: 200, length: 200, thickness: tg, count: 1, estimated: true }], fasteners: [{ kind: 'bolt', diameter: d, count: n }] } })
   }
   return out
 }

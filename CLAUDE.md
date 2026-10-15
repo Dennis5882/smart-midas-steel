@@ -56,7 +56,7 @@ Vite 8 + TypeScript + React 19 + Tailwind v4 + shadcn/ui(new-york) + **Vercel Fu
 - **M5 계산서**: 10장 HTML(화면 언어), 새 창 → 인쇄 PDF. **M6 DXF**: R12 5시트, ezdxf 검증 오류 0. 문자 ASCII 만.
 
 ## 모델링 방식 — 기본 모델링 / 자유골조 (2026-10-15, story 와 같은 구분)
-- **기본 모델링**(`mode 'template'`): GUIDE 소형 창고 18m·일반 공장 24m·장스팬 30m·물류창고 36m (`src/domain/templates.ts`, 형상만 — 지역·하중·단면은 기준 기본값 + 직전 입력). 요약 카드(`Summary`) → [실행]/[수정](편집 카드로 전환)/[취소]. 단면은 기본값이라 큰 스팬은 설계 검토 → 단면 최적화.
+- **기본 모델링**(`mode 'template'`, v0.13.0): GUIDE 템플릿 → `PlanCard`/`ModelWizard`의 시작·범위 → 횡단면 → 길이·베이 → 재료·단면 → 지역·하중 → 최종 확인 6단계. 단계 이동 시 값 유지, 최종 확인에 전체 입력 펼치기·단계별 수정. 상하단 고정, 본문 스크롤. 템플릿(`domain/templates.ts`)은 형상만 바꾸고 기준별 재료·지역·하중은 유지한다. 양수·최솟값·정수·단면 성질·선택값 검증 후 다음 단계, 최종 단계에서만 `buildFactory`. 잘못된 입력 또는 범위 밖이면 미리보기는 마지막 유효 형상을 유지한다. 횡단면·베이 SVG 개념도와 실시간 3D 미리보기. 큰 스팬은 생성 후 설계 검토 → 단면 최적화.
 - **자유골조**(`mode 'free'`): 처음부터 편집 카드, 베이 수·간격 대신 **베이별 간격 목록** `spec.bayList`. 명령 `자유골조 공장 생성` 또는 `공장 생성 베이 6,6,7.5,7.5,6`(목록이 있으면 자유골조).
 - 불균등 베이: `normalizeBays`가 `bays = 길이`, `baySpacing = 최댓값`(퍼린·거트 경간 등 설계값 — 보수적), 모두 같으면 `bayList` 제거. 형상 `portalGeometry().spans`·누적 y, 지붕 활하중 면적은 최소 베이(면적 작을수록 하중 큼). 길이 표기 `lengthText`(결과 탭·계산서·DXF 치수). 오프라인: 6+6+7.5+7.5+6+6 LR 적용 합 917.9 = q×24×39, TW 기본 15/55·CN 13/51 유지. **Gen 라이브 미검증.**
 
@@ -79,6 +79,13 @@ Vite 8 + TypeScript + React 19 + Tailwind v4 + shadcn/ui(new-york) + **Vercel Fu
 - 확인: 헤드리스 Chrome `--print-to-pdf` 로 A4 13쪽, 도면은 부록에서 새 페이지 시작. S2 아래 주석이 테두리 밖이던 것(시트 `below` 여백)·S5 접합 일람 비율 열 겹침 수정 — DXF 에도 적용.
 
 ## 계산서 PDF·물량 (2026-10-15, C단계 2·3)
+
+### v0.12.0 보완
+
+- PDF는 `actions/outputs.ts`의 `downloadReportPdf()` → `report/pdf.ts`로 직접 파일을 생성한다. pdfmake/pdf-lib는 지연 로딩하며 보고서 데이터는 서버로 전송하지 않는다. 정적 `public/fonts/NotoSansCJKkr-Regular.otf`(OFL, 원문 URL·버전은 같은 폴더 README)를 최초 출력 때 로드하고 PDF에는 사용한 글리프만 포함한다. 표·SVG를 벡터로 저장하고 넓은 표는 식별열을 반복해 분리한다. 실제 PDF의 페이지 수·크기를 확인한 뒤 다운로드 시작을 알린다. 취소 시 PDF 생성 완료 후 파일 다운로드를 중단한다.
+- 새 TW/CN 접합 결과의 `parts`에 판재 치수·수량과 볼트/앵커 치수를 숫자로 전달한다. `quantities.ts`는 이를 사용하고 구형 결과만 문자열 파서로 복원한다. 전단키와 소수 치수 스티프너를 포함하며 추정 치수 표시는 유지한다.
+- 설정은 네이티브 `dialog.showModal()`로 표시한다. 닫힌 대화상자는 접근성 트리에서 제외되고 배경은 inert가 된다. 최초 포커스, Tab 순환, Esc 및 열기 버튼으로 포커스 복귀를 처리한다. 접힌 가이드는 inert/aria-hidden이다.
+- 검증: `scripts/verify-quantities.ts`, `scripts/verify-pdf.ts`(4개 언어 PDF를 `output/pdf/`에 생성). 생성 PDF와 PNG는 Git에서 제외한다.
 - PDF: `printReport()` — 숨긴 iframe(srcdoc)에 계산서를 넣고 바로 인쇄 창(대상 'PDF로 저장'). 새 창이 아니라 팝업 차단과 무관, 벡터·글자 선택 유지, 문서 제목 = `steel_report_<날짜>` → 파일명. 계산서 `@page A4`. 서버 PDF 엔진은 쓰지 않음(사용자 결정). 'HTML 열기'(새 창) 는 보조.
 - 물량 `src/domain/quantities.ts`(순수): 부재(schedule) + 접합 판재(dims 문자열 'PL B×N×t'·'n-M d'·'2-PL b×t'·더블러) × 개소(주각·처마 = 2×골조, 마루 = 골조, 가새 = 요소×2) + 볼트·앵커 + 용접(추정: 플랜지 CJP 2bf + 웨브 필렛 2h) + 도장 면적(H 외곽 둘레, CC 양면, P 외면) + 로스(가정 부재 5%·판 10%) → 발주 중량. 추정(*) = 스티프너·더블러·거셋 크기, 용접. 계산서 9장 표 + `downloadQuantities()` CSV(UTF-8 BOM). 명령 `계산서 PDF`·`물량`, 결과 탭 버튼.
 - 대만 샘플(라이브 결과): 부재 42.58 t + 판재 3.50 t = 순 46.08 t, 발주 48.56 t, 도장 1527 m², 볼트 M24 앵커 112·M27 112·M20 120.
