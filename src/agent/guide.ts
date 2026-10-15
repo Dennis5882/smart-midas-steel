@@ -34,7 +34,9 @@ export const GUIDE: GuideSection[] = [
   { id: 'design', acc: 'blue', icon: '◫', open: true, items: [
     { icon: '✓', key: 'g_design_1' },
     { icon: '▦', key: 'g_design_2' },
+    { icon: '⎙', key: 'g_design_5' },
     { icon: '⌗', key: 'g_design_3' },
+    { icon: '∑', key: 'g_design_6' },
     { icon: '⚖', key: 'g_design_4' },
     { note: 'g_design_note' },
   ] },

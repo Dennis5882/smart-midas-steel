@@ -78,6 +78,11 @@ Vite 8 + TypeScript + React 19 + Tailwind v4 + shadcn/ui(new-york) + **Vercel Fu
 ' | node --import tsx scripts/live-tw.ts --optimize --out <접두사>` (키는 stdin 만) → html·dxf·-summary.json. 계산서 양식만 고칠 땐 `scripts/report-from-summary.ts <summary.json> <out.html> [lang]` 로 Gen 없이 재생성. 2026-10-15 라이브: 해석 15 케이스·55 조합, 기본 최대 0.912 NG 0, 최적화 2회 46.96→42.58 t 최대 0.917, API 오류 0, A4 14쪽.
 - 확인: 헤드리스 Chrome `--print-to-pdf` 로 A4 13쪽, 도면은 부록에서 새 페이지 시작. S2 아래 주석이 테두리 밖이던 것(시트 `below` 여백)·S5 접합 일람 비율 열 겹침 수정 — DXF 에도 적용.
 
+## 계산서 PDF·물량 (2026-10-15, C단계 2·3)
+- PDF: `printReport()` — 숨긴 iframe(srcdoc)에 계산서를 넣고 바로 인쇄 창(대상 'PDF로 저장'). 새 창이 아니라 팝업 차단과 무관, 벡터·글자 선택 유지, 문서 제목 = `steel_report_<날짜>` → 파일명. 계산서 `@page A4`. 서버 PDF 엔진은 쓰지 않음(사용자 결정). 'HTML 열기'(새 창) 는 보조.
+- 물량 `src/domain/quantities.ts`(순수): 부재(schedule) + 접합 판재(dims 문자열 'PL B×N×t'·'n-M d'·'2-PL b×t'·더블러) × 개소(주각·처마 = 2×골조, 마루 = 골조, 가새 = 요소×2) + 볼트·앵커 + 용접(추정: 플랜지 CJP 2bf + 웨브 필렛 2h) + 도장 면적(H 외곽 둘레, CC 양면, P 외면) + 로스(가정 부재 5%·판 10%) → 발주 중량. 추정(*) = 스티프너·더블러·거셋 크기, 용접. 계산서 9장 표 + `downloadQuantities()` CSV(UTF-8 BOM). 명령 `계산서 PDF`·`물량`, 결과 탭 버튼.
+- 대만 샘플(라이브 결과): 부재 42.58 t + 판재 3.50 t = 순 46.08 t, 발주 48.56 t, 도장 1527 m², 볼트 M24 앵커 112·M27 112·M20 120.
+
 ## 단면 자동 최적화 (2026-10-15, 라이브 검증)
 명령 `단면 최적화` (설계 검토 다음). 반복: 결과 회수 → 검토 → `proposeSections` → `sendModel`(재전송) → `analyzeCore`(재해석), 최대 5회.
 - 후보 `src/domain/catalog.ts` = 설치본 `Dbase/CNS2020.sdb` 에서 추출한 이름 그대로(RH 150·CC 45·P 60~318.5 40개). 단면적 오름차순, 목표 강도비 0.95, H 세장 단면 제외.

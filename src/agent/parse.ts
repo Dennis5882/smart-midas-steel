@@ -13,6 +13,8 @@ export type Intent =
   | { intent: 'design' }
   | { intent: 'optimize' }
   | { intent: 'report' }
+  | { intent: 'pdf' }
+  | { intent: 'quantities' }
   | { intent: 'drawings' }
   | { intent: 'status' }
   | { intent: 'conn' }
@@ -43,6 +45,8 @@ export function parseCommand(raw: string): Intent {
   if (/(connection|연결\s*확인|연결|連線確認|連接檢查|連線|連接)/i.test(txt)) return { intent: 'conn' }
   if (/(status|상태|狀態)/i.test(txt)) return { intent: 'status' }
   if (/(reaction|반력|反力)/i.test(txt)) return { intent: 'reactions' }
+  if (/pdf/i.test(txt)) return { intent: 'pdf' }
+  if (/(quantit|csv|물량|數量|材料表)/i.test(txt)) return { intent: 'quantities' }
   if (/(report|계산서|보고서|計算書)/i.test(txt)) return { intent: 'report' }
   if (/(drawing|dxf|도면|圖說|圖紙|圖)/i.test(txt)) return { intent: 'drawings' }
   /* '최적화'는 '설계' 보다 먼저 — '설계 최적화' 같은 문장도 최적화로 */

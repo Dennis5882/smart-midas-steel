@@ -5,11 +5,12 @@ import type { ConnResult } from '../domain/connections'
 import type { DesignResult } from '../domain/design'
 import type { OptSummary } from '../domain/optimize'
 import { portalGeometry } from '../domain/portal'
-import { memberSchedule } from '../domain/schedule'
+import { LOSS, quantities } from '../domain/quantities'
 import { buildDrawingSvgs } from '../drawing/drawings'
 import { isoSvg, RATIO_BANDS, ratioColor, ROLE_COLOR } from '../drawing/iso'
 import { connGrade, GRADES, roleGrade, summarizeStatus, type Grade, type Graded } from '../domain/status'
 import { siteSourceText } from '../components/Status'
+import { dimsText } from './dims'
 import { scopeMsg } from '../components/ScopeBox'
 import { checkScope } from '../domain/scope'
 import { sectionProps } from '../domain/sections'
@@ -94,7 +95,7 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   parts.push(`<h3>${L('rep_seismic')}</h3>`)
   const si = spec.seismic
   if (spec.code === 'TW') parts.push(table(['', 'X', 'Y'], [
-    ['site', `${esc(si.county ?? '')} ${esc(si.town ?? '')} · soil ${si.soil ?? '-'}`, ''],
+    [L('kv_site'), `${esc(si.county ?? '')} ${esc(si.town ?? '')} · ${si.soil ? L(`soil_${si.soil}`) : '-'}`, ''],
     [L('kv_site_src'), esc(siteSourceText(spec)), ''],
     ['SDS / SD1 / SMS / SM1 / I', `${si.SDS} / ${si.SD1} / ${si.SMS ?? '-'} / ${si.SM1 ?? '-'} / ${si.I}`, ''],
     ['R', si.Rx, si.Ry],
@@ -184,8 +185,8 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   /* 8. 접합부 */
   h2('rep_s8')
   for (const c of connections ?? []) {
-    parts.push(`<h3>${L(`cn_type_${c.type}`)} — ${ok(c.ratio)} ${grade(connGrade(c))} <span class="note">(${esc(c.combo)}, elem ${c.elem})</span></h3>`)
-    parts.push(`<p>${Object.entries(c.dims).map(([k, v]) => `${esc(k)}: ${esc(v)}`).join(' · ')}</p>`)
+    parts.push(`<h3>${L(`cn_type_${c.type}`)} — ${ok(c.ratio)} ${grade(connGrade(c))} <span class="note">(${esc(c.combo)}, ${L('rd_elem')} ${c.elem})</span></h3>`)
+    parts.push(`<p>${esc(dimsText(c.dims))}</p>`)
     if (c.notes.includes('rotTest')) parts.push(`<p class="note">${L('cn_note_rot')}</p>`)
     for (const [note, key] of [['gbFoundation', 'cn_note_foundation'], ['gbJointDetail', 'cn_note_joint'], ['gbBraceDetail', 'cn_note_brace']] as const) if (c.notes.includes(note)) parts.push(`<p class="note">${L(key)}</p>`)
     parts.push(table([t('sv_item'), t('cn_demand'), t('cn_capacity'), t('rd_ratio'), t('sv_clause')],
@@ -196,11 +197,28 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
 
   /* 9. 물량 */
   h2('rep_s9')
-  const sch = memberSchedule(spec, model)
-  parts.push(table([t('rd_role'), t('rd_section'), t('rep_count'), t('rep_len'), 'kg/m', t('rep_wt')],
-    [...sch.rows.map((r) => [L(`role_${r.role}`), esc(r.section), r.count, f(r.length, 1), f(r.kgPerM, 1), f(r.weight, 2)]),
-     [`<b>${L('rep_total')}</b>`, '', '', '', '', `<b>${f(sch.total, 2)}</b>`]]))
-  parts.push(`<p class="note">${esc(t('rep_wt_note', f((sch.total * 1000) / (spec.span * G.length), 1)))}</p>`)
+  const q = quantities(spec, model, connections)
+  const paintOf = new Map(q.paint.map((x) => [`${x.role}|${x.section}`, x.area]))
+  parts.push(table([t('rd_role'), t('rd_section'), t('rep_count'), t('rep_len'), 'kg/m', t('rep_wt'), `${t('q_paint')} (m²)`],
+    [...q.members.map((r) => [L(`role_${r.role}`), esc(r.section), r.count, f(r.length, 1), f(r.kgPerM, 1), f(r.weight, 2), f(paintOf.get(`${r.role}|${r.section}`) ?? 0, 0)]),
+     [`<b>${L('rep_total')}</b>`, '', '', '', '', `<b>${f(q.memberT, 2)}</b>`, `<b>${f(q.paintM2, 0)}</b>`]]))
+  parts.push(`<p class="note">${esc(t('rep_wt_note', f((q.memberT * 1000) / (spec.span * G.length), 1)))}</p>`)
+  if (q.plates.length) {
+    parts.push(`<h3>${L('q_plates')}</h3>`)
+    parts.push(table([t('q_conn'), t('q_part'), t('q_size'), t('q_per'), t('q_conns'), t('q_kg')],
+      [...q.plates.map((x) => [L(`cn_type_${x.type}`), `${L(`q_part_${x.part}`)}${x.est ? ' *' : ''}`, esc(x.size), x.perConn, x.conns, f(x.kg, 1)]),
+       [`<b>${L('rep_total')}</b>`, '', '', '', '', `<b>${f(q.plateT * 1000, 1)}</b>`]]))
+    parts.push(`<h3>${L('q_bolts')}</h3>`)
+    parts.push(table([t('q_conn'), t('q_part'), t('q_size'), t('q_per'), t('q_conns'), t('q_total')],
+      q.bolts.map((x) => [L(`cn_type_${x.type}`), L(`q_${x.kind}`), x.size, x.perConn, x.conns, x.total])))
+  }
+  parts.push(`<h3>${L('q_summary')}</h3>`)
+  parts.push(table([t('sv_item'), t('sv_value')], [
+    [L('q_memberT'), `${f(q.memberT, 2)} t`], [L('q_plateT'), `${f(q.plateT, 2)} t`], [L('q_netT'), `<b>${f(q.netT, 2)} t</b>`],
+    [L('q_loss'), esc(t('q_loss_v', LOSS.member * 100, LOSS.plate * 100))], [L('q_orderT'), `<b>${f(q.orderT, 2)} t</b>`],
+    [L('q_paint'), `${f(q.paintM2, 0)} m²`], [L('q_weld'), `${L('q_cjp')} ${f(q.cjpM, 1)} m · ${L('q_fillet')} ${f(q.filletM, 1)} m *`],
+  ]))
+  parts.push(`<p class="note">${L('q_note')}</p>`)
   if (opt) {
     parts.push(`<h3>${L('res_opt')}</h3>`)
     parts.push(table([t('rd_role'), t('op_before'), t('op_after'), t('rd_ratio'), t('op_gov'), t('op_tons')],
@@ -233,7 +251,8 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   .gr-fail{color:#c43030}.gr-expert{color:#5a45c6}.gr-prelim{color:#b56d00}.gr-reinforced{color:#2f55c9}.gr-pass{color:#1d8653}
   .ok{color:#1d8653}.ng{color:#c43030}.note{color:#555;font-size:11px} .meta{color:#555} ul{margin:4px 0 0 18px}
   figure{margin:10px 0 14px;text-align:center;break-inside:avoid} figure svg{border:1px solid #e1e4ea;background:#fff} figcaption{font-size:11px;color:#444;margin-top:4px}
-  @media print{body{margin:0} h2{break-after:avoid} table{break-inside:auto} tr{break-inside:avoid} .dwg{break-before:page} .dwg figure{break-inside:avoid}}
+  @page{size:A4;margin:14mm 12mm}
+  @media print{body{margin:0;max-width:none} h2{break-after:avoid} table{break-inside:auto} tr{break-inside:avoid} .dwg{break-before:page} .dwg figure{break-inside:avoid}}
 </style></head><body>
 <h1>${esc(title)}</h1>
 <div class="meta">${esc(t('rep_project'))} · ${today} · Smart MIDAS Steel v${esc(APP_VERSION)} · MIDAS Gen NX</div>

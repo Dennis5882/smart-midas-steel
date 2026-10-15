@@ -1,6 +1,6 @@
 /* 우측 패널 — 활동 로그 · 모델 상태 · 해석 결과 */
 import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from 'react'
-import { downloadDrawings, openReport } from '../actions/outputs'
+import { downloadDrawings, downloadQuantities, openReport, printReport } from '../actions/outputs'
 import { profileOf } from '../codes'
 import { buildLoadPayloads, type LoadInfo } from '../domain/loads'
 import { buildPortal } from '../domain/portal'
@@ -9,6 +9,7 @@ import type { DesignResult } from '../domain/design'
 import type { OptSummary } from '../domain/optimize'
 import { connGrade, roleGrade } from '../domain/status'
 import { GradeChip, siteSourceText, StatusCard } from './Status'
+import { dimValue } from '../report/dims'
 import { lengthText, ROLES, type FactoryModel, type FactorySpec } from '../domain/types'
 import { t, tc, type I18nKey } from '../i18n'
 import { useStore, type AppState } from '../state/store'
@@ -244,7 +245,7 @@ function ConnTables({ cs }: { cs: ConnResult[] }) {
           <div className="kv"><span className="k"><b style={{ color: 'var(--txt-hi)' }}>{t(`cn_type_${c.type}`)}</b> · {c.combo}</span>
             <span className="v" style={{ color: ratioColor(c.ratio), fontWeight: 700 }}>{c.ratio.toFixed(3)} {(() => { const g = connGrade(c); return <GradeChip g={g.grade} reasons={g.reasons} /> })()}</span></div>
           <div style={{ fontSize: '.78rem', color: 'var(--muted)', margin: '4px 0 6px' }}>
-            {Object.values(c.dims).join(' · ')}
+            {Object.values(c.dims).map(dimValue).join(' · ')}
             {c.notes.map((n) => <span key={n} style={{ color: 'var(--amber)' }}> · {n === 'gbFoundation' ? t('cn_note_foundation') : n === 'gbJointDetail' ? t('cn_note_joint') : n === 'gbBraceDetail' ? t('cn_note_brace') : n.startsWith('doubler') ? `${t('cn_note_doubler')} ${n.slice(8)}` : n === 'stiffeners' ? t('cn_note_stiffeners') : n === 'rotTest' ? t('cn_note_rot') : n}</span>)}
           </div>
           <table>
@@ -274,8 +275,10 @@ export function ResultsPanel() {
     <div>
       {s.built && (
         <div className="confirm-row" style={{ marginTop: 0, marginBottom: 12 }}>
-          <button className="btn btn-c" onClick={openReport}>{t('g_design_2')}</button>
+          <button className="btn btn-c" onClick={printReport}>{t('g_design_5')}</button>
+          <button className="btn btn-ghost" onClick={openReport}>{t('btn_html')}</button>
           <button className="btn btn-ghost" onClick={downloadDrawings}>{t('g_design_3')}</button>
+          <button className="btn btn-ghost" onClick={downloadQuantities}>{t('g_design_6')}</button>
         </div>
       )}
       {s.built && (s.design || !!s.connections?.length) && <StatusCard d={s.design} cs={s.connections} spec={s.built.spec} />}

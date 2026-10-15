@@ -2,7 +2,7 @@
 import { fetchReactions, runAnalysis } from '../actions/analysis'
 import { runDesignCheck } from '../actions/design'
 import { runOptimize } from '../actions/optimize'
-import { downloadDrawings, openReport } from '../actions/outputs'
+import { downloadDrawings, downloadQuantities, openReport, printReport } from '../actions/outputs'
 import type { CodeId } from '../codes'
 import { portalGeometry } from '../domain/portal'
 import { TEMPLATES } from '../domain/templates'
@@ -44,6 +44,8 @@ export async function send(raw: string): Promise<void> {
     case 'optimize': await runOptimize(); break
     case 'report': openReport(); break
     case 'drawings': downloadDrawings(); break
+    case 'pdf': printReport(); break
+    case 'quantities': downloadQuantities(); break
     case 'reactions': {
       if (!S.built) { addMsg('bot', t('no_model')); break }
       if (!S.analyzed) { addMsg('bot', t('need_anal')); break }
