@@ -14,6 +14,7 @@ import { addMsg, draw3D, log, tab } from '../state/ui'
 import { analyzeCore } from './analysis'
 import { sendModel } from './build'
 import { fetchResults } from './results'
+import { assertGenSync } from './genSync'
 import { quantities } from '../domain/quantities'
 import { beginJob, endJob, failMsg, setIter } from './job'
 
@@ -35,6 +36,7 @@ export async function runOptimize(): Promise<void> {
   let converged = false
   const ctl: Required<Pick<OptControl, 'floors' | 'bans' | 'amp'>> = { floors: {}, bans: [], amp: {} }
   try {
+    await assertGenSync() // 시작 모델이 앱이 보낸 것과 같은지 (반복 중 재전송분은 sendModel 이 확인)
     let d: DesignResult
     for (let it = 1; ; it++) {
       setIter(it, MAX_ITER)

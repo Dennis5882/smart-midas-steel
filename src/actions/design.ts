@@ -8,6 +8,7 @@ import { t, tc } from '../i18n'
 import { S, notify } from '../state/store'
 import { addMsg, log, tab } from '../state/ui'
 import { fetchResults } from './results'
+import { assertGenSync } from './genSync'
 import { beginJob, endJob, failMsg, stage } from './job'
 
 export async function runDesignCheck(): Promise<void> {
@@ -20,6 +21,7 @@ export async function runDesignCheck(): Promise<void> {
   addMsg('bot', tc(S.built.spec.code, 'design_start'))
   try {
     const b = S.built
+    await assertGenSync() // 해석 후 Gen 에서 바꿨으면 결과·단면 정보가 어긋남
     S.results = await fetchResults(b)
     log(t('log_results'), 'ok')
     stage('st_check')

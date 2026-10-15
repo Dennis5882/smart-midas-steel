@@ -5,6 +5,7 @@ import { t } from '../i18n'
 import { S, useStore, type ChatMsg } from '../state/store'
 import { PlanCard } from './PlanCard'
 import { JobBar } from './JobBar'
+import { Workflow } from './Workflow'
 
 function Message({ m }: { m: ChatMsg }) {
   const who = m.role === 'user' ? t('who_user') : t('who_agent')
@@ -108,6 +109,7 @@ export function Chat({ guideCollapsed, onOpenGuide }: { guideCollapsed: boolean;
       <div className="msgs" ref={msgsRef}>
         {s.msgs.map((m) => <Message key={m.id} m={m} />)}
       </div>
+      <Workflow />
       <JobBar />
       <Composer />
     </div>

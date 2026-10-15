@@ -5,6 +5,7 @@ import { S, notify, type ReactionSum } from '../state/store'
 import { addMsg, log, tab } from '../state/ui'
 import { autoSave } from './save'
 import { beginJob, endJob, failMsg, stage } from './job'
+import { assertGenSync } from './genSync'
 
 /* doc/anal 은 거부 시 HTTP 200 + message 로 회신(에러 필드 아님) → 메시지 직접 점검 */
 const NOT_ALLOWED = /not allowed|not permitted|허용되지|許可/i
@@ -15,6 +16,7 @@ export async function runAnalysis(): Promise<void> {
   if (!beginJob('anal')) return
   addMsg('bot', t('anal_start'))
   try {
+    await assertGenSync() // Gen 에서 모델을 바꿨으면 해석하지 않음 (앱 정보와 다른 모델)
     await analyzeCore()
     addMsg('bot', t('anal_done'))
     tab('resP')

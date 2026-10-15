@@ -30,7 +30,8 @@ export type ChatMsg = { ts?: string } & (
 )
 
 /** Gen 에 보낸 모델 — 스펙·형상·하중 요약 */
-export interface Built { spec: FactorySpec; model: FactoryModel; info: LoadInfo; cases: string[]; combos: number; comboNames: string[] }
+/** sent = Gen 에 보낸 페이로드(DB → Assign) — 해석·검토 직전 Gen 동일성 비교(actions/genSync) */
+export interface Built { spec: FactorySpec; model: FactoryModel; info: LoadInfo; cases: string[]; combos: number; comboNames: string[]; sent?: Record<string, Record<string, unknown>> }
 
 /** 진행 중 작업 — stage = 문구 키, step/total = 이 단계 MAPI 호출 수, iter = 최적화 반복 [n, 최대] */
 export type JobKind = 'build' | 'anal' | 'design' | 'opt' | 'pdf'
@@ -68,6 +69,10 @@ export const S = {
   busy: false,
   /** 진행 중 작업 (진행 표시·취소) — busy 와 함께 beginJob/endJob 이 관리 */
   job: null as Job | null,
+  /** 마지막 작업 실패·취소 (작업 흐름 띠의 다시 시도) — beginJob 이 비움 */
+  lastFail: null as { kind: JobKind; cancelled: boolean } | null,
+  /** Gen 모델 변경 감지 건수 (0 = 같음) — assertGenSync 가 갱신, sendModel 이 비움 */
+  genChanged: 0,
   theme: readTheme(),
   code: readCode(),
   panel: 'logP' as PanelId,

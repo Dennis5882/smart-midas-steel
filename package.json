@@ -1,7 +1,7 @@
 {
   "name": "smart-midas-steel",
   "private": true,
-  "version": "0.13.1",
+  "version": "0.14.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,7 +10,8 @@
     "release:check": "node scripts/release-check.mjs",
     "typecheck": "tsc -b",
     "preview": "vite preview",
-    "dev:api": "vercel dev --listen 3000"
+    "dev:api": "vercel dev --listen 3000",
+    "verify": "node scripts/verify-all.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",

@@ -114,6 +114,12 @@ Vite 8 + TypeScript + React 19 + Tailwind v4 + shadcn/ui(new-york) + **Vercel Fu
 - 스펙 입력 칸 정의·검증은 `src/components/planFields.ts`(순수): `invalidFields(spec, vals, free)` 를 **기본 모델링·자유골조 공통** 적용 — 빈 값·음수·비숫자·정수 칸 소수·베이 목록(`listError`)·선택값·단면명. 잘못된 칸이 있으면 두 모드 모두 실행 불가(자유골조는 오류를 바로 표시 + [실행] 비활성). `toSpec` 의 기존 값 대체는 미리보기용일 뿐 전송되지 않는다. 회귀 `scripts/verify-input.ts`(80).
 - 최적화: 반복마다 접합부 산정(`OptIter.connMax·connNg·plateT`), 최종안 `pickBest`(domain/optimize, TW·CN 공통) = 부재·사용성·접합 NG 0 중 (부재 + 접합 판재) 최경량, 유효안이 없으면 NG 최소안을 남기고 `opt.ok = false` + 경고 문구. 결과 탭 반복 표에 접합 최대비. 회귀 `scripts/verify-opt.ts`. **Gen 라이브 미재검증.**
 
+## Gen 모델 변경 감지·작업 흐름·품질 게이트 (2026-10-15, 재평가 11.4 의 1·5·6 — F4·F5·F7, 라이브 검증)
+- **F4 Gen 동일성**: `sendModel` 이 보낸 페이로드를 `S.built.sent` 에 보관 → 해석·설계 검토·최적화 직전 `assertGenSync()`(actions/genSync) 가 13개 DB 를 GET 해 `domain/genSync` 로 비교. 보낸 필드만 같은 값인지 보고 Gen 이 붙이는 필드는 무시(라이브 형식 차이: ELEM NODE 8칸 0 채움·STYPE). 다르면 `GenChangedError` → 실행 중단 + 차이 목록(요소 단면·재료는 이름 포함, 예: `ELEM 1 SECT: 1 (RH600x200x11x17) → 2 (RH298x149x5.5x8)`). 자동 재생성은 하지 않음(Gen 수정이 지워지므로 사용자가 선택). 라이브: 확인 ≈ 0.8~1.7 s, Gen 에서 요소 단면 변경 → 해석·검토·최적화 모두 차단, 되돌리면 통과. 회귀 `verify-sync.ts`(21).
+- **F5 작업 흐름**: `state/workflow.ts`(순수) 모델 → 해석 → 설계 검토 → 출력 단계 상태 + 다음 할 일, `Workflow.tsx` 띠(입력창 위, 다음 버튼·최적화 보조). `S.genChanged`(감지 건수)·입력 카드 스펙 ≠ Gen 에 보낸 스펙(`specChanged`, 키 순서 무관)이면 이후 단계 '이전 결과' + 결과 탭 `StaleBanner`. 실패·취소(`S.lastFail`, failMsg 가 기록·beginJob 이 비움)면 해당 단계 실패 + [다시 시도]. 회귀 `verify-workflow.ts`(14).
+- **F7 품질 게이트**: `npm run verify`(scripts/verify-all.mjs) — 오프라인 회귀 11종(~25 s, Gen·키 불필요). **커밋 전에 실행.** 중국 기준 모델 `fixtures/cn-sample.json.gz`(라이브 1.1 MB, 최대 0.920 NG 0) → `verify-golden.ts`(418, Gen 반력 = LR·SN·EX·EY 손계산 포함). 캡처 `capture-tw-golden.ts --code CN`. 변이 시험(좌굴곡선 b 계수)으로 검출 확인.
+- 라이브 최적화(2026-10-15): 반복마다 접합 기록 — 1회 46.96 t·판재 3.52·접합 0.988 / 2회 42.58 t·3.50·0.941, ok = true.
+
 ## 단면 자동 최적화 (2026-10-15, 라이브 검증)
 명령 `단면 최적화` (설계 검토 다음). 반복: 결과 회수 → 검토 → `proposeSections` → `sendModel`(재전송) → `analyzeCore`(재해석), 최대 5회.
 - 후보 `src/domain/catalog.ts` = 설치본 `Dbase/CNS2020.sdb` 에서 추출한 이름 그대로(RH 150·CC 45·P 60~318.5 40개). 단면적 오름차순, 목표 강도비 0.95, H 세장 단면 제외.

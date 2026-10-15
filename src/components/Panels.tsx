@@ -10,6 +10,7 @@ import type { OptSummary } from '../domain/optimize'
 import { connGrade, roleGrade } from '../domain/status'
 import { GradeChip, siteSourceText, StatusCard } from './Status'
 import { dimValue } from '../report/dims'
+import { StaleBanner } from './Workflow'
 import { lengthText, ROLES, type FactoryModel, type FactorySpec } from '../domain/types'
 import { t, tc, type I18nKey } from '../i18n'
 import { useStore, type AppState } from '../state/store'
@@ -274,6 +275,7 @@ export function ResultsPanel() {
   if (!s.reactions?.length && !s.design) return <div className="res-empty">{t('res_empty')}</div>
   return (
     <div>
+      <StaleBanner />
       {s.built && (
         <div className="confirm-row" style={{ marginTop: 0, marginBottom: 12 }}>
           <button className="btn btn-c" disabled={s.busy} onClick={() => void downloadReportPdf()}>{t('g_design_5')}</button>

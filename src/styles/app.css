@@ -266,6 +266,19 @@ main.splitting .right,main.splitting .chat{pointer-events:none}
 .typing span:nth-child(2){animation-delay:.2s}.typing span:nth-child(3){animation-delay:.4s}
 @keyframes blink{0%,60%,100%{opacity:.25}30%{opacity:1}}
 
+.wflow{border-top:1px solid var(--border);padding:7px 16px;background:var(--panel2);font-size:.78rem}
+.wflow ol{display:flex;gap:4px;list-style:none;margin:0;padding:0;flex-wrap:wrap}
+.wflow li{display:flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;border:1px solid var(--border);color:var(--dim)}
+.wflow .wf-mark{font-weight:700;width:.9em;text-align:center}
+.wflow .wf-done{color:var(--txt);border-color:color-mix(in srgb,var(--green) 45%,var(--border))}.wflow .wf-done .wf-mark{color:var(--green)}
+.wflow .wf-next,.wflow .wf-running{color:var(--txt-hi);border-color:var(--cyan);font-weight:600}.wflow .wf-next .wf-mark,.wflow .wf-running .wf-mark{color:var(--cyan)}
+.wflow .wf-stale{color:var(--amber);border-color:color-mix(in srgb,var(--amber) 55%,var(--border));border-style:dashed}
+.wflow .wf-failed{color:var(--red);border-color:color-mix(in srgb,var(--red) 55%,var(--border))}
+.wflow .wf-row{display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap}
+.wflow .wf-hint{flex:1;min-width:12em;color:var(--dim)}
+.wflow .wf-go{padding:4px 12px;font-size:.76rem}
+.stale-banner{margin-bottom:12px;padding:8px 12px;border:1px dashed var(--amber);border-radius:8px;color:var(--amber);font-size:.82rem}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .jobbar{border-top:1px solid var(--border);padding:8px 16px;background:var(--panel2);font-size:.8rem}
 .jobbar .jb-top{display:flex;align-items:center;gap:10px}
 .jobbar .jb-stage{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

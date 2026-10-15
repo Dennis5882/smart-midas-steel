@@ -63,7 +63,9 @@ export async function sendModel(spec: FactorySpec) {
   const cases = Object.values(l.STLD).map((c) => (c as { NAME: string }).NAME)
   const comboNames = Object.values(l['LCOM-GEN']).map((c) => (c as { NAME: string }).NAME)
   const combos = comboNames.length
-  S.built = { spec, model, info: l.info, cases, combos, comboNames }
+  const sent: Record<string, Record<string, unknown>> = Object.fromEntries(steps)
+  if (designCode) sent.DSTL = { 1: { DGNCODE: designCode } }
+  S.built = { spec, model, info: l.info, cases, combos, comboNames, sent }
   S.lastSpec = spec
   log(t('log_built'), 'ok')
   return model
@@ -71,6 +73,7 @@ export async function sendModel(spec: FactorySpec) {
 
 function clearBuilt(): void {
   S.built = null
+  S.genChanged = 0
   S.analyzed = false
   S.reactions = null
   S.results = null
