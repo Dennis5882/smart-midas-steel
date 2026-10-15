@@ -32,6 +32,10 @@ export type ChatMsg = { ts?: string } & (
 /** Gen 에 보낸 모델 — 스펙·형상·하중 요약 */
 export interface Built { spec: FactorySpec; model: FactoryModel; info: LoadInfo; cases: string[]; combos: number; comboNames: string[] }
 
+/** 진행 중 작업 — stage = 문구 키, step/total = 이 단계 MAPI 호출 수, iter = 최적화 반복 [n, 최대] */
+export type JobKind = 'build' | 'anal' | 'design' | 'opt'
+export interface Job { kind: JobKind; stage: string; step: number; total: number; detail: string; t0: number; cancel: boolean; iter?: [number, number] }
+
 /** 반력 합계 (하중 케이스별) */
 export interface ReactionSum { lc: string; fx: number; fy: number; fz: number }
 
@@ -62,6 +66,8 @@ export const S = {
   program: '',
   apiUser: '',
   busy: false,
+  /** 진행 중 작업 (진행 표시·취소) — busy 와 함께 beginJob/endJob 이 관리 */
+  job: null as Job | null,
   theme: readTheme(),
   code: readCode(),
   panel: 'logP' as PanelId,

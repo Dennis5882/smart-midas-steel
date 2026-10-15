@@ -6,6 +6,7 @@
 import { portalGeometry } from '../domain/portal'
 import type { Built } from '../state/store'
 import { mapi } from '../mapi/client'
+import { stage } from './job'
 
 export interface ForcePt { P: number; Vy: number; Vz: number; My: number; Mz: number }
 export interface Results {
@@ -44,6 +45,7 @@ export async function fetchResults(b: Built): Promise<Results> {
   const beam = new Map<number, Map<string, ForcePt[]>>()
   const beamRows: string[][] = []
   const batchSize = spec.code === 'CN' ? 4 : cb.length
+  stage('st_results', Math.ceil(cb.length / batchSize) + (trussIds.length ? 1 : 0) + 3)
   for (let offset = 0; offset < cb.length; offset += batchSize) {
     const bf = await table('BEAMFORCE', spec.code === 'CN' ? `F${offset}` : 'F', beamIds, cb.slice(offset, offset + batchSize), { PARTS: ['PartI', 'Part1/4', 'Part2/4', 'Part3/4', 'PartJ'] },
       ['Elem', 'Load', 'Part', 'Axial', 'Shear-y', 'Shear-z', 'Moment-y', 'Moment-z'])

@@ -13,12 +13,16 @@ import { S, notify, type Theme } from '../state/store'
 import { addMsg, addPlanMsg, escapeHtml, previewSpec, tab } from '../state/ui'
 import { parseCommand } from './parse'
 
+const BUSY_BLOCKED = new Set<string>(['analyze', 'design', 'optimize', 'report', 'drawings', 'pdf', 'quantities', 'reactions', 'conn'])
+
 /** 사용자 입력 1건 처리 (로컬 명령) */
 export async function send(raw: string): Promise<void> {
   const txt = raw.trim()
   if (!txt) return
   addMsg('user', escapeHtml(txt))
   const c = parseCommand(txt)
+  /* 작업 중에는 Gen 호출·결과를 쓰는 명령을 막는다 (결과가 바뀌는 중이라 출력도 막음). 도움말·스펙 카드·상태는 허용 */
+  if (S.busy && BUSY_BLOCKED.has(c.intent)) { addMsg('bot', t('busy')); return }
   switch (c.intent) {
     case 'help': addMsg('bot', t('help_html')); break
     case 'clear': clearChat(); break

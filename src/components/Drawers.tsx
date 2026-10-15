@@ -23,20 +23,21 @@ function MapiDrawer({ open, onClose }: { open: boolean; onClose(): void }) {
       <div className="body">
         <div className="field">
           <label>BASE URL</label>
-          <input value={s.baseUrl} onChange={(e) => { S.baseUrl = e.target.value; notify() }} />
+          <input disabled={s.busy} value={s.baseUrl} onChange={(e) => { S.baseUrl = e.target.value; notify() }} />
         </div>
         <div className="field">
           <label>MAPI-KEY</label>
-          <input type="password" autoComplete="off" value={s.mapiKey} placeholder={t('mapi_key_ph')}
+          <input type="password" autoComplete="off" disabled={s.busy} value={s.mapiKey} placeholder={t('mapi_key_ph')}
             onChange={(e) => { S.mapiKey = e.target.value; notify() }} />
           <div className="hint" dangerouslySetInnerHTML={{ __html: t('mapi_hint_html') }} />
         </div>
         <div className="field">
           <label>{t('save_dir')}</label>
-          <input value={s.saveDir} onChange={(e) => { S.saveDir = e.target.value; notify() }} />
+          <input disabled={s.busy} value={s.saveDir} onChange={(e) => { S.saveDir = e.target.value; notify() }} />
           <div className="hint">{t('save_dir_hint')}</div>
         </div>
-        <button className="btn btn-c" onClick={() => void onTest()}>{t('conn_test')}</button>
+        {s.busy && <div className="hint">{t('busy_locked')}</div>}
+        <button className="btn btn-c" disabled={s.busy} onClick={() => void onTest()}>{t('conn_test')}</button>
         {out && <div className={`test-out${out.cls ? ' ' + out.cls : ''}`} style={{ display: 'block' }}>{out.text}</div>}
         <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
           <button className="btn btn-c" onClick={onClose}>{t('save')}</button>

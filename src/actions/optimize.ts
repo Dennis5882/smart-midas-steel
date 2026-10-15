@@ -9,11 +9,12 @@ import { proposeSections, roleTons, steelWeight, type OptControl, type OptIter, 
 import { sectionProps } from '../domain/sections'
 import { ROLES } from '../domain/types'
 import { t } from '../i18n'
-import { S, notify } from '../state/store'
+import { S } from '../state/store'
 import { addMsg, draw3D, log, tab } from '../state/ui'
 import { analyzeCore } from './analysis'
 import { sendModel } from './build'
 import { fetchResults } from './results'
+import { beginJob, endJob, failMsg, setIter } from './job'
 
 const MAX_ITER = 5
 const key = (s: Sections) => ROLES.map((r) => s[r]).join('|')
@@ -22,8 +23,7 @@ export async function runOptimize(): Promise<void> {
   if (S.busy) { addMsg('bot', t('busy')); return }
   if (!S.built) { addMsg('bot', t('no_model')); return }
   if (!S.analyzed) { addMsg('bot', t('need_anal')); return }
-  S.busy = true
-  notify()
+  if (!beginJob('opt')) return
   addMsg('bot', t(S.built.spec.code === 'CN' ? 'opt_start_CN' : 'opt_start', MAX_ITER))
   tab('logP')
   const start = S.built.spec
@@ -34,6 +34,7 @@ export async function runOptimize(): Promise<void> {
   try {
     let d: DesignResult
     for (let it = 1; ; it++) {
+      setIter(it, MAX_ITER)
       const b = S.built!
       S.results = await fetchResults(b)
       d = runDesign(b.spec, b.model, b.info, S.results)
@@ -95,9 +96,8 @@ export async function runOptimize(): Promise<void> {
     draw3D()
     tab('resP')
   } catch (e) {
-    addMsg('bot', t('opt_fail', e instanceof Error ? e.message : String(e)))
+    addMsg('bot', failMsg(e, (m) => t('opt_fail', m)))
   } finally {
-    S.busy = false
-    notify()
+    endJob()
   }
 }

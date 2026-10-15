@@ -3,6 +3,7 @@
 import { MidasAPIError, MidasClient, type JsonObject } from 'midas-nx'
 import { S } from '../state/store'
 import { log } from '../state/ui'
+import { jobCall } from '../actions/job'
 
 /* 해석 등은 수 분 걸릴 수 있다 — SDK 기본 30s 대신 넉넉히 (대기만 중단, Gen 작업은 취소되지 않음) */
 const TIMEOUT_MS = 15 * 60 * 1000
@@ -30,6 +31,7 @@ export function apiErrorMessage(e: unknown): string {
 
 export async function mapi<T = any>(method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, body?: Record<string, any>, note = ''): Promise<T> {
   const ep = path.startsWith('/') ? path : `/db/${path}`
+  jobCall(`${method} ${ep}`) // 취소됐으면 여기서 Cancelled — 보내기 전에 멈춘다
   log(`<span style="color:var(--blue)">${method}</span> ${ep}${note ? ` <span style="color:var(--dim)">· ${note}</span>` : ''}`, 'api')
   try {
     return (await getClient().request(method, ep, body as JsonObject | undefined)) as T

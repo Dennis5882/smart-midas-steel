@@ -1,0 +1,64 @@
+/* 작업 진행·취소 — 생성·해석·설계 검토·최적화 공통.
+   진행: 단계(stage) = 문구 키 + 예상 MAPI 호출 수, mapi() 가 호출마다 step++·detail 갱신. 최적화는 iter 로 반복 수를 따로 표시.
+   취소: 협조식 — 플래그만 세우고 다음 MAPI 호출 직전에 Cancelled 를 던진다. Gen 이 처리 중인 호출(해석 등)은 끝까지 기다린다(중단 API 없음). */
+import { t, type I18nKey } from '../i18n'
+import { S, notify, type Job, type JobKind } from '../state/store'
+import { addMsg } from '../state/ui'
+
+export class Cancelled extends Error {
+  constructor() { super('cancelled') }
+}
+
+/** 작업 시작 — 이미 진행 중이면 false (중복 실행 방지, 동기 검사라 연속 클릭도 막힌다) */
+export function beginJob(kind: JobKind): boolean {
+  if (S.busy) { addMsg('bot', t('busy')); return false }
+  S.busy = true
+  S.job = { kind, stage: '', step: 0, total: 0, detail: '', t0: Date.now(), cancel: false }
+  notify()
+  return true
+}
+
+export function endJob(): void {
+  S.busy = false
+  S.job = null
+  notify()
+}
+
+/** 단계 전환 — total = 이 단계에서 예상하는 MAPI 호출 수(0 = 막대 없이 문구만) */
+export function stage(key: I18nKey, total = 0): void {
+  const j = S.job
+  if (!j) return
+  checkCancel()
+  Object.assign(j, { stage: key, step: 0, total, detail: '' } satisfies Partial<Job>)
+  notify()
+}
+
+export function setIter(n: number, max: number): void {
+  if (S.job) { S.job.iter = [n, max]; notify() }
+}
+
+/** mapi() 가 호출 직전에 부른다 */
+export function jobCall(detail: string): void {
+  const j = S.job
+  if (!j) return
+  checkCancel()
+  j.detail = detail
+  if (j.total) j.step = Math.min(j.step + 1, j.total)
+  notify()
+}
+
+export function checkCancel(): void {
+  if (S.job?.cancel) throw new Cancelled()
+}
+
+export function cancelJob(): void {
+  if (!S.job || S.job.cancel) return
+  S.job.cancel = true
+  notify()
+}
+
+/** 실패 메시지 — 취소면 취소 문구(모델이 중간 상태면 다시 생성 안내), 아니면 원래 실패 문구 */
+export function failMsg(e: unknown, failKey: (m: string) => string): string {
+  if (e instanceof Cancelled) return S.built ? t('job_cancelled') : t('job_cancelled_model')
+  return failKey(e instanceof Error ? e.message : String(e))
+}

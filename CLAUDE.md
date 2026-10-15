@@ -83,6 +83,12 @@ Vite 8 + TypeScript + React 19 + Tailwind v4 + shadcn/ui(new-york) + **Vercel Fu
 - 물량 `src/domain/quantities.ts`(순수): 부재(schedule) + 접합 판재(dims 문자열 'PL B×N×t'·'n-M d'·'2-PL b×t'·더블러) × 개소(주각·처마 = 2×골조, 마루 = 골조, 가새 = 요소×2) + 볼트·앵커 + 용접(추정: 플랜지 CJP 2bf + 웨브 필렛 2h) + 도장 면적(H 외곽 둘레, CC 양면, P 외면) + 로스(가정 부재 5%·판 10%) → 발주 중량. 추정(*) = 스티프너·더블러·거셋 크기, 용접. 계산서 9장 표 + `downloadQuantities()` CSV(UTF-8 BOM). 명령 `계산서 PDF`·`물량`, 결과 탭 버튼.
 - 대만 샘플(라이브 결과): 부재 42.58 t + 판재 3.50 t = 순 46.08 t, 발주 48.56 t, 도장 1527 m², 볼트 M24 앵커 112·M27 112·M20 120.
 
+## 작업 진행·취소·중복 실행·전송 확인 (2026-10-15, 평가 보고서 D단계, 라이브 검증)
+- `src/actions/job.ts`: `beginJob`(busy 동기 검사 — 연속 클릭도 거부)/`endJob`, `stage(키, 예상 호출 수)`, 최적화 `setIter`. `mapi()` 가 호출 직전 `jobCall` → step++·detail, 취소 플래그면 **보내기 전에** `Cancelled`. Gen 이 처리 중인 호출(해석)은 중단 API 가 없어 끝까지 기다린다. 메시지 `failMsg` — 모델이 중간 상태면 다시 생성 안내.
+- 화면 `JobBar`(입력창 위): 단계·n/N 막대(호출 수 모르면 불확정 막대)·경과 초·현재 호출·[취소]. 작업 중 결과 탭 출력 버튼·MAPI 드로어 입력 잠금, 채팅 명령 중 Gen·결과 사용 명령 거부(`BUSY_BLOCKED`), 새로고침 경고.
+- `sendModel`: `doc/new` 직후 이전 결과(`S.built` 등) 비움 — 중간 실패·취소 때 이전 모델로 해석·검토하지 않게. 전송 뒤 `MATL·SECT·NODE·ELEM·FRLS·CONS·STLD·LCOM-GEN` GET 개수 = 보낸 개수 확인(다르면 실패, 응답 형식이 다르면 경고만). 라이브: 8개 일치, 생성 6.9 s.
+- 오프라인 회귀 `node --import tsx scripts/verify-job.ts`(가짜 Gen = fetch 대체): 정상·개수 불일치·전송 중 취소·해석 중 취소·중복 실행 10항목.
+
 ## 단면 자동 최적화 (2026-10-15, 라이브 검증)
 명령 `단면 최적화` (설계 검토 다음). 반복: 결과 회수 → 검토 → `proposeSections` → `sendModel`(재전송) → `analyzeCore`(재해석), 최대 5회.
 - 후보 `src/domain/catalog.ts` = 설치본 `Dbase/CNS2020.sdb` 에서 추출한 이름 그대로(RH 150·CC 45·P 60~318.5 40개). 단면적 오름차순, 목표 강도비 0.95, H 세장 단면 제외.

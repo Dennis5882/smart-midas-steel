@@ -275,10 +275,10 @@ export function ResultsPanel() {
     <div>
       {s.built && (
         <div className="confirm-row" style={{ marginTop: 0, marginBottom: 12 }}>
-          <button className="btn btn-c" onClick={printReport}>{t('g_design_5')}</button>
-          <button className="btn btn-ghost" onClick={openReport}>{t('btn_html')}</button>
-          <button className="btn btn-ghost" onClick={downloadDrawings}>{t('g_design_3')}</button>
-          <button className="btn btn-ghost" onClick={downloadQuantities}>{t('g_design_6')}</button>
+          <button className="btn btn-c" disabled={s.busy} onClick={printReport}>{t('g_design_5')}</button>
+          <button className="btn btn-ghost" disabled={s.busy} onClick={openReport}>{t('btn_html')}</button>
+          <button className="btn btn-ghost" disabled={s.busy} onClick={downloadDrawings}>{t('g_design_3')}</button>
+          <button className="btn btn-ghost" disabled={s.busy} onClick={downloadQuantities}>{t('g_design_6')}</button>
         </div>
       )}
       {s.built && (s.design || !!s.connections?.length) && <StatusCard d={s.design} cs={s.connections} spec={s.built.spec} />}

@@ -4,6 +4,7 @@ import { mapi } from '../mapi/client'
 import { S, notify, type ReactionSum } from '../state/store'
 import { addMsg, log, tab } from '../state/ui'
 import { autoSave } from './save'
+import { beginJob, endJob, failMsg, stage } from './job'
 
 /* doc/anal 은 거부 시 HTTP 200 + message 로 회신(에러 필드 아님) → 메시지 직접 점검 */
 const NOT_ALLOWED = /not allowed|not permitted|허용되지|許可/i
@@ -11,23 +12,23 @@ const NOT_ALLOWED = /not allowed|not permitted|허용되지|許可/i
 export async function runAnalysis(): Promise<void> {
   if (S.busy) { addMsg('bot', t('busy')); return }
   if (!S.built) { addMsg('bot', t('no_model')); return }
-  S.busy = true
-  notify()
+  if (!beginJob('anal')) return
   addMsg('bot', t('anal_start'))
   try {
     await analyzeCore()
     addMsg('bot', t('anal_done'))
     tab('resP')
   } catch (e) {
-    addMsg('bot', t('anal_fail', e instanceof Error ? e.message : String(e)))
+    addMsg('bot', failMsg(e, (m) => t('anal_fail', m)))
   } finally {
-    S.busy = false
-    notify()
+    endJob()
   }
 }
 
 /** 해석 본체 (busy·메시지 없음) — 단면 최적화 반복에서도 사용 */
 export async function analyzeCore(): Promise<void> {
+  stage('st_anal', 3)
+  S.analyzed = false
   await autoSave('model') // doc/new 직후 무제 문서는 해석이 거부되고 확인 창이 뜬다 → 먼저 저장
   const res = await mapi<{ message?: string }>('POST', '/doc/anal', {})
   if (NOT_ALLOWED.test(String(res?.message ?? ''))) throw new Error(String(res?.message))

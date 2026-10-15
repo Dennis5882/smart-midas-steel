@@ -317,6 +317,9 @@ export const en = {
   g_help_2: 'Release notes',
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v0_11_0_1: 'Task progress bar — stage, progress, elapsed time and current Gen call; Cancel stops before the next call',
+  rn_v0_11_0_2: 'Duplicate runs, outputs and connection changes are blocked while a task runs; reload warning',
+  rn_v0_11_0_3: 'After sending, node/element and other counts in Gen are checked — stops on mismatch; a failed send never reuses old results',
   rn_v0_10_0_1: 'Report PDF — one button opens the print dialog to save an A4 PDF (command "report PDF")',
   rn_v0_10_0_2: 'Extended quantities — members plus connection plates, bolts, anchors, welds, paint area and loss to an order weight (report ch. 9)',
   rn_v0_10_0_3: 'Quantity CSV download (command "quantities", results tab button, opens cleanly in Excel)',
@@ -542,6 +545,22 @@ export const en = {
 
   /* ── 실행 메시지 ── */
   busy: 'Another task is running — please wait.',
+  st_send: 'Sending model and loads',
+  st_verify: 'Checking sent counts',
+  st_anal: 'Analysis (Gen NX)',
+  st_results: 'Fetching results',
+  st_check: 'Checking members and connections',
+  job_cancel: 'Cancel',
+  job_cancelling: 'Cancelling…',
+  job_cancel_tip: 'Stops before the next Gen call — an analysis in progress runs to completion',
+  job_cancelled: 'Task cancelled.',
+  job_cancelled_model: 'Task cancelled. The Gen model was only partly sent — run factory creation again.',
+  busy_locked: 'Connection settings are locked while a task is running.',
+  log_verify_skip: (name: string) => `${name} count check skipped — unexpected response format`,
+  log_verify_ok: (n: number) => `Sent counts verified — ${n} items match`,
+  verify_fail: (list: string) => `Gen holds a different count than was sent (got/sent): ${list}`,
+  job_iter: (n: number, max: number) => `Round ${n}/${max}`,
+  job_elapsed: (s: number) => `${s} s`,
   need_key: 'Set the MAPI-Key in ⚙ (top right) first.',
   build_start: 'Sending the model to Gen NX…',
   build_done: (n: number, e: number, cases: number, combos: number) =>

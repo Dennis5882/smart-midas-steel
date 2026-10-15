@@ -210,6 +210,17 @@ main.splitting .right,main.splitting .chat{pointer-events:none}
 .typing span:nth-child(2){animation-delay:.2s}.typing span:nth-child(3){animation-delay:.4s}
 @keyframes blink{0%,60%,100%{opacity:.25}30%{opacity:1}}
 
+.jobbar{border-top:1px solid var(--border);padding:8px 16px;background:var(--panel2);font-size:.8rem}
+.jobbar .jb-top{display:flex;align-items:center;gap:10px}
+.jobbar .jb-stage{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jobbar .jb-time{color:var(--dim);font-variant-numeric:tabular-nums}
+.jobbar .jb-cancel{padding:3px 10px;font-size:.75rem}
+.jobbar .jb-track{height:4px;margin-top:6px;border-radius:2px;background:var(--border);overflow:hidden}
+.jobbar .jb-fill{height:100%;background:var(--cyan);transition:width .3s}
+.jobbar .jb-fill.ind{width:30%;animation:jbslide 1.4s ease-in-out infinite}
+@keyframes jbslide{0%{transform:translateX(-100%)}100%{transform:translateX(340%)}}
+@media (prefers-reduced-motion:reduce){.jobbar .jb-fill.ind{animation:none;width:100%;opacity:.4}}
+.jobbar .jb-detail{margin-top:4px;color:var(--dim);font-family:var(--mono,monospace);font-size:.72rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .composer{border-top:1px solid var(--border);padding:14px 16px calc(20px + env(safe-area-inset-bottom));background:var(--panel2)}
 .composer .row{display:flex;gap:10px;align-items:flex-end}
 .composer textarea{

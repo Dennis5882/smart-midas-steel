@@ -5,21 +5,22 @@ import { summarizeStatus } from '../domain/status'
 import { checkScope } from '../domain/scope'
 import { statusLine } from '../components/Status'
 import { t, tc } from '../i18n'
-import { S, notify } from '../state/store'
+import { S } from '../state/store'
 import { addMsg, log, tab } from '../state/ui'
 import { fetchResults } from './results'
+import { beginJob, endJob, failMsg, stage } from './job'
 
 export async function runDesignCheck(): Promise<void> {
   if (S.busy) { addMsg('bot', t('busy')); return }
   if (!S.built) { addMsg('bot', t('no_model')); return }
   if (!S.analyzed) { addMsg('bot', t('need_anal')); return }
-  S.busy = true
-  notify()
+  if (!beginJob('design')) return
   addMsg('bot', tc(S.built.spec.code, 'design_start'))
   try {
     const b = S.built
     S.results = await fetchResults(b)
     log(t('log_results'), 'ok')
+    stage('st_check')
     S.design = runDesign(b.spec, b.model, b.info, S.results)
     S.connections = runConnections(b.spec, b.model, b.info, S.results)
     const d = S.design
@@ -28,9 +29,8 @@ export async function runDesignCheck(): Promise<void> {
     addMsg('bot', t('design_done', d.members.length, d.maxRatio.toFixed(2), statusLine(summarizeStatus(d, S.connections, checkScope(S.built!.spec)))))
     tab('resP')
   } catch (e) {
-    addMsg('bot', t('design_fail', e instanceof Error ? e.message : String(e)))
+    addMsg('bot', failMsg(e, (m) => t('design_fail', m)))
   } finally {
-    S.busy = false
-    notify()
+    endJob()
   }
 }
