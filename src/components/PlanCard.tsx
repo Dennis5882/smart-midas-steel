@@ -14,7 +14,7 @@ import { ScopeBox } from './ScopeBox'
 import { checkScope, NO_FEATURES, type ScopeFeatures } from '../domain/scope'
 import { lengthText, type FactorySpec } from '../domain/types'
 import { t, tc } from '../i18n'
-import { fieldStep, groupsFor, initVals, invalidFields, toSpec, type Group, type Path } from './planFields'
+import { fieldConflicts, fieldStep, groupsFor, initVals, invalidFields, toSpec, type Group, type Path } from './planFields'
 import { S, useStore, type ChatMsg } from '../state/store'
 import { draw3D, previewSpec, tab } from '../state/ui'
 
@@ -65,15 +65,18 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
   const live = s.buildEpoch === msg.epoch && !cancelled
   const groups = groupsFor(spec.code, free)
   const invalid = invalidFields(spec, vals, free)
+  /* 칸 사이 충돌(치수 한계·간격 과대)도 그 칸의 오류로 — 해당 단계에서 막는다 */
+  const conflicts = fieldConflicts(spec, vals, free)
+  const errors = [...invalid, ...conflicts.map((c) => c.field)]
   /* 자유골조는 한 화면 직접 편집 → 오류를 바로 표시. 위저드는 다음 단계로 넘어가려 할 때 */
   const showErrors = attempted || free
 
   /* 편집 변경 → 3D 미리보기 (첫 렌더 제외) */
   useEffect(() => {
-    if (!dirty.current || !live || s.busy || invalid.length || blocked) return
+    if (!dirty.current || !live || s.busy || errors.length || blocked) return
     const h = setTimeout(() => { tab('viewP'); previewSpec(spec) }, PREVIEW_DEBOUNCE_MS)
     return () => clearTimeout(h)
-  }, [spec, live, s.busy, blocked, invalid.length])
+  }, [spec, live, s.busy, blocked, errors.length])
 
   const set = (p: Path, v: string) => {
     dirty.current = true
@@ -92,7 +95,9 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
 
   const fields = (g: Group, readonly = false) => <div className="pe-grid">{g.fields.map((f) => {
     const id = `${formId}-${f.path}`
-    const error = showErrors && invalid.some((bad) => bad.path === f.path)
+    const bad = invalid.some((x) => x.path === f.path)
+    const conflict = bad ? undefined : conflicts.find((c) => c.field.path === f.path)
+    const error = showErrors && (bad || !!conflict)
     return <div key={f.path} className={`pe-f${f.kind === 'text' || f.full ? ' pe-full' : ''}`}>
       <label htmlFor={id}>{t(f.label)}</label>
       <div className="pe-in">
@@ -104,7 +109,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
               onChange={(e) => set(f.path, e.target.value)} aria-invalid={error} aria-describedby={error ? `${id}-error` : undefined} />}
         {f.unit && <span className="pe-u">{f.unit}</span>}
       </div>
-      {error && <small className="mw-error" id={`${id}-error`}>{f.kind === 'list' ? t('mw_list_error') : f.path.startsWith('sections.') ? t('mw_section_error', msg.spec.sections.column)
+      {error && <small className="mw-error" id={`${id}-error`}>{conflict ? conflict.text : f.kind === 'list' ? t('mw_list_error') : f.path.startsWith('sections.') ? t('mw_section_error', msg.spec.sections.column)
         : !vals[f.path]?.trim() ? t('mw_required') : f.kind === 'int' && !Number.isInteger(Number(vals[f.path])) ? t('mw_integer')
         : f.kind === 'num' || f.kind === 'int' ? f.min === undefined ? t('mw_positive') : t('mw_min', f.min) : t('mw_field_error')}</small>}
     </div>
@@ -113,8 +118,13 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
   function navigate(target: number) {
     if (!live || s.busy) return
     if (target > step) {
-      const first = invalid.find((f) => fieldStep(f) < target)
-      if (first) { setAttempted(true); setStep(fieldStep(first)); return }
+      const first = errors.find((f) => fieldStep(f) < target)
+      if (first) {
+        setAttempted(true); setStep(fieldStep(first))
+        /* 오류 칸으로 포커스 — 스크롤 아래·접힌 고급 칸이어도 문구가 보이게 (단계 전환·펼침 렌더 뒤) */
+        setTimeout(() => document.getElementById(`${formId}-${first.path}`)?.focus(), 60)
+        return
+      }
       if (blocked) { setAttempted(true); return }
     }
     setAttempted(false)
@@ -123,8 +133,8 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
   }
 
   if (!free) return <ModelWizard spec={spec} step={step} visited={visited} disabled={!live || s.busy}
-    onStep={navigate} blocked={blocked} invalid={invalid.length > 0} attempted={attempted}
-    onBuild={() => { if (invalid.length || blocked) { setAttempted(true); return }; void buildFactory(spec) }}
+    onStep={navigate} blocked={blocked} invalid={errors.length > 0} attempted={attempted}
+    onBuild={() => { if (errors.length || blocked) { setAttempted(true); return }; void buildFactory(spec) }}
     onCancel={() => { setCancelled(true); if (S.preview) draw3D() }}>
     {step === 0 && <>
       <div className="mw-templates">{TEMPLATE_KEYS.map((key) => <button type="button" key={key} aria-pressed={selectedTpl === key}
@@ -144,7 +154,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
       const basic = filtered.fields.filter((f) => !advanced.includes(f))
       return <section className="mw-group" key={g.title}>
         {basic.length > 0 && <><h4>{t(g.title)}</h4>{fields({ ...g, fields: basic })}</>}
-        {advanced.length > 0 && <details className="mw-advanced" open={attempted && advanced.some((f) => invalid.includes(f)) || undefined}>
+        {advanced.length > 0 && <details className="mw-advanced" open={attempted && advanced.some((f) => errors.includes(f)) || undefined}>
           <summary>{t(g.title === 'sec_conn' ? 'sec_conn' : step === 2 || step === 3 ? 'mw_secondary' : 'mw_coefficients')}<span>{t('mw_advanced')}</span></summary>
           {fields({ ...g, fields: advanced })}
         </details>}
@@ -189,11 +199,11 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
         {free && <div className="pe-tip">{t('free_tip', spec.bays, lengthText(spec))}</div>}
         <div className="pe-tip">{tc(spec.code, 'plan_tip')}</div>
       </div>
-      {live && invalid.length > 0 && <p className="mw-error mw-alert" role="alert">{t('mw_invalid')}</p>}
+      {live && errors.length > 0 && <p className="mw-error mw-alert" role="alert">{t('mw_invalid')}</p>}
       {live && (
         <div className="confirm-row">
-          <button className="btn btn-c" disabled={s.busy || blocked || invalid.length > 0} title={blocked ? t('sc_blocked') : invalid.length ? t('mw_invalid') : undefined}
-            onClick={() => { if (invalid.length || blocked) return; void buildFactory(spec) }}>{t('exec')}</button>
+          <button className="btn btn-c" disabled={s.busy || blocked || errors.length > 0} title={blocked ? t('sc_blocked') : errors.length ? t('mw_invalid') : undefined}
+            onClick={() => { if (errors.length || blocked) return; void buildFactory(spec) }}>{t('exec')}</button>
           <button className="btn btn-ghost" onClick={() => { setCancelled(true); if (S.preview) draw3D() }}>{t('cancel')}</button>
         </div>
       )}

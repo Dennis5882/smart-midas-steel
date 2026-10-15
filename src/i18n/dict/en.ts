@@ -22,6 +22,9 @@ export const en = {
   mw_list_error: 'Enter bay spacings as positive numbers separated by commas, e.g. 6, 6, 7.5',
   mw_section_error: (example: string) => `Enter a supported section name with valid dimensions, e.g. ${example}.`,
   mw_required: 'This input is required.', mw_integer: 'Enter a whole number.', mw_positive: 'Enter a number greater than zero.', mw_min: (n: number) => `Enter a number of at least ${n}.`,
+  mw_cf_purlin: (len: number, max: number) => `Too wide for the ${len} m rafter slope length — no purlin fits between eave and ridge. Enter ${max} m or less.`,
+  mw_cf_girt: (h: number, max: number) => `Too wide for the ${h} m eave height — no girt fits on the wall. Enter ${max} m or less.`,
+  mw_cf_post: (span: number, max: number) => `Too wide for the ${span} m span — no gable post fits on the end wall. Enter ${max} m or less.`,
   mw_secondary: 'Secondary members', mw_coefficients: 'Seismic coefficients', mw_advanced: 'Review defaults · expand to edit',
   /* ── 헤더·공통 ── */
   app_name: 'Steel Factory Agent',
@@ -349,6 +352,8 @@ export const en = {
   g_help_2: 'Release notes',
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v0_16_1_1: 'The wizard now stops span, eave height and slope limits and over-wide purlin, girt and gable post spacing (no member would be placed) at the field itself, with the maximum spacing shown',
+  rn_v0_16_1_2: 'When a step cannot advance, the first field in error is scrolled into view and focused',
   rn_v0_16_0_1: 'Confirmation before replacing the Gen model — the open document is backed up and can be brought back with [Restore previous model]',
   rn_v0_16_0_2: 'Step checklist (✓ ● ○) and [View log] under the job progress bar',
   rn_v0_16_0_3: 'Results tab summary cards (steel weight, max ratio, NG, optimization saving) and a full member results table (filter, search, sort, CSV)',

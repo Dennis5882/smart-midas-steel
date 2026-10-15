@@ -18,6 +18,8 @@ export interface ScopeFeatures { crane: boolean; mezzanine: boolean; multiSpan: 
 export const NO_FEATURES: ScopeFeatures = { crane: false, mezzanine: false, multiSpan: false, opening: false }
 
 const r2 = (x: number) => +x.toFixed(2)
+/** 치수 한계 (block) — 입력 위저드도 같은 값으로 해당 칸에서 바로 막는다 (components/planFields) */
+export const LIMITS = { span: 60, eave: 18, slope: 1 } as const
 
 export function checkScope(spec: FactorySpec, f: ScopeFeatures = spec.features ?? NO_FEATURES): ScopeResult {
   const out: ScopeIssue[] = []
@@ -36,9 +38,9 @@ export function checkScope(spec: FactorySpec, f: ScopeFeatures = spec.features ?
   }
 
   /* 치수 한계 */
-  if (!(spec.span > 0 && spec.span <= 60)) block('span', spec.span)
-  if (!(spec.eaveHeight > 0 && spec.eaveHeight <= 18)) block('eave', spec.eaveHeight)
-  if (!(spec.roofSlope > 0 && spec.roofSlope <= 1)) block('slope', spec.roofSlope)
+  if (!(spec.span > 0 && spec.span <= LIMITS.span)) block('span', spec.span)
+  if (!(spec.eaveHeight > 0 && spec.eaveHeight <= LIMITS.eave)) block('eave', spec.eaveHeight)
+  if (!(spec.roofSlope > 0 && spec.roofSlope <= LIMITS.slope)) block('slope', spec.roofSlope)
   const spans = G.spans
   const ratio = Math.max(...spans) / Math.min(...spans)
   if (ratio > 1.5) warn('bayRatio', r2(Math.min(...spans)), r2(Math.max(...spans)))

@@ -3,6 +3,8 @@
 import { profileOf } from '../codes'
 import { counties, townsOf } from '../codes/twSites'
 import { sectionProps } from '../domain/sections'
+import { portalGeometry } from '../domain/portal'
+import { LIMITS } from '../domain/scope'
 import { baySpans, normalizeBays, type FactorySpec } from '../domain/types'
 import { t, type I18nKey } from '../i18n'
 
@@ -165,3 +167,31 @@ export const fieldStep = (f: Field) => ['span', 'eaveHeight', 'roofSlope', 'base
 /** 잘못된 입력 칸 — 기본 모델링·자유골조 공통 (자유골조는 베이 수·간격 대신 베이 목록) */
 export const invalidFields = (spec: FactorySpec, vals: Record<Path, string>, free: boolean): Field[] =>
   groupsFor(spec.code, free).flatMap((g) => g.fields).filter((f) => invalidField(f, vals[f.path], spec))
+
+/** 칸 사이 충돌 — 각 칸은 올바르지만 함께 두면 모델이 성립하지 않는 경우. 위저드가 그 칸의 단계에서 바로 막는다.
+   ① 치수 한계(적용범위 block 과 같은 값) ② 간격이 커서 처마~마루·기초~처마·박공 사이에 부재가 하나도 안 들어감
+   (portalGeometry 의 개수 = round(길이 / 간격) — 내부 부재가 생기려면 길이 / 간격 ≥ 1.5).
+   관련 칸 중 하나라도 잘못이면 그 칸 오류가 먼저 — 여기서는 판단하지 않는다. */
+export interface Conflict { field: Field; text: string }
+const MIN_DIV = 1.5
+export function fieldConflicts(spec: FactorySpec, vals: Record<Path, string>, free: boolean): Conflict[] {
+  const fields = groupsFor(spec.code, free).flatMap((g) => g.fields)
+  const bad = new Set(fields.filter((f) => invalidField(f, vals[f.path], spec)).map((f) => f.path))
+  const ok = (...p: Path[]) => p.every((x) => !bad.has(x))
+  const out: Conflict[] = []
+  const add = (path: Path, text: string) => { const field = fields.find((f) => f.path === path); if (field) out.push({ field, text }) }
+  const floor2 = (x: number) => Math.floor(x * 100) / 100
+  if (ok('span') && spec.span > LIMITS.span) add('span', t('sc_span', spec.span))
+  if (ok('eaveHeight') && spec.eaveHeight > LIMITS.eave) add('eaveHeight', t('sc_eave', spec.eaveHeight))
+  if (ok('roofSlope') && spec.roofSlope > LIMITS.slope) add('roofSlope', t('sc_slope', spec.roofSlope))
+  if (out.length) return out
+  const G = portalGeometry(spec)
+  const r2 = (x: number) => +x.toFixed(2)
+  if (ok('span', 'roofSlope', 'purlinSpacing') && G.slopeLen / spec.purlinSpacing < MIN_DIV)
+    add('purlinSpacing', t('mw_cf_purlin', r2(G.slopeLen), floor2(G.slopeLen / MIN_DIV)))
+  if (ok('eaveHeight', 'girtSpacing') && spec.eaveHeight / spec.girtSpacing < MIN_DIV)
+    add('girtSpacing', t('mw_cf_girt', spec.eaveHeight, floor2(spec.eaveHeight / MIN_DIV)))
+  if (ok('span', 'postSpacing') && spec.span / Math.max(spec.postSpacing, 1) < MIN_DIV)
+    add('postSpacing', t('mw_cf_post', spec.span, floor2(spec.span / MIN_DIV)))
+  return out
+}

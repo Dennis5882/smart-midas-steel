@@ -111,7 +111,7 @@ Vite 8 + TypeScript + React 19 + Tailwind v4 + shadcn/ui(new-york) + **Vercel Fu
 - 손계산으로 찾은 것: 단위 상수 `MPA_TFCM2 = 0.0101972`(반올림) → `1/98.0665` — 강도가 +4e-6 과대(실무 영향 없음, 지배 조합·접합 치수 변화 없음). 변이 시험(전단 0.6→0.61)으로 회귀가 잡는 것 확인.
 
 ## 입력 검증·최적화 접합 판정 (2026-10-15, 재평가 11.4 의 2·3)
-- 스펙 입력 칸 정의·검증은 `src/components/planFields.ts`(순수): `invalidFields(spec, vals, free)` 를 **기본 모델링·자유골조 공통** 적용 — 빈 값·음수·비숫자·정수 칸 소수·베이 목록(`listError`)·선택값·단면명. 잘못된 칸이 있으면 두 모드 모두 실행 불가(자유골조는 오류를 바로 표시 + [실행] 비활성). `toSpec` 의 기존 값 대체는 미리보기용일 뿐 전송되지 않는다. 회귀 `scripts/verify-input.ts`(80).
+- 스펙 입력 칸 정의·검증은 `src/components/planFields.ts`(순수): `invalidFields(spec, vals, free)` 를 **기본 모델링·자유골조 공통** 적용 — 빈 값·음수·비숫자·정수 칸 소수·베이 목록(`listError`)·선택값·단면명. 잘못된 칸이 있으면 두 모드 모두 실행 불가(자유골조는 오류를 바로 표시 + [실행] 비활성). **칸 사이 충돌** `fieldConflicts`: 치수 한계(스팬 ≤ 60·처마 ≤ 18·경사 ≤ 1 — `scope.ts` `LIMITS` 공유)와 간격 과대(경사 길이·처마 높이·스팬 ÷ 간격 < 1.5 면 퍼린·거트·풍주가 하나도 안 들어감 → 최대 간격 안내)를 그 칸의 오류로 — 위저드는 해당 단계에서 막고 첫 오류 칸으로 포커스. `toSpec` 의 기존 값 대체는 미리보기용일 뿐 전송되지 않는다. 회귀 `scripts/verify-input.ts`(80).
 - 최적화: 반복마다 접합부 산정(`OptIter.connMax·connNg·plateT`), 최종안 `pickBest`(domain/optimize, TW·CN 공통) = 부재·사용성·접합 NG 0 중 (부재 + 접합 판재) 최경량, 유효안이 없으면 NG 최소안을 남기고 `opt.ok = false` + 경고 문구. 결과 탭 반복 표에 접합 최대비. 회귀 `scripts/verify-opt.ts`. **Gen 라이브 미재검증.**
 
 ## Gen 모델 변경 감지·작업 흐름·품질 게이트 (2026-10-15, 재평가 11.4 의 1·5·6 — F4·F5·F7, 라이브 검증)

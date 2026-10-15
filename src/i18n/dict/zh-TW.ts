@@ -22,6 +22,9 @@ export const zhTW: Dict = {
   mw_list_error: '請以逗號分隔輸入正數柱距，例如 6, 6, 7.5',
   mw_section_error: (example: string) => `請輸入支援的斷面名稱與有效尺寸，例如 ${example}。`,
   mw_required: '此欄位為必填。', mw_integer: '請輸入整數。', mw_positive: '請輸入大於零的數值。', mw_min: (n: number) => `請輸入不小於 ${n} 的數值。`,
+  mw_cf_purlin: (len, max) => `相對屋樑斜長 ${len} m 間距過大，簷口與屋脊之間無法配置檁條 — 請輸入 ${max} m 以下。`,
+  mw_cf_girt: (h, max) => `相對簷高 ${h} m 間距過大，牆面無法配置牆樑 — 請輸入 ${max} m 以下。`,
+  mw_cf_post: (span, max) => `相對跨度 ${span} m 間距過大，山牆無法配置山牆柱 — 請輸入 ${max} m 以下。`,
   mw_secondary: '次構件設定', mw_coefficients: '地震係數詳情', mw_advanced: '確認預設值，展開可修改',
   app_name: '鋼構廠房代理',
   subtitle: 'MIDAS Gen NX · 鋼構廠房自動化',
@@ -345,6 +348,8 @@ export const zhTW: Dict = {
   g_help_2: '版本說明',
   g_help_2_cmd: '版本說明',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v0_16_1_1: '輸入步驟即於該欄位檢查跨度・簷高・坡度上限，以及檁條・牆樑・山牆柱間距過大（無法配置構材），並提示最大間距',
+  rn_v0_16_1_2: '無法進入下一步時，自動移至第一個錯誤欄位並顯示說明',
   rn_v0_16_0_1: '建立廠房前確認取代 Gen 模型 — 自動備份目前文件，可用 [還原先前模型] 復原',
   rn_v0_16_0_2: '作業進度列下方顯示步驟清單（✓ ● ○）與 [檢視記錄]',
   rn_v0_16_0_3: '結果分頁摘要卡（鋼材量・最大強度比・NG・最佳化節省）與全部構材結果表（篩選・搜尋・排序・CSV）',
