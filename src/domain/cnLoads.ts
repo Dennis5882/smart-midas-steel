@@ -8,19 +8,19 @@ import type { LoadCaseType } from '../codes'
 import type { LoadInfo, LoadPayloads } from './loads'
 import { portalGeometry } from './portal'
 import { nodeWeights } from './weights'
-import type { FactoryModel, FactorySpec, Face, Node } from './types'
+import { baySpans, type FactoryModel, type FactorySpec, type Face, type Node } from './types'
 import { sectionProps } from './sections'
 
 export function validateCnSpec(spec: FactorySpec): void {
   const c = spec.china
   if (!c) throw new Error('CN project inputs are required')
   if (spec.wind.enclosure !== 'enclosed') throw new Error('GB: this factory model supports closed buildings; dominant openings require a separate pressure model')
-  if (!(spec.eaveHeight > 0 && spec.eaveHeight <= 18 && spec.span > 0 && spec.span <= 60 && spec.bays >= 1 && Number.isInteger(spec.bays) && spec.baySpacing > 0 && spec.roofSlope > 0 && spec.roofSlope <= 1)) throw new Error('GB scope: regular single-storey factory, eave ≤18 m, span ≤60 m, roof slope ≤1')
+  if (!(spec.eaveHeight > 0 && spec.eaveHeight <= 18 && spec.span > 0 && spec.span <= 60 && spec.bays >= 1 && Number.isInteger(spec.bays) && baySpans(spec).every((s) => s > 0) && spec.roofSlope > 0 && spec.roofSlope <= 1)) throw new Error('GB scope: regular single-storey factory, eave ≤18 m, span ≤60 m, roof slope ≤1')
   for (const k of ['w0', 'betaZ', 'topography', 'alphaMax', 'Tg', 'Tx', 'Ty', 'damping', 'snowMu', 'gamma0', 'concreteBearing', 'anchorFt'] as const)
     if (!(Number.isFinite(c[k]) && c[k] > 0)) throw new Error(`GB: invalid ${k}`)
   if (!(c.w0 >= .3 && c.betaZ >= 1 && c.topography >= .75 && c.snow >= 0 && Number.isFinite(c.snow) && c.snowMu >= .9 && c.gamma0 >= 1 && c.Tx <= 6 && c.Ty <= 6 && c.damping >= .045 && c.damping <= .05)) throw new Error('GB: check w0 ≥0.3, betaZ ≥1, topography ≥0.75, snow multiplier ≥0.9, gamma0 ≥1, periods ≤6 s, damping 0.045–0.05')
   if (spec.eaveHeight + spec.span * spec.roofSlope / 4 > 20) throw new Error('GB: mean roof height must be ≤20 m for the current local wind table')
-  if (spec.bays * spec.baySpacing > 90) throw new Error('GB: the current single temperature unit is limited to 90 m')
+  if (baySpans(spec).reduce((a, b) => a + b, 0) > 90) throw new Error('GB: the current single temperature unit is limited to 90 m')
   if (c.alphaMax >= .16 && spec.span > 24) throw new Error('GB: intensity 8/9 and span >24 m require a project-specific vertical earthquake model (GB/T 50011 5.3)')
   for (const name of Object.values(spec.sections)) { const p = sectionProps(name); if (![p.A, p.Ix, p.Iy, p.rx, p.ry].every((x) => Number.isFinite(x) && x > 0)) throw new Error(`GB: invalid section ${name}`) }
   if (spec.secondaryMaterial && spec.secondaryMaterial !== 'Q235B') throw new Error('GB/T 50018: the current cold-formed catalogue is configured for Q235B')
@@ -49,7 +49,7 @@ export function buildCnLoads(spec: FactorySpec, model: FactoryModel): LoadPayloa
   const topGirt = G.girtZs.at(-1) ?? 0
   const strip = (x: number) => Math.max(0, G.zAt(x) - topGirt - gWall / 2)
   const gable = (a: Node): 'y0' | 'yL' | null => a.y === 0 ? 'y0' : Math.abs(a.y - length) < 1e-8 ? 'yL' : null
-  const qLive = CN.roofLive({ slope: spec.roofSlope, tribArea: sRoof * cos * spec.baySpacing })
+  const qLive = CN.roofLive({ slope: spec.roofSlope, tribArea: sRoof * cos * Math.min(...baySpans(spec)) })
   // Table 7.2.1, single-span gable: uniform and, at 20–30°, .75/1.25.
   const snowAngles = [25, 30, 35, 40, 45, 50, 55, 60], snowMus = [1, .85, .7, .55, .4, .25, .1, 0]
   const snowIndex = snowAngles.findIndex((a) => deg <= a)

@@ -7,7 +7,9 @@ import { buildPortal } from '../domain/portal'
 import type { ConnResult } from '../domain/connections'
 import type { DesignResult } from '../domain/design'
 import type { OptSummary } from '../domain/optimize'
-import { ROLES, type FactoryModel, type FactorySpec } from '../domain/types'
+import { connGrade, roleGrade } from '../domain/status'
+import { GradeChip, siteSourceText, StatusCard } from './Status'
+import { lengthText, ROLES, type FactoryModel, type FactorySpec } from '../domain/types'
 import { t, tc, type I18nKey } from '../i18n'
 import { useStore, type AppState } from '../state/store'
 
@@ -39,9 +41,12 @@ interface Shown { spec: FactorySpec; model: FactoryModel; info: LoadInfo; cases:
 /** 표시 대상 — 편집 중 미리보기(오프라인 계산) 우선, 없으면 Gen 에 보낸 모델 */
 function shownOf(s: AppState): Shown | null {
   if (s.preview) {
-    const model = buildPortal(s.preview)
-    const l = buildLoadPayloads(s.preview, model)
-    return { spec: s.preview, model, info: l.info, cases: Object.keys(l.STLD).length, combos: Object.keys(l['LCOM-GEN']).length, preview: true }
+    /* 적용범위 밖 입력(CN validateCnSpec 등)은 하중 생성이 예외 → 미리보기 대신 보낸 모델 (범위 판정은 카드에 표시) */
+    try {
+      const model = buildPortal(s.preview)
+      const l = buildLoadPayloads(s.preview, model)
+      return { spec: s.preview, model, info: l.info, cases: Object.keys(l.STLD).length, combos: Object.keys(l['LCOM-GEN']).length, preview: true }
+    } catch { /* 아래로 */ }
   }
   const b = s.built
   return b ? { spec: b.spec, model: b.model, info: b.info, cases: b.cases.length, combos: b.combos, preview: false } : null
@@ -69,7 +74,7 @@ export function ModelPanel() {
       <div className="scard"><h3>{t('sec_geom')}</h3>
         <KV k={t('kv_code')} v={t(profileOf(sp.code).labelKey)} hi />
         <KV k={t('kv_span')} v={`${sp.span} m`} hi />
-        <KV k={t('kv_length')} v={`${sp.bays} × ${sp.baySpacing} = ${f1(sp.bays * sp.baySpacing)} m`} />
+        <KV k={t('kv_length')} v={lengthText(sp)} />
         <KV k={t('kv_eave')} v={`${sp.eaveHeight} m`} />
         <KV k={t('kv_slope')} v={`${sp.roofSlope} (${f1((Math.atan(sp.roofSlope) * 180) / Math.PI)}°)`} />
         <KV k={t('kv_base')} v={t(sp.baseFixity === 'fixed' ? 'base_fixed' : 'base_pinned')} />
@@ -89,6 +94,7 @@ export function ModelPanel() {
       </div>
       <div className="scard"><h3>{t('sec_load')}</h3>
         <KV k={t('kv_roofLive')} v={`${f3(info.roofLive)} kN/m²`} />
+        <KV k={t('kv_site_src')} v={siteSourceText(sp)} />
         <KV k={t('kv_W')} v={`${f1(info.seismic.W)} kN`} />
         <KV k={t('kv_EX')} v={seis('X')} hi />
         <KV k={t('kv_EY')} v={seis('Y')} hi />
@@ -129,7 +135,7 @@ function DesignTables({ d }: { d: DesignResult }) {
       <div className="scard"><h3>{tc(code, 'res_design')}</h3>
         <div style={{ overflow: 'auto' }}>
           <table>
-            <thead><tr><th>{t('rd_role')}</th><th>{t('rd_section')}</th><th>{t('rd_elem')}</th><th>{t('rd_ratio')}</th><th>{t('rd_eq')}</th><th>{t('rd_combo')}</th><th>{t('rd_mode')}</th></tr></thead>
+            <thead><tr><th>{t('rd_role')}</th><th>{t('rd_section')}</th><th>{t('rd_elem')}</th><th>{t('rd_ratio')}</th><th>{t('rd_eq')}</th><th>{t('rd_combo')}</th><th>{t('rd_mode')}</th><th>{t('rd_status')}</th></tr></thead>
             <tbody>
               {ROLES.filter((r) => d.byRole[r]).map((r) => {
                 const m = d.byRole[r]!
@@ -139,6 +145,7 @@ function DesignTables({ d }: { d: DesignResult }) {
                     <td style={{ color: ratioColor(m.ratio), fontWeight: 700 }}>{m.ratio.toFixed(3)}</td>
                     <td>{m.eq}</td><td>{m.combo}</td>
                     <td style={{ color: 'var(--muted)' }}>{m.eq === 'KL/r' ? `KL/r ${m.slender.value.toFixed(0)}/${m.slender.limit}` : m.cap.mxMode}{m.notes.length ? ' *' : ''}</td>
+                    <td>{(() => { const g = roleGrade(d, r); return <GradeChip g={g.grade} reasons={g.reasons} /> })()}</td>
                   </tr>
                 )
               })}
@@ -235,7 +242,7 @@ function ConnTables({ cs }: { cs: ConnResult[] }) {
       {cs.map((c) => (
         <div key={c.type} style={{ marginBottom: 12 }}>
           <div className="kv"><span className="k"><b style={{ color: 'var(--txt-hi)' }}>{t(`cn_type_${c.type}`)}</b> · {c.combo}</span>
-            <span className="v" style={{ color: ratioColor(c.ratio), fontWeight: 700 }}>{c.ratio.toFixed(3)}</span></div>
+            <span className="v" style={{ color: ratioColor(c.ratio), fontWeight: 700 }}>{c.ratio.toFixed(3)} {(() => { const g = connGrade(c); return <GradeChip g={g.grade} reasons={g.reasons} /> })()}</span></div>
           <div style={{ fontSize: '.78rem', color: 'var(--muted)', margin: '4px 0 6px' }}>
             {Object.values(c.dims).join(' · ')}
             {c.notes.map((n) => <span key={n} style={{ color: 'var(--amber)' }}> · {n === 'gbFoundation' ? t('cn_note_foundation') : n === 'gbJointDetail' ? t('cn_note_joint') : n === 'gbBraceDetail' ? t('cn_note_brace') : n.startsWith('doubler') ? `${t('cn_note_doubler')} ${n.slice(8)}` : n === 'stiffeners' ? t('cn_note_stiffeners') : n === 'rotTest' ? t('cn_note_rot') : n}</span>)}
@@ -271,6 +278,7 @@ export function ResultsPanel() {
           <button className="btn btn-ghost" onClick={downloadDrawings}>{t('g_design_3')}</button>
         </div>
       )}
+      {s.built && (s.design || !!s.connections?.length) && <StatusCard d={s.design} cs={s.connections} spec={s.built.spec} />}
       {s.opt && <OptTables o={s.opt} />}
       {s.design && <DesignTables d={s.design} />}
       {!!s.connections?.length && <ConnTables cs={s.connections} />}

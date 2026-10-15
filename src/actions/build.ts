@@ -5,6 +5,8 @@ import { buildGenPayloads } from '../domain/gen'
 import { buildLoadPayloads } from '../domain/loads'
 import { buildPortal } from '../domain/portal'
 import type { FactorySpec } from '../domain/types'
+import { checkScope } from '../domain/scope'
+import { scopeMsg } from '../components/ScopeBox'
 import { t } from '../i18n'
 import { mapi } from '../mapi/client'
 import { autoSave } from './save'
@@ -14,6 +16,8 @@ import { addMsg, draw3D, log, tab } from '../state/ui'
 export async function buildFactory(spec: FactorySpec): Promise<void> {
   if (S.busy) { addMsg('bot', t('busy')); return }
   if (!S.mapiKey.trim()) { addMsg('bot', t('need_key')); return }
+  const scope = checkScope(spec)
+  if (scope.blocked) { addMsg('bot', `${t('sc_blocked')}<br>${scope.issues.filter((i) => i.level === 'block').map((i) => `⛔ ${scopeMsg(i)}`).join('<br>')}`); return }
   S.busy = true
   S.buildEpoch++ // 이전 카드 버튼 잠금
   notify()

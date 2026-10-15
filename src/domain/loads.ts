@@ -51,7 +51,7 @@ export function buildLoadPayloads(spec: FactorySpec, model: FactoryModel): LoadP
   if (spec.code === 'CN') return buildCnLoads(spec, model)
   const prof = profileOf(spec.code)
   const lat = prof.lateral
-  const { span, eaveHeight, roofSlope, baySpacing } = spec
+  const { span, eaveHeight, roofSlope } = spec
   const G = portalGeometry(spec)
   const { sRoof, gWall, theta, length } = G
   const cosT = Math.cos(theta), sinT = Math.sin(theta)
@@ -84,7 +84,7 @@ export function buildLoadPayloads(spec: FactorySpec, model: FactoryModel): LoadP
   const addDead = (id: number, w: number) => { addLine(id, 'D', 'GZ', -w); deadLine.set(id, (deadLine.get(id) ?? 0) + w) }
 
   /* ── 중력: D, LR ── */
-  const qLive = prof.roofLive({ slope: roofSlope, tribArea: baySpacing * sRoof * cosT })
+  const qLive = prof.roofLive({ slope: roofSlope, tribArea: Math.min(...portalGeometry(spec).spans) * sRoof * cosT }) // 불균등 베이: 최소 베이 (면적 작을수록 하중 큼 → 보수적)
   for (const e of model.elements) {
     const [a, b] = ends(e.id)
     if (e.role === 'girt') { addDead(e.id, spec.wallDead * gWall); continue }

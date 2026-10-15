@@ -82,7 +82,6 @@ header{
   border-bottom:1px solid var(--border);backdrop-filter:blur(6px);flex-shrink:0;z-index:10;
 }
 header .mark{
-  /* SMS = Smart MIDAS Steel */
   width:36px;height:36px;display:flex;align-items:center;justify-content:center;
   background:linear-gradient(135deg,#ec1c2e 0%,#c80f25 100%);
   clip-path:polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
@@ -499,3 +498,11 @@ td.pos{color:var(--green)} td.neg{color:var(--red)}
 .theme-seg button.on{color:var(--txt-hi);background:color-mix(in srgb,var(--cyan) 14%,transparent)}
 .theme-seg .sw{width:11px;height:11px;border-radius:3px;border:1px solid var(--border);flex-shrink:0}
 @media(max-width:640px){.appfoot .by-x,.appfoot .foot-lbl{display:none}}   /* 폰: 버전(릴리즈 노트 버튼)만 남김 */
+
+/* 검토 상태 등급 칩 (components/Status.tsx) */
+.grade{display:inline-block;font-size:.72rem;font-weight:600;line-height:1.5;padding:0 7px;margin-left:6px;border:1px solid currentColor;border-radius:9px;white-space:nowrap;vertical-align:middle}
+.grade[data-g=fail]{color:var(--red)}
+.grade[data-g=expert]{color:var(--violet)}
+.grade[data-g=prelim]{color:var(--amber)}
+.grade[data-g=reinforced]{color:var(--blue)}
+.grade[data-g=pass]{color:var(--green)}

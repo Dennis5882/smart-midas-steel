@@ -10,6 +10,8 @@ import type { ConnResult } from '../domain/connections'
 import type { DesignResult } from '../domain/design'
 import type { LoadInfo } from '../domain/loads'
 import type { OptSummary } from '../domain/optimize'
+import type { TemplateKey } from '../domain/templates'
+import type { BuildMode } from '../agent/parse'
 import { DEFAULT_SPEC, type FactoryModel, type FactorySpec } from '../domain/types'
 
 export const THEMES = ['navy', 'light', 'cyber'] as const
@@ -24,7 +26,7 @@ export interface LogEntry { id: number; ts: string; type: LogType; html: string 
 export type ChatMsg = { ts?: string } & (
   | { id: number; role: 'user' | 'bot'; kind: 'html'; html: string }
   | { id: number; role: 'bot'; kind: 'thinking' }
-  | { id: number; role: 'bot'; kind: 'plan'; spec: FactorySpec; epoch: number }
+  | { id: number; role: 'bot'; kind: 'plan'; spec: FactorySpec; epoch: number; mode: BuildMode; tpl?: TemplateKey }
 )
 
 /** Gen 에 보낸 모델 — 스펙·형상·하중 요약 */

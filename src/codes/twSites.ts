@@ -388,3 +388,12 @@ export function siteCoef(county: string, town: string, soil: 1 | 2 | 3): SiteCoe
     basin: false, fault, note: extra.startsWith('里:') ? extra : '',
   }
 }
+
+/** 지진 계수 출처 — 입력 SDS·SD1·SMS·SM1 이 工址 표값과 같으면 'table', 다르면 'user'(표값 함께), 표에 없으면 'none'. 계산서·화면 표시용 */
+export type SiteSource = { kind: 'table' } | { kind: 'user'; SDS: number; SD1: number } | { kind: 'none' }
+export function siteSource(s: { county: string; town: string; soil: 1 | 2 | 3; SDS: number; SD1: number; SMS: number; SM1: number }): SiteSource {
+  const c = siteCoef(s.county, s.town, s.soil)
+  if (!c) return { kind: 'none' }
+  const same = (a: number, b: number) => Math.abs(a - b) < 5e-4
+  return same(c.SDS, s.SDS) && same(c.SD1, s.SD1) && same(c.SMS, s.SMS) && same(c.SM1, s.SM1) ? { kind: 'table' } : { kind: 'user', SDS: c.SDS, SD1: c.SD1 }
+}

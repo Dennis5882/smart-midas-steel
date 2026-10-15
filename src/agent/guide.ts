@@ -18,8 +18,11 @@ export interface GuideSection { id: GuideSecId; icon: string; acc: 'cyan' | 'blu
 export const GUIDE: GuideSection[] = [
   { id: 'model', acc: 'cyan', icon: '⊞', open: true, items: [
     { icon: '⌂', key: 'g_model_1' },
-    { icon: '↔', key: 'g_model_2' },
-    { icon: '⋯', key: 'g_model_3' },
+    { icon: '🏭', key: 'g_model_2' },
+    { icon: '↔', key: 'g_model_3' },
+    { icon: '📦', key: 'g_model_4' },
+    { div: true },
+    { icon: '🏗', key: 'g_model_5' },
     { note: 'g_model_note' },
   ] },
   { id: 'analysis', acc: 'green', icon: '∑', open: true, items: [

@@ -1,6 +1,9 @@
 /* 단면 자동 최적화 실행 — 검토 → 단면 제안 → 재전송 → 재해석 반복 (골조 부재력 재분배를 Gen 해석으로 확인).
    종료: 제안 = 현재(수렴) / 이미 거친 단면 조합(진동) / 최대 반복. 최종 = 거친 상태 중 OK 이고 가장 가벼운 것(현재가 아니면 그 단면으로 다시 전송·해석). */
 import { runConnections } from '../domain/connections'
+import { summarizeStatus } from '../domain/status'
+import { checkScope } from '../domain/scope'
+import { statusLine } from '../components/Status'
 import { runDesign, type DesignResult } from '../domain/design'
 import { proposeSections, roleTons, steelWeight, type OptControl, type OptIter, type OptRow, type Sections } from '../domain/optimize'
 import { sectionProps } from '../domain/sections'
@@ -88,7 +91,7 @@ export async function runOptimize(): Promise<void> {
     }
     S.ratioView = true
     const pct = wB > 0 ? ((wB - wA) / wB) * 100 : 0
-    addMsg('bot', t('opt_done', wB.toFixed(2), wA.toFixed(2), pct.toFixed(1), S.design.maxRatio.toFixed(2), S.design.ng, iters.length))
+    addMsg('bot', t('opt_done', wB.toFixed(2), wA.toFixed(2), pct.toFixed(1), S.design.maxRatio.toFixed(2), statusLine(summarizeStatus(S.design, S.connections, checkScope(S.built!.spec))), iters.length))
     draw3D()
     tab('resP')
   } catch (e) {

@@ -1,4 +1,6 @@
 /* UI 헬퍼 — 로그·채팅 메시지·탭·3D 미리보기 (story state/ui.ts 와 같은 역할) */
+import type { BuildMode } from '../agent/parse'
+import type { TemplateKey } from '../domain/templates'
 import type { FactorySpec } from '../domain/types'
 import { S, nextId, notify, type LogType, type PanelId } from './store'
 
@@ -20,9 +22,9 @@ export function addMsg(role: 'user' | 'bot', html: string): void {
   notify()
 }
 
-/** 공장 스펙 편집 카드 */
-export function addPlanMsg(spec: FactorySpec): void {
-  S.msgs.push({ id: nextId(), ts: hm(), role: 'bot', kind: 'plan', spec, epoch: S.buildEpoch })
+/** 공장 스펙 카드 — template: 요약 카드(수정 → 편집) / free: 자유골조 편집 카드 */
+export function addPlanMsg(spec: FactorySpec, mode: BuildMode = 'free', tpl?: TemplateKey): void {
+  S.msgs.push({ id: nextId(), ts: hm(), role: 'bot', kind: 'plan', spec, epoch: S.buildEpoch, mode, tpl })
   notify()
 }
 

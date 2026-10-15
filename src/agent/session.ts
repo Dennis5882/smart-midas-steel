@@ -4,7 +4,9 @@ import { runDesignCheck } from '../actions/design'
 import { runOptimize } from '../actions/optimize'
 import { downloadDrawings, openReport } from '../actions/outputs'
 import type { CodeId } from '../codes'
-import { defaultSpecFor, type FactorySpec } from '../domain/types'
+import { portalGeometry } from '../domain/portal'
+import { TEMPLATES } from '../domain/templates'
+import { defaultSpecFor, normalizeBays, type FactorySpec } from '../domain/types'
 import { getLang, langUrl, t } from '../i18n'
 import { verifyConn } from '../mapi/client'
 import { S, notify, type Theme } from '../state/store'
@@ -28,8 +30,11 @@ export async function send(raw: string): Promise<void> {
       break
     }
     case 'new': {
-      const spec: FactorySpec = { ...defaultSpecFor(S.code), ...(S.lastSpec.code === S.code ? S.lastSpec : {}), ...c.params, code: S.code }
-      addPlanMsg(spec)
+      /* 지역·하중·단면 = 기준 기본값 + 직전 입력. 기본 모델링은 형상을 템플릿으로 덮고 베이 목록을 지운다 */
+      const base: FactorySpec = { ...defaultSpecFor(S.code), ...(S.lastSpec.code === S.code ? S.lastSpec : {}) }
+      const geo = c.mode === 'template' ? { ...TEMPLATES[c.tpl ?? 'general'], bayList: undefined } : {}
+      const spec = normalizeBays({ ...base, ...geo, ...c.params, code: S.code })
+      addPlanMsg(spec, c.mode, c.tpl)
       tab('viewP')
       previewSpec(spec)
       break
@@ -50,7 +55,7 @@ export async function send(raw: string): Promise<void> {
     case 'status': {
       const b = S.built
       addMsg('bot', b
-        ? t('status_html', b.spec.span, b.spec.bays * b.spec.baySpacing, b.spec.eaveHeight, b.model.nodes.length, b.model.elements.length, S.analyzed)
+        ? t('status_html', b.spec.span, portalGeometry(b.spec).length, b.spec.eaveHeight, b.model.nodes.length, b.model.elements.length, S.analyzed)
         : t('status_none'))
       break
     }

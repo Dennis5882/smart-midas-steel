@@ -1,8 +1,9 @@
-import type { Element, ElementRole, Face, FactoryModel, FactorySpec, Node } from './types'
+import { baySpans, type Element, type ElementRole, type Face, type FactoryModel, type FactorySpec, type Node } from './types'
 
 /** 형상 상수 — 하중·설계가 같은 값을 쓰도록 한 곳에서 계산 */
 export function portalGeometry(spec: FactorySpec) {
-  const { span, bays, baySpacing, eaveHeight, roofSlope, purlinSpacing, girtSpacing } = spec
+  const { span, eaveHeight, roofSlope, purlinSpacing, girtSpacing } = spec
+  const spans = baySpans(spec)
   const rise = (span / 2) * roofSlope
   const slopeLen = Math.hypot(span / 2, rise)
   const nPurlin = Math.max(1, Math.round(slopeLen / purlinSpacing))
@@ -21,7 +22,7 @@ export function portalGeometry(spec: FactorySpec) {
   }))].filter((x) => x > 0 && x < span).sort((a, b) => a - b)
   return {
     rise, slopeLen, nPurlin, nGirt, xs, zAt, girtZs, postXs,
-    sRoof: slopeLen / nPurlin, gWall: eaveHeight / nGirt, length: bays * baySpacing,
+    sRoof: slopeLen / nPurlin, gWall: eaveHeight / nGirt, length: spans.reduce((a, b) => a + b, 0), spans,
     theta: Math.atan(roofSlope), ridgeZ: eaveHeight + rise,
   }
 }
@@ -29,8 +30,10 @@ export function portalGeometry(spec: FactorySpec) {
 /** 단경간 포털 프레임 + 2차부재 + 박공벽 풍주·거트 + 양 끝 베이 X-가새 형상 생성 (순수 함수).
     전역: X = 스팬, Y = 길이, Z = 높이. */
 export function buildPortal(spec: FactorySpec): FactoryModel {
-  const { span, bays, baySpacing, eaveHeight, sections: sec } = spec
+  const { span, eaveHeight, sections: sec } = spec
   const G = portalGeometry(spec)
+  const bays = G.spans.length
+  const ys = G.spans.reduce<number[]>((a, s) => [...a, a[a.length - 1] + s], [0])
   const nodes: Node[] = []
   const elements: Element[] = []
   const byKey = new Map<string, number>()
@@ -43,7 +46,7 @@ export function buildPortal(spec: FactorySpec): FactoryModel {
   const elem = (a: number, b: number, role: ElementRole, section: string, face?: Face) => {
     elements.push({ id: elements.length + 1, n1: a, n2: b, role, section, ...(face ? { face } : {}) })
   }
-  const yOf = (b: number) => b * baySpacing
+  const yOf = (b: number) => ys[b]
   const gableFace = (b: number): Face | null => (b === 0 ? 'y0' : b === bays ? 'yL' : null)
 
   for (let b = 0; b <= bays; b++) {

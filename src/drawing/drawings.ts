@@ -26,7 +26,7 @@ export function buildDxf({ spec, model, connections, title }: DrawingInput): str
   const nodes = new Map(model.nodes.map((n) => [n.id, n]))
   const ends = (e: { n1: number; n2: number }): [Node, Node] => [nodes.get(e.n1)!, nodes.get(e.n2)!]
   const near = (a: number, b: number) => Math.abs(a - b) < 1e-6
-  const frameYs = Array.from({ length: spec.bays + 1 }, (_, b) => b * spec.baySpacing)
+  const frameYs = G.spans.reduce<number[]>((a, s) => [...a, a[a.length - 1] + s], [0])
   const M = 4000 // 시트 여백
   let ox = 0 // 현재 시트 원점 x
 
@@ -61,7 +61,7 @@ export function buildDxf({ spec, model, connections, title }: DrawingInput): str
     }
     /* 풍주 위치 (박공 프레임) */
     for (const e of model.elements) if (e.role === 'post' && nodes.get(e.n1)!.z === 0) { const n = nodes.get(e.n1)!; const [x, y] = P(n.y, n.x); d.circle('POST', x, y, 200) }
-    d.dim('DIM', ox, 0, ox + W, 0, 2500, TXT, `${spec.bays} @ ${mm(spec.baySpacing)} = ${mm(G.length)}`)
+    d.dim('DIM', ox, 0, ox + W, 0, 2500, TXT, spec.bayList?.length ? `${G.spans.map(mm).join(' + ')} = ${mm(G.length)}` : `${spec.bays} @ ${mm(spec.baySpacing)} = ${mm(G.length)}`)
     d.dim('DIM', ox + W, 0, ox + W, H, -2500, TXT, String(mm(spec.span)))
     d.text('TEXT', ox, -3200, TXT, `Purlin ${spec.sections.purlin} @ ${Math.round(mm(G.sRoof))}  Strut ${spec.sections.strut}  Roof brace ${spec.sections.brace}`)
     ox += W + 2 * M + 3000

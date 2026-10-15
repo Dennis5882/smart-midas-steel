@@ -104,7 +104,7 @@ export function capacity(sp: SectionProps, FyMPa: number, EMPa: number, L: Membe
 
   if (sp.kind === 'CC') {
     /* 냉간성형 립 C형강 — 탄성 단면, LTB 는 7.2 식(무립 Cw 근사). 冷軋型鋼 규범의 유효폭은 미고려 → 참고 값 */
-    notes.push('冷軋型鋼: 7.2 근사(유효폭 미고려)')
+    notes.push('冷軋型鋼: 7.2 approx. (no effective width)')
     const Mr = Fy * Sx
     const Lb = L.Lb / 10
     const Mcr = Cb * (Math.PI / Lb) * Math.sqrt(E * Iy * G * J + (Math.PI * E / Lb) ** 2 * Iy * Cw)
@@ -124,7 +124,7 @@ export function capacity(sp: SectionProps, FyMPa: number, EMPa: number, L: Membe
   const wR = 260 / sq
   /* 순압축 세장 판정 — 플랜지 25/√Fy(압연)·20/√(Fy−Fr)(용접), 웨브 68/√Fy */
   const cfR = sp.rolled ? 25 / sq : 20 / Math.sqrt(Fy - Fr)
-  if (PuComp_kN > 0 && (bt > cfR || htw > 68 / sq)) notes.push('壓力 細長肢材 (附錄1, Q 미적용)')
+  if (PuComp_kN > 0 && (bt > cfR || htw > 68 / sq)) notes.push('壓力 細長肢材 (附錄1, Q not applied)')
 
   const Mp = Fy * Zx, Mr = FL * Sx
   /* 횡비틀림 (7.2.2·7.2.3) */

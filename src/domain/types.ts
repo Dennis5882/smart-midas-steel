@@ -1,4 +1,5 @@
 import type { CodeId } from '../codes'
+import type { ScopeFeatures } from './scope'
 
 /* 공장형 단경간 포털 프레임 입력 스펙. 단위: m, kN */
 export interface FactorySpec {
@@ -8,8 +9,10 @@ export interface FactorySpec {
   span: number
   /** 길이 방향 베이 수 */
   bays: number
-  /** 베이 간격 (m) */
+  /** 베이 간격 (m) — bayList 가 있으면 그중 최댓값(퍼린·거트 경간 등 설계값, 보수적) */
   baySpacing: number
+  /** 자유골조: 베이별 간격 (m, y=0 박공부터). 있으면 bays = 길이, baySpacing = 최댓값 (normalizeBays) */
+  bayList?: number[]
   /** 처마 높이 (m) */
   eaveHeight: number
   /** 지붕 경사 (rise/run, 예 0.1 = 1:10) */
@@ -39,10 +42,32 @@ export interface FactorySpec {
   anchorFu: number
   sections: { column: string; rafter: string; purlin: string; girt: string; strut: string; post: string; brace: string }
   material: string
+  /** 적용범위 질문 답 (크레인·메자닌·다경간·큰 개구부) — domain/scope.ts */
+  features?: ScopeFeatures
   /** China: secondary members may use a different certified steel grade. */
   secondaryMaterial?: string
   /** GB inputs, used only when code === CN. Pressures kN/m², periods s. */
   china?: { w0: number; terrain: 'A' | 'B' | 'C' | 'D'; betaZ: number; topography: number; alphaMax: number; Tg: number; Tx: number; Ty: number; damping: number; snow: number; snowMu: number; gamma0: number; concreteBearing: number; anchorFt: number }
+}
+
+/** 베이별 간격 (m) — 등간격이면 baySpacing × bays */
+export function baySpans(spec: Pick<FactorySpec, 'bays' | 'baySpacing' | 'bayList'>): number[] {
+  return spec.bayList?.length ? spec.bayList : Array.from({ length: spec.bays }, () => spec.baySpacing)
+}
+
+/** bayList → bays·baySpacing 동기화. 모든 균등 간격이면 bayList 제거 */
+export function normalizeBays(spec: FactorySpec): FactorySpec {
+  const list = spec.bayList?.filter((v) => Number.isFinite(v) && v > 0)
+  if (!list?.length) { const { bayList: _, ...rest } = spec; return rest }
+  if (list.every((v) => v === list[0])) { const { bayList: _, ...rest } = spec; return { ...rest, bays: list.length, baySpacing: list[0] } }
+  return { ...spec, bayList: list, bays: list.length, baySpacing: Math.max(...list) }
+}
+
+/** 길이 표기 — '6 × 6 = 36 m' / '6 + 7.5 + 6 = 19.5 m' */
+export function lengthText(spec: FactorySpec): string {
+  const s = baySpans(spec), L = s.reduce((a, b) => a + b, 0)
+  const r = (v: number) => +v.toFixed(2)
+  return spec.bayList?.length ? `${s.map(r).join(' + ')} = ${r(L)} m` : `${spec.bays} × ${r(spec.baySpacing)} = ${r(L)} m`
 }
 
 export interface Node { id: number; x: number; y: number; z: number }

@@ -10,7 +10,7 @@ export function Header({ onOpenMapi }: { onOpenMapi(): void }) {
 
   return (
     <header>
-      <div className="mark">STL</div>
+      <div className="mark">GEN</div>
       <h1>
         {t('app_name')}
         <small>{t('subtitle')}</small>

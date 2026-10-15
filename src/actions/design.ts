@@ -1,6 +1,9 @@
 /* 설계 검토 실행 (M3) — 결과 회수(M2) → 대만 LRFD 부재·사용성 검토 */
 import { runConnections } from '../domain/connections'
 import { runDesign } from '../domain/design'
+import { summarizeStatus } from '../domain/status'
+import { checkScope } from '../domain/scope'
+import { statusLine } from '../components/Status'
 import { t, tc } from '../i18n'
 import { S, notify } from '../state/store'
 import { addMsg, log, tab } from '../state/ui'
@@ -22,7 +25,7 @@ export async function runDesignCheck(): Promise<void> {
     const d = S.design
     log(t('log_design', d.members.length, d.ng), d.ng ? 'warn' : 'ok')
     S.ratioView = true
-    addMsg('bot', t('design_done', d.members.length, d.maxRatio.toFixed(2), d.ng))
+    addMsg('bot', t('design_done', d.members.length, d.maxRatio.toFixed(2), statusLine(summarizeStatus(d, S.connections, checkScope(S.built!.spec)))))
     tab('resP')
   } catch (e) {
     addMsg('bot', t('design_fail', e instanceof Error ? e.message : String(e)))

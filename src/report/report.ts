@@ -6,8 +6,12 @@ import type { DesignResult } from '../domain/design'
 import type { OptSummary } from '../domain/optimize'
 import { portalGeometry } from '../domain/portal'
 import { memberSchedule } from '../domain/schedule'
+import { connGrade, GRADES, roleGrade, summarizeStatus, type Graded } from '../domain/status'
+import { siteSourceText } from '../components/Status'
+import { scopeMsg } from '../components/ScopeBox'
+import { checkScope } from '../domain/scope'
 import { sectionProps } from '../domain/sections'
-import { ROLES } from '../domain/types'
+import { lengthText, ROLES } from '../domain/types'
 import { getLang, htmlLang, t, tc, type I18nKey } from '../i18n'
 import type { Built, ReactionSum } from '../state/store'
 import { APP_VERSION } from '../version'
@@ -17,6 +21,11 @@ const f = (x: number, d = 2) => (Number.isFinite(x) ? x.toFixed(d) : '—')
 const row = (cells: unknown[], th = false) => `<tr>${cells.map((c) => (th ? `<th>${esc(c)}</th>` : `<td>${c}</td>`)).join('')}</tr>`
 const table = (head: unknown[], rows: unknown[][]) => `<table>${row(head, true)}${rows.map((r) => row(r)).join('')}</table>`
 const ok = (r: number) => `<b class="${r > 1 ? 'ng' : 'ok'}">${f(r, 3)}</b>`
+/** 등급 칩 — 사유는 괄호로 */
+const grade = (g: Graded) => {
+  const why = g.reasons.filter((r) => r !== 'ng').map((r) => t(`rs_${r}`)).join(', ')
+  return `<span class="gr gr-${g.grade}">${esc(t(`gr_${g.grade}`))}</span>${why ? ` <span class="note">(${esc(why)})</span>` : ''}`
+}
 
 export interface ReportInput {
   built: Built
@@ -37,11 +46,23 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   const parts: string[] = []
   const h2 = (k: I18nKey) => parts.push(`<h2>${esc(tc(spec.code, k))}</h2>`)
 
+  /* 검토 상태 요약 — 통과 근거 구분 + 계산 주체 (Gen NX 해석 / 앱 계산) */
+  const scope = checkScope(spec)
+  const sum = summarizeStatus(design, connections, scope)
+  const cnt = (c: Record<string, number>) => GRADES.filter((g) => c[g] > 0).map((g) => `${esc(t(`gr_${g}`))} ${c[g]}`).join(' · ') || '—'
+  const used = GRADES.filter((g) => sum.members[g] + sum.conns[g] > 0 || (g === 'fail' && sum.service.ng) || (g === 'expert' && sum.scopeWarn))
+  parts.push(`<div class="status"><b>${L('res_status')}</b> ${grade({ grade: sum.overall, reasons: [] })}
+    ${design ? `<br>${L('st_members')} (${design.members.length}): ${cnt(sum.members)} · ${L('st_service')}: ${sum.service.ng ? `NG ${sum.service.ng}` : 'OK'}` : ''}
+    ${connections?.length ? `<br>${L('st_conns')} (${connections.length}): ${cnt(sum.conns)}` : ''}
+    ${scope.issues.map((i) => `<br><span class="gr gr-expert">${L('sec_scope')}</span> ${esc(scopeMsg(i))}`).join('')}
+    <ul>${used.map((g) => `<li>${grade({ grade: g, reasons: [] })} ${L(`gr_${g}_d`)}</li>`).join('')}</ul>
+    <div class="note">${L('src_anal')}<br>${esc(t('src_design', t(prof.labelKey)))} ${esc(tc(spec.code, 'src_design_why'))}</div></div>`)
+
   /* 1. 설계 개요 */
   h2('rep_s1')
   parts.push(table([t('sv_item'), t('sv_value')], [
     [L('kv_code'), `${esc(t(prof.labelKey))} — ${esc(t(spec.code === 'CN' ? 'rep_code_refs_CN' : 'rep_code_refs'))}`],
-    [L('kv_span'), `${spec.span} m`], [L('kv_length'), `${spec.bays} × ${spec.baySpacing} = ${f(G.length, 1)} m`],
+    [L('kv_span'), `${spec.span} m`], [L('kv_length'), lengthText(spec)],
     [L('kv_eave'), `${spec.eaveHeight} m`], [L('kv_slope'), `${spec.roofSlope} (${f((G.theta * 180) / Math.PI, 1)}°)`],
     [L('kv_base'), L(spec.baseFixity === 'fixed' ? 'base_fixed' : 'base_pinned')],
     [L('f_purlinSp'), `${f(G.sRoof, 3)} m`], [L('f_girtSp'), `${f(G.gWall, 3)} m`], [L('f_postSp'), `${spec.postSpacing} m`], [L('f_sagRods'), spec.sagRods],
@@ -66,6 +87,7 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   const si = spec.seismic
   if (spec.code === 'TW') parts.push(table(['', 'X', 'Y'], [
     ['site', `${esc(si.county ?? '')} ${esc(si.town ?? '')} · soil ${si.soil ?? '-'}`, ''],
+    [L('kv_site_src'), esc(siteSourceText(spec)), ''],
     ['SDS / SD1 / SMS / SM1 / I', `${si.SDS} / ${si.SD1} / ${si.SMS ?? '-'} / ${si.SM1 ?? '-'} / ${si.I}`, ''],
     ['R', si.Rx, si.Ry],
     ['T (s)', f(info.seismic.X.T, 3), f(info.seismic.Y.T, 3)],
@@ -81,6 +103,7 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   ]))
   if (spec.code === 'CN') parts.push(table(['GB/T 50011', 'X', 'Y'], [
     ['αmax / Tg / ζ', `${spec.china!.alphaMax} / ${spec.china!.Tg} / ${spec.china!.damping}`, ''],
+    [L('kv_site_src'), esc(siteSourceText(spec)), ''],
     ['T (s)', f(info.seismic.X.T, 3), f(info.seismic.Y.T, 3)],
     ['α(T)', f(info.seismic.X.c, 4), f(info.seismic.Y.c, 4)],
     ['G = D+0.5S (kN)', f(info.seismic.W, 1), ''],
@@ -109,12 +132,12 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   h2('rep_s6')
   if (design) {
     parts.push(`<p class="note">${esc(t(spec.code === 'CN' ? 'rd_assump_CN' : 'rd_assump'))}</p>`)
-    parts.push(table([t('rd_role'), t('rd_section'), t('rd_elem'), t('rd_combo'), 'Pu', 'Mux', 'Muy', 'Vu', 'φPn', 'φMnx', 'φMny', 'φVn', 'Cb', 'B', 'KL/r', t('rd_eq'), t('rd_ratio')],
+    parts.push(table([t('rd_role'), t('rd_section'), t('rd_elem'), t('rd_combo'), 'Pu', 'Mux', 'Muy', 'Vu', 'φPn', 'φMnx', 'φMny', 'φVn', 'Cb', 'B', 'KL/r', t('rd_eq'), t('rd_ratio'), t('rd_status')],
       ROLES.filter((r) => design.byRole[r]).map((r) => {
         const m = design.byRole[r]!
         const phiPn = m.forces.P >= 0 ? m.cap.phiPnt : m.cap.phiPnc
         return [L(`role_${r}`), esc(m.section), m.id, esc(m.combo), f(m.forces.P, 1), f(m.forces.Mx, 1), f(m.forces.My, 1), f(m.forces.V, 1),
-          f(phiPn, 0), f(m.cap.phiMnx, 1), f(m.cap.phiMny, 1), f(m.cap.phiVn, 0), f(m.Cb, 2), f(m.B, 3), f(m.slender.value, 0), m.eq, ok(m.ratio)]
+          f(phiPn, 0), f(m.cap.phiMnx, 1), f(m.cap.phiMny, 1), f(m.cap.phiVn, 0), f(m.Cb, 2), f(m.B, 3), f(m.slender.value, 0), m.eq, ok(m.ratio), grade(roleGrade(design, r))]
       })))
     parts.push(`<p class="note">${esc(t('rep_units_kn'))}</p>`)
     const top = [...design.members].sort((a, b) => b.ratio - a.ratio).slice(0, 40)
@@ -148,7 +171,7 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   /* 8. 접합부 */
   h2('rep_s8')
   for (const c of connections ?? []) {
-    parts.push(`<h3>${L(`cn_type_${c.type}`)} — ${ok(c.ratio)} <span class="note">(${esc(c.combo)}, elem ${c.elem})</span></h3>`)
+    parts.push(`<h3>${L(`cn_type_${c.type}`)} — ${ok(c.ratio)} ${grade(connGrade(c))} <span class="note">(${esc(c.combo)}, elem ${c.elem})</span></h3>`)
     parts.push(`<p>${Object.entries(c.dims).map(([k, v]) => `${esc(k)}: ${esc(v)}`).join(' · ')}</p>`)
     if (c.notes.includes('rotTest')) parts.push(`<p class="note">${L('cn_note_rot')}</p>`)
     for (const [note, key] of [['gbFoundation', 'cn_note_foundation'], ['gbJointDetail', 'cn_note_joint'], ['gbBraceDetail', 'cn_note_brace']] as const) if (c.notes.includes(note)) parts.push(`<p class="note">${L(key)}</p>`)
@@ -186,6 +209,9 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   h1{font-size:20px;margin:0 0 4px} h2{font-size:15px;margin:22px 0 8px;padding-bottom:4px;border-bottom:2px solid #1f3a8a;color:#1f3a8a}
   h3{font-size:13px;margin:14px 0 6px} table{border-collapse:collapse;width:100%;margin:6px 0 10px;font-size:11px}
   th,td{border:1px solid #c8ccd4;padding:3px 6px;text-align:left} th{background:#eef1f7}
+  .status{border:1px solid #c8ccd4;border-radius:4px;padding:8px 12px;margin:10px 0;background:#f7f8fb}
+  .gr{display:inline-block;padding:0 6px;border:1px solid currentColor;border-radius:8px;font-size:10.5px;font-weight:600}
+  .gr-fail{color:#c43030}.gr-expert{color:#5a45c6}.gr-prelim{color:#b56d00}.gr-reinforced{color:#2f55c9}.gr-pass{color:#1d8653}
   .ok{color:#1d8653}.ng{color:#c43030}.note{color:#555;font-size:11px} .meta{color:#555} ul{margin:4px 0 0 18px}
   @media print{body{margin:0} h2{break-after:avoid} table{break-inside:auto} tr{break-inside:avoid}}
 </style></head><body>

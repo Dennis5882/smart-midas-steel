@@ -55,6 +55,22 @@ Vite 8 + TypeScript + React 19 + Tailwind v4 + shadcn/ui(new-york) + **Vercel Fu
 - **Gen 설계 API**: `post/STEELCODECHECK`·`DESIGN/STEEL/<code>/CODE-ANAL` 은 KDS 만 — TWN 404 → 설계 검토는 자체 구현.
 - **M5 계산서**: 10장 HTML(화면 언어), 새 창 → 인쇄 PDF. **M6 DXF**: R12 5시트, ezdxf 검증 오류 0. 문자 ASCII 만.
 
+## 모델링 방식 — 기본 모델링 / 자유골조 (2026-10-15, story 와 같은 구분)
+- **기본 모델링**(`mode 'template'`): GUIDE 소형 창고 18m·일반 공장 24m·장스팬 30m·물류창고 36m (`src/domain/templates.ts`, 형상만 — 지역·하중·단면은 기준 기본값 + 직전 입력). 요약 카드(`Summary`) → [실행]/[수정](편집 카드로 전환)/[취소]. 단면은 기본값이라 큰 스팬은 설계 검토 → 단면 최적화.
+- **자유골조**(`mode 'free'`): 처음부터 편집 카드, 베이 수·간격 대신 **베이별 간격 목록** `spec.bayList`. 명령 `자유골조 공장 생성` 또는 `공장 생성 베이 6,6,7.5,7.5,6`(목록이 있으면 자유골조).
+- 불균등 베이: `normalizeBays`가 `bays = 길이`, `baySpacing = 최댓값`(퍼린·거트 경간 등 설계값 — 보수적), 모두 같으면 `bayList` 제거. 형상 `portalGeometry().spans`·누적 y, 지붕 활하중 면적은 최소 베이(면적 작을수록 하중 큼). 길이 표기 `lengthText`(결과 탭·계산서·DXF 치수). 오프라인: 6+6+7.5+7.5+6+6 LR 적용 합 917.9 = q×24×39, TW 기본 15/55·CN 13/51 유지. **Gen 라이브 미검증.**
+
+## 검토 상태 등급·계산 주체 표시 (2026-10-15, 평가 보고서 A단계)
+- `src/domain/status.ts`(순수): 등급 `fail`(NG) > `expert`(전문가 검토 필요: TW 처마 rotTest, CN gb* 상세) > `prelim`(예비검토: 냉간성형 `CC` 단면 — TW AISI 유효폭 원문 미대조, CN 근사) > `reinforced`(보강 후 통과: 스티프너·더블러) > `pass`. 사유는 모두 보존, 등급 = 가장 나쁜 사유. **'모두 OK' 문구 금지** — 채팅(`design_done`·`opt_done`)·결과 탭 `StatusCard`·계산서 상단 상태 상자 모두 등급 요약.
+- 계산 주체: "해석 = Gen NX 선형 정적 / 설계 검토 = 앱 자체 계산 (Gen 설계 API: TW 미지원·CN 구판)" 을 결과 탭·계산서에 표기.
+- 지진 계수 출처 `siteSource`(twSites): 입력값 = 표2-1·2-4 값이면 '자동값', 다르면 '사용자 입력 — 표값 …', 표에 없으면 '표에 없음'. CN 은 '프로젝트 입력'. 편집 카드·모델 탭·계산서 3장에 표시. 등급 문구는 `gr_*`/`gr_*_d`/`rs_*` 키.
+- TW 샘플은 처마 접합 rotTest 때문에 전체 등급이 항상 `전문가 검토 필요` — 의도된 동작(회전 능력은 시험 근거 필요, 13.6.1).
+
+## 적용범위 게이트 (2026-10-15, 평가 보고서 B단계)
+- `src/domain/scope.ts`(순수) `checkScope(spec)`: **block**(실행 막음 — 크레인·메자닌·다경간 체크, 스팬 0~60·처마 ≤18·경사 0~1 밖, CN 큰 개구부, CN `validateCnSpec` 실패 메시지) / **warn**(실행 가능 — TW 큰 개구부(부분 밀폐 권고), 베이 간격 비 > 1.5, 베이 > 9 m, TW 길이 > 90 m, TW 평균 높이 > 12 m(표1-3 R 조건)).
+- 건물 특성 답은 `spec.features`(크레인·메자닌·다경간·큰 개구부). 스펙 카드 맨 위 `ScopeBox`(체크 + 판정), block 이면 [실행] 비활성 + `buildFactory` 도 거부. warn 은 결과 상태를 최소 `전문가 검토 필요`로 올리고 결과 탭·계산서 상태 상자에 남김.
+- 템플릿 4종은 TW·CN 모두 범위 안(물류창고 처마 11 m — 평균 높이 11.9 m).
+
 ## 단면 자동 최적화 (2026-10-15, 라이브 검증)
 명령 `단면 최적화` (설계 검토 다음). 반복: 결과 회수 → 검토 → `proposeSections` → `sendModel`(재전송) → `analyzeCore`(재해석), 최대 5회.
 - 후보 `src/domain/catalog.ts` = 설치본 `Dbase/CNS2020.sdb` 에서 추출한 이름 그대로(RH 150·CC 45·P 60~318.5 40개). 단면적 오름차순, 목표 강도비 0.95, H 세장 단면 제외.
