@@ -15,6 +15,7 @@ import { addMsg, addPlanMsg, escapeHtml, previewSpec, tab, selectTask } from '..
 import { unavailable } from '../state/taskFlow'
 import type { TaskId } from '../state/store'
 import { parseCommand, type Intent } from './parse'
+import { confirmAction } from '../components/ConfirmDialog'
 
 const BUSY_BLOCKED = new Set<string>(['new', 'analyze', 'design', 'optimize', 'report', 'drawings', 'pdf', 'quantities', 'reactions', 'conn'])
 
@@ -126,12 +127,22 @@ export function setTheme(th: Theme): void {
   notify()
 }
 
-/** 설계기준 — 이후 새로 만드는 스펙에 적용 */
-export function setCode(id: CodeId): void {
-  if (S.code !== id) S.buildEpoch++
+/** Project code changes retain geometry but reset code-dependent inputs. Existing Gen results stay tied to their model. */
+export async function setCode(id: CodeId): Promise<void> {
+  if (id === S.code || S.busy || S.confirm) return
+  const previous = S.draftSpec ?? S.activePlan?.spec ?? S.built?.spec
+  if (previous && !await confirmAction({ title: t('project_code_change'), body: t('project_code_confirm'), ok: t('project_code_apply') })) return
+  if (S.busy || S.confirm) return
+  const plan = S.activePlan
+  S.buildEpoch++
   S.code = id
-  if (S.lastSpec.code !== id) S.lastSpec = defaultSpecFor(id)
-  try { localStorage.setItem('sms_code', id) } catch { /* 무시 */ }
+  const defaults = defaultSpecFor(id)
+  S.lastSpec = previous ? { ...defaults, span: previous.span, bays: previous.bays, baySpacing: previous.baySpacing, bayList: previous.bayList?.slice(), eaveHeight: previous.eaveHeight, roofSlope: previous.roofSlope, baseFixity: previous.baseFixity, purlinSpacing: previous.purlinSpacing, girtSpacing: previous.girtSpacing, postSpacing: previous.postSpacing, sagRods: previous.sagRods, features: previous.features && { ...previous.features } } : defaults
+  if (previous) {
+    addPlanMsg(S.lastSpec, plan?.mode ?? (previous.bayList ? 'free' : 'template'), plan?.tpl ?? 'general')
+    previewSpec(S.lastSpec)
+    tab('viewP')
+  }
   notify()
 }
 

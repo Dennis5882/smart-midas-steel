@@ -1,5 +1,3 @@
-import { setCode } from '../agent/session'
-import { CODE_IDS, PROFILES, type CodeId } from '../codes'
 import { LANG_DEFS, normalizeLang, setLang, t, useLang } from '../i18n'
 import { useStore } from '../state/store'
 
@@ -21,17 +19,10 @@ export function Header({ onOpenMapi }: { onOpenMapi(): void }) {
           {LANG_DEFS.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
         </select>
       </div>
-      {/* 설계기준 — UI 언어와 독립. 이후 새로 만드는 모델에 적용 */}
-      <div className="langsel" title={t('code_label')}>
-        <select value={s.code} onChange={(e) => setCode(e.target.value as CodeId)} aria-label={t('code_label')}>
-          {CODE_IDS.map((id) => <option key={id} value={id}>{t(PROFILES[id].labelKey)}</option>)}
-        </select>
-      </div>
-      <button type="button" className={`pill${s.connected ? ' on' : ''}${s.connErr ? ' err' : ''}`} onClick={onOpenMapi} aria-haspopup="dialog">
+      <button type="button" className={`pill${s.connected ? ' on' : ''}${s.connErr ? ' err' : ''}`} onClick={onOpenMapi} title={t('flow_connection')} aria-label={`${connTxt} · ${t('flow_connection')}`} aria-haspopup="dialog">
         <span className="dot" />
         <span>{connTxt}</span>
       </button>
-      <button type="button" className="gear" onClick={onOpenMapi} aria-label={t('settings')} aria-haspopup="dialog">⚙</button>
     </header>
   )
 }

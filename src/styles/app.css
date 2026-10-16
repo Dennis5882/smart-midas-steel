@@ -425,6 +425,10 @@ main.splitting .right,main.splitting .chat{pointer-events:none}
 }
 .guide.collapsed{width:0;border-right:none}
 .guide.task-nav.collapsed{width:0;min-width:0}
+.project-code{margin:22px 0}.project-code>p{font-size:.76rem;line-height:1.7;color:var(--muted);margin:8px 0 12px}
+.project-code select{width:100%;min-height:44px;padding:11px 36px 11px 14px;border:1px solid var(--border);border-radius:8px;background:var(--panel2);color:var(--txt-hi);font:inherit;font-size:.84rem;cursor:pointer}
+.project-code select:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}.project-code select:disabled{opacity:.5;cursor:default}
+.project-code-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:.73rem;color:var(--muted)}.project-code-summary strong{color:var(--txt-hi)}
 @media(max-width:960px){.guide:not(.task-nav){display:none}.task-nav.collapsed{min-width:0}}
 .guide-hd{
   display:flex;align-items:center;padding:11px 12px;
@@ -678,7 +682,7 @@ td.pos{color:var(--green)} td.neg{color:var(--red)}
 /* CJK 자형: <html lang> 별로 우선 폰트 전환 — 간체는 SC, 번체는 TC, 그 외(ko/en)는 KR 우선 */
 :root{--cjk:'Noto Sans KR','Noto Sans TC','Noto Sans SC'}
 :root:lang(zh-Hant){--cjk:'Noto Sans TC','Noto Sans KR','Noto Sans SC'}
-:root:lang(zh-Hans){--cjk:'Noto Sans SC','Noto Sans KR','Noto Sans TC'}
+:root:lang(zh-Hans){--cjk:'Microsoft YaHei','微软雅黑','Noto Sans SC','Noto Sans KR','Noto Sans TC'}
 
 /* 하단 상태 바 — 개발자·버전(왼쪽) · 테마 버튼(오른쪽) */
 .appfoot{display:flex;align-items:center;gap:10px;padding:5px 14px calc(5px + env(safe-area-inset-bottom));flex-shrink:0;

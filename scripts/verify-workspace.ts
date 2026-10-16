@@ -67,4 +67,35 @@ const freshId = S.activePlan!.id
   openCurrentModel()
   assert.equal(S.activePlan!.id, freshId, 'resuming a fresh draft must not replace it with the earlier optimized model')
 }
-console.log('Workspace passed: 4 languages × TW/CN × 5 modeling actions; resume, busy/confirmation guards, notices')
+const { setCode } = await import('../src/agent/session')
+const { setConfirmHandler } = await import('../src/components/ConfirmDialog')
+const { unavailable } = await import('../src/state/taskFlow')
+S.busy = false; S.confirm = null; S.code = 'TW'; S.opt = null
+const source = { ...defaultSpecFor('TW'), span: 28, bays: 3, bayList: [6, 7, 8], baySpacing: 8, material: 'SN490B', roofDead: 0.55 }
+S.draftSpec = source; S.built = { spec: source } as NonNullable<typeof S.built>
+S.analyzed = true; S.design = {} as NonNullable<typeof S.design>; S.connections = {} as NonNullable<typeof S.connections>
+const builtBefore = S.built
+const editorBefore = S.activePlan
+setConfirmHandler(() => false)
+await setCode('CN')
+assert.equal(S.code, 'TW', 'cancel preserves the project code')
+assert.equal(S.activePlan, editorBefore, 'cancel preserves raw editor identity')
+setConfirmHandler(() => true)
+S.busy = true
+await setCode('CN')
+assert.equal(S.code, 'TW', 'a running job cannot switch project code')
+S.busy = false
+await setCode('CN')
+assert.equal(S.code, 'CN')
+assert.equal(S.draftSpec!.span, 28)
+assert.deepEqual(S.draftSpec!.bayList, [6, 7, 8])
+assert.equal(S.draftSpec!.material, defaultSpecFor('CN').material)
+assert.equal(S.draftSpec!.roofDead, defaultSpecFor('CN').roofDead)
+assert.deepEqual(S.draftSpec!.sections, defaultSpecFor('CN').sections)
+assert.equal(S.built, builtBefore, 'changing inputs does not modify the existing Gen model or results')
+assert.equal(unavailable(S, 'outputs'), 'wf_stale_edited', 'new code inputs cannot export the old model as current')
+await setCode('TW')
+assert.equal(S.draftSpec!.material, defaultSpecFor('TW').material)
+assert.equal(S.draftSpec!.span, 28)
+setConfirmHandler(null)
+console.log('Workspace passed: 4 languages × TW/CN × 5 modeling actions; resume, guards, project code migration/cancel/stale results')

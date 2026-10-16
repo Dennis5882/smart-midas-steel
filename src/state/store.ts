@@ -4,8 +4,8 @@
    MAPI-Key 는 메모리에만(저장 금지). 언어는 i18n 모듈이 따로 관리(useLang).
 ════════════════════════════════════════════════════════════ */
 import { useSyncExternalStore } from 'react'
-import type { LText } from '../i18n'
-import { CODE_IDS, DEFAULT_CODE, type CodeId } from '../codes'
+import { getLang, type LText } from '../i18n'
+import { type CodeId } from '../codes'
 import type { Results } from '../actions/results'
 import type { ConnResult } from '../domain/connections'
 import type { DesignResult } from '../domain/design'
@@ -59,11 +59,7 @@ function readTheme(): Theme {
 }
 
 function readCode(): CodeId {
-  try {
-    const c = localStorage.getItem('sms_code')
-    if ((CODE_IDS as readonly string[]).includes(c ?? '')) return c as CodeId
-  } catch { /* storage 차단 */ }
-  return DEFAULT_CODE
+  return getLang() === 'zh-CN' ? 'CN' : 'TW'
 }
 
 export const S = {
