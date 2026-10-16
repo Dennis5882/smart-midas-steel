@@ -41,7 +41,7 @@ export interface MemberCheck {
 }
 
 export interface ServiceCheck {
-  key: 'windDriftX' | 'windDriftY' | 'seisDriftX' | 'seisDriftY' | 'rafterDefl' | 'purlinDefl'
+  key: 'windDriftX' | 'windDriftY' | 'seisDriftX' | 'seisDriftY' | 'rafterDefl' | 'purlinDefl' | 'girtDefl' | 'postDefl'
   value: number
   limit: number
   ratio: number
@@ -53,9 +53,11 @@ export interface ServiceCheck {
 export interface ColumnAxial13 { elem: number; puRatio: number; exempt: boolean; ratio: number; combo: string; P: number; phiPn: number }
 
 /** 국부 풍압 요약 (역할·구역별 대표) */
-export interface CCSummary { role: ElementRole; zone: number; A: number; pPos: number; pNeg: number; count: number }
+export interface CCSummary { role: ElementRole; zone: number | string; A: number; pPos: number; pNeg: number; count: number }
 
 export interface DesignResult {
+  /** CN: GB 51022 8.4.2 隅撑 설계 축력 (kN, 한쪽 배치 기준 — 쌍이면 각 1/2) */
+  kneeBrace?: { column: number; rafter: number }
   cc?: CCSummary[]
   /** 13.4.1 지배 기둥 (내진 특별 조합이 있을 때) */
   col13?: ColumnAxial13 | null
@@ -78,12 +80,12 @@ export function purlinDefl(spec: FactorySpec, info: LoadInfo, section: string): 
   const mat = profileOf(spec.code).materials[spec.material]
   const G = portalGeometry(spec)
   const wLR = spec.code === 'CN'
-    ? (spec.roofDead + Math.max(info.roofLive * Math.cos(G.theta), (info.snow ?? 0) * Math.cos(G.theta))) * G.sRoof + mat.gamma * sectionProps(section).A * 1e-6
+    ? (spec.roofDead + Math.max(info.roofLive * Math.cos(G.theta), (info.snowPeak ?? info.snow ?? 0) * Math.cos(G.theta))) * G.sRoof + mat.gamma * sectionProps(section).A * 1e-6
     : info.roofLive * G.sRoof * Math.cos(G.theta) // kN/m
   return (5 * wLR * spec.baySpacing ** 4) / (384 * mat.E * 1e3 * (sectionProps(section).Ix * 1e-12)) // m (E kPa, I m⁴)
 }
 
-/** 퍼린 처짐 한계 = 베이 / 이 값 — TW LRFD 11.5.3 L/360, CN GB 50017 부록 B L/150, KR 프로젝트 기준 L/240 */
+/** 퍼린 처짐 한계 = 베이 / 이 값 — TW LRFD 11.5.3 L/360, CN GB 51022 표 3.3.2 L/150, KR 프로젝트 기준 L/240 */
 export const purlinLimitDiv = (code: FactorySpec['code']) => (code === 'CN' ? 150 : code === 'KR' ? KR_DEFL.purlin : 360)
 
 /** roles 를 주면 그 역할 부재만 검토하고 사용성은 생략 (단면 최적화 후보 평가용) */
@@ -295,7 +297,7 @@ export function runDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
     if (s) { s.count++; s.pNeg = Math.min(s.pNeg, c.pNeg); s.pPos = Math.max(s.pPos, c.pPos) }
     else ccSum.set(k, { role, zone: c.zone, A: c.A, pPos: c.pPos, pNeg: c.pNeg, count: 1 })
   }
-  out.cc = [...ccSum.values()].sort((x, y) => (x.role === y.role ? x.zone - y.zone : x.role === 'purlin' ? -1 : 1))
+  out.cc = [...ccSum.values()].sort((x, y) => (x.role === y.role ? String(x.zone).localeCompare(String(y.zone)) : x.role === 'purlin' ? -1 : 1))
   const c13 = col13 as ColumnAxial13 | null
   if (c13 && !c13.exempt && c13.ratio > 1) out.ng++
   return { ...out, col13: c13 }

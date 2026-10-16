@@ -1,6 +1,7 @@
 /* 공장 스펙 입력 칸 정의·검증 (순수, JSX 없음) — PlanCard(기본 모델링 위저드·자유골조 편집) 공통.
    잘못된 칸이 하나라도 있으면 두 모드 모두 생성 불가 — 기존 값으로 조용히 대체해 전송하지 않는다. */
 import { profileOf } from '../codes'
+import type { FigureKey } from './FigureRef'
 import { counties, townsOf } from '../codes/twSites'
 import { CPI_KEYS, SITES_KR, REGIONS_KR } from '../codes/krLateral'
 import { sectionProps } from '../domain/sections'
@@ -25,6 +26,8 @@ export interface Field {
   /** 스펙에 값이 없을 때 입력 칸 초기값 (선택 항목 추가 전 저장된 스펙 호환) */
   fallback?: string
   full?: boolean
+  /** 입력 칸 옆 원문 그림(지도) + 칸 아래 원문 주 — FigureRef */
+  figure?: FigureKey
 }
 export interface Group { title: I18nKey; fields: Field[] }
 
@@ -86,7 +89,6 @@ export const CN_GROUPS: Group[] = [
   { title: 'sec_wind', fields: [
     { path: 'china.w0', label: 'f_cn_w0', unit: 'kN/m²', kind: 'num', min: .3 },
     { path: 'china.terrain', label: 'f_exposure', kind: 'select', options: () => ['A', 'B', 'C', 'D'].map((v) => ({ value: v, label: v })) },
-    { path: 'china.betaZ', label: 'f_cn_beta', kind: 'num', min: 1 },
     { path: 'china.topography', label: 'f_cn_topo', kind: 'num', min: .75 },
   ] },
   { title: 'sec_seismic', fields: [
@@ -109,7 +111,7 @@ export const CN_GROUPS: Group[] = [
 /* 한국 KDS — 풍(41 12 00 5장)·지진(41 17 00, 표 6.2-1 계통)·적설(41 12 00 4장)·접합(14 31 25 — 콘크리트 fck·앵커 Fu) */
 export const KR_GROUPS: Group[] = [
   { title: 'sec_wind', fields: [
-    { path: 'korea.V0', label: 'f_kr_V0', unit: 'm/s', kind: 'num', min: 20 },
+    { path: 'korea.V0', label: 'f_kr_V0', unit: 'm/s', kind: 'num', min: 20, full: true, figure: 'krWind' },
     { path: 'korea.exposure', label: 'f_exposure', kind: 'select', options: () => ['A', 'B', 'C', 'D'].map((v) => ({ value: v, label: v })) },
     { path: 'korea.cpi', label: 'f_kr_cpi', kind: 'select', options: () => CPI_KEYS.map((v) => ({ value: v, label: t(`cpi_${v}`) })) },
     { path: 'korea.Kzt', label: 'f_kr_Kzt', kind: 'num', min: 1 },
@@ -126,7 +128,7 @@ export const KR_GROUPS: Group[] = [
     { path: 'korea.systemY', label: 'f_kr_sysY', kind: 'select', fallback: 'general', options: () => (['general', 'OCBF'] as const).map((v) => ({ value: v, label: t(`sys_kr_${v}`) })) },
   ] },
   { title: 'sec_kr_snow', fields: [
-    { path: 'korea.Sg', label: 'f_kr_Sg', unit: 'kN/m²', kind: 'num', min: 0.5 },
+    { path: 'korea.Sg', label: 'f_kr_Sg', unit: 'kN/m²', kind: 'num', min: 0.5, full: true, figure: 'krSnow' },
     { path: 'korea.Ce', label: 'f_kr_Ce', kind: 'select', numeric: true, options: () => [0.8, 0.9, 1.0, 1.1, 1.2].map((n) => ({ value: String(n), label: t('ce_opt', n) })) },
     { path: 'korea.Ct', label: 'f_kr_Ct', kind: 'select', numeric: true, options: () => [{ value: '1', label: t('ct_heated') }, { value: '1.2', label: t('ct_unheated') }] },
   ] },

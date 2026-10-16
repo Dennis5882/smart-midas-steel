@@ -19,7 +19,7 @@ export interface CCDemand {
   /** 압축 플랜지가 외장재에 구속 */
   braced: boolean
 }
-export interface CCLoad { zone: CCZone; A: number; pPos: number; pNeg: number; demands: CCDemand[] }
+export interface CCLoad { zone: CCZone | string; A: number; pPos: number; pNeg: number; demands: CCDemand[] }
 
 export function ccLoads(spec: FactorySpec, model: FactoryModel, info: LoadInfo): Map<number, CCLoad> {
   if (spec.code === 'CN') return cnCCLoads(spec, model, info)

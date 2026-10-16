@@ -1,16 +1,12 @@
-/* Explicit opt-in live regression. Reads MAPI-Key from stdin, keeps it in
+/* Explicit opt-in live regression. Reads MAPI-Key (stdin, MAPI_KEY env or gitignored .env), keeps it in
    memory only. Saves the current Gen document before creating a test model.
    Run: npx tsx scripts/live-cn.ts [--optimize]. Never put credentials here. */
-import { createInterface } from 'node:readline'
+import { readMapiKey } from './mapi-key'
 import { writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-const lines = createInterface({ input: process.stdin, terminal: false })
-console.log('Waiting for MAPI-Key on stdin (not echoed).')
-let key = ''
-for await (const line of lines) { key = line.trim(); lines.close(); break }
-if (!key) throw new Error('MAPI-Key required on stdin')
+const key = await readMapiKey()
 ;(globalThis as any).document = { documentElement: { lang: 'ko', dataset: {} } }
 const { S } = await import('../src/state/store')
 const { CN_DEFAULT_SPEC } = await import('../src/domain/types')

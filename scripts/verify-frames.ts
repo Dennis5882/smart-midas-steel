@@ -75,14 +75,14 @@ for (const base of [DEFAULT_SPEC, CN_DEFAULT_SPEC]) {
     const gable = buildLoadPayloads(DEFAULT_SPEC, buildPortal(DEFAULT_SPEC))
     ok(!Object.values(gable.STLD).some((c: any) => c.NAME === 'WX5'), 'TW gable: unchanged (no WX5)')
   } else {
-    /* GB 50009 표 7.2.1: 단坡는 균일 적설만 */
+    /* GB 51022 표 4.3.2 항 1: 단坡는 균일(+ 반경간 4.3.5) — 불균형 SN1/SN2 없음 */
     const steep = { ...spec, span: 12, eaveHeight: 6, roofSlope: 0.5, china: { ...spec.china!, snow: 0.5 } } // 높은 처마 12 m
     const sl = buildLoadPayloads(steep, buildPortal(steep))
     const sc = Object.values(sl.STLD).map((c: any) => c.NAME)
     ok(sc.includes('SN') && !sc.includes('SN1'), 'CN mono 26.6°: uniform snow only (no SN1/SN2)')
     const gs = { ...structuredClone(CN_DEFAULT_SPEC), roofSlope: 0.5, china: { ...CN_DEFAULT_SPEC.china!, snow: 0.5 } }
     ok(Object.values(buildLoadPayloads(gs, buildPortal(gs)).STLD).some((c: any) => c.NAME === 'SN1'), 'CN gable 26.6°: unbalanced snow kept')
-    /* 양방향 풍: 지붕 체형계수 — 낮은 쪽 풍상 = 제2항, 높은 쪽 풍상 = −0.5 (표 8.3.1 제5항) */
+    /* 양방향 풍: GB 51022 그림 4.2.2-1(b) — 편坡도 풍상 B/2 = 2구역, 나머지 3구역 (양방향 케이스) */
     ok(tot.WX1[0] > 0 && tot.WX3[0] < 0, 'CN mono: both wind directions')
   }
   /* 적용범위 */
@@ -161,9 +161,9 @@ for (const base of [DEFAULT_SPEC, CN_DEFAULT_SPEC]) {
   near(v[1], v[2], 1e-12, 'TW 表2.8: E = D′ (表2.5 풍하)')
 }
 {
-  /* CN 다경간 26.6°: 균일 적설만(7.2.2-3), 25° 초과는 적용범위에서 막음 */
+  /* CN 다경간 26.6°: GB 51022 표 4.3.2 항 3 — 균일 + 골 1.4·2.0 (SV1·SV2), 불균형 SN1 없음, 적용범위 통과 */
   const steep = normalizeSpans({ ...structuredClone(CN_DEFAULT_SPEC), frame: 'multi' as const, spanList: [12, 12], eaveHeight: 6, roofSlope: 0.5, china: { ...CN_DEFAULT_SPEC.china!, snow: 0.5 } })
   const sc = Object.values(buildLoadPayloads(steep, buildPortal(steep)).STLD).map((c: any) => c.NAME)
-  ok(sc.includes('SN') && !sc.includes('SN1') && checkScope(steep).issues.some((i) => i.key === 'multiSnowCN' && i.level === 'block'), 'CN multi 26.6°: uniform snow, blocked by scope (valley drift)')
+  ok(sc.includes('SN') && sc.includes('SV1') && sc.includes('SV2') && !sc.includes('SN1') && !checkScope(steep).blocked, 'CN multi 26.6°: uniform + valley snow (GB 51022 4.3.2), not blocked')
 }
 console.log(`Frames: ${n} checks passed (mono-slope + multi-span + TW 表2.8: geometry, releases, loads, wind, snow, scope, quantities, inputs)`)

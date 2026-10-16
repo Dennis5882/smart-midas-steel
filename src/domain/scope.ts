@@ -11,7 +11,7 @@ import { frameSpans, type FactorySpec } from './types'
 
 export type ScopeKey =
   | 'crane' | 'mezzanine' | 'multiSpan' | 'opening' | 'openingCN'
-  | 'span' | 'eave' | 'eaveHigh' | 'slope' | 'bayRatio' | 'baySpacing' | 'length' | 'hnR' | 'cn' | 'monoTW' | 'multi' | 'multiTW' | 'multiSnowCN' | 'kr' | 'multiKR'
+  | 'span' | 'eave' | 'eaveHigh' | 'slope' | 'bayRatio' | 'baySpacing' | 'length' | 'hnR' | 'cn' | 'monoTW' | 'multi' | 'multiTW' | 'kr' | 'multiKR'
 export interface ScopeIssue { key: ScopeKey; level: 'block' | 'warn'; args: (string | number)[] }
 export interface ScopeResult { issues: ScopeIssue[]; blocked: boolean }
 
@@ -47,11 +47,10 @@ export function checkScope(spec: FactorySpec, f: ScopeFeatures = spec.features ?
   if (!(spec.eaveHeight > 0 && spec.eaveHeight <= LIMITS.eave)) block('eave', spec.eaveHeight)
   if (!(spec.roofSlope > 0 && spec.roofSlope <= LIMITS.slope)) block('slope', spec.roofSlope)
   /* 편경사: 높은 쪽 처마도 한계 안. TW 는 풍압계수 해석(表2.5 를 지붕 전체에 풍상/풍하, ASCE 7 단경사 주석 준용)·외장재 구역 근사 → 경고 */
-  /* 다경간: 내부 기둥 상단 핀·골 거터 상세는 검토 범위 밖(경고). TW 주골조 풍압은 면 단위 해석(경고). CN 25° 초과는 골 적설(표 7.2.1 제7항 최대 2.0) 미반영 → 막음 */
+  /* 다경간: 내부 기둥 상단 핀·골 거터 상세는 검토 범위 밖(경고). TW 주골조 풍압은 면 단위 해석(경고). CN 골 적설은 GB 51022 표 4.3.2 항 3 (1.4·2.0) 반영 */
   if (spec.frame === 'multi') {
     warn('multi')
     if (spec.code === 'TW') warn('multiTW')
-    if (spec.code === 'CN' && Math.atan(spec.roofSlope) * 180 / Math.PI > 25) block('multiSnowCN')
     /* KR: 표 5.7-1 에 다경간 표 없음 — θ ≥ 10° 는 첫 풍상면만 풍상 표·나머지 풍하 표, 불균형 적설(4.5.3) 처마 쪽 면 0.5S_f 가정 */
     if (spec.code === 'KR') warn('multiKR')
   }

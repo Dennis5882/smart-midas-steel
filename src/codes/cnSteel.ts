@@ -115,15 +115,17 @@ export function cnCapacity(s: SectionProps, material: string, L: MemberLengths, 
   return cap
 }
 
-export function cnCheck(c: CnCapacity, f: MemberForces, sway = 1): { ratio: number; eq: `GB ${string}`; B: number } {
+/** gammaRE — GB 51022 표 3.1.5 / GB 50011 5.4.2 지진 조합: 강도 0.85, 안정 0.90 (요구/저항 비에 곱함) */
+export function cnCheck(c: CnCapacity, f: MemberForces, sway = 1, gammaRE?: { strength: number; stability: number }): { ratio: number; eq: `GB ${string}`; B: number } {
+  const gs = gammaRE?.strength ?? 1, gb = gammaRE?.stability ?? 1
   const N = Math.max(0, -f.P), bx = N >= c.nex / .8 ? 99 : 1 / (1 - .8 * N / c.nex), by = N >= c.ney / .8 ? 99 : 1 / (1 - .8 * N / c.ney)
   const B = Math.max(1, bx, by, sway)
-  const gross = Math.abs(f.P) / c.phiPnt + sway * (f.Mx / c.elasticX + f.My / c.elasticY)
-  const inPlane = N / c.px + Math.max(bx, sway) * f.Mx / c.elasticX + sway * f.My / c.phiMny
-  const outPlane = N / c.py + sway * f.Mx / c.phiMnx + Math.max(by, sway) * f.My / c.elasticY
-  const tensionBending = Math.abs(f.P) / c.phiPnt + sway * (f.Mx / c.phiMnx + f.My / c.phiMny)
+  const gross = gs * (Math.abs(f.P) / c.phiPnt + sway * (f.Mx / c.elasticX + f.My / c.elasticY))
+  const inPlane = gb * (N / c.px + Math.max(bx, sway) * f.Mx / c.elasticX + sway * f.My / c.phiMny)
+  const outPlane = gb * (N / c.py + sway * f.Mx / c.phiMnx + Math.max(by, sway) * f.My / c.elasticY)
+  const tensionBending = gs * (Math.abs(f.P) / c.phiPnt + sway * (f.Mx / c.phiMnx + f.My / c.phiMny))
   const pm = f.P >= 0 ? Math.max(gross, tensionBending) : Math.max(gross, inPlane, outPlane)
-  const shear = Math.abs(f.V) / c.phiVn
+  const shear = gs * Math.abs(f.V) / c.phiVn
   // 6.1.4 combined normal/shear stress: conservative same-point envelope.
   const interaction = Math.hypot(pm, shear)
   const r = Math.max(pm, shear, interaction, c.local > 1 ? c.local : 0)

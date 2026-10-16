@@ -56,7 +56,7 @@ export interface FactorySpec {
   /** China: secondary members may use a different certified steel grade. */
   secondaryMaterial?: string
   /** GB inputs, used only when code === CN. Pressures kN/m², periods s. */
-  china?: { w0: number; terrain: 'A' | 'B' | 'C' | 'D'; betaZ: number; topography: number; alphaMax: number; Tg: number; Tx: number; Ty: number; damping: number; snow: number; snowMu: number; gamma0: number; concreteBearing: number; anchorFt: number }
+  china?: { w0: number; terrain: 'A' | 'B' | 'C' | 'D'; /** 미사용 — GB 51022 4.2.1 β(1.1·1.5)로 대체 (이전 저장값 호환) */ betaZ?: number; topography: number; alphaMax: number; Tg: number; Tx: number; Ty: number; damping: number; snow: number; snowMu: number; gamma0: number; concreteBearing: number; anchorFt: number }
   /** KDS 입력 (code === KR 에서만). 풍 KDS 41 12 00 5장: V0 기본풍속(m/s, 그림 5.5-1), 지표면조도 A~D, K_zt 지형계수, K_D 풍향계수, cpi 표 5.7-4 밀폐 분류,
       roofZeta 지붕 1차 감쇠비(5.6.4). 적설 4장: Sg 기본지상설하중(kN/m², 그림 4.2-1), Ce 노출계수, Ct 온도계수.
       지진 KDS 41 17 00: zone 지진구역 I/II, S 유효지반가속도(= Z × 2.0), site 지반종류 S1~S5. importance = KDS 41 10 05 중요도(특·1·2·3) — I_W·I_s·내진등급 */
@@ -136,7 +136,7 @@ export const CN_DEFAULT_SPEC: FactorySpec = {
   ...DEFAULT_SPEC, code: 'CN', material: 'Q235B', secondaryMaterial: 'Q235B',
   // Gen NX live sizing: CC candidates failed local wind/LTB; use rolled H.
   sections: { column: 'HM 390x300x10/16', rafter: 'HM 390x300x10/16', purlin: 'HN 198x99x4.5/7', girt: 'HN 150x75x5/7', strut: 'HW 175x175x7.5/11', post: 'HN 248x124x5/8', brace: 'P 219x6' },
-  china: { w0: 0.45, terrain: 'B', betaZ: 1, topography: 1, alphaMax: 0.08, Tg: 0.35, Tx: 0.5, Ty: 0.3, damping: 0.05, snow: 0.3, snowMu: 1, gamma0: 1, concreteBearing: 14.3, anchorFt: 140 },
+  china: { w0: 0.45, terrain: 'B', topography: 1, alphaMax: 0.08, Tg: 0.35, Tx: 0.5, Ty: 0.3, damping: 0.05, snow: 0.3, snowMu: 1, gamma0: 1, concreteBearing: 14.3, anchorFt: 140 },
 }
 
 /* 한국 샘플: 서울(지진구역 I, S = 0.11 × 2.0), 지반 S4(4.1.1 ③ 자료 부족 시), V0 28 m/s·Sg 0.5 kN/m² 는 지도 판독 예시값 — 프로젝트 지역으로 바꿀 것.

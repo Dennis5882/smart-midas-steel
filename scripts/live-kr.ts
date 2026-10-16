@@ -1,19 +1,15 @@
-/* 한국 KDS 라이브 회귀 (명시적 실행). MAPI-Key 는 stdin 으로만 받아 메모리에만 둔다 — 파일·인자 금지.
+/* 한국 KDS 라이브 회귀 (명시적 실행). MAPI-Key 는 stdin → MAPI_KEY 환경변수 → .env(gitignore) 순 — 인자·커밋 금지.
    현재 Gen 문서를 자동 저장한 뒤 시험 모델을 만든다.
    실행: printf '<key>
 ' | node --import tsx scripts/live-kr.ts [--frame mono|multi] [--optimize] [--gen-check] [--gen-default] [--systems] [--assert-pass]
    --gen-check: PUT DESIGN/STEEL/DSTL 'KDS 41 30 : 2022' → POST .../CODE-ANAL(60 s 제한 — SDK 에 RC 판 정지 보고) → post/STEELCODECHECK,
    Gen KDS 강도비를 앱 검토와 역할별로 대조. 기본: 앱 유효길이(krLengths)를 LENG(K = 1)·DCTL·MBTP 로 맞춘 뒤 대조, --gen-default 면 Gen 기본 설계 옵션. */
-import { createInterface } from 'node:readline'
+import { readMapiKey } from './mapi-key'
 import { writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-const lines = createInterface({ input: process.stdin, terminal: false })
-console.log('Waiting for MAPI-Key on stdin (not echoed).')
-let key = ''
-for await (const line of lines) { key = line.trim(); lines.close(); break }
-if (!key) throw new Error('MAPI-Key required on stdin')
+const key = await readMapiKey()
 ;(globalThis as any).document = { documentElement: { lang: 'ko', dataset: {} } }
 const { S } = await import('../src/state/store')
 const { KR_DEFAULT_SPEC } = await import('../src/domain/types')

@@ -140,8 +140,9 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   parts.push(`<h3>${L('rep_wind')}</h3>`)
   const wi = spec.wind
   if (spec.code === 'KR' && kr) parts.push(`<p>V<sub>0</sub> = ${spec.korea!.V0} m/s, K<sub>D</sub> = ${spec.korea!.KD}, K<sub>zr</sub> = ${f(kr.Kzr, 3)} (${L('f_exposure')} ${spec.korea!.exposure}), K<sub>zt</sub> = ${spec.korea!.Kzt}, I<sub>W</sub> = ${kr.Iw} → V<sub>H</sub> = ${f(kr.VH, 2)} m/s, q<sub>H</sub> = ½ρV<sub>H</sub>² = ${f(info.wind.qh, 3)} kN/m² (H = ${f(info.wind.hRef, 2)} m); G<sub>D</sub> X ${f(kr.GD.X, 3)} / Y ${f(kr.GD.Y, 3)} (5.6-2); G<sub>pe</sub> X ${f(kr.Gpe.X, 3)} / Y ${f(kr.Gpe.Y, 3)} (${kr.resonant.X ? '5.6-6' : '5.6-5'}, n<sub>R0</sub> ≈ ${f(kr.nR0, 2)} Hz); C<sub>pi</sub> ${kr.cpi.join(' / ')} (표 5.7-4)</p>`)
-  else parts.push(spec.code === 'CN' ? `<p>w0=${spec.china!.w0} kN/m²; terrain ${spec.china!.terrain}; βz=${spec.china!.betaZ}; topography=${spec.china!.topography}; h=${f(info.wind.hRef, 2)} m; μz·w0=${f(info.wind.qh, 3)} kN/m²</p>` : `<p>V10 = ${wi.V10} m/s, I = ${wi.I}, ${L('f_exposure')} ${wi.exposure}, ${L(wi.enclosure === 'enclosed' ? 'encl_enclosed' : 'encl_partial')}, h = ${f(info.wind.hRef, 2)} m, q(h) = ${f(info.wind.qh, 3)} kN/m², G = ${prof.lateral.gust}</p>`)
-  parts.push(table([t('res_lc'), 'X / Y', t('kv_cpRoof'), 'GCpi'], info.wind.cases.map((c) => [c.name, c.dir, f(c.roofCp, 3), f(c.gcpi, 3)])))
+  else parts.push(spec.code === 'CN' ? `<p>w<sub>0</sub> = ${spec.china!.w0} kN/m²; terrain ${spec.china!.terrain}; topography ${spec.china!.topography}; h = ${f(info.wind.hRef, 2)} m; μ<sub>z</sub>·w<sub>0</sub> = ${f(info.wind.qh, 3)} kN/m² (μ<sub>z</sub> at max(h, 10 m)); β = 1.1 (frame) / 1.5 (purlin·girt); 2a = ${f(info.cn?.endZone ?? 0, 2)} m (GB 51022 4.2)</p>` : `<p>V10 = ${wi.V10} m/s, I = ${wi.I}, ${L('f_exposure')} ${wi.exposure}, ${L(wi.enclosure === 'enclosed' ? 'encl_enclosed' : 'encl_partial')}, h = ${f(info.wind.hRef, 2)} m, q(h) = ${f(info.wind.qh, 3)} kN/m², G = ${prof.lateral.gust}</p>`)
+  if (spec.code === 'CN') parts.push(table([t('res_lc'), 'X / Y', 'μw (2)', '±i'], info.wind.cases.map((c) => [c.name, c.dir, f(c.roofCp, 3), c.gcpi > 0 ? '+i' : '−i'])))
+  else parts.push(table([t('res_lc'), 'X / Y', t('kv_cpRoof'), 'GCpi'], info.wind.cases.map((c) => [c.name, c.dir, f(c.roofCp, 3), f(c.gcpi, 3)])))
   const ac = info.wind.across
   if (ac && spec.code === 'KR' && kr) parts.push(`<p><b>${esc(tc(spec.code, 'kv_across'))}</b>: W<sub>D,X</sub> = ${f(ac.WDx, 1)} kN, W<sub>D,Y</sub> = ${f(ac.WDy, 1)} kN; γ = 0.35·D/B ≥ 0.2 → ${f(kr.gammaL.X, 3)} / ${f(kr.gammaL.Y, 3)}; W<sub>LC</sub> = ${f(ac.WLX, 1)} / ${f(ac.WLY, 1)} kN</p>`)
   if (ac && spec.code === 'TW') parts.push(`<p><b>${L('kv_across')}</b>: W<sub>D,X</sub> = ${f(ac.WDx, 1)} kN, W<sub>D,Y</sub> = ${f(ac.WDy, 1)} kN; W<sub>L</sub> = 0.87(L/B)W<sub>D</sub> → W<sub>L,X</sub> = ${f(ac.WLX, 1)} kN, W<sub>L,Y</sub> = ${f(ac.WLY, 1)} kN; M<sub>T</sub> = 0.28·max(B·W<sub>D</sub>) = ${f(ac.MT, 1)} kN·m; W = ${f(ac.kD, 3)}·W<sub>D</sub> + 0.7(W<sub>L</sub> ± W<sub>T</sub>) (2.12)</p>`)
@@ -185,6 +186,7 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
         design.cc.map((c) => [L(`role_${c.role}`), c.zone, f(c.A, 1), f(c.pPos, 3), f(c.pNeg, 3), c.count])))
       parts.push(`<p class="note">${esc(tc(spec.code, 'cc_note'))}</p>`)
     }
+    if (design.kneeBrace) parts.push(`<p>${L('cn_knee')}: ${L('role_column')} N = ${f(design.kneeBrace.column, 1)} kN, ${L('role_rafter')} N = ${f(design.kneeBrace.rafter, 1)} kN — N = A<sub>f</sub>·f/(60·cosθ), θ = 45° (GB 51022 8.4.2)</p>`)
     if (design.col13 !== undefined) {
       parts.push(`<h3>${L('res_seis13')}</h3>`)
       const c = design.col13, om = info.omega

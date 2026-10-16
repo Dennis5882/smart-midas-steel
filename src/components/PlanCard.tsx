@@ -10,6 +10,7 @@ import { regionZoneKR, ZONE_Z } from '../codes/krLateral'
 import type { TemplateKey } from '../domain/templates'
 import { TEMPLATES, TEMPLATE_KEYS } from '../domain/templates'
 import { ModelWizard, WIZARD_STEPS } from './ModelWizard'
+import { FigureButton, FigureNote } from './FigureRef'
 import { siteSourceText } from './Status'
 import { ScopeBox } from './ScopeBox'
 import { checkScope, NO_FEATURES, type ScopeFeatures } from '../domain/scope'
@@ -132,7 +133,9 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
           : <input id={id} value={vals[f.path]} disabled={!live || s.busy || readonly} inputMode={f.kind === 'text' || f.kind === 'list' ? 'text' : 'decimal'}
               onChange={(e) => set(f.path, e.target.value)} aria-invalid={error} aria-describedby={error ? `${id}-error` : undefined} />}
         {f.unit && <span className="pe-u">{f.unit}</span>}
+        {f.figure && <FigureButton fig={f.figure} />}
       </div>
+      {f.figure && <FigureNote fig={f.figure} />}
       {error && <small className="mw-error" id={`${id}-error`}>{conflict ? conflict.text : f.kind === 'list' ? t('mw_list_error') : f.path.startsWith('sections.') ? t('mw_section_error', msg.spec.sections.column)
         : !vals[f.path]?.trim() ? t('mw_required') : f.kind === 'int' && !Number.isInteger(Number(vals[f.path])) ? t('mw_integer')
         : f.kind === 'num' || f.kind === 'int' ? f.min === undefined ? t('mw_positive') : t('mw_min', f.min) : t('mw_field_error')}</small>}

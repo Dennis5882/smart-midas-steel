@@ -63,6 +63,8 @@ export async function runOptimize(): Promise<void> {
       const svcNg = (k: string) => d.service.some((s) => s.key === k && s.ratio > 1)
       if (svcNg('windDriftY') || svcNg('seisDriftY')) ctl.floors.brace = Math.max(ctl.floors.brace ?? 0, sectionProps(b.spec.sections.brace).A)
       if (svcNg('purlinDefl')) ctl.floors.purlin = Math.max(ctl.floors.purlin ?? 0, sectionProps(b.spec.sections.purlin).A)
+      if (svcNg('girtDefl')) ctl.floors.girt = Math.max(ctl.floors.girt ?? 0, sectionProps(b.spec.sections.girt).A)
+      if (svcNg('postDefl')) ctl.floors.post = Math.max(ctl.floors.post ?? 0, sectionProps(b.spec.sections.post).A)
       if (it === MAX_ITER) break
       const p = proposeSections(b.spec, b.model, b.info, S.results, d, ctl)
       lastRows = p.rows

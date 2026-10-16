@@ -37,7 +37,7 @@ for (const [name, spec] of [['TW', DEFAULT_SPEC], ['CN', CN_DEFAULT_SPEC]] as co
 /* TW 전용 지진·풍 / CN 전용 칸 */
 ok(bad(DEFAULT_SPEC, true, { 'seismic.SDS': '-0.1' }).includes('seismic.SDS'), 'TW free: SDS −0.1 rejected')
 ok(bad(DEFAULT_SPEC, true, { 'wind.exposure': 'Z' }).includes('wind.exposure'), 'TW free: exposure Z rejected')
-ok(bad(CN_DEFAULT_SPEC, true, { 'china.betaZ': '0.9' }).includes('china.betaZ'), 'CN free: βz 0.9 < 1 rejected')
+ok(bad(CN_DEFAULT_SPEC, true, { 'china.topography': '0.5' }).includes('china.topography'), 'CN free: topography 0.5 < 0.75 rejected')
 ok(bad(CN_DEFAULT_SPEC, true, { 'china.alphaMax': '0.5' }).includes('china.alphaMax'), 'CN free: αmax 0.5 not in list rejected')
 
 /* 칸 사이 충돌 — 치수 한계·간격 과대는 해당 칸 오류 (위저드가 그 단계에서 막음) */

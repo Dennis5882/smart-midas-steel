@@ -13,7 +13,7 @@ import { buildPortal } from '../src/domain/portal'
 import { buildLoadPayloads } from '../src/domain/loads'
 import { runConnections } from '../src/domain/connections'
 import { runDesign } from '../src/domain/design'
-import { FIXTURE, decodeResults } from './tw-golden'
+import { FIXTURE, decodeResults, fixtureFor } from './tw-golden'
 import type { ReportInput } from '../src/report/report'
 import { krSynthetic } from './kr-synth'
 import { defaultSpecFor } from '../src/domain/types'
@@ -30,7 +30,11 @@ const input: ReportInput = { built: { spec: fx.spec, model, info: loads.info, ca
 /* KR — 합성 결과(경로·글꼴 확인용) */
 const krSpec = defaultSpecFor('KR'), kr = krSynthetic(krSpec)
 const krInput: ReportInput = { built: { spec: krSpec, model: kr.model, info: kr.loads.info, cases: kr.cases, combos: kr.combos.length, comboNames: kr.combos }, reactions: fx.reactions, design: runDesign(krSpec, kr.model, kr.loads.info, kr.results), connections: runConnections(krSpec, kr.model, kr.loads.info, kr.results) }
-for (const [code, inp] of [['TW', input], ['KR', krInput]] as const) for (const lang of ['ko', 'en', 'zh-TW', 'zh-CN'] as const) {
+/* CN — 라이브 정답 세트 (GB 51022 문구·隅撑 등 CN 전용 글자) */
+const cfx = JSON.parse(gunzipSync(readFileSync(fixtureFor('CN'))).toString())
+const cModel = buildPortal(cfx.spec), cLoads = buildLoadPayloads(cfx.spec, cModel), cRes = decodeResults(cfx.results)
+const cnInput: ReportInput = { built: { spec: cfx.spec, model: cModel, info: cLoads.info, cases: Object.values(cLoads.STLD).map((v: any) => v.NAME), combos: Object.keys(cLoads.info.comboKind).length, comboNames: Object.keys(cLoads.info.comboKind) }, reactions: cfx.reactions, design: runDesign(cfx.spec, cModel, cLoads.info, cRes), connections: runConnections(cfx.spec, cModel, cLoads.info, cRes) }
+for (const [code, inp] of [['TW', input], ['KR', krInput], ['CN', cnInput]] as const) for (const lang of ['ko', 'en', 'zh-TW', 'zh-CN'] as const) {
   setLang(lang)
   const html = buildReport(inp)
   const doc = new DOMParser().parseFromString(html, 'text/html')

@@ -1,12 +1,14 @@
-/* GB loads for a regular, single-span, closed gable factory.
-   Sources: GB 55001-2021 3.1.13, GB 50009-2012 5.3/7/8;
-   GB/T 50011-2010 (2024) 5.1.3–5.2.1, 5.2.5, 5.4.1.
+/* GB loads for a regular, single-storey, closed portal-frame factory.
+   Sources: GB 55001-2021 3.1.13 (load factors — supersede GB 51022 4.5.3), GB 55002-2021 4.3.2;
+   GB 51022-2015 门式刚架 4.2 (wind μw·β), 4.3 (snow distribution), 4.4.2-3 (vertical earthquake), 1.0.2 (scope);
+   GB 50009-2012 7.2 (μr by slope), 8.2 (μz); GB/T 50011-2010 (2024) 5.1.3–5.2.1, 5.2.5, 5.4.1.
    No Taiwan load factors, periods, amplified seismic or across-wind rules. */
 import { CN } from '../codes/cn'
-import { muZ, roofShape, spectrum } from '../codes/cnLateral'
+import { muZ, spectrum } from '../codes/cnLateral'
+import { BETA_FRAME_CN, edgeACN, mwLongCN, mwTransCN, verticalRatioCN, zone2LenCN, type Internal, type ZoneMW } from '../codes/cnPortal'
 import type { LoadCaseType } from '../codes'
 import type { LoadInfo, LoadPayloads } from './loads'
-import { portalGeometry } from './portal'
+import { portalGeometry, type Geometry } from './portal'
 import { nodeWeights } from './weights'
 import { baySpans, frameSpans, type FactoryModel, type FactorySpec, type Face, type Node } from './types'
 import { sectionProps } from './sections'
@@ -16,14 +18,57 @@ export function validateCnSpec(spec: FactorySpec): void {
   if (!c) throw new Error('CN project inputs are required')
   if (spec.wind.enclosure !== 'enclosed') throw new Error('GB: this factory model supports closed buildings; dominant openings require a separate pressure model')
   if (!(spec.eaveHeight > 0 && spec.eaveHeight <= 18 && spec.span > 0 && Math.max(...frameSpans(spec)) <= 60 && spec.bays >= 1 && Number.isInteger(spec.bays) && baySpans(spec).every((s) => s > 0) && spec.roofSlope > 0 && spec.roofSlope <= 1 && (spec.frame !== 'mono' || spec.eaveHeight + spec.span * spec.roofSlope <= 18))) throw new Error('GB scope: regular single-storey factory, eave ≤18 m, span ≤60 m, roof slope ≤1')
-  for (const k of ['w0', 'betaZ', 'topography', 'alphaMax', 'Tg', 'Tx', 'Ty', 'damping', 'snowMu', 'gamma0', 'concreteBearing', 'anchorFt'] as const)
+  for (const k of ['w0', 'topography', 'alphaMax', 'Tg', 'Tx', 'Ty', 'damping', 'snowMu', 'gamma0', 'concreteBearing', 'anchorFt'] as const)
     if (!(Number.isFinite(c[k]) && c[k] > 0)) throw new Error(`GB: invalid ${k}`)
-  if (!(c.w0 >= .3 && c.betaZ >= 1 && c.topography >= .75 && c.snow >= 0 && Number.isFinite(c.snow) && c.snowMu >= .9 && c.gamma0 >= 1 && c.Tx <= 6 && c.Ty <= 6 && c.damping >= .045 && c.damping <= .05)) throw new Error('GB: check w0 ≥0.3, betaZ ≥1, topography ≥0.75, snow multiplier ≥0.9, gamma0 ≥1, periods ≤6 s, damping 0.045–0.05')
-  if (spec.eaveHeight + Math.max(...frameSpans(spec)) * spec.roofSlope / (spec.frame === 'mono' ? 2 : 4) > 20) throw new Error('GB: mean roof height must be ≤20 m for the current local wind table')
+  if (!(c.w0 >= .3 && c.topography >= .75 && c.snow >= 0 && Number.isFinite(c.snow) && c.snowMu >= .9 && c.gamma0 >= 1 && c.Tx <= 6 && c.Ty <= 6 && c.damping >= .045 && c.damping <= .05)) throw new Error('GB: check w0 ≥0.3, topography ≥0.75, snow multiplier ≥0.9, gamma0 ≥1, periods ≤6 s, damping 0.045–0.05')
+  /* GB 51022 1.0.2 — 높이 ≤ 18 m·높이/폭 < 1 (μw 표 적용 조건 4.2.2), 그림 4.2.2-1(b) 편坡 θ < 30° */
+  const hMean = spec.eaveHeight + Math.max(...frameSpans(spec)) * spec.roofSlope / (spec.frame === 'mono' ? 2 : 4)
+  if (hMean > 18) throw new Error('GB 51022 1.0.2: mean roof height must be ≤18 m')
+  if (!(hMean < spec.span)) throw new Error('GB 51022 1.0.2: height/width must be < 1')
+  if (spec.frame === 'mono' && Math.atan(spec.roofSlope) * 180 / Math.PI >= 30) throw new Error('GB 51022 figure 4.2.2-1(b): mono-slope roof angle must be < 30°')
   if (baySpans(spec).reduce((a, b) => a + b, 0) > 90) throw new Error('GB: the current single temperature unit is limited to 90 m')
-  if (c.alphaMax >= .16 && spec.span > 24) throw new Error('GB: intensity 8/9 and span >24 m require a project-specific vertical earthquake model (GB/T 50011 5.3)')
   for (const name of Object.values(spec.sections)) { const p = sectionProps(name); if (![p.A, p.Ix, p.Iy, p.rx, p.ry].every((x) => Number.isFinite(x) && x > 0)) throw new Error(`GB: invalid section ${name}`) }
   if (spec.secondaryMaterial && spec.secondaryMaterial !== 'Q235B') throw new Error('GB/T 50018: the current cold-formed catalogue is configured for Q235B')
+}
+
+/** GB 51022 표 4.3.2 μr (항 1) — θ ≤ 25° 1.0, 60° 이상 0, 사이 직선 */
+export function muRoofSnowCN(deg: number): number {
+  const angles = [25, 30, 35, 40, 45, 50, 55, 60], mus = [1, .85, .7, .55, .4, .25, .1, 0]
+  if (deg <= 25) return 1
+  const i = angles.findIndex((a) => deg <= a)
+  return i < 0 ? 0 : mus[i - 1] + (mus[i] - mus[i - 1]) * (deg - angles[i - 1]) / (angles[i] - angles[i - 1])
+}
+
+/** GB 51022 4.3.2·4.3.5 적설 분포 — 케이스별 지붕면 계수 k(x, 면) (기본 설하중 s0 에 곱함).
+    SN 균일 (다경간 1.0), SN1·SN2 단경간 쌍坡 0.75/1.25 (모든 경사, 항 2), SV1·SV2 다경간 골 1.4 / 골 2.0 삼각 (항 3, 경사 > 1/20),
+    SH1… 반경간 균일 (4.3.5-2 지붕보 — 쌍坡·다경간은 지붕면별, 편坡는 스팬 절반). halfSpan 케이스는 1.3D+1.5S 에만 조합 */
+export function snowShapeCN(spec: FactorySpec, G: Geometry = portalGeometry(spec)) {
+  const deg = G.theta * 180 / Math.PI, mu = muRoofSnowCN(deg)
+  const multi = G.ridges.length > 1, gable = G.ridges.length === 1
+  const uniform = multi ? 1 : mu
+  const P = G.planes, last = P.length - 1
+  const inner = (p: number) => p > 0 && p < last
+  const valleyEnd = (p: number) => (G.valleys.some((v) => Math.abs(v - P[p].xa) < 1e-6) ? P[p].xa : P[p].xb)
+  const halves: [number, number][] = spec.frame === 'mono' ? [[0, spec.span / 2], [spec.span / 2, spec.span]] : P.map((p) => [p.xa, p.xb])
+  const cases: { name: string; half: boolean; k: (x: number, plane: number) => number }[] = [{ name: 'SN', half: false, k: () => uniform }]
+  if (gable) for (const n of ['SN1', 'SN2']) cases.push({ name: n, half: false, k: (_x, p) => (P[p].rising === (n === 'SN1') ? 1.25 : .75) * mu })
+  if (multi && spec.roofSlope > 1 / 20 + 1e-12) {
+    cases.push({ name: 'SV1', half: false, k: (_x, p) => (inner(p) ? 1.4 : mu) })
+    cases.push({ name: 'SV2', half: false, k: (x, p) => {
+      if (!inner(p)) return mu
+      const v = valleyEnd(p), w = P[p].xb - P[p].xa
+      return mu + (2 - mu) * (1 - Math.min(1, Math.abs(x - v) / w))
+    } })
+  }
+  halves.forEach(([xa, xb], j) => cases.push({ name: `SH${j + 1}`, half: true, k: (x, p) => {
+    if (spec.frame !== 'mono') return p === j ? uniform : 0
+    const inside = x > xa + 1e-6 && x < xb - 1e-6, edge = Math.abs(x - xa) < 1e-6 || Math.abs(x - xb) < 1e-6
+    return (inside ? 1 : edge && x > 1e-6 && x < spec.span - 1e-6 ? .5 : edge ? 1 : 0) * uniform
+  } }))
+  /** 퍼린 설계용 최대 계수 (4.3.5-1 불균등 최악) */
+  const peakAt = (x: number) => Math.max(...cases.filter((c) => !c.half).flatMap((c) => G.roofTrib(x).map((r) => c.k(x, r.plane))))
+  const peak = Math.max(...G.xs.map(peakAt))
+  return { mu, uniform, cases, peakAt, peak }
 }
 
 export function buildCnLoads(spec: FactorySpec, model: FactoryModel): LoadPayloads {
@@ -52,28 +97,20 @@ export function buildCnLoads(spec: FactorySpec, model: FactoryModel): LoadPayloa
   const wallTrib = (face: Exclude<Face, 'roof'>) => (face === 'x0' ? G.gWallAt(G.eaveXs[0]) : face === 'xL' ? G.gWallAt(G.eaveXs[G.eaveXs.length - 1]) : G.gEnd)
   const gable = (a: Node): 'y0' | 'yL' | null => a.y === 0 ? 'y0' : Math.abs(a.y - length) < 1e-8 ? 'yL' : null
   const qLive = CN.roofLive({ slope: spec.roofSlope, tribArea: sRoof * cos * Math.min(...baySpans(spec)) })
-  // Table 7.2.1, single-span gable: uniform and, at 20–30°, .75/1.25.
-  const snowAngles = [25, 30, 35, 40, 45, 50, 55, 60], snowMus = [1, .85, .7, .55, .4, .25, .1, 0]
-  const snowIndex = snowAngles.findIndex((a) => deg <= a)
-  const mu = deg <= 25 ? 1 : snowIndex < 0 ? 0 : snowMus[snowIndex - 1] + (snowMus[snowIndex] - snowMus[snowIndex - 1]) * (deg - snowAngles[snowIndex - 1]) / (snowAngles[snowIndex] - snowAngles[snowIndex - 1])
-  const qSnow = c.snow * mu * c.snowMu
-  /* 표 7.2.1 — 불균형(20~30°)은 제2항 단경간 쌍坡만. 제1항 단坡는 균일. 다경간(제7항)은 7.2.2-3 골조·기둥 = 전 경간 균일 (25° 초과는 적용범위에서 막음) */
-  const snowCases = c.snow > 0 ? (deg >= 20 && deg <= 30 && G.ridges.length === 1 ? ['SN', 'SN1', 'SN2'] : ['SN']) : []
+  const s0 = c.snow * c.snowMu, shape = snowShapeCN(spec, G)
+  const qSnow = s0 * shape.uniform
+  const snowCases = c.snow > 0 ? shape.cases : []
   for (const e of model.elements) {
     const [a, b] = ends(e)
     let w = 0
     if (e.role === 'girt') w = spec.wallDead * (e.face && e.face !== 'roof' ? wallTrib(e.face) : gWall)
     if (e.role === 'rafter' && gable(a)) w = spec.wallDead * strip((a.x + b.x) / 2)
     if (e.role === 'purlin' || e.role === 'strut') {
-      const eave = !!G.eaveSide(a.x), trib = G.roofTrib(a.x).reduce((t, r) => t + r.trib, 0)
+      const eave = !!G.eaveSide(a.x), tribs = G.roofTrib(a.x), trib = tribs.reduce((t, r) => t + r.trib, 0)
       w = spec.roofDead * trib + (eave ? spec.wallDead * G.gWallAt(a.x) / 2 : 0)
       add(e.id, 'LR', 'GZ', -qLive * trib * cos)
       snow.set(e.id, qSnow * trib * cos)
-      for (const lc of snowCases) {
-        /* 불균형: SN1 = 오르막 면(rising) 1.25·반대 0.75, SN2 = 반대. 마루 절점은 양쪽 평균 = 1 */
-        const k = lc === 'SN' || G.isRidge(a.x) ? 1 : G.planes[G.roofTrib(a.x)[0].plane].rising === (lc === 'SN1') ? 1.25 : .75
-        add(e.id, lc, 'GZ', -qSnow * trib * cos * k)
-      }
+      for (const sc of snowCases) add(e.id, sc.name, 'GZ', -s0 * cos * tribs.reduce((t, r) => t + sc.k(a.x, r.plane) * r.trib, 0))
     }
     if (w) { add(e.id, 'D', 'GZ', -w); dead.set(e.id, w) }
   }
@@ -82,6 +119,10 @@ export function buildCnLoads(spec: FactorySpec, model: FactoryModel): LoadPayloa
   const W = [...weights.values()].reduce((a, b) => a + b, 0)
   const denom = model.nodes.reduce((s, n) => s + (weights.get(n.id) ?? 0) * n.z, 0)
   const seismic = { W } as LoadInfo['seismic']
+  const node = (id: number, lc: string, F: [number, number, number]) => {
+    const items = (CNLD[id] ??= { ITEMS: [] }).ITEMS
+    items.push({ ID: items.length + 1, LCNAME: lc, GROUP_NAME: '', FX: F[0], FY: F[1], FZ: F[2], MX: 0, MY: 0, MZ: 0 })
+  }
   for (const d of ['X', 'Y'] as const) {
     const T = d === 'X' ? c.Tx : c.Ty
     const sa = spectrum(T, c.alphaMax, c.Tg, c.damping), minimum = .2 * c.alphaMax
@@ -89,69 +130,103 @@ export function buildCnLoads(spec: FactorySpec, model: FactoryModel): LoadPayloa
     seismic[d] = { T, c: coef, cV: sa, cStar: coef, cMin: minimum, cM: 0, gov: sa >= minimum ? 'GB/T 50011 5.1.5' : 'GB/T 50011 5.2.5', V, Fu: 1, R: 1, Mt: 0 }
     for (const n of model.nodes) {
       const F = denom > 0 ? V * (weights.get(n.id) ?? 0) * n.z / denom : 0
-      if (!F) continue
-      const items = (CNLD[n.id] ??= { ITEMS: [] }).ITEMS
-      items.push({ ID: items.length + 1, LCNAME: `E${d}`, GROUP_NAME: '', FX: d === 'X' ? F : 0, FY: d === 'Y' ? F : 0, FZ: 0, MX: 0, MY: 0, MZ: 0 })
+      if (F) node(n.id, `E${d}`, [d === 'X' ? F : 0, d === 'Y' ? F : 0, 0])
     }
   }
-  const hRef = G.hMean
-  const q = (z: number) => c.w0 * muZ(z, c.terrain) * c.topography
-  const qh = q(hRef), cp = roofShape(deg)
+  /* GB 51022 4.4.2-3 수직지진 — 8도·9도: 중력 대표값의 10%(0.20g)·15%(0.30g)·20%(9도), 아래 방향 + */
+  const vRatio = verticalRatioCN(c.alphaMax)
+  if (vRatio > 0) for (const n of model.nodes) { const w = weights.get(n.id) ?? 0; if (w) node(n.id, 'EV', [0, 0, -vRatio * w]) }
+
+  /* GB 51022 4.2 — wk = β·μw·μz·w0, β 1.1 (주골조), μz 는 10 m 미만이면 10 m 값, h = 평균 지붕 높이 */
+  const hRef = G.hMean, B = spec.span, minDim = Math.min(B, length)
+  const q0 = c.w0 * c.topography * muZ(Math.max(hRef, 10), c.terrain), qF = BETA_FRAME_CN * q0
+  /* 끝 구역 폭 2a — 횡방향은 박공 쪽, 종방향은 측벽 쪽 (그림 4.2.2-1·4.2.2-2; 종방향 그림 표기 a 이나 MBMA 와 같이 2a 로 보수적) */
+  const endW = 2 * edgeACN(minDim, hRef)
+  const nearGable = (y: number) => y <= endW + 1e-9 || y >= length - endW - 1e-9
+  const nearSide = (x: number) => x <= endW + 1e-9 || x >= B - endW - 1e-9
+  type WindCase = { name: string; dir: 'X' | 'Y'; sign: number; i: Internal }
+  const winds: WindCase[] = []
+  for (const dir of ['X', 'Y'] as const) for (const sign of [1, -1]) for (const i of ['+i', '-i'] as const)
+    winds.push({ name: `W${dir}${winds.filter((w) => w.dir === dir).length + 1}`, dir, sign, i })
+  const mu = (wc: WindCase, zone: ZoneMW) => (wc.dir === 'X' ? mwTransCN(deg, wc.i, zone) : mwLongCN(wc.i, zone))
+  const E = (z: '1' | '2' | '3' | '4', end: boolean) => (end ? `${z}E` : z) as ZoneMW
+  /** 벽 μw — 횡: 풍상 측벽 1, 풍하 측벽 4, 박공벽 5·6 / 종: 풍상 박공 1, 풍하 박공 4, 측벽 5·6 */
+  const wallMu = (wc: WindCase, face: Exclude<Face, 'roof'>, x: number, y: number) => {
+    const [windward, leeward] = wc.dir === 'X' ? (wc.sign > 0 ? ['x0', 'xL'] : ['xL', 'x0']) : (wc.sign > 0 ? ['y0', 'yL'] : ['yL', 'y0'])
+    const end = wc.dir === 'X' ? nearGable(y) : nearSide(x)
+    return mu(wc, face === windward ? E('1', end) : face === leeward ? E('4', end) : '5')
+  }
+  /** 지붕 μw — 횡: 풍상 처마에서 주 4 길이까지 2, 이후 3 / 종: 풍상 L/2 까지 2, 이후 3 */
+  const roofMu = (wc: WindCase, x: number, y: number) => {
+    if (wc.dir === 'X') {
+      const xp = wc.sign > 0 ? x : B - x
+      return mu(wc, E(xp < zone2LenCN(mu(wc, '2'), minDim, hRef, B) - 1e-9 ? '2' : '3', nearGable(y)))
+    }
+    const yp = wc.sign > 0 ? y : length - y
+    return mu(wc, E(yp < length / 2 - 1e-9 ? '2' : '3', nearSide(x)))
+  }
   const OUT: Record<Exclude<Face, 'roof'>, [number, number]> = { x0: [-1, 0], xL: [1, 0], y0: [0, -1], yL: [0, 1] }
-  const winds: { name: string; dir: 'X' | 'Y'; sign: number; internal: number }[] = []
-  for (const dir of ['X', 'Y'] as const) for (const sign of [1, -1]) for (const internal of [.2, -.2])
-    winds.push({ name: `W${dir}${winds.filter((w) => w.dir === dir).length + 1}`, dir, sign, internal })
   for (const wc of winds) {
-    const windward = wc.dir === 'X' ? (wc.sign > 0 ? 'x0' : 'xL') : (wc.sign > 0 ? 'y0' : 'yL')
-    const leeward = wc.dir === 'X' ? (wc.sign > 0 ? 'xL' : 'x0') : (wc.sign > 0 ? 'yL' : 'y0')
-    /* 표 8.3.1: 풍하벽 −0.5 (단경간 제2·5항), 다경간 −0.4 (제8항) */
-    const leeCp = G.ridges.length > 1 ? -.4 : -.5
-    const wallP = (face: Exclude<Face, 'roof'>, z: number) => c.betaZ * (face === windward ? .8 * q(z) : (face === leeward ? leeCp : -.7) * qh) - wc.internal * qh
-    const wall = (id: number, face: Exclude<Face, 'roof'>, z: number, trib: number) => { const p = wallP(face, z) * trib, [x, y] = OUT[face]; add(id, wc.name, 'GX', -x * p); add(id, wc.name, 'GY', -y * p) }
+    const wall = (id: number, face: Exclude<Face, 'roof'>, x: number, y: number, trib: number) => { const p = qF * wallMu(wc, face, x, y) * trib, [ox, oy] = OUT[face]; add(id, wc.name, 'GX', -ox * p); add(id, wc.name, 'GY', -oy * p) }
     for (const e of model.elements) {
-      const [a, b] = ends(e)
-      if (e.role === 'girt' && e.face && e.face !== 'roof') { wall(e.id, e.face, a.z, wallTrib(e.face)); continue }
-      if (e.role === 'rafter') { const face = gable(a); if (face) wall(e.id, face, (a.z + b.z) / 2, strip((a.x + b.x) / 2)); continue }
+      const [a, b] = ends(e), xm = (a.x + b.x) / 2, ym = (a.y + b.y) / 2
+      if (e.role === 'girt' && e.face && e.face !== 'roof') { wall(e.id, e.face, xm, ym, wallTrib(e.face)); continue }
+      if (e.role === 'rafter') { const face = gable(a); if (face) wall(e.id, face, xm, a.y, strip(xm)); continue }
       if (e.role !== 'purlin' && e.role !== 'strut') continue
       let fx = 0, fz = 0
-      /* 지붕면마다(G.roofTrib): rising 면은 +X 풍을 마주봄. 처마면 측벽 반 칸 */
+      /* 지붕면마다(G.roofTrib) 면 쪽으로 조금 들어간 점의 구역 — 마루 퍼린의 풍상면 몫은 2구역 */
       for (const { plane, trib } of G.roofTrib(a.x)) {
-        const rising = G.planes[plane].rising
-        const windFacing = rising === (wc.sign > 0)
-        /* 풍상 쪽부터 순서: 첫 면(마주볼 때) μs(제2항), 첫 경간 다른 면 −0.5, 이후 경간 −0.4 (제8항 등고 쌍경간) */
-        const order = wc.sign > 0 ? plane : G.planes.length - 1 - plane
-        const coeff = wc.dir === 'Y' ? -.6 : order === 0 && windFacing ? cp : order <= 1 ? -.5 : -.4
-        const p = qh * (c.betaZ * coeff - wc.internal)
-        fx += (rising ? 1 : -1) * p * trib * sin; fz -= p * trib * cos
+        const pl = G.planes[plane], xe = Math.min(Math.max(a.x, pl.xa + 1e-6), pl.xb - 1e-6)
+        const p = qF * roofMu(wc, xe, ym)
+        fx += (pl.rising ? 1 : -1) * p * trib * sin; fz -= p * trib * cos
       }
       const side = G.eaveSide(a.x)
-      if (side === 'x0') fx += wallP('x0', G.zAt(a.x)) * G.gWallAt(a.x) / 2
-      else if (side === 'xL') fx -= wallP('xL', G.zAt(a.x)) * G.gWallAt(a.x) / 2
+      if (side === 'x0') fx += qF * wallMu(wc, 'x0', a.x, ym) * G.gWallAt(a.x) / 2
+      else if (side === 'xL') fx -= qF * wallMu(wc, 'xL', a.x, ym) * G.gWallAt(a.x) / 2
       add(e.id, wc.name, 'GX', fx); add(e.id, wc.name, 'GZ', fz)
     }
   }
+
   type Part = { lc: string; f: number }
-  const variants: Record<LoadCaseType, Part[][]> = { D: [[{ lc: 'D', f: 1 }]], L: [[{ lc: 'LR', f: 1 }]], S: snowCases.length ? snowCases.map((lc) => [{ lc, f: 1 }]) : [[]], W: winds.map((w) => [{ lc: w.name, f: 1 }]), E: ['EX', 'EY'].flatMap((lc) => [1, -1].map((f) => [{ lc, f }])) }
+  const full = snowCases.filter((s) => !s.half), halves = snowCases.filter((s) => s.half)
+  const variants: Record<LoadCaseType, Part[][]> = { D: [[{ lc: 'D', f: 1 }]], L: [[{ lc: 'LR', f: 1 }]], S: full.length ? full.map((s) => [{ lc: s.name, f: 1 }]) : [[]], W: winds.map((w) => [{ lc: w.name, f: 1 }]), E: ['EX', 'EY'].flatMap((lc) => [1, -1].map((f) => [{ lc, f }])) }
   const LCOM: Record<string, unknown> = {}, comboKind: LoadInfo['comboKind'] = {}
   let no = 0
+  const seen = new Set<string>()
+  const push = (ref: string, parts: Part[]) => {
+    const key = JSON.stringify(parts); if (seen.has(key)) return; seen.add(key)
+    const suffix = parts.filter((p) => !['D', 'LR'].includes(p.lc)).map((p) => `${p.f < 0 ? '-' : ''}${p.lc}`).join(' ')
+    const name = `GB ${ref}${suffix ? ` ${suffix}` : ''}`
+    comboKind[name] = 'basic'
+    // Structural importance gamma0 is applied to non-seismic combinations.
+    const gamma = parts.some((p) => p.lc.startsWith('E')) ? 1 : c.gamma0
+    LCOM[++no] = { NAME: name, ACTIVE: 'ACTIVE', iTYPE: 0, DESC: 'GB 55001 / GB 51022 / GB/T 50011', vCOMB: parts.map((p) => ({ ANAL: 'ST', LCNAME: p.lc, FACTOR: p.f * gamma })) }
+  }
   for (const combo of CN.combos({ heavyLive: false })) {
     if (!snowCases.length && combo.ref === 'S') continue
     let combos: Part[][] = [[]]
-    for (const [k, factor] of combo.terms) combos = combos.flatMap((parts) => variants[k].map((v) => [...parts, ...v.map((p) => ({ lc: p.lc, f: p.f * factor }))]))
-    const seen = new Set<string>()
-    for (const parts of combos) {
-      const key = JSON.stringify(parts); if (seen.has(key)) continue; seen.add(key)
-      const suffix = parts.filter((p) => !['D', 'LR'].includes(p.lc)).map((p) => `${p.f < 0 ? '-' : ''}${p.lc}`).join(' ')
-      const name = `GB ${combo.ref}${suffix ? ` ${suffix}` : ''}`
-      comboKind[name] = 'basic'
-      // Structural importance gamma0 is applied to non-seismic combinations.
-      const gamma = parts.some((p) => p.lc.startsWith('E')) ? 1 : c.gamma0
-      LCOM[++no] = { NAME: name, ACTIVE: 'ACTIVE', iTYPE: 0, DESC: 'GB 55001 / GB 50009 / GB/T 50011', vCOMB: parts.map((p) => ({ ANAL: 'ST', LCNAME: p.lc, FACTOR: p.f * gamma })) }
+    /* 지진 조합의 적설 = 중력 대표값(균일 0.5S) — 불균등·골 분포는 쓰지 않음 */
+    const vs = (k: LoadCaseType) => (k === 'S' && combo.terms.some(([t]) => t === 'E') ? variants.S.slice(0, 1) : variants[k])
+    for (const [k, factor] of combo.terms) combos = combos.flatMap((parts) => vs(k).map((v) => [...parts, ...v.map((p) => ({ lc: p.lc, f: p.f * factor }))]))
+    for (const parts of combos) push(combo.ref, parts)
+    /* 4.3.5-2 반경간 균일 적설 — 적설 지배 조합(1.3D + 1.5S)만 */
+    if (combo.ref === 'S') for (const h of halves) push('S', [{ lc: 'D', f: 1.3 }, { lc: h.name, f: 1.5 }])
+  }
+  /* GB 55002 표 4.3.2 — 수직지진 단독 γEv 1.4, 수평 지배 시 γEh 1.4 + γEv 0.5. 중력 대표값 = D + 0.5S(균일) */
+  if (vRatio > 0) {
+    const g = (fav: boolean): Part[] => fav ? [{ lc: 'D', f: 1 }] : [{ lc: 'D', f: 1.3 }, ...(snowCases.length ? [{ lc: 'SN', f: .65 }] : [])]
+    push('EV', [...g(false), { lc: 'EV', f: 1.4 }])
+    push('EV', [...g(true), { lc: 'EV', f: -1.4 }])
+    for (const [e] of variants.E) {
+      push('EHV', [...g(false), { lc: e.lc, f: 1.4 * e.f }, { lc: 'EV', f: .5 }])
+      push('EHV', [...g(true), { lc: e.lc, f: 1.4 * e.f }, { lc: 'EV', f: -.5 }])
     }
   }
   const STLD: Record<string, unknown> = {}
-  const cases = [['D', 'D'], ['LR', 'LR'], ...snowCases.map((n) => [n, 'S']), ['EX', 'E'], ['EY', 'E'], ...winds.map((w) => [w.name, 'W'])]
+  const cases = [['D', 'D'], ['LR', 'LR'], ...snowCases.map((s) => [s.name, 'S']), ['EX', 'E'], ['EY', 'E'], ...(vRatio > 0 ? [['EV', 'E']] : []), ...winds.map((w) => [w.name, 'W'])]
   cases.forEach(([NAME, TYPE], i) => { STLD[i + 1] = { NAME, TYPE, DESC: `GB ${NAME}` } })
+  const cp2 = (i: Internal) => mwTransCN(deg, i, '2')
   return { STLD, BODF: { 1: { LCNAME: 'D', GROUP_NAME: '', FV: [0, 0, -1] } }, BMLD, CNLD, 'LCOM-GEN': LCOM,
-    info: { roofLive: qLive, snow: qSnow, seismic, comboKind, omega: { X: 1, Y: 1 }, wind: { qh, hRef, cases: winds.map((w) => ({ name: w.name, dir: w.dir, roofCp: w.dir === 'X' ? cp : -.6, gcpi: w.internal })), windwardRoofCp: { low: cp, high: cp }, across: { WDx: Math.max(...winds.filter((w) => w.dir === 'X').map((w) => Math.abs(total[w.name]?.x ?? 0))), WDy: Math.max(...winds.filter((w) => w.dir === 'Y').map((w) => Math.abs(total[w.name]?.y ?? 0))), WLX: 0, WLY: 0, MT: 0, kD: 1 }, variants: winds.map((w) => ({ tag: w.name, dir: w.dir, parts: [{ lc: w.name, f: 1 }] })) } } }
+    info: { roofLive: qLive, snow: qSnow, snowPeak: s0 * shape.peak, seismic, comboKind, omega: { X: 1, Y: 1 }, cn: { verticalRatio: vRatio, endZone: endW },
+      wind: { qh: q0, hRef, cases: winds.map((w) => ({ name: w.name, dir: w.dir, roofCp: mu(w, '2'), gcpi: w.i === '+i' ? 1 : -1 })), windwardRoofCp: { low: cp2('+i'), high: cp2('-i') }, across: { WDx: Math.max(...winds.filter((w) => w.dir === 'X').map((w) => Math.abs(total[w.name]?.x ?? 0))), WDy: Math.max(...winds.filter((w) => w.dir === 'Y').map((w) => Math.abs(total[w.name]?.y ?? 0))), WLX: 0, WLY: 0, MT: 0, kD: 1 }, variants: winds.map((w) => ({ tag: w.name, dir: w.dir, parts: [{ lc: w.name, f: 1 }] })) } } }
 }

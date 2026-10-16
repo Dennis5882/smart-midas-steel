@@ -17,6 +17,7 @@ import { CN_CATALOG } from './cnCatalog'
 import { KR_CATALOG } from './krCatalog'
 import { CATALOG } from './catalog'
 import { purlinDefl, purlinLimitDiv, runDesign, type DesignResult, type ServiceCheck } from './design'
+import { cnGirtDeflRatio, cnPostDeflRatio } from './cnDesign'
 import type { LoadInfo } from './loads'
 import { portalGeometry } from './portal'
 import { sectionProps } from './sections'
@@ -164,6 +165,7 @@ export function proposeSections(spec: FactorySpec, model: FactoryModel, info: Lo
       if (s > tgt(r, sec)) continue
       if (r === 'purlin' && purlinDefl(spec, info, sec) / (spec.baySpacing / purlinLimitDiv(spec.code)) > target) { governs = 'service'; continue }
       if (r === 'brace' && (driftY * braceA0) / sectionProps(sec).A > target) { governs = 'service'; continue }
+      if (spec.code === 'CN' && ((r === 'girt' && cnGirtDeflRatio(spec, info, sec) > target) || (r === 'post' && cnPostDeflRatio(spec, info, sec) > target))) { governs = 'service'; continue }
       pick = sec; ratio = s
       break
     }

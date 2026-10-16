@@ -16,6 +16,10 @@ import { buildKrLoads, type KrLoadInfo } from './krLoads'
 
 export interface LoadInfo {
   snow?: number
+  /** CN: 퍼린 설계용 최대 적설 (kN/m², GB 51022 4.3.5-1 불균등 최악) — 없으면 snow */
+  snowPeak?: number
+  /** CN: GB 51022 수직지진 비율(4.4.2-3, 0 = 없음)·풍 끝 구역 폭 2a (m) */
+  cn?: { verticalRatio: number; endZone: number }
   /** KR: KDS 중간값 (스펙트럼·가스트·적설 계수) — 계산서 표시 */
   kr?: KrLoadInfo
   /** 지붕 활하중 (kN/m², 수평투영) */

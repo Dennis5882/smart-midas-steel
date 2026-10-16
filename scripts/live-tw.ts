@@ -2,16 +2,12 @@
    현재 Gen 문서를 자동 저장한 뒤 새 모델을 만든다 → 시험용 Gen 세션에서 실행.
    실행: node --import tsx scripts/live-tw.ts [--optimize] [--frame mono|multi] [--out <경로 접두사>]
    출력: <out>.html (계산서) · .dxf · -summary.json (스펙·반력·검토·접합·최적화 — 계산서 재생성용) */
-import { createInterface } from 'node:readline'
+import { readMapiKey } from './mapi-key'
 import { writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-const lines = createInterface({ input: process.stdin, terminal: false })
-console.log('Waiting for MAPI-Key on stdin (not echoed).')
-let key = ''
-for await (const line of lines) { key = line.trim(); lines.close(); break }
-if (!key) throw new Error('MAPI-Key required on stdin')
+const key = await readMapiKey()
 ;(globalThis as any).document = { documentElement: { lang: 'ko', dataset: {} } }
 const { S } = await import('../src/state/store')
 const { DEFAULT_SPEC, normalizeSpans } = await import('../src/domain/types')

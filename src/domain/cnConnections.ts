@@ -11,6 +11,7 @@ import type { FactorySpec, FactoryModel } from './types'
 import type { ConnCheck, ConnResult, ConnectionParts } from './connections'
 import { sectionProps } from './sections'
 import { portalGeometry } from './portal'
+import { isSeismicCN } from '../codes/cnPortal'
 
 const PLATES = [10, 12, 14, 16, 18, 20, 22, 25, 28, 30, 32, 36, 40, 45, 50, 55, 60, 65, 70, 80, 90, 100]
 // Stop at the verified material-table range; an undersized 100 mm plate stays NG.
@@ -48,6 +49,8 @@ export function runCnConnections(spec: FactorySpec, model: FactoryModel, res: Re
     const tp = pick(Math.max(16, tReq)), keyW = Math.max(200, Math.ceil(maxKey * 1000 / (100 * c.concreteBearing) / 10) * 10), keyT = pick(Math.max(10, maxKey * 1000 / (100 * cnStrength(spec.material, 16).fv)))
     const w = Math.max(6, Math.ceil(maxV * 1000 / (.7 * weldF * 2 * col.h)))
     checks.push(check('plateT', tReq, tp, 'mm', 'GB 50017 12.7.5, elastic cantilever'), check('shearKey', maxKey, Math.min(100 * keyT * cnStrength(spec.material, keyT).fv, keyW * 100 * c.concreteBearing) / 1000, 'kN', 'GB 50017 12.7.4'), check('weldWeb', maxV, .7 * w * 2 * col.h * weldF / 1000, 'kN', 'GB 50017 11.2.2'))
+    /* GB 51022 3.4.3-3: 지진 조합 지배 + 고정 주각 → 앵커 면적 ≥ 0.15 × 기둥 단면적 (유효 단면적 기준, 보수적) */
+    if (spec.baseFixity === 'fixed' && isSeismicCN(worstF.combo)) checks.push(check('anchorArea', .15 * col.A, 2 * nSide * tensileArea(d), 'mm²', 'GB 51022 3.4.3-3'))
     selected = { type: 'base', elem: worstF.elem, combo: worstF.combo, dims: { plate: `PL ${B}x${N}x${tp}`, anchors: `${2 * nSide}-M${d} Q235/Q345, ft=${c.anchorFt} MPa`, anchorLayout: `${nSide}/side; edge ${edge} mm`, shearKey: `PL ${keyW}x100x${keyT}; embedded 100 mm`, weld: `web ${w} mm; flanges CJP` }, checks, ratio: ratio(checks), notes: ['gbFoundation'] }
     selected.parts = { plates: [{ part: 'plate', width: B, length: N, thickness: tp, count: 1, estimated: false }, { part: 'shearKey', width: keyW, length: 100, thickness: keyT, count: 1, estimated: false }], fasteners: [{ kind: 'anchor', diameter: d, count: 2 * nSide }] }
     if (selected.ratio <= 1) break
