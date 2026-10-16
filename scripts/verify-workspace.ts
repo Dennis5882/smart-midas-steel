@@ -98,4 +98,14 @@ await setCode('TW')
 assert.equal(S.draftSpec!.material, defaultSpecFor('TW').material)
 assert.equal(S.draftSpec!.span, 28)
 setConfirmHandler(null)
+/* 설계기준·언어 예외 규칙 (간체만): 새 작업은 CN 만 / 작업 중 간체 전환은 TW 유지 / 그 밖 언어는 고른 기준 유지 */
+{
+  const { codeForLang } = await import('../src/state/store')
+  assert.equal(codeForLang('zh-CN', 'TW', 'TW', false), 'CN', 'zh-CN new work → CN only')
+  assert.equal(codeForLang('zh-CN', 'TW', 'TW', true), 'TW', 'switching to zh-CN mid-work keeps TW')
+  assert.equal(codeForLang('zh-TW', 'CN', null, false), 'CN', 'zh-TW keeps current choice (no forced TW)')
+  assert.equal(codeForLang('ko', 'CN', 'TW', false), 'TW', 'leaving zh-CN restores the saved choice')
+  assert.equal(codeForLang('en', 'TW', 'CN', false), 'CN', 'saved CN survives reload in en')
+  assert.equal(codeForLang('en', 'TW', null, false), 'TW', 'no saved choice → current (TW default)')
+}
 console.log('Workspace passed: 4 languages × TW/CN × 5 modeling actions; resume, guards, project code migration/cancel/stale results')

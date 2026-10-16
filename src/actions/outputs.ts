@@ -3,7 +3,7 @@
 import { buildDxf } from '../drawing/drawings'
 import { getLang, t, lt } from '../i18n'
 import { buildReport } from '../report/report'
-import { LOSS, quantities } from '../domain/quantities'
+import { LOSS, QuantityError, quantities } from '../domain/quantities'
 import type { I18nKey } from '../i18n'
 import { S } from '../state/store'
 import { addMsg, log, recordArtifact } from '../state/ui'
@@ -77,7 +77,10 @@ export function downloadQuantities(): void {
   if (!canOutput()) return
   if (!S.built) { addMsg('bot', lt('no_model')); return }
   const { spec, model } = S.built
-  const q = quantities(spec, model, S.connections)
+  let q: ReturnType<typeof quantities>
+  try { q = quantities(spec, model, S.connections) } catch (e) {
+    addMsg('bot', e instanceof QuantityError ? t('q_invalid', e.where) : String(e instanceof Error ? e.message : e), 'error'); return
+  }
   const L = (k: string) => t(k as I18nKey)
   const cell = (v: unknown) => { const s = String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
   const rows: unknown[][] = [

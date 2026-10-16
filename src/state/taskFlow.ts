@@ -1,7 +1,12 @@
 /** Shared button availability and stage states. Viewing a stage never runs a job. */
 import type { AppState, TaskId } from './store'
-import { specChanged } from './workflow'
+import type { FactorySpec } from '../domain/types'
 import type { I18nKey } from '../i18n'
+
+/** 키 순서·undefined 와 무관한 스펙 비교 (카드의 toSpec·normalizeBays 가 키 순서를 바꿀 수 있음) */
+const canon = (v: unknown): unknown => Array.isArray(v) ? v.map(canon)
+  : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).filter((k) => (v as any)[k] !== undefined).sort().map((k) => [k, canon((v as any)[k])])) : v
+export const specChanged = (a: FactorySpec | null, b: FactorySpec | null | undefined) => !!a && !!b && JSON.stringify(canon(a)) !== JSON.stringify(canon(b))
 
 export const TASKS: { id: Exclude<TaskId, 'history'>; label: I18nKey; hint: I18nKey }[] = [
   { id: 'model', label: 'flow_model', hint: 'flow_model_hint' },
@@ -18,12 +23,17 @@ export function unavailable(s: FlowState, task: TaskId): I18nKey | null {
   if (s.busy || s.confirm) return 'busy'
   if (task === 'model' || task === 'history') return null
   if (!s.built) return 'flow_need_model'
-  if (s.genChanged) return 'wf_stale_gen'
+  /* Gen 변경: 해석·검토·최적화는 실행 첫 단계에서 Gen 을 다시 비교(assertGenSync)하므로 막지 않는다 —
+     Gen 에서 되돌렸으면 통과하고 감지 건수도 0 으로. 막으면 다시 확인할 길이 없어 재생성만 남는다 */
+  const genChecked = task === 'analysis' || task === 'design' || task === 'optimize'
+  if (s.genChanged && !genChecked) return 'wf_stale_gen'
   if (s.draftInvalid) return 'flow_invalid_draft'
-  if (isStale(s)) return 'wf_stale_edited'
+  if (specChanged(s.draftSpec, s.built.spec)) return 'wf_stale_edited'
+  /* 산출물은 모델만 있으면 가능 — 계산서는 부분판(검토 전 표시), 도면·물량은 접합 없이 부재만 */
+  if (task === 'outputs') return null
   if (task !== 'analysis' && !s.analyzed) return 'need_anal'
-  if ((task === 'optimize' || task === 'outputs') && (!s.design || !s.connections)) return 'flow_need_design'
-  if (task !== 'outputs' && !s.mapiKey.trim()) return 'flow_need_connection'
+  if (task === 'optimize' && (!s.design || !s.connections)) return 'flow_need_design'
+  if (!s.mapiKey.trim()) return 'flow_need_connection'
   return null
 }
 

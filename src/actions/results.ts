@@ -21,7 +21,7 @@ export interface Results {
   combos: string[]
 }
 
-const num = (s: unknown) => resultNumber(s, 'TABLE: blank or invalid numeric cell')
+const num = (s: unknown) => resultNumber(s, 'TABLE')
 
 async function table(type: string, name: string, keys: number[], loads: string[], extra: Record<string, unknown> = {}, components?: string[]) {
   const j = await mapi<any>('POST', '/post/TABLE', {
@@ -32,17 +32,21 @@ async function table(type: string, name: string, keys: number[], loads: string[]
     },
   }, `${type} · ${keys.length} × ${loads.length}`)
   const out = j?.[name]
-  requireResult(out && typeof out === 'object' && (Array.isArray(out.DATA) || Array.isArray(out.SUB_TABLES)), `${type}: ${name}, invalid table response`)
+  requireResult(out && typeof out === 'object' && (Array.isArray(out.DATA) || Array.isArray(out.SUB_TABLES)), type, 'invalid', name)
   return out as { HEAD: string[]; DATA: string[][]; SUB_TABLES?: any[] }
 }
+
+const STATIONS = ['I', '1/4', '2/4', '3/4', 'J']
 
 export async function fetchResults(b: Built): Promise<Results> {
   const { model, spec } = b
   const combos = b.comboNames
-  requireResult(combos.length > 0 && new Set(combos).size === combos.length, 'COMBINATIONS: empty or duplicated')
+  requireResult(combos.length > 0 && new Set(combos).size === combos.length, 'COMBINATIONS', 'invalid')
   const cb = combos.map((c) => `${c}(CB)`)
   const beamIds = model.elements.filter((e) => e.role !== 'brace').map((e) => e.id)
   const trussIds = model.elements.filter((e) => e.role === 'brace').map((e) => e.id)
+  /* 행 검증은 Set 조회 — 배열 includes 는 11만 행 × 410 요소로 화면 스레드에서 수천만 번 비교 */
+  const comboSet = new Set(combos), beamSet = new Set(beamIds), trussSet = new Set(trussIds)
 
   /* 보 부재력 */
   const beam = new Map<number, Map<string, ForcePt[]>>()
@@ -52,19 +56,19 @@ export async function fetchResults(b: Built): Promise<Results> {
   for (let offset = 0; offset < cb.length; offset += batchSize) {
     const bf = await table('BEAMFORCE', spec.code === 'CN' ? `F${offset}` : 'F', beamIds, cb.slice(offset, offset + batchSize), { PARTS: ['PartI', 'Part1/4', 'Part2/4', 'Part3/4', 'PartJ'] },
       ['Elem', 'Load', 'Part', 'Axial', 'Shear-y', 'Shear-z', 'Moment-y', 'Moment-z'])
-    requireResult(Array.isArray(bf.DATA) && bf.DATA.length > 0, 'BEAMFORCE: empty force table')
+    requireResult(Array.isArray(bf.DATA) && bf.DATA.length > 0, 'BEAMFORCE', 'missing')
     /* push(...DATA) 금지 — TW 는 410×55×5 ≈ 11만 행이라 브라우저(크롬)에서 인자 펼치기가 스택 초과 (Node 는 통과해서 늦게 발견, 2026-10-15) */
     for (const row of bf.DATA) beamRows.push(row)
   }
   for (const r of beamRows) {
     const [, el, lc, part, P, Vy, Vz, My, Mz] = r
-    const id = num(el), station = ['I', '1/4', '2/4', '3/4', 'J'].indexOf(String(part).trim().replace(/\[\d+\]$/, ''))
-    requireResult(beamIds.includes(id) && combos.includes(lc) && station >= 0, `BEAMFORCE: unexpected element/load/station ${el}, ${lc}, ${part}`)
+    const id = num(el), station = STATIONS.indexOf(String(part).trim().replace(/\[\d+\]$/, ''))
+    requireResult(beamSet.has(id) && comboSet.has(lc) && station >= 0, 'BEAMFORCE', 'unexpected', `${el} · ${lc} · ${part}`)
     const m = beam.get(id) ?? new Map<string, ForcePt[]>()
     beam.set(id, m)
     const arr = m.get(lc) ?? []
     m.set(lc, arr)
-    requireResult(!arr[station], `BEAMFORCE: duplicate station ${el}, ${lc}, ${part}`)
+    requireResult(!arr[station], 'BEAMFORCE', 'duplicate', `${el} · ${lc} · ${part}`)
     arr[station] = { P: num(P), Vy: num(Vy), Vz: num(Vz), My: num(My), Mz: num(Mz) }
   }
 
@@ -74,7 +78,7 @@ export async function fetchResults(b: Built): Promise<Results> {
     const tf = await table('TRUSSFORCE', 'T', trussIds, cb)
     for (const [, el, lc, fi, fj] of tf?.DATA ?? []) {
       const m = truss.get(+el) ?? new Map<string, number>()
-      requireResult(trussIds.includes(+el) && combos.includes(lc) && !m.has(lc), `TRUSSFORCE: unexpected/duplicate element/load ${el}, ${lc}`)
+      requireResult(trussSet.has(+el) && comboSet.has(lc) && !m.has(lc), 'TRUSSFORCE', m.has(lc) ? 'duplicate' : 'unexpected', `${el} · ${lc}`)
       truss.set(+el, m)
       m.set(lc, Math.abs(num(fi)) > Math.abs(num(fj)) ? num(fi) : num(fj))
     }
@@ -86,17 +90,18 @@ export async function fetchResults(b: Built): Promise<Results> {
   const rx = await table('REACTIONG', 'R', [base.id], cb, {}, ['Node', 'Load', 'FX', 'FY', 'FZ'])
   const sums = new Map<string, number[]>()
   const reactionRows = rx.SUB_TABLES?.[0]?.['SUMMATION OF REACTION FORCES PRINTOUT']?.DATA
-  requireResult(Array.isArray(reactionRows), 'REACTIONG: missing reaction sums')
+  requireResult(Array.isArray(reactionRows), 'REACTIONG', 'missing')
   for (const [lc, fx, fy, fz] of reactionRows as string[][]) {
-    requireResult(combos.includes(lc) && !sums.has(lc), `REACTIONG: unexpected/duplicate load ${lc}`)
+    requireResult(comboSet.has(lc) && !sums.has(lc), 'REACTIONG', sums.has(lc) ? 'duplicate' : 'unexpected', lc)
     sums.set(lc, [num(fx), num(fy), num(fz)])
   }
   const ux = await table('DISPLACEMENTG', 'U', eaveNodes.map((n) => n.id), cb, {}, ['Node', 'Load', 'DX', 'DY', 'DZ'])
   const dsum = new Map<string, number[]>()
   const seenU = new Set<string>()
+  const eaveSet = new Set(eaveNodes.map((n) => n.id))
   for (const [, nd, lc, dx, dy, dz] of ux.DATA ?? []) {
     const key = `${lc}:${nd}`
-    requireResult(eaveNodes.some((n) => n.id === +nd) && combos.includes(lc) && !seenU.has(key), `DISPLACEMENTG: unexpected/duplicate node/load ${nd}, ${lc}`)
+    requireResult(eaveSet.has(+nd) && comboSet.has(lc) && !seenU.has(key), 'DISPLACEMENTG', seenU.has(key) ? 'duplicate' : 'unexpected', `${nd} · ${lc}`)
     seenU.add(key); num(dz)
     const a = dsum.get(lc) ?? [0, 0, 0]
     a[0] += num(dx); a[1] += num(dy); a[2]++
@@ -105,7 +110,7 @@ export async function fetchResults(b: Built): Promise<Results> {
   const sway = new Map<string, Record<'X' | 'Y', { sumPu: number; drift: number; sumH: number }>>()
   for (const c of combos) {
     const s = sums.get(c), d = dsum.get(c)
-    requireResult(s && d && d[2] === eaveNodes.length && eaveNodes.every((n) => seenU.has(`${c}:${n.id}`)), `SWAY: missing reactions/displacements for ${c}`)
+    requireResult(s && d && d[2] === eaveNodes.length && eaveNodes.every((n) => seenU.has(`${c}:${n.id}`)), 'SWAY', 'missing', c)
     sway.set(c, {
       X: { sumPu: Math.abs(s[2]), drift: Math.abs(d[0] / d[2]), sumH: Math.abs(s[0]) },
       Y: { sumPu: Math.abs(s[2]), drift: Math.abs(d[1] / d[2]), sumH: Math.abs(s[1]) },
@@ -116,13 +121,14 @@ export async function fetchResults(b: Built): Promise<Results> {
   const svcCases = b.cases.filter((c) => spec.code === 'CN' || c !== 'D')
   const us = await table('DISPLACEMENTG', 'S', svcNodes.map((n) => n.id), svcCases.map((c) => `${c}(ST)`), {}, ['Node', 'Load', 'DX', 'DY', 'DZ'])
   const disp = new Map<string, Map<number, { dx: number; dy: number; dz: number }>>()
+  const svcCaseSet = new Set(svcCases), svcNodeSet = new Set(svcNodes.map((n) => n.id))
   for (const [, nd, lc, dx, dy, dz] of us?.DATA ?? []) {
     const m = disp.get(lc) ?? new Map()
-    requireResult(svcCases.includes(lc) && svcNodes.some((n) => n.id === +nd) && !m.has(+nd), `DISPLACEMENTG: unexpected/duplicate service node/load ${nd}, ${lc}`)
+    requireResult(svcCaseSet.has(lc) && svcNodeSet.has(+nd) && !m.has(+nd), 'DISPLACEMENTG', m.has(+nd) ? 'duplicate' : 'unexpected', `${nd} · ${lc}`)
     disp.set(lc, m)
     m.set(+nd, { dx: num(dx), dy: num(dy), dz: num(dz) })
   }
-  for (const c of svcCases) for (const n of svcNodes) requireResult(disp.get(c)?.has(n.id), `DISPLACEMENTG: missing service node/load ${n.id}, ${c}`)
+  for (const c of svcCases) for (const n of svcNodes) requireResult(disp.get(c)?.has(n.id), 'DISPLACEMENTG', 'missing', `${n.id} · ${c}`)
   const results = { beam, truss, sway, disp, combos }
   validateDesignResults(spec, model, b.info, results)
   return results

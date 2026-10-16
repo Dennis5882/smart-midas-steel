@@ -30,10 +30,11 @@ export async function runAnalysis(): Promise<void> {
 /** 해석 본체 (busy·메시지 없음) — 단면 최적화 반복에서도 사용 */
 export async function analyzeCore(): Promise<void> {
   stage('st_anal', 3)
+  await autoSave('model') // doc/new 직후 무제 문서는 해석이 거부되고 확인 창이 뜬다 → 먼저 저장
+  /* 저장이 성공한 뒤에 이전 결과를 비운다 — 저장 실패(폴더 없음 등)로 해석을 못 했는데 결과만 사라지지 않게 */
   S.analyzed = false
   S.results = null; S.design = null; S.connections = null; S.opt = null; S.reactions = null; S.ratioView = false
   notify()
-  await autoSave('model') // doc/new 직후 무제 문서는 해석이 거부되고 확인 창이 뜬다 → 먼저 저장
   const res = await mapi<{ message?: string }>('POST', '/doc/anal', {})
   if (NOT_ALLOWED.test(String(res?.message ?? ''))) throw new Error(String(res?.message))
   S.analyzed = true

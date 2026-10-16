@@ -9,8 +9,8 @@ import { TEMPLATES } from '../domain/templates'
 import { defaultSpecFor, normalizeBays, type FactorySpec } from '../domain/types'
 import { getLang, langUrl, t, lt } from '../i18n'
 import { verifyConn } from '../mapi/client'
-import { S, notify, type Theme } from '../state/store'
-import { specChanged } from '../state/workflow'
+import { S, notify, saveCode, type Theme } from '../state/store'
+import { specChanged } from '../state/taskFlow'
 import { addMsg, addPlanMsg, escapeHtml, previewSpec, tab, selectTask } from '../state/ui'
 import { unavailable } from '../state/taskFlow'
 import type { TaskId } from '../state/store'
@@ -136,6 +136,7 @@ export async function setCode(id: CodeId): Promise<void> {
   const plan = S.activePlan
   S.buildEpoch++
   S.code = id
+  if (getLang() !== 'zh-CN') saveCode(id) // 간체의 CN 은 언어 규칙이라 사용자 선택으로 저장하지 않음
   const defaults = defaultSpecFor(id)
   S.lastSpec = previous ? { ...defaults, span: previous.span, bays: previous.bays, baySpacing: previous.baySpacing, bayList: previous.bayList?.slice(), eaveHeight: previous.eaveHeight, roofSlope: previous.roofSlope, baseFixity: previous.baseFixity, purlinSpacing: previous.purlinSpacing, girtSpacing: previous.girtSpacing, postSpacing: previous.postSpacing, sagRods: previous.sagRods, features: previous.features && { ...previous.features } } : defaults
   if (previous) {

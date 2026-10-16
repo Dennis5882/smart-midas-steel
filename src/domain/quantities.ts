@@ -9,6 +9,11 @@ import { memberSchedule, type ScheduleRow } from './schedule'
 import { sectionProps } from './sections'
 import { ROLES, type ElementRole, type FactoryModel, type FactorySpec } from './types'
 
+/** 접합 수량 값이 잘못됨 — 화면 문구는 job.failText 가 현재 언어로(q_invalid). where = 접합 종류.부위 */
+export class QuantityError extends Error {
+  constructor(readonly where: string) { super(`Invalid connection quantity: ${where}`); this.name = 'QuantityError' }
+}
+
 /** 로스율 (가정) — 부재 5 %, 판재 10 % */
 export const LOSS = { member: 0.05, plate: 0.1 }
 const STEEL_KG_MM3 = 7.85e-6
@@ -37,7 +42,7 @@ function legacyParts(c: ConnResult, colH: number, rafD: number): ConnectionParts
   const read = (key: string, pattern: RegExp) => {
     if (d[key] === undefined) return null
     const m = String(d[key]).match(pattern)
-    if (!m) throw new Error(`Invalid connection quantity: ${c.type}.${key}`)
+    if (!m) throw new QuantityError(`${c.type}.${key}`)
     return m
   }
   for (const key of ['plate', 'shearKey'] as const) {
@@ -77,7 +82,7 @@ export function quantities(spec: FactorySpec, model: FactoryModel, conns: ConnRe
   const plates: PlateRow[] = [], bolts: BoltRow[] = [], welds: WeldRow[] = []
   const fmt = (n: number) => +n.toFixed(3)
   const addPlate = (type: ConnType, part: PlateRow['part'], b: number, l: number, t: number, perConn: number, est: boolean) => {
-    if (![b, l, t, perConn].every((n) => Number.isFinite(n) && n > 0) || !Number.isInteger(perConn)) throw new Error(`Invalid connection quantity: ${type}.${part}`)
+    if (![b, l, t, perConn].every((n) => Number.isFinite(n) && n > 0) || !Number.isInteger(perConn)) throw new QuantityError(`${type}.${part}`)
     plates.push({ type, part, size: `PL ${fmt(b)}×${fmt(l)}×${fmt(t)}`, perConn, conns: countOf[type], kg: b * l * t * STEEL_KG_MM3 * perConn * countOf[type], est })
   }
 
@@ -85,7 +90,7 @@ export function quantities(spec: FactorySpec, model: FactoryModel, conns: ConnRe
     const parts = c.parts ?? legacyParts(c, col.h, raf.d)
     for (const p of parts.plates) addPlate(c.type, p.part, p.width, p.length, p.thickness, p.count, p.estimated)
     for (const f of parts.fasteners) {
-      if (!(Number.isFinite(f.diameter) && f.diameter > 0 && Number.isInteger(f.count) && f.count > 0)) throw new Error(`Invalid connection quantity: ${c.type}.${f.kind}`)
+      if (!(Number.isFinite(f.diameter) && f.diameter > 0 && Number.isInteger(f.count) && f.count > 0)) throw new QuantityError(`${c.type}.${f.kind}`)
       bolts.push({ type: c.type, kind: f.kind, size: `M${f.diameter}`, perConn: f.count, conns: countOf[c.type], total: f.count * countOf[c.type] })
     }
     /* 용접 (단부판 접합): 주각 = 기둥–베이스판, 처마 = 지붕보–단부판, 마루 = 양쪽 지붕보–단부판 */

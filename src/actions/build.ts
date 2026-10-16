@@ -7,7 +7,7 @@ import { buildLoadPayloads } from '../domain/loads'
 import { buildPortal } from '../domain/portal'
 import type { FactorySpec } from '../domain/types'
 import { checkScope } from '../domain/scope'
-import { isRecord, loadDifference } from '../domain/payloadValidation'
+import { dbDifferences, diffText, isRecord } from '../domain/genSync'
 import { scopeMsg } from '../components/ScopeBox'
 import { t, lt } from '../i18n'
 import { mapi } from '../mapi/client'
@@ -30,8 +30,8 @@ export async function buildFactory(spec: FactorySpec): Promise<void> {
   addMsg('bot', lt('build_start'))
   tab('logP')
   try {
-    const model = await sendModel(spec)
-    S.restorePoint = lastBackup
+    /* 복원 지점은 doc/new 가 사용자 문서를 지운 순간 기록 — 이후 전송 실패·취소에도 실패 카드에서 복원 가능 */
+    const model = await sendModel(spec, (backup) => { S.restorePoint = backup; notify() })
     const b = S.built!
     addMsg('bot', lt('build_done', model.nodes.length, model.elements.length, b.cases.length, b.combos))
     S.task = 'analysis'
@@ -44,8 +44,6 @@ export async function buildFactory(spec: FactorySpec): Promise<void> {
   }
 }
 
-let lastBackup: string | null = null
-
 /** [이전 모델로 복원] — 마지막 [공장 생성] 직전 백업을 Gen 에서 다시 연다 (현재 문서는 sms_model_* 로 먼저 저장). 앱의 모델·결과는 비운다 */
 export async function restoreBackup(): Promise<void> {
   const path = S.restorePoint
@@ -56,7 +54,7 @@ export async function restoreBackup(): Promise<void> {
     stage('st_restore', 2)
     await autoSave('model')
     const res = await mapi<{ message?: string }>('POST', '/doc/open', { Argument: path }, path)
-    if (res?.message !== 'MIDAS GEN NX command complete') throw new Error(String(res?.message ?? 'open failed'))
+    if (res?.message !== 'MIDAS GEN NX command complete') throw new Error(String(res?.message ?? t('gen_bad_response')))
     clearBuilt()
     S.restorePoint = null
     S.buildEpoch++
@@ -69,8 +67,9 @@ export async function restoreBackup(): Promise<void> {
   }
 }
 
-/** 전송 본체 (busy·메시지 없음) — 단면 최적화 반복에서도 사용. 성공하면 S.built 갱신, 이전 결과 초기화 */
-export async function sendModel(spec: FactorySpec) {
+/** 전송 본체 (busy·메시지 없음) — 단면 최적화 반복에서도 사용. 성공하면 S.built 갱신, 이전 결과 초기화.
+    onReplaced: doc/new 직후 백업 경로 — [공장 생성]만 복원 지점으로 쓴다(최적화 반복의 백업은 앱이 만든 모델) */
+export async function sendModel(spec: FactorySpec, onReplaced?: (backup: string) => void) {
   const model = buildPortal(spec)
   const p = buildGenPayloads(spec, model)
   const l = buildLoadPayloads(spec, model)
@@ -81,9 +80,10 @@ export async function sendModel(spec: FactorySpec) {
   const designCode = profileOf(spec.code).gen.designCode
   stage('st_send', 2 + steps.length + (designCode ? 1 : 0))
   /* 열린 문서를 먼저 임시 저장 → doc/new 가 "저장할까요?" 창을 띄우지 않게 (사용자 원본 파일은 건드리지 않음) */
-  lastBackup = await autoSave('backup')
+  const backup = await autoSave('backup')
   /* 전체 문서를 doc/new 로 초기화 — 항목별 DELETE 의 경고·잔여 데이터 방지 (story 와 같은 방식) */
   await mapi('POST', '/doc/new', {})
+  onReplaced?.(backup)
   /* 여기부터 Gen 문서는 이전 모델이 아니다 — 중간 실패·취소 때 이전 결과로 해석·검토하지 않게 먼저 비운다 */
   clearBuilt()
   for (const [name, assign] of steps) await mapi('PUT', name, { Assign: assign }, String(Object.keys(assign).length))
@@ -119,10 +119,9 @@ function clearBuilt(): void {
   notify()
 }
 
-/* Unknown response shapes fail closed. Load records also require matching
-   target IDs, item IDs, case names, directions, positions and values. */
+/* 응답 형식을 모르면 실패. 개수·대상 ID 와 보낸 필드 값 전부를 Gen 동일성 검사(domain/genSync)와 같은 규칙으로 비교 —
+   하중은 항목 ID·케이스·방향·위치·값까지. Gen 이 붙이는 기본 필드·배열 순서 변경·ELEM NODE 0 채움은 허용. */
 const VERIFY = ['MATL', 'SECT', 'NODE', 'ELEM', 'FRLS', 'CONS', 'STLD', 'LCOM-GEN', 'BODF', 'BMLD', 'CNLD'] as const
-const LOADS = new Set<string>(['BODF', 'BMLD', 'CNLD'])
 
 async function verifyCounts(sent: Record<string, Record<string, unknown>>): Promise<void> {
   stage('st_verify', VERIFY.length)
@@ -131,14 +130,8 @@ async function verifyCounts(sent: Record<string, Record<string, unknown>>): Prom
     const want = Object.keys(sent[name] ?? {}).length
     const r = await mapi<Record<string, unknown>>('GET', name, undefined, String(want))
     const got = r?.[name]
-    if (!isRecord(got)) throw new Error(t('verify_fail', `${name}: invalid response`))
-    const n = Object.keys(got).length
-    if (n !== want) { bad.push(`${name} ${n}/${want}`); continue }
-    if (Object.keys(sent[name]).some((id) => !Object.hasOwn(got, id))) { bad.push(`${name}: target ID mismatch`); continue }
-    if (LOADS.has(name)) {
-      const difference = loadDifference(sent[name], got, name)
-      if (difference) bad.push(difference)
-    }
+    if (!isRecord(got)) throw new Error(t('verify_fail', `${name}: ${t('gen_bad_response')}`))
+    for (const d of dbDifferences(name, sent[name] ?? {}, got, 3)) bad.push(diffText(d))
   }
   if (bad.length) throw new Error(t('verify_fail', bad.join(', ')))
   log(t('log_verify_ok', VERIFY.length), 'ok')

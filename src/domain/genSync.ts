@@ -1,7 +1,8 @@
 /* Gen 모델 동일성 (순수) — 앱이 보낸 페이로드 vs 지금 Gen 의 GET 응답.
    해석·설계 검토·최적화 직전에 비교해, 사용자가 Gen 에서 단면·재료·절점·하중 등을 바꿨으면 이전 앱 정보로 검토하지 않게 한다.
-   Gen 이 덧붙이는 필드(STYPE 등)는 무시하고, 보낸 필드만 같은 값인지 본다. 라이브(2026-10-15) 형식 차이: ELEM NODE 를 8칸으로 0 채움. */
-import { isRecord } from './payloadValidation'
+   Gen 이 덧붙이는 필드(STYPE 등)는 무시하고, 보낸 필드만 같은 값인지 본다. 라이브(2026-10-15) 형식 차이: ELEM NODE 를 8칸으로 0 채움.
+   전송 직후 확인(build.verifyCounts)도 같은 비교를 쓴다 — 비교 규칙(허용오차·Gen 채움·ITEMS ID)은 여기 한 곳. */
+export const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 
 /** 비교 대상 DB (보낸 순서) */
 export const SYNC_DBS = ['UNIT', 'MATL', 'SECT', 'NODE', 'ELEM', 'FRLS', 'CONS', 'STLD', 'BODF', 'BMLD', 'CNLD', 'LCOM-GEN', 'DSTL'] as const
@@ -31,7 +32,10 @@ function diff(e: unknown, a: unknown, path: string, nodeList: boolean): { field:
     const padded = nodeList && a.length > e.length && a.slice(e.length).every((v) => v === 0)
     if (a.length !== e.length && !padded) return at(e, a)
     if (path.endsWith('ITEMS') && e.every((v) => isRecord(v) && typeof v.ID === 'number')) {
-      const byId = new Map(a.filter(isRecord).map((v) => [v.ID, v]))
+      /* 하중 항목은 배열 순서가 아니라 ID 로 대응 — Gen 쪽 ID 가 없거나 중복이면 대응 불가 → 다름 */
+      if (!a.every((v) => isRecord(v) && typeof v.ID === 'number')) return { field: `${path}.ID`, expected: 'ID', actual: a }
+      const byId = new Map((a as Record<string, unknown>[]).map((v) => [v.ID, v]))
+      if (byId.size !== a.length) return { field: `${path}.ID`, expected: 'unique ID', actual: 'duplicate' }
       for (const item of e as Record<string, unknown>[]) { const d = diff(item, byId.get(item.ID), `${path}[ID=${item.ID}]`, false); if (d) return d }
       return null
     }

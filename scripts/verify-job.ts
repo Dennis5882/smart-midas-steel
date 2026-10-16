@@ -77,15 +77,21 @@ ok(S.log.some((l) => l.html === t('log_verify_ok', 11)), 'log: data verified')
 
 /* Backup failure must preserve the existing app/Gen model and prevent doc/new. */
 for (const f of ['save-http', 'save-message', 'save-unknown']) {
-  const before = S.built
+  const before = S.built, rp = S.restorePoint
   reset(); fault = f
   await buildFactory(spec())
   ok(S.built === before && !calls.includes('POST /doc/new') && !calls.some((c) => c.startsWith('PUT')), `${f}: model replacement prevented`)
+  ok(S.restorePoint === rp, `${f}: restore point unchanged (Gen document untouched)`)
   ok(!S.busy && S.job === null, `${f}: job cleaned up`)
 }
-reset(); await buildFactory(spec()); reset(); fault = 'save-message'
+reset(); await buildFactory(spec())
+/* 저장 실패 → 해석 안 함 + 이전 결과 보존 (해석하지 않았으니 결과는 여전히 현재 모델의 것) */
+const prevDesign = {} as NonNullable<typeof S.design>
+S.analyzed = true; S.design = prevDesign; S.connections = []
+reset(); fault = 'save-message'
 await runAnalysis()
-ok(!calls.includes('POST /doc/anal') && !S.analyzed && !S.design && !S.connections, 'failed model save blocks analysis and removes stale design')
+ok(!calls.includes('POST /doc/anal') && S.analyzed && S.design === prevDesign && !!S.connections, 'failed model save blocks analysis and keeps prior results')
+S.analyzed = false; S.design = null; S.connections = null
 
 /* Same record count must not hide changed IDs, missing load items or values. */
 for (const f of ['unknown-get', 'target-id', 'body-force', 'beam-value', 'beam-item', 'node-direction', 'node-case', 'duplicate-load']) {
@@ -102,17 +108,21 @@ reset(); fault = 'beam-value'; await buildFactory(structuredClone(CN_DEFAULT_SPE
 ok(S.built === null, 'CN: changed load value rejected')
 
 /* 2. Gen 이 절점 하나를 버림 → 실패, 이전 모델 정보 비움 */
+S.restorePoint = null
 reset(); dropNode = true
 await buildFactory(spec())
 ok(S.built === null && lastBot().includes('NODE') && lastBot().includes('/'), `count mismatch fails: ${lastBot().replace(/<[^>]+>/g, '')}`)
+ok(/sms_backup_.*\.mgbx$/.test(S.restorePoint ?? ''), `count mismatch after doc/new → restore point kept for the failure card (${S.restorePoint})`)
 
 /* 3. 전송 도중 취소 → 다음 호출 전에 멈춤, 모델 중간 상태 안내 */
+S.restorePoint = null
 reset()
 onCall = (n) => { if (n === 5) cancelJob() }
 await buildFactory(spec())
 ok(calls.length === 5, `cancel stops before next call (calls ${calls.length})`)
 ok(S.built === null && lastBot() === t('job_cancelled_model'), 'cancel mid-send → rebuild message')
 ok(S.job === null && !S.busy, 'job cleared after cancel')
+ok(/sms_backup_/.test(S.restorePoint ?? ''), 'cancel after doc/new → restore point recorded')
 
 /* 4. 해석 중 취소 → 해석 호출은 끝까지, 이후 호출 없음, 모델 유지 */
 reset()

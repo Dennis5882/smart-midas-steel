@@ -125,4 +125,13 @@ for (const cn of [false, true]) {
   console.log(`${code}: complete data accepted; missing/corrupt data rejected`)
 }
 S.mapiKey = ''
+/* 실패 문구는 현재 언어 — 문제 종류는 rv_* 키, 표 이름·요소·조합만 식별자 그대로 */
+{
+  const { failMsg } = await import('../src/actions/job')
+  const { QuantityError } = await import('../src/domain/quantities')
+  const m = failMsg(new ResultValidationError('BEAMFORCE', 'missing', '3 · LCB1'), (x) => x)
+  assert.ok(m.includes(t('rv_missing')) && m.includes('BEAMFORCE · ') && !/\bmissing\b/.test(m), m); passed++
+  const q = failMsg(new QuantityError('knee.stiffener'), (x) => x)
+  assert.ok(q === t('q_invalid', 'knee.stiffener') && !/Invalid connection/.test(q), q); passed++
+}
 console.log(`Result integrity: ${passed} checks passed`)

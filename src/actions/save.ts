@@ -25,7 +25,7 @@ export async function autoSave(tag: 'backup' | 'model'): Promise<string> {
   try {
     const res = await mapi<{ message?: string }>('POST', '/doc/saveas', { Argument: path }, path)
     // HTTP 200 alone is insufficient: Gen also returns command refusals as messages.
-    if (res?.message !== 'MIDAS GEN NX command complete') throw new Error(String(res?.message ?? 'Unrecognized save response'))
+    if (res?.message !== 'MIDAS GEN NX command complete') throw new Error(String(res?.message ?? t('gen_bad_response')))
     return path
   } catch (e) {
     if (e instanceof Cancelled) throw e

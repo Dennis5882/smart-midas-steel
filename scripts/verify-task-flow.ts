@@ -22,8 +22,11 @@ for (const code of ['TW', 'CN'] as const) {
   eq(unavailable(S, 'analysis'), 'flow_need_connection')
   S.mapiKey = 'test-only'; eq(unavailable(S, 'analysis'), null)
   eq(unavailable(S, 'design'), 'need_anal')
+  // Outputs need only the model: partial report, member-only drawings and quantities.
+  S.analyzed = false; eq(unavailable(S, 'outputs'), null)
   S.analyzed = true; eq(unavailable(S, 'design'), null)
-  eq(unavailable(S, 'outputs'), 'flow_need_design')
+  eq(unavailable(S, 'outputs'), null)
+  eq(unavailable(S, 'optimize'), 'flow_need_design')
   S.design = {} as NonNullable<typeof S.design>; S.connections = []
   eq(unavailable(S, 'outputs'), null)
   S.mapiKey = ''; eq(unavailable(S, 'outputs'), null) // Local outputs do not require an API key.
@@ -41,6 +44,10 @@ for (const code of ['TW', 'CN'] as const) {
   eq(downloads, 0)
   S.draftInvalid = false; S.genChanged = 1
   eq(unavailable(S, 'outputs'), 'wf_stale_gen')
+  // Gen-checking jobs stay runnable: their first step re-compares Gen, so reverting in Gen clears the block.
+  S.mapiKey = 'test-only'
+  for (const task of ['analysis', 'design', 'optimize'] as const) eq(unavailable(S, task), null)
+  S.mapiKey = ''
   eq(taskStatus(S, 'outputs'), 'stale')
   S.genChanged = 0
   eq(taskStatus(S, 'outputs'), 'ready')

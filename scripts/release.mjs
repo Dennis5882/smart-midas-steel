@@ -19,6 +19,9 @@ let [ma, mi, pa] = JSON.parse(pkgTxt).version.split('.').map(Number)
 if (level === 'major') [ma, mi, pa] = [ma + 1, 0, 0]
 else if (level === 'minor') [mi, pa] = [mi + 1, 0]
 else pa += 1
+/* 자릿수 올림 (사용자 규칙 2026-10-16): minor·patch 는 0~9 — 10 이 되면 윗자리로. 예) 0.9.x minor → 1.0.0, 1.2.9 patch → 1.3.0 */
+if (pa >= 10) [mi, pa] = [mi + 1, 0]
+if (mi >= 10) [ma, mi, pa] = [ma + 1, 0, 0]
 const version = `${ma}.${mi}.${pa}`
 const id = 'v' + version.replace(/\./g, '_')
 const kst = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)

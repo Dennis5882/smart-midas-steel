@@ -4,8 +4,8 @@
    MAPI-Key 는 메모리에만(저장 금지). 언어는 i18n 모듈이 따로 관리(useLang).
 ════════════════════════════════════════════════════════════ */
 import { useSyncExternalStore } from 'react'
-import { getLang, type LText } from '../i18n'
-import { type CodeId } from '../codes'
+import { getLang, type Lang, type LText } from '../i18n'
+import { CODE_IDS, type CodeId } from '../codes'
 import type { Results } from '../actions/results'
 import type { ConnResult } from '../domain/connections'
 import type { DesignResult } from '../domain/design'
@@ -58,8 +58,22 @@ function readTheme(): Theme {
   return 'light'
 }
 
+/** 설계기준·화면 언어 — 서로 독립인데 **간체만 예외** (사용자 결정 2026-10-16):
+    간체에서 새 작업은 CN 만. 작업 중(입력 카드·생성 모델)에 간체로 바꾸면 기존 기준(TW 포함) 유지.
+    그 밖의 언어는 사용자가 고른 기준을 유지 — 새로고침·언어 전환에도 (sms_code, 간체에서의 강제 CN 은 저장 안 함). */
+export function codeForLang(lang: Lang, current: CodeId, saved: CodeId | null, hasWork: boolean): CodeId {
+  if (hasWork) return current
+  if (lang === 'zh-CN') return 'CN'
+  return saved ?? current
+}
+export function savedCode(): CodeId | null {
+  try { const c = localStorage.getItem('sms_code'); return (CODE_IDS as string[]).includes(c ?? '') ? c as CodeId : null } catch { return null }
+}
+export function saveCode(c: CodeId): void {
+  try { localStorage.setItem('sms_code', c) } catch { /* storage 차단 — 이번 세션만 */ }
+}
 function readCode(): CodeId {
-  return getLang() === 'zh-CN' ? 'CN' : 'TW'
+  return codeForLang(getLang(), 'TW', savedCode(), false)
 }
 
 export const S = {
