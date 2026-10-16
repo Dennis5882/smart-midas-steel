@@ -40,10 +40,22 @@ try {
     const spec = structuredClone(CN_DEFAULT_SPEC), model = buildPortal(spec), loads = buildLoadPayloads(spec, model)
     S.built = { spec, model, info: loads.info, cases: Object.values(loads.STLD).map((x: any) => x.NAME), combos: Object.keys(loads['LCOM-GEN']).length, comboNames: Object.values(loads['LCOM-GEN']).map((x: any) => x.NAME) }; S.analyzed = true
   } else {
-    await sendModel(structuredClone(CN_DEFAULT_SPEC))
-    console.log('CN model transmitted.')
+    const fr = process.argv.indexOf('--frame') > 0 ? process.argv[process.argv.indexOf('--frame') + 1] : 'gable'
+    const { normalizeSpans } = await import('../src/domain/types')
+    await sendModel(normalizeSpans({ ...structuredClone(CN_DEFAULT_SPEC), ...(fr === 'mono' ? { frame: 'mono' as const } : fr === 'multi' ? { frame: 'multi' as const, spanList: [24, 24] } : {}) }))
+    console.log(`CN model transmitted (${fr}): nodes ${S.built!.model.nodes.length}, cases ${S.built!.cases.length}, combos ${S.built!.combos}.`)
     await analyzeCore()
     console.log('CN analysis completed.')
+    /* 반력 평형 (D 제외 — 자중 BODF) */
+    const b = S.built!, node = new Map(b.model.nodes.map((x) => [x.id, x])), applied: Record<string, number[]> = {}
+    for (const [id, rec] of Object.entries(b.sent!.BMLD)) {
+      const e = b.model.elements[+id - 1], a = node.get(e.n1)!, c = node.get(e.n2)!, L = Math.hypot(c.x - a.x, c.y - a.y, c.z - a.z)
+      for (const it of (rec as any).ITEMS) { const o = (applied[it.LCNAME] ??= [0, 0, 0]); o[['GX', 'GY', 'GZ'].indexOf(it.DIRECTION)] += it.P[0] * L }
+    }
+    for (const rec of Object.values(b.sent!.CNLD)) for (const it of (rec as any).ITEMS) { const o = (applied[it.LCNAME] ??= [0, 0, 0]); o[0] += it.FX; o[1] += it.FY; o[2] += it.FZ }
+    let worst = 0
+    for (const r of S.reactions ?? []) { const lc = r.lc.replace(/\(ST\)$/, ''); if (lc === 'D') continue; const a = applied[lc] ?? [0, 0, 0]; worst = Math.max(worst, Math.max(Math.abs(r.fx + a[0]), Math.abs(r.fy + a[1]), Math.abs(r.fz + a[2])) / Math.max(1, Math.hypot(...a))) }
+    console.log(`CN equilibrium worst ${(worst * 100).toFixed(3)}% over ${(S.reactions ?? []).length - 1} cases`)
   }
   S.results = await fetchResults(S.built!)
   S.design = runDesign(S.built!.spec, S.built!.model, S.built!.info, S.results)

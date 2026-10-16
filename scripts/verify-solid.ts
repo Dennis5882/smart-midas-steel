@@ -2,13 +2,13 @@
    모든 요소가 메시가 되고(H 3상자·CC 5상자·P 12각), 좌표 유한, 삼각형 번호 범위 안, 단면 폭·춤이 실제 치수와 같은지. */
 import assert from 'node:assert/strict'
 import { addElementSolid, emptyMesh, solidMeshes } from '../src/drawing/solid'
-import { buildPortal } from '../src/domain/portal'
+import { buildPortal, risingAt } from '../src/domain/portal'
 import { CN_DEFAULT_SPEC, DEFAULT_SPEC } from '../src/domain/types'
 
 let n = 0
 for (const spec of [DEFAULT_SPEC, CN_DEFAULT_SPEC]) {
   const m = buildPortal(spec)
-  const meshes = solidMeshes(m, spec.span, spec.roofSlope, (e) => e.role)
+  const meshes = solidMeshes(m, risingAt(spec), spec.roofSlope, (e) => e.role)
   let verts = 0, tris = 0
   for (const [, mesh] of meshes) {
     const nv = mesh.x.length
@@ -24,7 +24,7 @@ const spec = DEFAULT_SPEC, model = buildPortal(spec)
 const col = model.elements.find((e) => e.role === 'column')!
 const byId = new Map(model.nodes.map((x) => [x.id, x]))
 const mesh = emptyMesh()
-addElementSolid(mesh, col, byId.get(col.n1)!, byId.get(col.n2)!, spec.span, spec.roofSlope)
+addElementSolid(mesh, col, byId.get(col.n1)!, byId.get(col.n2)!, risingAt(spec), spec.roofSlope)
 const [, dims] = col.section.split(/\s+/), [H, B] = dims.replace('/', 'x').split('x').map(Number)
 const ext = (a: number[]) => Math.max(...a) - Math.min(...a)
 assert.ok(Math.abs(ext(mesh.x) - H / 1000) < 1e-9, `column depth along X = ${H} mm`); n++

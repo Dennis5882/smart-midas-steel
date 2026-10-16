@@ -14,14 +14,15 @@ export function runCnDesign(spec: FactorySpec, model: FactoryModel, info: LoadIn
   validateDesignResults(spec, model, info, res, roles)
   const G = portalGeometry(spec), nodes = new Map(model.nodes.map((n) => [n.id, n]))
   const col = sectionProps(spec.sections.column), raf = sectionProps(spec.sections.rafter)
-  const K = cnK((col.Ix / spec.eaveHeight) / (raf.Ix / (2 * G.slopeLen)), spec.baseFixity === 'fixed')
+  /* 기둥 열마다 높이 = 그 열 처마 높이 (편경사 좌우 다름) */
+  const Kat = new Map(G.eaveXs.map((x) => [x, cnK((col.Ix / G.zAt(x)) / (raf.Ix / G.rafterLen), spec.baseFixity === 'fixed')]))
   const cc = cnCCLoads(spec, model, info), members: MemberCheck[] = [], service: ServiceCheck[] = []
   for (const e of model.elements) {
     if (roles && !roles.includes(e.role)) continue
     const a = nodes.get(e.n1)!, b = nodes.get(e.n2)!, sp = sectionProps(e.section)
     const L = 1000 * Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z)
     const secL = Math.min(L, 1000 * spec.baySpacing / (spec.sagRods + 1))
-    const lens = e.role === 'column' ? { KLx: K * spec.eaveHeight * 1000, KLy: L, Lb: L }
+    const lens = e.role === 'column' ? { KLx: (e.lean ? 1 : Kat.get(a.x)!) * G.zAt(a.x) * 1000, KLy: L, Lb: L } // 흔들림 기둥 K = 1
       : e.role === 'rafter' ? { KLx: G.slopeLen * 1000, KLy: L, Lb: L }
       : e.role === 'purlin' || e.role === 'girt' ? { KLx: L, KLy: secL, Lb: secL }
       : e.role === 'post' ? { KLx: G.zAt(a.x) * 1000, KLy: L, Lb: L } : { KLx: L, KLy: L, Lb: L }
@@ -52,8 +53,8 @@ export function runCnDesign(spec: FactorySpec, model: FactoryModel, info: LoadIn
     members.push(m)
   }
   if (!roles) {
-    const eaves = model.nodes.filter((n) => Math.abs(n.z - spec.eaveHeight) < 1e-8 && (n.x === 0 || n.x === spec.span))
-    const ridges = model.nodes.filter((n) => Math.abs(n.z - G.ridgeZ) < 1e-8 && Math.abs(n.x - spec.span / 2) < 1e-8)
+    const eaves = model.nodes.filter(G.isEaveNode)
+    const ridges = model.nodes.filter(G.isDeflNode)
     const disp = (lc: string, id: number) => {
       const v = res.disp.get(lc)?.get(id)
       if (!v || ![v.dx, v.dy, v.dz].every(Number.isFinite)) throw new Error(`GB: missing/invalid service displacement ${lc}, node ${id}`)

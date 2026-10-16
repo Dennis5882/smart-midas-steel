@@ -98,7 +98,7 @@ export const steelWeight = (spec: FactorySpec, model: FactoryModel, sections: Se
 /** 문형 라멘 횡강성(상대값)·지붕보 처짐 계수(상대값) */
 function frameStiff(spec: FactorySpec, col: string, raf: string) {
   const G = portalGeometry(spec)
-  const h = spec.eaveHeight, Lr = 2 * G.slopeLen
+  const h = spec.eaveHeight, Lr = G.rafterLen
   const Ic = sectionProps(col).Ix, Ir = sectionProps(raf).Ix
   const fixed = spec.baseFixity === 'fixed'
   let k: number

@@ -60,8 +60,10 @@ export function buildLoadPayloads(spec: FactorySpec, model: FactoryModel): LoadP
   /** 박공 지붕보 요소 — y 가 0 또는 길이 */
   const gableOf = (a: Node): 'y0' | 'yL' | null => (a.y === 0 ? 'y0' : Math.abs(a.y - length) < 1e-9 ? 'yL' : null)
   /** 박공 상부 띠 높이 — 최상단 거트가 위로 반 칸(gWall/2)을 받으므로 그 위부터 지붕선까지. 요소 중점 x 기준 */
-  const topGirt = G.girtZs.length ? G.girtZs[G.girtZs.length - 1] : 0
-  const stripH = (x: number) => Math.max(0, G.zAt(x) - topGirt - gWall / 2)
+  const topGirt = (x: number) => { const zs = G.endGirtZs.filter((z) => z < G.zAt(x) - 1e-6); return zs.length ? zs[zs.length - 1] : 0 }
+  const stripH = (x: number) => Math.max(0, G.zAt(x) - topGirt(x) - G.gEnd / 2)
+  /** 벽 거트 분담 높이 — 측벽은 그 벽 높이의 거트 간격(편경사는 좌우 다름), 박공벽은 박공벽 간격 */
+  const wallTrib = (face: Exclude<Face, 'roof'>) => (face === 'x0' ? G.gWallAt(G.eaveXs[0]) : face === 'xL' ? G.gWallAt(G.eaveXs[G.eaveXs.length - 1]) : G.gEnd)
 
   /* ── 보하중 누적 ── */
   const BMLD: Record<string, { ITEMS: unknown[] }> = {}
@@ -87,7 +89,7 @@ export function buildLoadPayloads(spec: FactorySpec, model: FactoryModel): LoadP
   const qLive = prof.roofLive({ slope: roofSlope, tribArea: Math.min(...portalGeometry(spec).spans) * sRoof * cosT }) // 불균등 베이: 최소 베이 (면적 작을수록 하중 큼 → 보수적)
   for (const e of model.elements) {
     const [a, b] = ends(e.id)
-    if (e.role === 'girt') { addDead(e.id, spec.wallDead * gWall); continue }
+    if (e.role === 'girt') { addDead(e.id, spec.wallDead * (e.face && e.face !== 'roof' ? wallTrib(e.face) : gWall)); continue }
     if (e.role === 'rafter') {
       const g = gableOf(a)
       if (g) addDead(e.id, spec.wallDead * stripH((a.x + b.x) / 2)) // 박공 상부 벽 → 박공 지붕보
@@ -95,16 +97,16 @@ export function buildLoadPayloads(spec: FactorySpec, model: FactoryModel): LoadP
     }
     if (e.role !== 'purlin' && e.role !== 'strut') continue
     /* 지붕: 처마 스트럿 = 반 간격 + 측벽 반 칸, 마루 스트럿 = 양쪽 반 간격 = 1 간격, 퍼린 = 1 간격 */
-    const eave = a.x === 0 || a.x === span
-    const sTrib = eave ? sRoof / 2 : sRoof
-    addDead(e.id, spec.roofDead * sTrib + (eave ? spec.wallDead * (gWall / 2) : 0))
+    const eave = !!G.eaveSide(a.x)
+    const sTrib = G.roofTrib(a.x).reduce((t, r) => t + r.trib, 0)
+    addDead(e.id, spec.roofDead * sTrib + (eave ? spec.wallDead * (G.gWallAt(a.x) / 2) : 0))
     addLine(e.id, 'LR', 'GZ', -(qLive * sTrib * cosT))
   }
 
   /* ── 지진: 절점 무게 × 높이 분배 (2.11), 단일 층이므로 Ft 는 T > 0.7s 일 때만 ── */
   const W = nodeWeights(spec, model, (id) => deadLine.get(id) ?? 0)
   const Wtot = [...W.values()].reduce((x, y) => x + y, 0)
-  const hn = eaveHeight + G.rise / 2 // 기면~평균 지붕면
+  const hn = G.hMean // 기면~평균 지붕면
   const si = spec.seismic
   const CNLD: Record<string, { ITEMS: unknown[] }> = {}
   const seismic = { W: Wtot } as LoadInfo['seismic']
@@ -135,7 +137,8 @@ export function buildLoadPayloads(spec: FactorySpec, model: FactoryModel): LoadP
 
   /* ── 풍. 封閉/部分封閉 건물 MWFRS p = q·G·Cp − q_i·(GCpi) (風力規範 2.2), p > 0 = 면을 향하는 압력 ── */
   const wi = spec.wind
-  const hRef = theta < (10 * Math.PI) / 180 ? eaveHeight : eaveHeight + G.rise / 2 // 風力規範 符號 h
+  /* 風力規範 符號 h — θ < 10° 이면 처마 높이. 편경사는 처마가 둘이라 평균 지붕 높이(높은 쪽 쪽으로 보수적) */
+  const hRef = theta < (10 * Math.PI) / 180 && G.symmetric ? eaveHeight : G.hMean
   const qOf = (z: number) => lat.windQ(z, { V10: wi.V10, I: wi.I, exposure: wi.exposure })
   const qh = qOf(hRef)
   const Gf = lat.gust
@@ -144,18 +147,33 @@ export function buildLoadPayloads(spec: FactorySpec, model: FactoryModel): LoadP
   const SIDE_CP = -0.7 // 표2.4 측풍면
   const ROOF_PARALLEL_CP = Math.max(hRef / span, hRef / length) <= 2.5 ? -0.7 : -0.8 // 표2.5 풍향 ∥ 용마루
 
-  interface WindCase { name: string; dir: 'X' | 'Y'; s: 1 | -1; roofW: number; roofL: number }
+  /** from: X 풍이 불어오는 측벽. 대칭(박공)은 x0 만 — 반대 방향은 미러. 비대칭(편경사)은 xL 풍도 별도 케이스(WX5~8) */
+  interface WindCase { name: string; dir: 'X' | 'Y'; s: 1 | -1; roofW: number; roofL: number; from?: 'xL' }
   const windCases: WindCase[] = [
     { name: 'WX1', dir: 'X', s: 1, roofW: rc.high, roofL: rc.leeward }, { name: 'WX2', dir: 'X', s: -1, roofW: rc.high, roofL: rc.leeward },
     { name: 'WX3', dir: 'X', s: 1, roofW: rc.low, roofL: rc.leeward }, { name: 'WX4', dir: 'X', s: -1, roofW: rc.low, roofL: rc.leeward },
+    ...(G.symmetric ? [] : [
+      { name: 'WX5', dir: 'X', s: 1, roofW: rc.high, roofL: rc.leeward, from: 'xL' }, { name: 'WX6', dir: 'X', s: -1, roofW: rc.high, roofL: rc.leeward, from: 'xL' },
+      { name: 'WX7', dir: 'X', s: 1, roofW: rc.low, roofL: rc.leeward, from: 'xL' }, { name: 'WX8', dir: 'X', s: -1, roofW: rc.low, roofL: rc.leeward, from: 'xL' },
+    ] as WindCase[]),
     { name: 'WY1', dir: 'Y', s: 1, roofW: ROOF_PARALLEL_CP, roofL: ROOF_PARALLEL_CP }, { name: 'WY2', dir: 'Y', s: -1, roofW: ROOF_PARALLEL_CP, roofL: ROOF_PARALLEL_CP },
   ]
+  /** 表2.8 鋸齒狀屋頂 — 풍상 쪽부터 경사면 순서: D(첫 풍상면)·E(첫 풍하면)·D′·E′·D″ … 의 위치.
+      첫 면이 풍을 마주보지 않으면(편경사 높은 쪽 풍) 그 면은 E 부터. 박공 = D·E 로 表2.5 와 같음 */
+  const facePos = (plane: number, from?: 'xL') => {
+    const n = G.planes.length
+    const order = from ? n - 1 - plane : plane
+    const firstFacing = from ? !G.planes[n - 1].rising : G.planes[0].rising
+    return order + (firstFacing ? 0 : 1)
+  }
+  /** 위치별 Cp — D 表2.5 풍상, E·D′ 表2.5 풍하, E′·D″ −0.5, E″·D‴ −0.4, 그 뒤 −0.3. null = 表2.5 값(케이스의 roofW·roofL) */
+  const SAW_CP = [null, null, null, -0.5, -0.5, -0.4, -0.4, -0.3]
   for (const wc of windCases) {
     const pi = qh * wc.s * gpi
     /** 벽면 순압력 p(z) — 풍상벽 0.8·q(z), 풍하벽 Cp(L/B)·q(h), 측벽 −0.7·q(h) */
     const wallP = (face: Exclude<Face, 'roof'>, z: number): number => {
-      const windward = wc.dir === 'X' ? 'x0' : 'y0'
-      const leeward = wc.dir === 'X' ? 'xL' : 'yL'
+      const windward = wc.dir === 'X' ? (wc.from ?? 'x0') : 'y0'
+      const leeward = wc.dir === 'X' ? (wc.from ? 'x0' : 'xL') : 'yL'
       const LB = wc.dir === 'X' ? span / length : length / span // L = 풍향 평행, B = 직각
       if (face === windward) return qOf(z) * Gf * lat.wallCp.windward - pi
       if (face === leeward) return qh * Gf * lat.wallCp.leeward(LB) - pi
@@ -170,24 +188,27 @@ export function buildLoadPayloads(spec: FactorySpec, model: FactoryModel): LoadP
     }
     for (const e of model.elements) {
       const [a, b] = ends(e.id)
-      if (e.role === 'girt' && e.face && e.face !== 'roof') { wallForce(e.id, e.face, a.z, gWall); continue }
+      if (e.role === 'girt' && e.face && e.face !== 'roof') { wallForce(e.id, e.face, a.z, wallTrib(e.face)); continue }
       if (e.role === 'rafter') {
         const g = gableOf(a)
         if (g) wallForce(e.id, g, (a.z + b.z) / 2, stripH((a.x + b.x) / 2))
         continue
       }
       if (e.role !== 'purlin' && e.role !== 'strut') continue
-      /* 지붕 — 풍상 경사면(x < 스팬/2) 법선 (−sinθ, 0, cosθ), 풍하 (sinθ, 0, cosθ). 힘 = p·s·(−법선) */
+      /* 지붕 — 풍(x0 → xL)을 마주보는 면(rising) = 풍상, 법선 (−sinθ, 0, cosθ) / 반대면 = 풍하, (sinθ, 0, cosθ). 힘 = p·s·(−법선).
+         절점이 분담하는 면마다(G.roofTrib) 더하고, 처마면 측벽 반 칸 */
       const pW = qh * Gf * wc.roofW - pi, pL = qh * Gf * wc.roofL - pi
       let fx = 0, fz = 0
-      const roofW = (s: number) => { fx += pW * s * sinT; fz += -pW * s * cosT }
-      const roofL = (s: number) => { fx += -pL * s * sinT; fz += -pL * s * cosT }
-      const x = a.x
-      if (x === 0) { roofW(sRoof / 2); const f = wallP('x0', eaveHeight) * (gWall / 2); fx += f }
-      else if (x === span) { roofL(sRoof / 2); const f = wallP('xL', eaveHeight) * (gWall / 2); fx += -f }
-      else if (Math.abs(x - span / 2) < 1e-9) { roofW(sRoof / 2); roofL(sRoof / 2) }
-      else if (x < span / 2) roofW(sRoof)
-      else roofL(sRoof)
+      for (const { plane, trib } of G.roofTrib(a.x)) {
+        /* X 풍: 表2.8 면 순서 계수 (다경간·편경사 공통, 박공은 表2.5 그대로). Y 풍: 용마루 평행 계수 */
+        const rising = G.planes[plane].rising
+        const pos = facePos(plane, wc.from), saw = SAW_CP[Math.min(pos, SAW_CP.length - 1)]
+        const p = wc.dir !== 'X' || pos === 0 ? pW : saw === null ? pL : qh * Gf * saw - pi
+        if (rising) { fx += p * trib * sinT; fz += -p * trib * cosT }
+        else { fx += -p * trib * sinT; fz += -p * trib * cosT }
+      }
+      const side = G.eaveSide(a.x)
+      if (side) { const f = wallP(side, G.zAt(a.x)) * (G.gWallAt(a.x) / 2); fx += side === 'x0' ? f : -f }
       addLine(e.id, wc.name, 'GX', fx)
       addLine(e.id, wc.name, 'GZ', fz)
     }
@@ -211,7 +232,7 @@ export function buildLoadPayloads(spec: FactorySpec, model: FactoryModel): LoadP
   /* 비틀림 +Z(반시계): 측벽 x = 스팬 에 +Y, x = 0 에 −Y 우력 (가새 측벽이 저항) — 처마 스트럿(RH) 축방향 선하중.
      거트(냉간성형)에 축력을 주지 않으려고 스트럿에 재하 (가새 베이로 직접 전달) */
   for (const [x, sgn] of [[span, 1], [0, -1]] as const) {
-    const ss = model.elements.filter((e) => e.role === 'strut' && ends(e.id).every((n) => n.x === x && Math.abs(n.z - eaveHeight) < 1e-9))
+    const ss = model.elements.filter((e) => e.role === 'strut' && ends(e.id).every((n) => n.x === x && G.isEaveNode(n)))
     const Ls = ss.reduce((t, e) => t + elLen(e.id), 0)
     if (Ls > 0) for (const e of ss) addLine(e.id, 'WT', 'GY', (sgn * MT) / span / Ls)
   }
@@ -219,7 +240,7 @@ export function buildLoadPayloads(spec: FactorySpec, model: FactoryModel): LoadP
   /** 측벽 처마 스트럿 ±Y 우력으로 연직축 비틀림 M (반시계 +) — 가새 측벽이 저항 */
   const torsionCouple = (lc: string, M: number) => {
     for (const [x, sgn] of [[span, 1], [0, -1]] as const) {
-      const ss = model.elements.filter((e) => e.role === 'strut' && ends(e.id).every((n) => n.x === x && Math.abs(n.z - eaveHeight) < 1e-9))
+      const ss = model.elements.filter((e) => e.role === 'strut' && ends(e.id).every((n) => n.x === x && G.isEaveNode(n)))
       const Ls = ss.reduce((t, e) => t + elLen(e.id), 0)
       if (Ls > 0) for (const e of ss) addLine(e.id, lc, 'GY', (sgn * M) / span / Ls)
     }
@@ -230,20 +251,26 @@ export function buildLoadPayloads(spec: FactorySpec, model: FactoryModel): LoadP
   /* ── 하중조합: 종류별 변형 전개 (E 는 ±, W 는 케이스 자체가 방향·내압 변형 + 2.12 조합 변형) ── */
   const windVariants: (Variant & { dir: 'X' | 'Y' })[] = [
     ...windCases.map((v) => ({ dir: v.dir, tag: ` ${v.name}`, parts: [{ lc: v.name, f: 1 }] })),
-    ...windCases.flatMap((v) => ([1, -1] as const).map((ts) => ({
-      dir: v.dir, tag: ` ${v.name}+L${ts > 0 ? '+' : '-'}T`,
-      parts: [{ lc: v.name, f: kD }, { lc: v.dir === 'X' ? 'WLX' : 'WLY', f: 0.7 }, { lc: 'WT', f: 0.7 * ts }],
-    }))),
+    ...windCases.flatMap((v) => ([1, -1] as const).flatMap((ts) =>
+      /* 횡풍향 WLY(+X)는 비대칭(편경사)이면 −X 도 — WLX(+Y)는 길이 방향 대칭이라 미러 */
+      (v.dir === 'Y' && !G.symmetric ? [1, -1] as const : [1] as const).map((ls) => ({
+        dir: v.dir, tag: ` ${v.name}${ls > 0 ? '+' : '-'}L${ts > 0 ? '+' : '-'}T`,
+        parts: [{ lc: v.name, f: kD }, { lc: v.dir === 'X' ? 'WLX' : 'WLY', f: 0.7 * ls }, { lc: 'WT', f: 0.7 * ts }],
+      })))),
   ]
   const variants: Record<LoadCaseType, Variant[]> = {
     S: [],
     D: [{ parts: [{ lc: 'D', f: 1 }], tag: '' }],
     L: [{ parts: [{ lc: 'LR', f: 1 }], tag: '' }],
     W: windVariants,
-    /* 지진 + 우발 비틀림(같은 부호) — 대칭 구조라 (±E, ∓ET) 는 미러로 포함 */
+    /* 지진 + 우발 비틀림(같은 부호) — 대칭 구조라 (±E, ∓ET) 는 미러로 포함. 비대칭(편경사)은 반대 부호도 */
     E: (['EX', 'EY'] as const).flatMap((n) => [
       { parts: [{ lc: n, f: 1 }, { lc: `ET${n[1]}`, f: 1 }], tag: ` +${n}` },
       { parts: [{ lc: n, f: -1 }, { lc: `ET${n[1]}`, f: -1 }], tag: ` -${n}` },
+      ...(G.symmetric ? [] : [
+        { parts: [{ lc: n, f: 1 }, { lc: `ET${n[1]}`, f: -1 }], tag: ` +${n}-T` },
+        { parts: [{ lc: n, f: -1 }, { lc: `ET${n[1]}`, f: 1 }], tag: ` -${n}+T` },
+      ]),
     ]),
   }
   const LCOM: Record<string, unknown> = {}

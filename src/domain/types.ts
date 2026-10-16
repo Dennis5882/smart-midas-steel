@@ -2,6 +2,9 @@ import type { CodeId } from '../codes'
 import type { ScopeFeatures } from './scope'
 
 /* 공장형 단경간 포털 프레임 입력 스펙. 단위: m, kN */
+export type FrameType = 'gable' | 'mono' | 'multi'
+export const FRAME_TYPES: FrameType[] = ['gable', 'mono', 'multi']
+
 export interface FactorySpec {
   /** 설계기준 (UI 언어와 독립) */
   code: CodeId
@@ -13,7 +16,12 @@ export interface FactorySpec {
   baySpacing: number
   /** 자유골조: 베이별 간격 (m, y=0 박공부터). 있으면 bays = 길이, baySpacing = 최댓값 (normalizeBays) */
   bayList?: number[]
-  /** 처마 높이 (m) */
+  /** 횡단면 형식 — 없으면 'gable'(단경간 박공). 'mono' = 단경간 편경사: x = 0 이 낮은 처마, x = 스팬이 높은 처마.
+      'multi' = 다경간 박공: 경간마다 마루, 내부 기둥 = 흔들림 기둥(상·하단 핀), 골 높이 = 처마 */
+  frame?: FrameType
+  /** 다경간 경간별 폭 (m, x = 0 부터). frame 'multi' 에서만 — span = 합계 (normalizeSpans) */
+  spanList?: number[]
+  /** 처마 높이 (m) — 편경사는 낮은 쪽 처마 (높은 쪽 = 처마 + 스팬 × 경사) */
   eaveHeight: number
   /** 지붕 경사 (rise/run, 예 0.1 = 1:10) */
   roofSlope: number
@@ -55,6 +63,17 @@ export function baySpans(spec: Pick<FactorySpec, 'bays' | 'baySpacing' | 'bayLis
   return spec.bayList?.length ? spec.bayList : Array.from({ length: spec.bays }, () => spec.baySpacing)
 }
 
+/** 다경간 경간 폭 목록 — 'multi' 가 아니면 [span] */
+export function frameSpans(spec: Pick<FactorySpec, 'frame' | 'span' | 'spanList'>): number[] {
+  return spec.frame === 'multi' && spec.spanList?.length ? spec.spanList : [spec.span]
+}
+/** 다경간: span = 경간 합계 (전체 폭). 그 밖 형식은 spanList 제거 */
+export function normalizeSpans(spec: FactorySpec): FactorySpec {
+  if (spec.frame !== 'multi') return spec.spanList ? { ...spec, spanList: undefined } : spec
+  const list = spec.spanList?.filter((v) => Number.isFinite(v) && v > 0)
+  return list?.length ? { ...spec, spanList: list, span: list.reduce((a, b) => a + b, 0) } : spec
+}
+
 /** bayList → bays·baySpacing 동기화. 모든 균등 간격이면 bayList 제거 */
 export function normalizeBays(spec: FactorySpec): FactorySpec {
   const list = spec.bayList?.filter((v) => Number.isFinite(v) && v > 0)
@@ -76,7 +95,7 @@ export type ElementRole = 'column' | 'rafter' | 'purlin' | 'girt' | 'strut' | 'p
 export const ROLES: ElementRole[] = ['column', 'rafter', 'purlin', 'girt', 'strut', 'post', 'brace']
 /** wall: 벽 부재가 붙은 면 — 'x0'·'xL' = 측벽(x=0, x=스팬), 'y0'·'yL' = 박공벽(y=0, y=길이), 'roof' = 지붕 가새 */
 export type Face = 'x0' | 'xL' | 'y0' | 'yL' | 'roof'
-export interface Element { id: number; n1: number; n2: number; role: ElementRole; section: string; face?: Face }
+export interface Element { id: number; n1: number; n2: number; role: ElementRole; section: string; face?: Face; /** 흔들림 기둥(다경간 내부): 상단 핀·기초 핀, 면내 K = 1 */ lean?: true }
 
 /** 전역: X = 스팬 방향, Y = 길이 방향, Z = 높이 */
 export interface FactoryModel { nodes: Node[]; elements: Element[] }

@@ -10,6 +10,7 @@ import type { Results } from '../actions/results'
 import type { FactorySpec, FactoryModel } from './types'
 import type { ConnCheck, ConnResult, ConnectionParts } from './connections'
 import { sectionProps } from './sections'
+import { portalGeometry } from './portal'
 
 const PLATES = [10, 12, 14, 16, 18, 20, 22, 25, 28, 30, 32, 36, 40, 45, 50, 55, 60, 65, 70, 80, 90, 100]
 // Stop at the verified material-table range; an undersized 100 mm plate stays NG.
@@ -23,7 +24,7 @@ const ratio = (cs: ConnCheck[]) => Math.max(0, ...cs.map((x) => x.ratio))
 interface Force { elem: number; combo: string; P: number; M: number; V: number }
 const endpoints = (res: Results, id: number, part: number): Force[] => [...res.beam.get(id) ?? []].map(([combo, p]) => ({ elem: id, combo, P: p[part].P, M: Math.abs(p[part].My), V: Math.hypot(p[part].Vy, p[part].Vz) }))
 export function runCnConnections(spec: FactorySpec, model: FactoryModel, res: Results): ConnResult[] {
-  const out: ConnResult[] = [], c = spec.china!, nodes = new Map(model.nodes.map((n) => [n.id, n]))
+  const out: ConnResult[] = [], c = spec.china!, nodes = new Map(model.nodes.map((n) => [n.id, n])), G = portalGeometry(spec)
   const col = sectionProps(spec.sections.column), raf = sectionProps(spec.sections.rafter)
   const plateF = (t: number) => cnStrength(spec.material, t).f
   const weldF = spec.material === 'Q235B' ? 160 : 200 // E43 / E50, GB table 4.4.5
@@ -52,9 +53,10 @@ export function runCnConnections(spec: FactorySpec, model: FactoryModel, res: Re
     if (selected.ratio <= 1) break
   }
   out.push(selected!)
-  for (const type of ['knee', 'apex'] as const) {
-    const els = model.elements.filter((e) => e.role === 'rafter' && (type === 'knee' ? nodes.get(e.n1)!.x === 0 || nodes.get(e.n2)!.x === spec.span : Math.abs(nodes.get(e.n1)!.x - spec.span / 2) < 1e-8 || Math.abs(nodes.get(e.n2)!.x - spec.span / 2) < 1e-8))
-    const fs = els.flatMap((e) => endpoints(res, e.id, type === 'knee' ? nodes.get(e.n1)!.x === 0 ? 0 : 4 : Math.abs(nodes.get(e.n1)!.x - spec.span / 2) < 1e-8 ? 0 : 4))
+  for (const type of (G.ridges.length ? ['knee', 'apex'] : ['knee']) as ('knee' | 'apex')[]) {
+    const at = type === 'knee' ? G.isEaveNode : G.isRidgeNode
+    const els = model.elements.filter((e) => e.role === 'rafter' && (at(nodes.get(e.n1)!) || at(nodes.get(e.n2)!)))
+    const fs = els.flatMap((e) => endpoints(res, e.id, at(nodes.get(e.n1)!) ? 0 : 4))
     if (!fs.length) throw new Error(`GB connections: no ${type} forces`)
     const capacityMoment = 1.2 * raf.Zx * cnStrength(spec.material, raf.tf).fy / 1e6
     if (type === 'knee') fs.push({ elem: fs[0].elem, combo: 'GB capacity envelope 1.2Mp', P: Math.max(0, ...fs.map((f) => f.P)), M: capacityMoment, V: Math.max(...fs.map((f) => f.V)) })

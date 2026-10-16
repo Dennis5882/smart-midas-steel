@@ -7,6 +7,7 @@
 import type { ConnResult, ConnectionParts, PlatePart } from './connections'
 import { memberSchedule, type ScheduleRow } from './schedule'
 import { sectionProps } from './sections'
+import { portalGeometry } from './portal'
 import { ROLES, type ElementRole, type FactoryModel, type FactorySpec } from './types'
 
 /** 접합 수량 값이 잘못됨 — 화면 문구는 job.failText 가 현재 언어로(q_invalid). where = 접합 종류.부위 */
@@ -74,8 +75,10 @@ export function quantities(spec: FactorySpec, model: FactoryModel, conns: ConnRe
   const sch = memberSchedule(spec, model)
   const nodes = new Map(model.nodes.map((n) => [n.id, n]))
   const frames = new Set(model.elements.filter((e) => e.role === 'rafter').map((e) => nodes.get(e.n1)!.y.toFixed(3))).size
+  /* 주각 = 기초에서 시작하는 기둥 수(다경간 내부 기둥 포함), 마루 = 마루 절점 수(다경간은 경간마다, 편경사 0) */
+  const G = portalGeometry(spec)
   const countOf: Record<ConnType, number> = {
-    base: 2 * frames, knee: 2 * frames, apex: frames,
+    base: model.elements.filter((e) => e.role === 'column' && nodes.get(e.n1)!.z === 0).length, knee: 2 * frames, apex: model.nodes.filter(G.isRidgeNode).length,
     brace: 2 * model.elements.filter((e) => e.role === 'brace').length,
   }
   const col = sectionProps(spec.sections.column), raf = sectionProps(spec.sections.rafter)

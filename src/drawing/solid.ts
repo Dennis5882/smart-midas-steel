@@ -18,13 +18,13 @@ export interface Mesh { x: number[]; y: number[]; z: number[]; i: number[]; j: n
 export const emptyMesh = (): Mesh => ({ x: [], y: [], z: [], i: [], j: [], k: [] })
 
 /** 강축 춤 방향(전역) — 부재 축 ex 에 직교하도록 보정 */
-function depthDir(e: Element, ex: V3, a: Node, span: number, slope: number): V3 {
+function depthDir(e: Element, ex: V3, a: Node, rising: (x: number) => boolean, slope: number): V3 {
   let d: V3
   switch (e.role) {
     case 'column': d = [1, 0, 0]; break
     case 'rafter': d = cross([0, 1, 0], ex); break // 골조면 안, 축에 직교
     case 'strut': d = [0, 0, 1]; break
-    case 'purlin': { const s = a.x < span / 2 ? -1 : 1; d = [s * Math.sin(Math.atan(slope)), 0, Math.cos(Math.atan(slope))]; break }
+    case 'purlin': { const s = rising(a.x) ? -1 : 1; /* 오르막 면 = 법선 −x 쪽 */ d = [s * Math.sin(Math.atan(slope)), 0, Math.cos(Math.atan(slope))]; break }
     default: d = cross([0, 0, 1], ex) // 거트·풍주: 벽면 법선(수평)
   }
   if (Math.hypot(...cross(d, ex)) < 1e-6) d = [0, 0, 1]
@@ -57,9 +57,10 @@ function pushPrism(m: Mesh, ring: V3[], A: V3, B: V3) {
 }
 
 /** 요소 하나를 메시에 추가 (좌표 m) */
-export function addElementSolid(m: Mesh, e: Element, a: Node, b: Node, span: number, slope: number) {
+/** rising(x): 퍼린 위치 x 의 지붕면이 오르막(x 증가 시 높아짐)인지 — 퍼린 춤 방향(지붕 법선) */
+export function addElementSolid(m: Mesh, e: Element, a: Node, b: Node, rising: (x: number) => boolean, slope: number) {
   const A: V3 = [a.x, a.y, a.z], B: V3 = [b.x, b.y, b.z]
-  const ex = unit(sub(B, A)), dv = depthDir(e, ex, a, span, slope), uv = unit(cross(ex, dv))
+  const ex = unit(sub(B, A)), dv = depthDir(e, ex, a, rising, slope), uv = unit(cross(ex, dv))
   const kind = e.section.trim().split(/\s+/)[0]
   if (kind === 'P') {
     const r = sectionProps(e.section).d / 2000
@@ -74,7 +75,7 @@ export function addElementSolid(m: Mesh, e: Element, a: Node, b: Node, span: num
 }
 
 /** 묶음별 메시 — key(e) 로 나눈다 (부재 종류 또는 강도비 구간) */
-export function solidMeshes(model: FactoryModel, span: number, slope: number, key: (e: Element) => string | null): Map<string, Mesh> {
+export function solidMeshes(model: FactoryModel, rising: (x: number) => boolean, slope: number, key: (e: Element) => string | null): Map<string, Mesh> {
   const byId = new Map(model.nodes.map((n) => [n.id, n]))
   const out = new Map<string, Mesh>()
   for (const e of model.elements) {
@@ -82,7 +83,7 @@ export function solidMeshes(model: FactoryModel, span: number, slope: number, ke
     if (k === null) continue
     const m = out.get(k) ?? emptyMesh()
     out.set(k, m)
-    addElementSolid(m, e, byId.get(e.n1)!, byId.get(e.n2)!, span, slope)
+    addElementSolid(m, e, byId.get(e.n1)!, byId.get(e.n2)!, rising, slope)
   }
   return out
 }

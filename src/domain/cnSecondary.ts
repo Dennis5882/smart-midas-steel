@@ -33,7 +33,7 @@ export function cnCCLoads(spec: FactorySpec, model: FactoryModel, info: LoadInfo
     const n1 = nodes.get(e.n1)!, n2 = nodes.get(e.n2)!, sp = sectionProps(e.section)
     const L = Math.hypot(n2.x - n1.x, n2.y - n1.y, n2.z - n1.z)
     const end = Math.min(n1.y, n2.y) <= a || Math.max(n1.y, n2.y) >= G.length - a
-    const edge = n1.x <= E / 10 || n1.x >= spec.span - E / 10 || Math.abs(n1.x - spec.span / 2) <= E / 10
+    const edge = G.nearEave(n1.x, E / 10) || G.nearRidge(n1.x, E / 10)
     const zone = e.role === 'girt' ? (end ? 5 : 4) : end && edge ? 3 : end || edge ? 2 : 1
     let pos: number, neg: number
     if (e.role === 'girt') { pos = 1; neg = zone === 5 ? -1.4 : -1 }

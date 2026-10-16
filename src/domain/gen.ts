@@ -56,18 +56,22 @@ export function buildGenPayloads(spec: FactorySpec, model: FactoryModel): GenPay
   /* 단부 해제: 2차부재 양단 핀, 풍주는 지붕보에 닿는 상단만 핀(기초는 핀 지점이라 해제 불필요 — 양단 해제 시 기초 절점 회전 불안정) */
   const FRLS: Record<string, unknown> = {}
   const postStarts = new Set(model.elements.filter((e) => e.role === 'post').map((e) => e.n1))
+  /* 흔들림 기둥(다경간 내부) 상단 = 지붕보에 핀 */
+  const leanStarts = new Set(model.elements.filter((e) => e.lean).map((e) => e.n1))
   for (const e of model.elements) {
     const both = PINNED_BOTH.includes(e.role)
-    const postTop = e.role === 'post' && !postStarts.has(e.n2)
+    const postTop = (e.role === 'post' && !postStarts.has(e.n2)) || (!!e.lean && !leanStarts.has(e.n2))
     if (!both && !postTop) continue
     FRLS[e.id] = { ITEMS: [{ ID: 1, bVALUE: false, FLAG_I: both ? PIN : FIX, VALUE_I: [0, 0, 0, 0, 0, 0, 0], FLAG_J: PIN, VALUE_J: [0, 0, 0, 0, 0, 0, 0] }] }
   }
 
   const code = spec.baseFixity === 'fixed' ? '1111111' : '1110000'
+  /* 흔들림 기둥 기초는 항상 핀 */
+  const leanBase = new Set(model.elements.filter((e) => e.lean).map((e) => e.n1))
   const CONS: Record<string, unknown> = {}
   for (const n of model.nodes) {
     /* GROUP_NAME 은 미리 정의된 경계 그룹만 허용(없는 이름이면 Unknown Error, 라이브 확인) → 생략 */
-    if (n.z === 0) CONS[n.id] = { ITEMS: [{ ID: n.id, CONSTRAINT: code }] }
+    if (n.z === 0) CONS[n.id] = { ITEMS: [{ ID: n.id, CONSTRAINT: leanBase.has(n.id) ? '1110000' : code }] }
   }
 
   const material = (name: string) => {

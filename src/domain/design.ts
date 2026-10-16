@@ -93,13 +93,15 @@ export function runDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
 
   /* 기둥 면내 K — G_top = (Ic/Lc) / (Ir/Lr), 지붕보 길이 = 처마~처마 경사길이(대칭 횡이동 = 역대칭 곡률), G_bottom = 핀 10 / 고정 1 */
   const col = sectionProps(spec.sections.column), raf = sectionProps(spec.sections.rafter)
-  const Gtop = (col.Ix / spec.eaveHeight) / (raf.Ix / (2 * G.slopeLen))
-  const Kcol = kSway(Gtop, spec.baseFixity === 'fixed' ? 1 : 10)
+  /* 기둥 열마다 높이 h = 그 열 처마 높이 (편경사는 좌우 다름, 박공은 같음) */
+  const Kcol = (h: number) => kSway((col.Ix / h) / (raf.Ix / G.rafterLen), spec.baseFixity === 'fixed' ? 1 : 10)
+  const KcolAt = new Map(G.eaveXs.map((x) => [x, Kcol(G.zAt(x))]))
   const Lsec = (spec.baySpacing / (spec.sagRods + 1))
 
-  const lengthsOf = (role: ElementRole, Lel: number, e: { n1: number; n2: number }) => {
+  const lengthsOf = (role: ElementRole, Lel: number, e: { n1: number; n2: number; lean?: true }) => {
     switch (role) {
-      case 'column': return { KLx: mm(Kcol * spec.eaveHeight), KLy: mm(Lel), Lb: mm(Lel) }
+      /* 흔들림 기둥(다경간 내부): 양단 핀 → 면내 K = 1, L = 기둥 전체 높이 */
+      case 'column': { const x = nodes.get(e.n1)!.x; return { KLx: mm((e.lean ? 1 : KcolAt.get(x)!) * G.zAt(x)), KLy: mm(Lel), Lb: mm(Lel) } }
       case 'rafter': return { KLx: mm(G.slopeLen), KLy: mm(Lel), Lb: mm(Lel) }
       case 'purlin': case 'girt': return { KLx: mm(Lel), KLy: mm(Math.min(Lel, Lsec)), Lb: mm(Math.min(Lel, Lsec)) }
       case 'post': return { KLx: mm(G.zAt(nodes.get(e.n1)!.x)), KLy: mm(Lel), Lb: mm(Lel) }
@@ -243,8 +245,8 @@ export function runDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
   /* ── 사용성 ── */
   const service: ServiceCheck[] = []
   if (roles) return { ...summarize(members, service), col13 }
-  const eaveIds = model.nodes.filter((n) => Math.abs(n.z - spec.eaveHeight) < 1e-9 && (n.x === 0 || n.x === spec.span)).map((n) => n.id)
-  const ridgeIds = model.nodes.filter((n) => Math.abs(n.x - spec.span / 2) < 1e-9 && Math.abs(n.z - G.ridgeZ) < 1e-9).map((n) => n.id)
+  const eaveIds = model.nodes.filter(G.isEaveNode).map((n) => n.id)
+  const ridgeIds = model.nodes.filter(G.isDeflNode).map((n) => n.id)
   /* 風力規範 4.2: 50년 풍 층간변위각 ≤ 5/1000 — 순풍향·횡풍향·비틀림을 2.12 로 조합 (info.wind.variants, 양 풍향 모두) */
   const wv = info.wind.variants?.length ? info.wind.variants : [...res.disp.keys()].filter((c) => /^W[XY]\d/.test(c)).map((c) => ({ tag: c, dir: 'X' as const, parts: [{ lc: c, f: 1 }] }))
   for (const [key, comp] of [['windDriftX', 'dx'], ['windDriftY', 'dy']] as const) {

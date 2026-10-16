@@ -5,7 +5,7 @@
    토글·표시 방식을 바꿔도 사용자가 돌린 시점은 유지(uirevision = 시점). */
 import { useEffect, useMemo, useRef } from 'react'
 import { solidMeshes } from '../drawing/solid'
-import { buildPortal } from '../domain/portal'
+import { buildPortal, risingAt } from '../domain/portal'
 import { ROLES, type ElementRole, type FactoryModel, type FactorySpec } from '../domain/types'
 import { t, useLang, type I18nKey } from '../i18n'
 import { S, notify, useStore, type CamId, type Vis3D } from '../state/store'
@@ -85,7 +85,7 @@ function traces(m: FactoryModel, spec: FactorySpec, P: Pal, ratio: Map<number, n
     ? BANDS.map(([, v, fb], i) => ({ key: `b${i}`, name: bandName(i), color: cs.getPropertyValue(v).trim() || fb, width: 4, visible: true, has: (id: number) => bandOf(ratio.get(id) ?? 0) === i }))
     : ROLES.map((r) => ({ key: r, name: t(`role_${r}`), color: P.role[r], width: ROLE_VAR[r][2], visible: vis[r], has: (_: number, role: ElementRole) => role === r }))
   if (solid) {
-    const meshes = solidMeshes(m, spec.span, spec.roofSlope, (e) => groups.find((g) => g.has(e.id, e.role))?.key ?? null)
+    const meshes = solidMeshes(m, risingAt(spec), spec.roofSlope, (e) => groups.find((g) => g.has(e.id, e.role))?.key ?? null)
     for (const g of groups) {
       const mesh = meshes.get(g.key)
       if (mesh) out.push({ type: 'mesh3d', name: g.name, ...mesh, color: g.color, visible: g.visible, flatshading: true, lighting: LIGHT, showlegend: true, hoverinfo: 'skip' })

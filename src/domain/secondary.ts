@@ -42,8 +42,8 @@ export function ccLoads(spec: FactorySpec, model: FactoryModel, info: LoadInfo):
     const nearGable = yLo < a - 1e-9 || yHi > G.length - a + 1e-9
     if (e.role === 'purlin') {
       trib = G.sRoof
-      const nearEave = p1.x <= a + 1e-9 || p1.x >= spec.span - a - 1e-9
-      const nearRidge = thetaDeg > 7 && Math.abs(p1.x - spec.span / 2) <= a + 1e-9 // 7° 초과면 마루 띠도 ②
+      const nearEave = G.nearEave(p1.x, a, 1e-9)
+      const nearRidge = thetaDeg > 7 && G.nearRidge(p1.x, a, 1e-9) // 7° 초과면 마루 띠도 ②
       const edge = nearEave || nearRidge
       zone = edge && nearGable ? 3 : edge || nearGable ? 2 : 1
       const D = spec.roofDead * trib + self

@@ -27,8 +27,8 @@ export function resultNumber(value: unknown, table: string, where = ''): number 
 
 export function serviceNodes(spec: FactorySpec, model: FactoryModel) {
   const G = portalGeometry(spec)
-  const eaves = model.nodes.filter((n) => Math.abs(n.z - spec.eaveHeight) < 1e-9 && (n.x === 0 || n.x === spec.span))
-  const ridge = model.nodes.filter((n) => Math.abs(n.z - G.ridgeZ) < 1e-9 && Math.abs(n.x - spec.span / 2) < 1e-9)
+  const eaves = model.nodes.filter(G.isEaveNode)
+  const ridge = model.nodes.filter(G.isDeflNode)
   return { eaves, nodes: [...new Map([...eaves, ...ridge].map((n) => [n.id, n])).values()] }
 }
 

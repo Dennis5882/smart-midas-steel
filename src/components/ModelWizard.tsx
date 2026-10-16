@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, Building2, Send } from 'lucide-react'
-import { baySpans, type FactorySpec } from '../domain/types'
+import { baySpans, frameSpans, type FactorySpec } from '../domain/types'
 import { t } from '../i18n'
 
 export const WIZARD_STEPS = ['mw_scope', 'mw_frame', 'mw_bays', 'mw_sections', 'mw_loads', 'mw_review'] as const
@@ -11,9 +11,12 @@ function GeometrySketch({ spec, plan }: { spec: FactorySpec; plan: boolean }) {
   const gridId = useId()
   const spans = baySpans(spec)
   const length = spans.reduce((a, b) => a + b, 0)
-  const width = 220, scale = Math.min(width / spec.span, 112 / (spec.eaveHeight + spec.span * spec.roofSlope / 2))
+  const mono = spec.frame === 'mono'
+  const widths = frameSpans(spec)
+  const rise = (mono ? spec.span : Math.max(...widths) / 2) * spec.roofSlope
+  const width = 220, scale = Math.min(width / spec.span, 112 / (spec.eaveHeight + rise))
   const left = (300 - spec.span * scale) / 2, right = 300 - left
-  const eave = 145 - spec.eaveHeight * scale, ridge = eave - spec.span * spec.roofSlope * scale / 2
+  const eave = 145 - spec.eaveHeight * scale, ridge = eave - rise * scale
   const n = Math.min(spec.bays, 16)
   return <div className="mw-sketch" aria-hidden="true">
     <svg viewBox="0 0 300 185" focusable="false">
@@ -26,11 +29,17 @@ function GeometrySketch({ spec, plan }: { spec: FactorySpec; plan: boolean }) {
         <text x="150" y="163" textAnchor="middle">{+length.toFixed(2)} m · {spec.bays} × {spec.baySpacing} m</text>
         <text x="150" y="24" textAnchor="middle">{t('mw_plan')}</text>
       </> : <>
-        <path d={`M${left} 145 V${eave} L150 ${ridge} L${right} ${eave} V145`} fill="var(--tile)" stroke="var(--cyan)" strokeWidth="4" strokeLinejoin="round" />
+        <path d={mono ? `M${left} 145 V${eave} L${right} ${ridge} V145`
+          : `M${left} 145 V${eave} ${widths.reduce((acc, w, i) => { const x0 = left + widths.slice(0, i).reduce((a, b) => a + b, 0) * scale; return `${acc} L${x0 + w * scale / 2} ${eave - (w / 2) * spec.roofSlope * scale} L${x0 + w * scale} ${eave}` }, '')} V145`}
+          fill="var(--tile)" stroke="var(--cyan)" strokeWidth="4" strokeLinejoin="round" />
+        {/* 다경간 내부 기둥 (흔들림 기둥) */}
+        {widths.slice(0, -1).map((_, i) => { const x = left + widths.slice(0, i + 1).reduce((a, b) => a + b, 0) * scale; return <path key={i} d={`M${x} 145 V${eave}`} stroke="var(--cyan)" strokeWidth="2" strokeDasharray="4 3" /> })}
         <path d={`M${left - 12} 149 H${left + 12} M${right - 12} 149 H${right + 12}`} stroke="var(--muted)" strokeWidth="2" />
         <path d={`M${left} 163 H${right} M${left} 158 V168 M${right} 158 V168`} stroke="var(--muted)" />
         <text x="150" y="180" textAnchor="middle">{spec.span} m</text>
-        <text x={right + 8} y={(145 + eave) / 2} fontSize="10">{spec.eaveHeight} m</text>
+        {/* 편경사: 낮은 처마는 왼쪽, 높은 처마는 오른쪽에 */}
+        <text x={mono ? left - 8 : right + 8} y={(145 + eave) / 2} fontSize="10" textAnchor={mono ? 'end' : 'start'}>{spec.eaveHeight} m</text>
+        {mono && <text x={right + 8} y={(145 + ridge) / 2} fontSize="10">{+(spec.eaveHeight + rise).toFixed(2)} m</text>}
         <text x="150" y={Math.max(14, ridge - 12)} textAnchor="middle">{t('f_slope')} {spec.roofSlope}</text>
       </>}
     </svg>

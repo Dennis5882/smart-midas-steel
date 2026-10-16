@@ -5,7 +5,7 @@ import { counties, townsOf } from '../codes/twSites'
 import { sectionProps } from '../domain/sections'
 import { portalGeometry } from '../domain/portal'
 import { LIMITS } from '../domain/scope'
-import { baySpans, normalizeBays, type FactorySpec } from '../domain/types'
+import { baySpans, FRAME_TYPES, frameSpans, normalizeBays, normalizeSpans, type FactorySpec, type FrameType } from '../domain/types'
 import { t, type I18nKey } from '../i18n'
 
 /** 스펙 경로 ('span', 'sections.column', 'seismic.SDS' …) */
@@ -27,6 +27,7 @@ export interface Group { title: I18nKey; fields: Field[] }
 
 export const GROUPS: Group[] = [
   { title: 'sec_geometry', fields: [
+    { path: 'frame', label: 'f_frame', kind: 'select', options: () => FRAME_TYPES.map((v) => ({ value: v, label: t(`frame_${v}`) })) },
     { path: 'span', label: 'f_span', unit: 'm', kind: 'num' },
     { path: 'eaveHeight', label: 'f_eave', unit: 'm', kind: 'num' },
     { path: 'bays', label: 'f_bays', kind: 'int' },
@@ -103,12 +104,17 @@ export const CN_GROUPS: Group[] = [
   ] },
 ]
 const BAY_LIST: Field = { path: 'bayList', label: 'f_bayList', unit: 'm', kind: 'list', full: true }
+/** 다경간: 스팬 한 칸 대신 경간별 폭 목록 (합계 = 전체 폭) */
+const SPAN_LIST: Field = { path: 'spanList', label: 'f_spanList', unit: 'm', kind: 'list', full: true }
+const multiGeometry = (g: Group): Group => g.title !== 'sec_geometry' ? g
+  : { ...g, fields: g.fields.flatMap((f) => (f.path === 'span' ? [SPAN_LIST] : [f])) }
 /** 자유골조: 형상의 베이 수·간격 → 베이별 간격 목록 한 칸 */
 const freeGeometry = (g: Group): Group => g.title !== 'sec_geometry' ? g
   : { ...g, fields: [BAY_LIST, ...g.fields.filter((f) => f.path !== 'bays' && f.path !== 'baySpacing')] }
-export const groupsFor = (code: FactorySpec['code'], free = false) =>
+export const groupsFor = (code: FactorySpec['code'], free = false, frame?: FrameType) =>
   (code === 'CN' ? [...GROUPS.filter((g) => !['sec_wind', 'sec_seismic', 'sec_conn'].includes(g.title)), ...CN_GROUPS] : GROUPS)
     .map((g) => free ? freeGeometry(g) : g)
+    .map((g) => frame === 'multi' ? multiGeometry(g) : g)
 export const FIELDS = [...GROUPS, ...CN_GROUPS].flatMap((g) => g.fields)
 export const parseList = (raw: string) => raw.split(/[,，、\s]+/).filter(Boolean).map(Number)
 
@@ -122,22 +128,26 @@ export function setPath<T>(o: T, p: Path, v: unknown): T {
    여기서의 대체는 미리보기·요약이 깨지지 않게 하는 용도뿐이다. */
 export function toSpec(base: FactorySpec, vals: Record<Path, string>, free: boolean): FactorySpec {
   let sp = free ? base : { ...base, bayList: undefined }
-  for (const f of groupsFor(base.code, free).flatMap((g) => g.fields)) {
+  const frame = (vals.frame || base.frame) as FrameType | undefined
+  for (const f of groupsFor(base.code, free, frame).flatMap((g) => g.fields)) {
     const raw = vals[f.path]
     if (f.kind === 'list') {
       const l = parseList(raw)
-      if (l.length && l.every((v) => Number.isFinite(v) && v > 0)) sp = { ...sp, bayList: l }
+      if (l.length && l.every((v) => Number.isFinite(v) && v > 0)) sp = setPath(sp, f.path, l)
     } else if (f.kind === 'num' || f.kind === 'int') {
       const n = f.kind === 'int' ? Math.round(+raw) : +raw
       if (Number.isFinite(n) && (f.min !== undefined ? n >= f.min : n > 0)) sp = setPath(sp, f.path, n)
     } else if (raw.trim()) sp = setPath(sp, f.path, f.numeric ? +raw : raw.trim())
   }
-  return normalizeBays(sp)
+  return normalizeSpans(normalizeBays(sp))
 }
 
 export const initVals = (sp: FactorySpec): Record<Path, string> => ({
   ...Object.fromEntries(FIELDS.map((f) => [f.path, String(getPath(sp, f.path) ?? '')])),
   bayList: baySpans(sp).join(', '),
+  frame: sp.frame ?? 'gable',
+  /* 다경간으로 바꾸면 처음엔 지금 스팬 두 개 */
+  spanList: (sp.spanList ?? [sp.span, sp.span]).join(', '),
 })
 
 /** 베이 목록 '6, 6, 7.5' — 비었거나, 숫자가 아니거나, 0 이하인 항목이 있으면 오류 */
@@ -160,13 +170,13 @@ export function invalidField(f: Field, raw: string, spec: FactorySpec): boolean 
   return false
 }
 
-export const fieldStep = (f: Field) => ['span', 'eaveHeight', 'roofSlope', 'baseFixity'].includes(f.path) ? 1
+export const fieldStep = (f: Field) => ['frame', 'span', 'spanList', 'eaveHeight', 'roofSlope', 'baseFixity'].includes(f.path) ? 1
   : ['bays', 'baySpacing', 'purlinSpacing', 'girtSpacing', 'postSpacing', 'sagRods'].includes(f.path) ? 2
   : f.path.startsWith('sections.') || f.path === 'material' || ['fc', 'anchorFu', 'china.concreteBearing', 'china.anchorFt'].includes(f.path) ? 3 : 4
 
 /** 잘못된 입력 칸 — 기본 모델링·자유골조 공통 (자유골조는 베이 수·간격 대신 베이 목록) */
 export const invalidFields = (spec: FactorySpec, vals: Record<Path, string>, free: boolean): Field[] =>
-  groupsFor(spec.code, free).flatMap((g) => g.fields).filter((f) => invalidField(f, vals[f.path], spec))
+  groupsFor(spec.code, free, spec.frame).flatMap((g) => g.fields).filter((f) => invalidField(f, vals[f.path], spec))
 
 /** 칸 사이 충돌 — 각 칸은 올바르지만 함께 두면 모델이 성립하지 않는 경우. 위저드가 그 칸의 단계에서 바로 막는다.
    ① 치수 한계(적용범위 block 과 같은 값) ② 간격이 커서 처마~마루·기초~처마·박공 사이에 부재가 하나도 안 들어감
@@ -175,23 +185,31 @@ export const invalidFields = (spec: FactorySpec, vals: Record<Path, string>, fre
 export interface Conflict { field: Field; text: string }
 const MIN_DIV = 1.5
 export function fieldConflicts(spec: FactorySpec, vals: Record<Path, string>, free: boolean): Conflict[] {
-  const fields = groupsFor(spec.code, free).flatMap((g) => g.fields)
+  const fields = groupsFor(spec.code, free, spec.frame).flatMap((g) => g.fields)
   const bad = new Set(fields.filter((f) => invalidField(f, vals[f.path], spec)).map((f) => f.path))
   const ok = (...p: Path[]) => p.every((x) => !bad.has(x))
   const out: Conflict[] = []
   const add = (path: Path, text: string) => { const field = fields.find((f) => f.path === path); if (field) out.push({ field, text }) }
   const floor2 = (x: number) => Math.floor(x * 100) / 100
   if (ok('span') && spec.span > LIMITS.span) add('span', t('sc_span', spec.span))
+  /* 다경간: 스팬 한계는 경간마다 */
+  const widths = frameSpans(spec), wMax = Math.max(...widths), wMin = Math.min(...widths)
+  if (spec.frame === 'multi' && ok('spanList') && wMax > LIMITS.span) add('spanList', t('sc_span', wMax))
   if (ok('eaveHeight') && spec.eaveHeight > LIMITS.eave) add('eaveHeight', t('sc_eave', spec.eaveHeight))
   if (ok('roofSlope') && spec.roofSlope > LIMITS.slope) add('roofSlope', t('sc_slope', spec.roofSlope))
   if (out.length) return out
   const G = portalGeometry(spec)
+  /* 편경사 높은 쪽 처마 = 처마 + 스팬 × 경사 */
+  if (spec.frame === 'mono' && ok('span', 'eaveHeight', 'roofSlope') && G.ridgeZ > LIMITS.eave) { add('roofSlope', t('sc_eaveHigh', +G.ridgeZ.toFixed(2))); return out }
   const r2 = (x: number) => +x.toFixed(2)
-  if (ok('span', 'roofSlope', 'purlinSpacing') && G.slopeLen / spec.purlinSpacing < MIN_DIV)
-    add('purlinSpacing', t('mw_cf_purlin', r2(G.slopeLen), floor2(G.slopeLen / MIN_DIV)))
+  /* 다경간은 가장 좁은 경간의 지붕면 길이 기준 */
+  const slopeLen = spec.frame === 'multi' ? Math.hypot(wMin / 2, (wMin / 2) * spec.roofSlope) : G.slopeLen
+  if (ok('span', 'spanList', 'roofSlope', 'purlinSpacing') && slopeLen / spec.purlinSpacing < MIN_DIV)
+    add('purlinSpacing', t('mw_cf_purlin', r2(slopeLen), floor2(slopeLen / MIN_DIV)))
   if (ok('eaveHeight', 'girtSpacing') && spec.eaveHeight / spec.girtSpacing < MIN_DIV)
     add('girtSpacing', t('mw_cf_girt', spec.eaveHeight, floor2(spec.eaveHeight / MIN_DIV)))
-  if (ok('span', 'postSpacing') && spec.span / Math.max(spec.postSpacing, 1) < MIN_DIV)
-    add('postSpacing', t('mw_cf_post', spec.span, floor2(spec.span / MIN_DIV)))
+  const wPost = spec.frame === 'multi' ? wMin : spec.span
+  if (ok('span', 'spanList', 'postSpacing') && wPost / Math.max(spec.postSpacing, 1) < MIN_DIV)
+    add('postSpacing', t('mw_cf_post', wPost, floor2(wPost / MIN_DIV)))
   return out
 }

@@ -35,7 +35,8 @@ function Summary({ spec, tpl }: { spec: FactorySpec; tpl?: TemplateKey }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9, paddingBottom: 8, borderBottom: '1px dashed var(--line2)' }}>
         <div><span className="plan-type">{t(`tpl_${k}`)}</span></div>
       </div>
-      {row(t('f_span'), `${spec.span} m`)}
+      {row(t('f_frame'), t(`frame_${spec.frame ?? 'gable'}`))}
+      {row(t('f_span'), spec.frame === 'multi' && spec.spanList ? `${spec.span} m (${spec.spanList.join(' + ')})` : `${spec.span} m`)}
       {row(t('kv_length'), lengthText(spec))}
       {row(t('f_eave'), `${spec.eaveHeight} m · ${t('f_slope')} ${spec.roofSlope} · ${t('f_base')} ${t(spec.baseFixity === 'fixed' ? 'base_fixed' : 'base_pinned')}`)}
       {row(t('f_column'), `${sec.column} · ${t('f_rafter')} ${sec.rafter}`)}
@@ -62,7 +63,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
   const spec = useMemo(() => ({ ...toSpec(msg.spec, vals, free), features: feat }), [msg.spec, vals, free, feat])
   const blocked = checkScope(spec).blocked
   const live = s.buildEpoch === msg.epoch && s.workspaceView === 'model' && s.task === 'model' && !(s.opt && (msg.modelRevision ?? 0) < s.modelRevision)
-  const groups = groupsFor(spec.code, free)
+  const groups = groupsFor(spec.code, free, spec.frame)
   const invalid = invalidFields(spec, vals, free)
   /* 칸 사이 충돌(치수 한계·간격 과대)도 그 칸의 오류로 — 해당 단계에서 막는다 */
   const conflicts = fieldConflicts(spec, vals, free)
@@ -197,7 +198,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
       <ScopeBox spec={spec} feat={feat} setFeat={setFeat} disabled={!live} />
       <div className="plan-editor">
         {spec.code === 'CN' && <div className="pe-tip">{t('cn_scope_note')}</div>}
-        {groupsFor(spec.code, free).map((g) => (
+        {groupsFor(spec.code, free, spec.frame).map((g) => (
           <div key={g.title} style={{ marginBottom: 12 }}>
             <div className="sec-divider" style={{ margin: '4px 0 10px' }}>{t(g.title)}</div>
             {fields(g)}

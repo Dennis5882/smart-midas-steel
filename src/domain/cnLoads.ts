@@ -8,18 +8,18 @@ import type { LoadCaseType } from '../codes'
 import type { LoadInfo, LoadPayloads } from './loads'
 import { portalGeometry } from './portal'
 import { nodeWeights } from './weights'
-import { baySpans, type FactoryModel, type FactorySpec, type Face, type Node } from './types'
+import { baySpans, frameSpans, type FactoryModel, type FactorySpec, type Face, type Node } from './types'
 import { sectionProps } from './sections'
 
 export function validateCnSpec(spec: FactorySpec): void {
   const c = spec.china
   if (!c) throw new Error('CN project inputs are required')
   if (spec.wind.enclosure !== 'enclosed') throw new Error('GB: this factory model supports closed buildings; dominant openings require a separate pressure model')
-  if (!(spec.eaveHeight > 0 && spec.eaveHeight <= 18 && spec.span > 0 && spec.span <= 60 && spec.bays >= 1 && Number.isInteger(spec.bays) && baySpans(spec).every((s) => s > 0) && spec.roofSlope > 0 && spec.roofSlope <= 1)) throw new Error('GB scope: regular single-storey factory, eave ≤18 m, span ≤60 m, roof slope ≤1')
+  if (!(spec.eaveHeight > 0 && spec.eaveHeight <= 18 && spec.span > 0 && Math.max(...frameSpans(spec)) <= 60 && spec.bays >= 1 && Number.isInteger(spec.bays) && baySpans(spec).every((s) => s > 0) && spec.roofSlope > 0 && spec.roofSlope <= 1 && (spec.frame !== 'mono' || spec.eaveHeight + spec.span * spec.roofSlope <= 18))) throw new Error('GB scope: regular single-storey factory, eave ≤18 m, span ≤60 m, roof slope ≤1')
   for (const k of ['w0', 'betaZ', 'topography', 'alphaMax', 'Tg', 'Tx', 'Ty', 'damping', 'snowMu', 'gamma0', 'concreteBearing', 'anchorFt'] as const)
     if (!(Number.isFinite(c[k]) && c[k] > 0)) throw new Error(`GB: invalid ${k}`)
   if (!(c.w0 >= .3 && c.betaZ >= 1 && c.topography >= .75 && c.snow >= 0 && Number.isFinite(c.snow) && c.snowMu >= .9 && c.gamma0 >= 1 && c.Tx <= 6 && c.Ty <= 6 && c.damping >= .045 && c.damping <= .05)) throw new Error('GB: check w0 ≥0.3, betaZ ≥1, topography ≥0.75, snow multiplier ≥0.9, gamma0 ≥1, periods ≤6 s, damping 0.045–0.05')
-  if (spec.eaveHeight + spec.span * spec.roofSlope / 4 > 20) throw new Error('GB: mean roof height must be ≤20 m for the current local wind table')
+  if (spec.eaveHeight + Math.max(...frameSpans(spec)) * spec.roofSlope / (spec.frame === 'mono' ? 2 : 4) > 20) throw new Error('GB: mean roof height must be ≤20 m for the current local wind table')
   if (baySpans(spec).reduce((a, b) => a + b, 0) > 90) throw new Error('GB: the current single temperature unit is limited to 90 m')
   if (c.alphaMax >= .16 && spec.span > 24) throw new Error('GB: intensity 8/9 and span >24 m require a project-specific vertical earthquake model (GB/T 50011 5.3)')
   for (const name of Object.values(spec.sections)) { const p = sectionProps(name); if (![p.A, p.Ix, p.Iy, p.rx, p.ry].every((x) => Number.isFinite(x) && x > 0)) throw new Error(`GB: invalid section ${name}`) }
@@ -29,7 +29,7 @@ export function validateCnSpec(spec: FactorySpec): void {
 export function buildCnLoads(spec: FactorySpec, model: FactoryModel): LoadPayloads {
   validateCnSpec(spec)
   const c = spec.china!, G = portalGeometry(spec)
-  const { span, eaveHeight } = spec, { length, sRoof, gWall, theta } = G
+  const { length, sRoof, gWall, theta } = G
   const cos = Math.cos(theta), sin = Math.sin(theta), deg = theta * 180 / Math.PI
   const nodes = new Map(model.nodes.map((n) => [n.id, n]))
   const ends = (e: FactoryModel['elements'][number]): [Node, Node] => [nodes.get(e.n1)!, nodes.get(e.n2)!]
@@ -46,8 +46,10 @@ export function buildCnLoads(spec: FactorySpec, model: FactoryModel): LoadPayloa
     if (dir === 'GX') t.x += w * L
     if (dir === 'GY') t.y += w * L
   }
-  const topGirt = G.girtZs.at(-1) ?? 0
-  const strip = (x: number) => Math.max(0, G.zAt(x) - topGirt - gWall / 2)
+  const topGirt = (x: number) => G.endGirtZs.filter((z) => z < G.zAt(x) - 1e-6).at(-1) ?? 0
+  const strip = (x: number) => Math.max(0, G.zAt(x) - topGirt(x) - G.gEnd / 2)
+  /** 벽 거트 분담 높이 — 측벽은 그 벽의 간격(편경사 좌우 다름), 박공벽은 박공벽 간격 */
+  const wallTrib = (face: Exclude<Face, 'roof'>) => (face === 'x0' ? G.gWallAt(G.eaveXs[0]) : face === 'xL' ? G.gWallAt(G.eaveXs[G.eaveXs.length - 1]) : G.gEnd)
   const gable = (a: Node): 'y0' | 'yL' | null => a.y === 0 ? 'y0' : Math.abs(a.y - length) < 1e-8 ? 'yL' : null
   const qLive = CN.roofLive({ slope: spec.roofSlope, tribArea: sRoof * cos * Math.min(...baySpans(spec)) })
   // Table 7.2.1, single-span gable: uniform and, at 20–30°, .75/1.25.
@@ -55,19 +57,21 @@ export function buildCnLoads(spec: FactorySpec, model: FactoryModel): LoadPayloa
   const snowIndex = snowAngles.findIndex((a) => deg <= a)
   const mu = deg <= 25 ? 1 : snowIndex < 0 ? 0 : snowMus[snowIndex - 1] + (snowMus[snowIndex] - snowMus[snowIndex - 1]) * (deg - snowAngles[snowIndex - 1]) / (snowAngles[snowIndex] - snowAngles[snowIndex - 1])
   const qSnow = c.snow * mu * c.snowMu
-  const snowCases = c.snow > 0 ? (deg >= 20 && deg <= 30 ? ['SN', 'SN1', 'SN2'] : ['SN']) : []
+  /* 표 7.2.1 — 불균형(20~30°)은 제2항 단경간 쌍坡만. 제1항 단坡는 균일. 다경간(제7항)은 7.2.2-3 골조·기둥 = 전 경간 균일 (25° 초과는 적용범위에서 막음) */
+  const snowCases = c.snow > 0 ? (deg >= 20 && deg <= 30 && G.ridges.length === 1 ? ['SN', 'SN1', 'SN2'] : ['SN']) : []
   for (const e of model.elements) {
     const [a, b] = ends(e)
     let w = 0
-    if (e.role === 'girt') w = spec.wallDead * gWall
+    if (e.role === 'girt') w = spec.wallDead * (e.face && e.face !== 'roof' ? wallTrib(e.face) : gWall)
     if (e.role === 'rafter' && gable(a)) w = spec.wallDead * strip((a.x + b.x) / 2)
     if (e.role === 'purlin' || e.role === 'strut') {
-      const eave = a.x === 0 || a.x === span, trib = eave ? sRoof / 2 : sRoof
-      w = spec.roofDead * trib + (eave ? spec.wallDead * gWall / 2 : 0)
+      const eave = !!G.eaveSide(a.x), trib = G.roofTrib(a.x).reduce((t, r) => t + r.trib, 0)
+      w = spec.roofDead * trib + (eave ? spec.wallDead * G.gWallAt(a.x) / 2 : 0)
       add(e.id, 'LR', 'GZ', -qLive * trib * cos)
       snow.set(e.id, qSnow * trib * cos)
       for (const lc of snowCases) {
-        const k = lc === 'SN' || Math.abs(a.x - span / 2) < 1e-8 ? 1 : (a.x < span / 2) === (lc === 'SN1') ? 1.25 : .75
+        /* 불균형: SN1 = 오르막 면(rising) 1.25·반대 0.75, SN2 = 반대. 마루 절점은 양쪽 평균 = 1 */
+        const k = lc === 'SN' || G.isRidge(a.x) ? 1 : G.planes[G.roofTrib(a.x)[0].plane].rising === (lc === 'SN1') ? 1.25 : .75
         add(e.id, lc, 'GZ', -qSnow * trib * cos * k)
       }
     }
@@ -90,7 +94,7 @@ export function buildCnLoads(spec: FactorySpec, model: FactoryModel): LoadPayloa
       items.push({ ID: items.length + 1, LCNAME: `E${d}`, GROUP_NAME: '', FX: d === 'X' ? F : 0, FY: d === 'Y' ? F : 0, FZ: 0, MX: 0, MY: 0, MZ: 0 })
     }
   }
-  const hRef = eaveHeight + G.rise / 2
+  const hRef = G.hMean
   const q = (z: number) => c.w0 * muZ(z, c.terrain) * c.topography
   const qh = q(hRef), cp = roofShape(deg)
   const OUT: Record<Exclude<Face, 'roof'>, [number, number]> = { x0: [-1, 0], xL: [1, 0], y0: [0, -1], yL: [0, 1] }
@@ -100,24 +104,29 @@ export function buildCnLoads(spec: FactorySpec, model: FactoryModel): LoadPayloa
   for (const wc of winds) {
     const windward = wc.dir === 'X' ? (wc.sign > 0 ? 'x0' : 'xL') : (wc.sign > 0 ? 'y0' : 'yL')
     const leeward = wc.dir === 'X' ? (wc.sign > 0 ? 'xL' : 'x0') : (wc.sign > 0 ? 'yL' : 'y0')
-    const wallP = (face: Exclude<Face, 'roof'>, z: number) => c.betaZ * (face === windward ? .8 * q(z) : (face === leeward ? -.5 : -.7) * qh) - wc.internal * qh
+    /* 표 8.3.1: 풍하벽 −0.5 (단경간 제2·5항), 다경간 −0.4 (제8항) */
+    const leeCp = G.ridges.length > 1 ? -.4 : -.5
+    const wallP = (face: Exclude<Face, 'roof'>, z: number) => c.betaZ * (face === windward ? .8 * q(z) : (face === leeward ? leeCp : -.7) * qh) - wc.internal * qh
     const wall = (id: number, face: Exclude<Face, 'roof'>, z: number, trib: number) => { const p = wallP(face, z) * trib, [x, y] = OUT[face]; add(id, wc.name, 'GX', -x * p); add(id, wc.name, 'GY', -y * p) }
     for (const e of model.elements) {
       const [a, b] = ends(e)
-      if (e.role === 'girt' && e.face && e.face !== 'roof') { wall(e.id, e.face, a.z, gWall); continue }
+      if (e.role === 'girt' && e.face && e.face !== 'roof') { wall(e.id, e.face, a.z, wallTrib(e.face)); continue }
       if (e.role === 'rafter') { const face = gable(a); if (face) wall(e.id, face, (a.z + b.z) / 2, strip((a.x + b.x) / 2)); continue }
       if (e.role !== 'purlin' && e.role !== 'strut') continue
       let fx = 0, fz = 0
-      const roof = (left: boolean, trib: number) => {
-        const windFacing = left === (wc.sign > 0)
-        const coeff = wc.dir === 'Y' ? -.6 : windFacing ? cp : -.5
+      /* 지붕면마다(G.roofTrib): rising 면은 +X 풍을 마주봄. 처마면 측벽 반 칸 */
+      for (const { plane, trib } of G.roofTrib(a.x)) {
+        const rising = G.planes[plane].rising
+        const windFacing = rising === (wc.sign > 0)
+        /* 풍상 쪽부터 순서: 첫 면(마주볼 때) μs(제2항), 첫 경간 다른 면 −0.5, 이후 경간 −0.4 (제8항 등고 쌍경간) */
+        const order = wc.sign > 0 ? plane : G.planes.length - 1 - plane
+        const coeff = wc.dir === 'Y' ? -.6 : order === 0 && windFacing ? cp : order <= 1 ? -.5 : -.4
         const p = qh * (c.betaZ * coeff - wc.internal)
-        fx += (left ? 1 : -1) * p * trib * sin; fz -= p * trib * cos
+        fx += (rising ? 1 : -1) * p * trib * sin; fz -= p * trib * cos
       }
-      if (a.x === 0) { roof(true, sRoof / 2); fx += wallP('x0', eaveHeight) * gWall / 2 }
-      else if (a.x === span) { roof(false, sRoof / 2); fx -= wallP('xL', eaveHeight) * gWall / 2 }
-      else if (Math.abs(a.x - span / 2) < 1e-8) { roof(true, sRoof / 2); roof(false, sRoof / 2) }
-      else roof(a.x < span / 2, sRoof)
+      const side = G.eaveSide(a.x)
+      if (side === 'x0') fx += wallP('x0', G.zAt(a.x)) * G.gWallAt(a.x) / 2
+      else if (side === 'xL') fx -= wallP('xL', G.zAt(a.x)) * G.gWallAt(a.x) / 2
       add(e.id, wc.name, 'GX', fx); add(e.id, wc.name, 'GZ', fz)
     }
   }

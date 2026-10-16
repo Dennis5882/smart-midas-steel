@@ -237,9 +237,10 @@ export function runConnections(spec: FactorySpec, model: FactoryModel, info: Loa
 
   /* 주각: 기초 절점에서 시작하는 기둥 요소의 I 단 */
   const baseF = model.elements.filter((e) => e.role === 'column' && at(e.n1).z === 0).flatMap((e) => endForces(res, e.id, 0, withAmp)) // 13.4.5
-  /* 처마: 처마 절점에 닿는 지붕보 끝 (x = 0 이면 I, x = 스팬이면 J) */
-  const kneeEls = model.elements.filter((e) => e.role === 'rafter' && (at(e.n1).x === 0 || at(e.n2).x === spec.span))
-  const kneePart = (e: (typeof kneeEls)[number]) => (at(e.n1).x === 0 ? 0 : 4) as 0 | 4
+  /* 처마: 처마 절점에 닿는 지붕보 끝 (I 단이 처마면 I, 아니면 J) */
+  const G = portalGeometry(spec)
+  const kneeEls = model.elements.filter((e) => e.role === 'rafter' && (G.isEaveNode(at(e.n1)) || G.isEaveNode(at(e.n2))))
+  const kneePart = (e: (typeof kneeEls)[number]) => (G.isEaveNode(at(e.n1)) ? 0 : 4) as 0 | 4
   const kneeF = kneeEls.flatMap((e) => endForces(res, e.id, kneePart(e), basic))
   /* 13.6.1 용량 설계 힘 — 지붕보 Mp, 전단 Vg + 2Mp/Lh ≤ V(13.3-1) */
   const kneeNotes: string[] = []
@@ -248,7 +249,7 @@ export function runConnections(spec: FactorySpec, model: FactoryModel, info: Loa
     const mat = profileOf(spec.code).materials[spec.material]
     const raf = sectionProps(spec.sections.rafter), col = sectionProps(spec.sections.column)
     const Mp = (raf.Zx * (profileOf(spec.code).fyAt?.(spec.material, Math.max(raf.tf, raf.tw)) ?? mat.fy)) / 1e6 // kN·m
-    const Lh = 2 * portalGeometry(spec).slopeLen - col.d / 1000 // 처마~처마 기둥면 사이 지붕보 길이 (m)
+    const Lh = G.rafterLen - col.d / 1000 // 처마~처마 기둥면 사이 지붕보 길이 (m)
     const grav = kneeEls.flatMap((e) => endForces(res, e.id, kneePart(e), (c) => kind(c) === 'gravity'))
     const amp1 = kneeEls.flatMap((e) => endForces(res, e.id, kneePart(e), (c) => kind(c) === 'amplified' && c.includes('13.3-1')))
     const Vg = Math.max(0, ...grav.map((f) => f.V)), V13 = Math.max(0, ...amp1.map((f) => f.V))
@@ -257,7 +258,7 @@ export function runConnections(spec: FactorySpec, model: FactoryModel, info: Loa
     kneeF.push({ elem: kneeEls[0].id, combo: '13.6.1 Mp', P: Pg, M: Mp, V: Vu, Vw: 0 })
     /* 13.7.2-3a 소요 소성 회전각: min(0.01, 1.1(R − 1)θE), θE = 설계 지진 EX 처마 변위각 */
     const ex = res.disp.get('EX')
-    const eave = model.nodes.filter((n) => Math.abs(n.z - spec.eaveHeight) < 1e-9 && (n.x === 0 || n.x === spec.span))
+    const eave = model.nodes.filter(G.isEaveNode)
     const thetaE = ex ? Math.max(0, ...eave.map((n) => Math.abs(ex.get(n.id)?.dx ?? 0))) / spec.eaveHeight : 0
     const thetaP = Math.min(0.01, 1.1 * (info.seismic.X.R - 1) * thetaE)
     kneeDims.Mu = `Mp = ${Mp.toFixed(1)} kN·m, Vu = ${Vu.toFixed(1)} kN (13.6.1)`
@@ -265,9 +266,8 @@ export function runConnections(spec: FactorySpec, model: FactoryModel, info: Loa
     kneeNotes.push('rotTest')
   }
   /* 마루: 마루 절점에 닿는 지붕보 끝 */
-  const ridgeX = spec.span / 2
-  const apexF = model.elements.filter((e) => e.role === 'rafter' && (Math.abs(at(e.n2).x - ridgeX) < 1e-9 || Math.abs(at(e.n1).x - ridgeX) < 1e-9))
-    .flatMap((e) => endForces(res, e.id, Math.abs(at(e.n2).x - ridgeX) < 1e-9 ? 4 : 0, basic))
+  const apexF = model.elements.filter((e) => e.role === 'rafter' && (G.isRidgeNode(at(e.n2)) || G.isRidgeNode(at(e.n1))))
+    .flatMap((e) => endForces(res, e.id, G.isRidgeNode(at(e.n2)) ? 4 : 0, basic))
 
   /* 주각: 앵커 지름·개수 최소 조합 */
   for (const d of [24, 30, 36, 42]) {
@@ -282,7 +282,8 @@ export function runConnections(spec: FactorySpec, model: FactoryModel, info: Loa
     }
     if (done) break
   }
-  for (const [type, forces, colName] of [['knee', kneeF, spec.sections.column], ['apex', apexF, null]] as const) {
+  /* 마루 접합은 마루가 있는 형식만 (편경사 없음) */
+  for (const [type, forces, colName] of [['knee', kneeF, spec.sections.column], ...(G.ridges.length ? [['apex', apexF, null]] as const : [])] as const) {
     for (const d of [20, 22, 24, 27, 30]) {
       const r = endPlateFor(spec, forces, d, spec.sections.rafter, colName)
       if (r && (r.ratio <= 1 || d === 30)) {

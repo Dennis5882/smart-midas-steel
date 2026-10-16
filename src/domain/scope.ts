@@ -5,11 +5,11 @@
    CN 의 세부 범위는 validateCnSpec(GB 표 적용 한계) 을 그대로 쓴다. */
 import { validateCnSpec } from './cnLoads'
 import { portalGeometry } from './portal'
-import type { FactorySpec } from './types'
+import { frameSpans, type FactorySpec } from './types'
 
 export type ScopeKey =
   | 'crane' | 'mezzanine' | 'multiSpan' | 'opening' | 'openingCN'
-  | 'span' | 'eave' | 'slope' | 'bayRatio' | 'baySpacing' | 'length' | 'hnR' | 'cn'
+  | 'span' | 'eave' | 'eaveHigh' | 'slope' | 'bayRatio' | 'baySpacing' | 'length' | 'hnR' | 'cn' | 'monoTW' | 'multi' | 'multiTW' | 'multiSnowCN'
 export interface ScopeIssue { key: ScopeKey; level: 'block' | 'warn'; args: (string | number)[] }
 export interface ScopeResult { issues: ScopeIssue[]; blocked: boolean }
 
@@ -28,9 +28,10 @@ export function checkScope(spec: FactorySpec, f: ScopeFeatures = spec.features ?
   const G = portalGeometry(spec)
 
   /* 앱이 모델링하지 않는 구조 */
+  /* 크레인: 현재 전부 막음. 지원할 때 — 크레인(런웨이·브래킷)을 받는 기둥은 흔들림 기둥(핀) 금지, 강접 라멘 기둥으로 (다경간 내부 기둥 포함) */
   if (f.crane) block('crane')
   if (f.mezzanine) block('mezzanine')
-  if (f.multiSpan) block('multiSpan')
+  if (f.multiSpan && spec.frame !== 'multi') block('multiSpan') // 다경간 형식을 고르면 지원
   /* 큰 개구부: TW 는 부분 밀폐(GCpi ±0.55)로 근사 가능 — 개구부 골조는 별도. CN 은 폐쇄형만 */
   if (f.opening) {
     if (spec.code === 'CN') block('openingCN')
@@ -38,16 +39,29 @@ export function checkScope(spec: FactorySpec, f: ScopeFeatures = spec.features ?
   }
 
   /* 치수 한계 */
-  if (!(spec.span > 0 && spec.span <= LIMITS.span)) block('span', spec.span)
+  /* 스팬 한계는 경간마다 (다경간은 경간 폭 목록) */
+  const wMax = Math.max(...frameSpans(spec))
+  if (!(spec.span > 0 && wMax <= LIMITS.span)) block('span', wMax)
   if (!(spec.eaveHeight > 0 && spec.eaveHeight <= LIMITS.eave)) block('eave', spec.eaveHeight)
   if (!(spec.roofSlope > 0 && spec.roofSlope <= LIMITS.slope)) block('slope', spec.roofSlope)
+  /* 편경사: 높은 쪽 처마도 한계 안. TW 는 풍압계수 해석(表2.5 를 지붕 전체에 풍상/풍하, ASCE 7 단경사 주석 준용)·외장재 구역 근사 → 경고 */
+  /* 다경간: 내부 기둥 상단 핀·골 거터 상세는 검토 범위 밖(경고). TW 주골조 풍압은 면 단위 해석(경고). CN 25° 초과는 골 적설(표 7.2.1 제7항 최대 2.0) 미반영 → 막음 */
+  if (spec.frame === 'multi') {
+    warn('multi')
+    if (spec.code === 'TW') warn('multiTW')
+    if (spec.code === 'CN' && Math.atan(spec.roofSlope) * 180 / Math.PI > 25) block('multiSnowCN')
+  }
+  if (spec.frame === 'mono') {
+    if (spec.eaveHeight <= LIMITS.eave && G.ridgeZ > LIMITS.eave) block('eaveHigh', r2(G.ridgeZ))
+    if (spec.code === 'TW') warn('monoTW')
+  }
   const spans = G.spans
   const ratio = Math.max(...spans) / Math.min(...spans)
   if (ratio > 1.5) warn('bayRatio', r2(Math.min(...spans)), r2(Math.max(...spans)))
   if (Math.max(...spans) > 9) warn('baySpacing', r2(Math.max(...spans)))
   if (spec.code === 'TW' && G.length > 90) warn('length', r2(G.length))
   /* TW 표1-3 R(Rx 3.2·Ry 2.0)은 h ≤ 12 m 조건 — 넘으면 구조계 R 재확인 */
-  const hn = spec.eaveHeight + G.rise / 2
+  const hn = G.hMean
   if (spec.code === 'TW' && hn > 12) warn('hnR', r2(hn))
 
   /* CN: GB 표 적용 한계 (validateCnSpec 메시지 그대로) */

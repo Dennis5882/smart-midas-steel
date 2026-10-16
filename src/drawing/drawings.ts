@@ -97,7 +97,9 @@ function drawSheets({ spec, model, connections, title }: DrawingInput): Dxf {
     d.line('GRID', ox, -1500, ox, H + 800); d.line('GRID', ox + W, -1500, ox + W, H + 800)
     d.dim('DIM', ox, 0, ox + W, 0, 3500, TXT)
     d.dim('DIM', ox, 0, ox, mm(spec.eaveHeight), 1500, TXT)
-    d.dim('DIM', ox + W / 2, mm(spec.eaveHeight), ox + W / 2, H, -800, TXT, `${Math.round(mm(G.rise))}`)
+    /* 박공: 마루 상승 치수 / 편경사: 오른쪽 높은 처마 높이 */
+    if (G.ridges.length) { const rx = G.ridges.length > 1 ? ox + mm(G.ridges[0]) : ox + W / 2; d.dim('DIM', rx, mm(spec.eaveHeight), rx, H, -800, TXT, `${Math.round(mm(G.rise))}`) }
+    else d.dim('DIM', ox + W, 0, ox + W, H, -1500, TXT)
     d.text('TEXT', ox + 300, mm(spec.eaveHeight) / 2, TXT, `COL ${spec.sections.column}`, 0, 90)
     d.text('TEXT', ox + W / 4, mm(G.zAt(spec.span / 4)) + 500, TXT, `RAFTER ${spec.sections.rafter}`, 1)
     const cn = (t: string) => connections?.find((c) => c.type === t)

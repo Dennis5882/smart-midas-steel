@@ -16,6 +16,7 @@ const SUITES = [
   ['Task flow / history', 'verify-task-flow.ts'],
   ['Optimization pick', 'verify-opt.ts'],
   ['3D solid sections', 'verify-solid.ts'],
+  ['Cross-section types', 'verify-frames.ts'],
   ['Quantities', 'verify-quantities.ts'],
   ['PDF + fonts', 'verify-pdf.ts'],
 ]
