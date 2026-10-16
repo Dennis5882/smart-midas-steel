@@ -12,7 +12,7 @@ export function NoticeCenter() {
   const s = useStore()
   const issues = s.activity.filter((a) => a.source === 'notice' && a.level !== 'info' && !a.acknowledged)
   const info = s.activity.filter((a) => a.source === 'notice' && a.level === 'info' && !a.acknowledged).at(-1)
-  const shown = issues.length ? issues : info ? [info] : []
+  const shown = info ? [...issues, info] : issues
   if (!shown.length) return null
   return <div className="notice-center" aria-label={t('ws_notice')}>{shown.map((a) => <div key={a.id} className={`flow-notice ${a.level}`} role={a.level === 'info' ? 'status' : 'alert'}>
     {a.level === 'info' ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}<div><span className="notice-time">{time(a.at)}{a.kind && ` · ${t(JOB_LABEL[a.kind])}`}</span><div dangerouslySetInnerHTML={{ __html: a.html ? render(a.html) : '' }} /></div>

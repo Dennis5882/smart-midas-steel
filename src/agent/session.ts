@@ -7,7 +7,7 @@ import type { CodeId } from '../codes'
 import { portalGeometry } from '../domain/portal'
 import { TEMPLATES } from '../domain/templates'
 import { defaultSpecFor, normalizeBays, type FactorySpec } from '../domain/types'
-import { getLang, langUrl, t, lt } from '../i18n'
+import { getLang, langUrl, t, lt, isLText } from '../i18n'
 import { verifyConn } from '../mapi/client'
 import { S, notify, saveCode, type Theme } from '../state/store'
 import { specChanged } from '../state/taskFlow'
@@ -38,7 +38,12 @@ export async function executeAction(c: Intent): Promise<void> {
     selectTask(task)
   }
   try { switch (c.intent) {
-    case 'help': addMsg('bot', lt('ws_help')); break
+    case 'help': {
+      /* 사용 안내 = 토글: 안내가 떠 있으면 닫기 */
+      const open = S.activity.find((a) => a.source === 'notice' && a.level === 'info' && !a.acknowledged && isLText(a.html) && a.html.k === 'ws_help')
+      if (open) { open.acknowledged = true; notify() } else addMsg('bot', lt('ws_help'))
+      break
+    }
     case 'clear': clearChat(); break
     case 'release_notes': S.rnOpen = true; notify(); break
     case 'copy_link': {

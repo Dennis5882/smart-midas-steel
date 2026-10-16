@@ -64,9 +64,9 @@ function readTheme(): Theme {
     한국어(ko)는 고른 기준이 없으면 KR 로 시작 (사용자 결정 2026-10-16, 강제 아님 — 드롭다운에서 TW·CN 선택 가능). */
 export function codeForLang(lang: Lang, current: CodeId, saved: CodeId | null, hasWork: boolean): CodeId {
   if (hasWork) return current
-  if (lang === 'zh-CN') return 'CN'
-  if (saved) return saved
-  return lang === 'ko' ? 'KR' : current
+  /* 새 작업의 기준은 언어 우선(사용자 결정 2026-10-16): 번체 TW · 간체 CN · 한국어 KR. 영어만 고른 기준 유지 */
+  const byLang: Partial<Record<Lang, CodeId>> = { 'zh-TW': 'TW', 'zh-CN': 'CN', ko: 'KR' }
+  return byLang[lang] ?? saved ?? current
 }
 export function savedCode(): CodeId | null {
   try { const c = localStorage.getItem('sms_code'); return (CODE_IDS as string[]).includes(c ?? '') ? c as CodeId : null } catch { return null }

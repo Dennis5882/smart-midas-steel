@@ -21,8 +21,12 @@ export function log(msg: string, type: LogType = 'api'): void {
 /** html = 문자열(지금 언어로 확정) 또는 lt()/ltc() (그릴 때 번역 — 언어 변경 시 지난 메시지도 바뀜) */
 export function addMsg(role: 'user' | 'bot', html: string | LText, level?: Activity['level']): void {
   S.msgs.push({ id: nextId(), ts: hm(), role, kind: 'html', html })
-  if (role === 'bot') recordActivity({ source: 'notice', html, parent: S.job?.activityId, kind: S.job?.kind,
-    level: level ?? (S.job && S.lastFail?.kind === S.job.kind ? S.lastFail.cancelled ? 'warn' : 'error' : 'info') })
+  if (role === 'bot') {
+    const lv = level ?? (S.job && S.lastFail?.kind === S.job.kind ? S.lastFail.cancelled ? 'warn' : 'error' : 'info')
+    /* 안내(info)는 최신 하나만 표시 — 이전 안내는 닫힘 처리(쌓이면 × 를 눌러도 같은 안내가 다시 보임) */
+    if (lv === 'info') for (const a of S.activity) if (a.source === 'notice' && a.level === 'info') a.acknowledged = true
+    recordActivity({ source: 'notice', html, parent: S.job?.activityId, kind: S.job?.kind, level: lv })
+  }
   notify()
 }
 

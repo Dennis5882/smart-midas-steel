@@ -17,7 +17,7 @@ export function Workspace({ guideCollapsed, onOpenGuide, onOpenMapi }: { guideCo
   const s = useStore()
   const lang = useLang()
   useEffect(() => {
-    /* 간체 = 새 작업 CN 만, 작업 중이면 기존 기준 유지, 그 밖 언어 = 사용자가 고른 기준 (store.codeForLang) */
+    /* 새 작업 = 언어 기본 기준(번체 TW·간체 CN·한국어 KR, 영어는 고른 기준), 작업 중이면 기존 기준 유지 (store.codeForLang) */
     const want = codeForLang(lang, S.code, savedCode(), !!(S.activePlan || S.built))
     if (want !== S.code) void setCode(want, { auto: true })
   }, [lang])
@@ -43,7 +43,7 @@ export function Workspace({ guideCollapsed, onOpenGuide, onOpenMapi }: { guideCo
     <NoticeCenter />
     <div className="ws-start" hidden={!!editing || s.task !== 'model'}>
       <div className="ws-hero"><span className="ws-kicker">{t('ws_kicker')}</span><h2 tabIndex={-1}>{t('project_start_title')}</h2><p>{t('project_start_hint')}</p></div>
-      <section className="project-code" aria-labelledby="project-code-heading"><h3 id="project-code-heading" className="ws-section-label">01 · {t('code_label')}</h3><p>{t('project_code_hint')}</p><select aria-label={t('code_label')} value={restrictedCode ? '' : s.code} disabled={s.busy || !!s.confirm} onChange={(e) => void setCode(e.target.value as CodeId)}>{restrictedCode && <option value="" disabled>{t('project_code_existing')}</option>}{availableCodes.map((id) => <option key={id} value={id}>{t(PROFILES[id].labelKey)}</option>)}</select>{restrictedCode && <p role="status">{t('project_code_existing_hint')}</p>}</section>
+      <section className="project-code" aria-labelledby="project-code-heading"><h3 id="project-code-heading" className="ws-section-label">01 · {t('code_label')}</h3><select aria-label={t('code_label')} value={restrictedCode ? '' : s.code} disabled={s.busy || !!s.confirm} onChange={(e) => void setCode(e.target.value as CodeId)}>{restrictedCode && <option value="" disabled>{t('project_code_existing')}</option>}{availableCodes.map((id) => <option key={id} value={id}>{t(PROFILES[id].labelKey)}</option>)}</select>{restrictedCode && <p role="status">{t('project_code_existing_hint')}</p>}</section>
       {plan?.spec.code === s.code && <button className="ws-resume-card" disabled={s.busy} onClick={openCurrentModel}><FolderOpen size={20} /><span><strong>{t('ws_resume')}</strong><small>{t('ws_resume_hint')}</small></span><ArrowRight size={16} /></button>}
       <h3 className="ws-section-label">02 · {t('ws_templates')}</h3>
       <div className="ws-template-grid">{TEMPLATE_KEYS.map((key, i) => <button className="ws-template" key={key} disabled={s.busy || restrictedCode} onClick={() => void executeAction({ intent: 'new', mode: 'template', tpl: key, params: {} })}>

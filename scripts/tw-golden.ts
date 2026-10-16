@@ -8,8 +8,8 @@ import { buildLoadPayloads } from '../src/domain/loads'
 import { buildPortal } from '../src/domain/portal'
 import type { FactorySpec } from '../src/domain/types'
 
-/** 국가별 기준 모델 fixture — TW tw-sample, CN cn-sample */
-export const fixtureFor = (code: 'TW' | 'CN') => fileURLToPath(new URL(`./fixtures/${code.toLowerCase()}-sample.json.gz`, import.meta.url))
+/** 국가별 기준 모델 fixture — TW tw-sample, CN cn-sample, KR kr-sample */
+export const fixtureFor = (code: 'TW' | 'CN' | 'KR') => fileURLToPath(new URL(`./fixtures/${code.toLowerCase()}-sample.json.gz`, import.meta.url))
 export const FIXTURE = fixtureFor('TW')
 
 type Pt = [number, number, number, number, number]

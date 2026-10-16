@@ -6,6 +6,7 @@
    약축: 중력(지붕 경사 성분·벽 자중)을 새그로드 경간 L/(n+1) 단순보로 — wt·(L/(n+1))²/8. */
 import { profileOf } from '../codes'
 import { cnCCLoads } from './cnSecondary'
+import { krCCLoads } from './krSecondary'
 import { effArea, gcpCC, zoneWidth, type CCZone } from '../codes/twWindCC'
 import type { LoadInfo } from './loads'
 import { portalGeometry } from './portal'
@@ -22,8 +23,7 @@ export interface CCLoad { zone: CCZone; A: number; pPos: number; pNeg: number; d
 
 export function ccLoads(spec: FactorySpec, model: FactoryModel, info: LoadInfo): Map<number, CCLoad> {
   if (spec.code === 'CN') return cnCCLoads(spec, model, info)
-  /* KR 외장재설계용 풍하중(KDS 41 12 00 5.4·5.8)은 2단계 */
-  if (spec.code === 'KR') return new Map()
+  if (spec.code === 'KR') return krCCLoads(spec, model, info)
   const out = new Map<number, CCLoad>()
   const G = portalGeometry(spec)
   const gamma = profileOf(spec.code).materials[spec.material].gamma

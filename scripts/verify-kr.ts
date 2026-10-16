@@ -19,6 +19,10 @@ import { runDesign } from '../src/domain/design'
 import { runConnections } from '../src/domain/connections'
 import { groupsFor, initVals, invalidFields, toSpec } from '../src/components/planFields'
 import { krSynthetic } from './kr-synth'
+import { cpeCCKR, cpiCCKR, zoneWidthKR } from '../src/codes/krWindCC'
+import { CPI_KEYS, CPI_KR } from '../src/codes/krLateral'
+import { krCCLoads, ccVelocityKR } from '../src/domain/krSecondary'
+import { portalGeometry } from '../src/domain/portal'
 
 let n = 0
 const near = (a: number, b: number, tol = 1e-6, msg = '') => { n++; assert.ok(Math.abs(a - b) <= tol, `${msg} ${a} != ${b}`) }
@@ -123,4 +127,45 @@ ok(col.B >= 1 && /KDS|KL/.test(col.eq), `column eq ${col.eq}`)
 near(d.service.find((s) => s.key === 'seisDriftX')!.value, 3 * Math.abs(0.004 + 0.004) / 8, 1e-9, 'δ = Cd·(E+ET)/I_E / h') // dx(EX) + dx(ETX)
 near(d.service.find((s) => s.key === 'windDriftX')!.value, 0.65 * Math.abs(0.004 + 0.004) / 8, 1e-9, '0.65·(W + W_L)')
 ok(runConnections(spec, g.m, info, res).length === 0, 'connections phase 2 → none')
-console.log(`KR passed: ${n} checks (KDS tables, KDS 14 31 10 hand calc, loads equilibrium, scope/input/Gen, synthetic design)`)
+
+/* ⑥ 외장재설계용 풍하중 (KDS 41 12 00 5.4.2·5.8) — 그래프 고정점 + 샘플 손계산 */
+for (const k of CPI_KEYS) ok(cpiCCKR(k)[0] === 2 * CPI_KR[k][0] && cpiCCKR(k)[1] === 2 * CPI_KR[k][1], `table 5.8-9 = 2 × table 5.7-4 (${k})`)
+near(cpeCCKR('gable', 3, 1, 5).neg, -6.0); near(cpeCCKR('gable', 3, 10, 5).neg, -2.25); near(cpeCCKR('gable', 2, 0.5, 5).neg, -3.9)
+near(cpeCCKR('gable', 1, 50, 20).neg, -1.6); near(cpeCCKR('gable', 3, 1, 35).pos, 1.95); near(cpeCCKR('gable', 1, 1, 5).pos, 0, 0, 'θ ≤ 10° roof: no positive graph')
+near(cpeCCKR('mono', 3, 1, 5).neg, -5.2); near(cpeCCKR('mono', 3, 10, 20).neg, -4.0); near(cpeCCKR('multi', 2, 1, 20).neg, -4.4); near(cpeCCKR('multi', 1, 1, 5).neg, -2.1, 1e-12, 'multi θ ≤ 10° = table 5.8-2② ①')
+near(cpeCCKR('gable', 4, 2, 20).pos, 2.0, 1e-12, 'wall + flat to 2 m²'); near(cpeCCKR('gable', 5, 50, 20).neg, -1.6); near(cpeCCKR('gable', 4, 1, 5).neg, -2.2 * 0.9, 1e-12, 'θ ≤ 10° wall −10%')
+assert.throws(() => cpeCCKR('mono', 1, 5, 35), /5\.8/); n++
+near(zoneWidthKR(8.6, 24), 2.4); near(zoneWidthKR(3, 60), 2.4, 1e-12, '0.04 × 60 governs'); near(zoneWidthKR(2, 10), 1.0, 1e-12, '1 m floor')
+{
+  const sp0 = defaultSpecFor('KR'), G0 = portalGeometry(sp0), q = ccVelocityKR(sp0, info), cc = krCCLoads(sp0, g.m, info)
+  near(q, info.wind.qh, 1e-12, 'exposure C sample: C&C q_H = MWFRS q_H')
+  const lg = Math.log10
+  const Ap = 6 * G0.sRoof, Ag = 6 * G0.gWall
+  const pur = [...cc.entries()].filter(([id]) => g.m.elements[id - 1].role === 'purlin'), gir = [...cc.entries()].filter(([id]) => g.m.elements[id - 1].role === 'girt')
+  const z3 = pur.find(([, c]) => c.zone === 3)![1], z1 = pur.find(([, c]) => c.zone === 1)
+  near(z3.A, Ap, 1e-9, 'A_C = bay × purlin spacing')
+  near(z3.pNeg, q * (-6 + 3.75 * lg(Ap)), 1e-9, 'purlin corner p− = q_H·Cpe③ (Cpi+ 0, wallsLeaky)')
+  near(z3.pPos, 0.675, 1e-12, 'purlin p+ = q·0.8 < 675 N/m² → floor')
+  const g4 = gir.find(([, c]) => c.zone === 4)![1]
+  near(g4.pPos, q * (0.9 * (2.0 - 0.6 * lg(Ag / 2) / lg(25)) + 0.8), 1e-9, 'girt p+ = q(0.9·Cpe④⑤ − Cpi−)')
+  near(g4.pNeg, q * 0.9 * (-2.2 + 0.6 * lg(Ag) / lg(50)), 1e-9, 'girt p− = q·0.9·Cpe④')
+  const [id1, c1] = z1!, e1 = g.m.elements[id1 - 1], wD = (sp0.roofDead * G0.sRoof + 77 * sectionProps(e1.section).A * 1e-6) * Math.cos(G0.theta)
+  near(c1.demands.find((x) => x.combo.endsWith('1.7-6'))!.f.Mx, Math.abs(0.9 * wD + c1.pNeg * G0.sRoof) * 36 / 8, 1e-9, '1.7-6 Mx = |0.9D + W−|·L²/8')
+  ok(pur.every(([, c]) => c.demands.length === 3) && gir.every(([, c]) => c.demands.length === 2), 'purlin 1.7-3/4/6, girt 1.7-4/6')
+  ok(d.cc?.length === 5 && d.cc.reduce((t, c) => t + c.count, 0) === pur.length + gir.length, 'design C&C summary: 3 roof + 2 wall zones, every purlin/girt')
+  /* 설계 반영 — 외장재 요구 강도비 ≤ 부재 강도비 */
+  const m1 = d.members.find((m) => m.id === id1)!, sp1 = sectionProps(e1.section), Fy1 = fyKR(sp0.secondaryMaterial ?? sp0.material, Math.max(sp1.tf, sp1.tw))
+  const ccR = Math.max(...c1.demands.map((x) => krCheck(krCapacity(sp1, Fy1, x.braced ? { ...m1.lengths, Lb: 1 } : m1.lengths, 1), x.f, 1).ratio))
+  ok(m1.ratio >= ccR - 1e-12, `purlin ratio ${m1.ratio.toFixed(3)} ≥ C&C ${ccR.toFixed(3)}`)
+  /* 하한 — 낮은 풍속에서 모든 |p| ≥ 0.675 */
+  const low = { ...sp0, korea: { ...sp0.korea!, V0: 20 } }, ml = buildPortal(low)
+  ok([...krCCLoads(low, ml, buildLoadPayloads(low, ml).info).values()].every((c) => c.pPos >= 0.675 && c.pNeg <= -0.675), '|W_C/A_C| ≥ 675 N/m² (5.4(2))')
+  /* 큰 개구부(탁월 개구부 2) 에서 외장재 하중이 지배 */
+  const open = { ...sp0, korea: { ...sp0.korea!, cpi: 'dominant2' as const, V0: 40 } }, mo = buildPortal(open), io = buildLoadPayloads(open, mo).info
+  const dOpen = runDesign(open, mo, io, krSynthetic(open).results)
+  ok(/^C&C/.test(dOpen.byRole.purlin!.combo) || /^C&C/.test(dOpen.byRole.girt!.combo), `C&C governs with dominant opening (purlin ${dOpen.byRole.purlin!.combo}, girt ${dOpen.byRole.girt!.combo})`)
+  /* 적용범위 — 표 5.8-1(H ≥ 20 m)·편지붕 30° 초과는 막음 */
+  ok(checkScope({ ...sp0, frame: 'mono', roofSlope: 0.7 }).blocked, 'mono > 30° blocked (table 5.8-3)')
+  ok(checkScope({ ...sp0, eaveHeight: 18, span: 60, roofSlope: 0.3 }).blocked, 'H ≥ 20 m blocked (table 5.8-1 not implemented)')
+}
+console.log(`KR passed: ${n} checks (KDS tables, KDS 14 31 10 hand calc, loads equilibrium, scope/input/Gen, synthetic design, cladding wind)`)

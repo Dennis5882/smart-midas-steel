@@ -68,7 +68,7 @@ export function checkScope(spec: FactorySpec, f: ScopeFeatures = spec.features ?
   const hn = G.hMean
   if (spec.code === 'TW' && hn > 12) warn('hnR', r2(hn))
 
-  /* KR: 접합부(KDS 14 31 25)·외장재 풍하중(5.4·5.8)·냉간성형(41 30 30)·내진상세(14 31 60)는 2단계 → 항상 전문가 검토 필요 */
+  /* KR: 접합부(KDS 14 31 25)·냉간성형(41 30 30)·내진상세(14 31 60)는 2단계 → 항상 전문가 검토 필요 */
   if (spec.code === 'KR') {
     warn('krPhase')
     try { validateKrSpec(spec) } catch (e) { block('kr', e instanceof Error ? e.message : String(e)) }

@@ -8,6 +8,7 @@
    - 풍 KDS 41 12 00 5.2·5.3: 벽 G_D·q_H·(C_pe − C_pi), 지붕 G_pe·q_H·(C_pe − C_pi). 표 5.7-1 구역별 계수, 표 5.7-4 C_pi 두 값,
      5.13.1 풍직각방향 W_LC = γW_D (γ = 0.35D/B ≥ 0.2) 동시 작용 (밀폐형만), 5.13.3 지붕 + 수평 동시
    - KDS 14 31 15 4.3.2 유효길이법 가상하중 N = 0.002Y — 중력만의 조합에만 (NXD·NXL·NXS·NYD…) */
+import { ccRangeKR } from '../codes/krWindCC'
 import { KR, roofLiveKR } from '../codes/kr'
 import {
   CPI_KR, csKR, distK, flatRoofCpeKR, flatSnowKR, gustKR, isPartialKR, IS_KR, IW_KR, kzKR, leewardRoofCpeKR, periodKR, roofGustKR,
@@ -41,6 +42,10 @@ export function validateKrSpec(spec: FactorySpec): void {
   if (!(k.cpi in CPI_KR)) throw new Error('KDS 41 12 00 table 5.7-4: invalid enclosure class')
   /* 5.6.2 강체(n_D > 1 Hz) G_D 만 구현 — 근사주기 Ta ≥ 1 s 면 5.6.1 유연 G_D 필요 */
   if (periodKR('moment', portalGeometry(spec).hMean) >= 1) throw new Error('KDS 41 12 00 5.6.1: flexible building (n_D ≤ 1 Hz) gust factor is not implemented')
+  /* 외장재 피크외압계수 표 5.8-2~5.8-4 = 기준높이 20 m 미만, 편지붕 θ ≤ 30° (그 밖 표 5.8-1·톱니 등은 미구현) */
+  const G = portalGeometry(spec), deg = G.theta * 180 / Math.PI
+  if (G.hMean >= 20) throw new Error('KDS 41 12 00 5.4.1: cladding wind for H ≥ 20 m (table 5.8-1) is not implemented')
+  if (!ccRangeKR(spec.frame === 'mono' ? 'mono' : spec.frame === 'multi' ? 'multi' : 'gable', deg)) throw new Error('KDS 41 12 00 table 5.8-3: mono-slope cladding coefficients only up to 30°')
   for (const name of Object.values(spec.sections)) { const p = sectionProps(name); if (![p.A, p.Ix, p.Iy, p.rx, p.ry].every((x) => Number.isFinite(x) && x > 0)) throw new Error(`KDS: invalid section ${name}`) }
 }
 

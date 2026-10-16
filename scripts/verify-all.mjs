@@ -8,6 +8,7 @@ const SUITES = [
   ['CN code anchors', 'verify-cn.ts'],
   ['CN golden', 'verify-golden.ts'],
   ['KR code anchors', 'verify-kr.ts'],
+  ['KR golden', 'verify-golden.ts', '--code', 'KR'],
   ['Result integrity', 'verify-results.ts'],
   ['Job / send / cancel', 'verify-job.ts'],
   ['Gen sync', 'verify-sync.ts'],
@@ -23,9 +24,9 @@ const SUITES = [
 ]
 const t0 = Date.now()
 let failed = 0
-for (const [name, file] of SUITES) {
+for (const [name, file, ...args] of SUITES) {
   const t = Date.now()
-  const r = spawnSync(process.execPath, ['--stack-size=500', '--import', 'tsx', `scripts/${file}`], { encoding: 'utf8' })
+  const r = spawnSync(process.execPath, ['--stack-size=500', '--import', 'tsx', `scripts/${file}`, ...args], { encoding: 'utf8' })
   const ok = r.status === 0
   if (!ok) failed++
   const last = (ok ? r.stdout : r.stderr || r.stdout).trim().split('\n').filter(Boolean).at(-1) ?? ''

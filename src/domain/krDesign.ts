@@ -6,11 +6,12 @@
 import { cbKR, krB1, krB2, krCapacity, krCheck, krKSway, SLENDER_KR, type KrCapacity } from '../codes/krSteel'
 import { fyKR } from '../codes/kr'
 import type { Results } from '../actions/results'
-import type { DesignResult, MemberCheck, ServiceCheck } from './design'
+import type { CCSummary, DesignResult, MemberCheck, ServiceCheck } from './design'
 import type { LoadInfo } from './loads'
 import { portalGeometry } from './portal'
 import { sectionProps } from './sections'
 import { validateDesignResults } from './resultValidation'
+import { krCCLoads } from './krSecondary'
 import { frameSpans, type ElementRole, type FactoryModel, type FactorySpec } from './types'
 
 /** 프로젝트 기준 처짐 한계 (스팬/값) — 지붕보·퍼린, 지붕활하중 또는 적설 */
@@ -30,6 +31,8 @@ export function runKrDesign(spec: FactorySpec, model: FactoryModel, info: LoadIn
   const Lsec = spec.baySpacing / (spec.sagRods + 1)
   const mm = (m: number) => m * 1000
   const members: MemberCheck[] = [], service: ServiceCheck[] = []
+  /* 퍼린·거트 외장재설계용 풍하중 (KDS 41 12 00 5.4·5.8) — krSecondary */
+  const cc = krCCLoads(spec, model, info)
   let b2Max = 1
   for (const e of model.elements) {
     if (roles && !roles.includes(e.role)) continue
@@ -75,6 +78,12 @@ export function runKrDesign(spec: FactorySpec, model: FactoryModel, info: LoadIn
           B = Math.max(B, B2)
         }
         pts.forEach((p, i) => consider(combo, i, { P: p.P, Mx: Math.abs(p.My), My: Math.abs(p.Mz) * myScale, V: Math.abs(p.Vz) }, cap, B, Cb))
+      }
+      /* 외장재 풍압: 정압 = 외장재 쪽 플랜지 압축(구속, L_b ≈ 0), 부압 = 자유 플랜지 압축(L_b = 새그로드 간격, C_b 1.0) */
+      const ccl = cc.get(e.id)
+      if (ccl) {
+        const capBraced = krCapacity(sp, Fy, { ...lens, Lb: 1 }, 1), capFree = krCapacity(sp, Fy, lens, 1)
+        for (const d of ccl.demands) consider(d.combo, 2, d.f, d.braced ? capBraced : capFree, 1, 1)
       }
     }
     if (!best) throw new Error(`KDS: missing analysis forces for element ${e.id}`)
@@ -130,7 +139,13 @@ export function runKrDesign(spec: FactorySpec, model: FactoryModel, info: LoadIn
   }
   const byRole: DesignResult['byRole'] = {}
   for (const m of members) if (!byRole[m.role] || m.ratio > byRole[m.role]!.ratio) byRole[m.role] = m
-  return { members, byRole, service, maxRatio: Math.max(0, ...members.map((m) => m.ratio)), ng: members.filter((m) => m.ratio > 1).length + service.filter((s) => s.ratio > 1).length }
+  const sums = new Map<string, CCSummary>()
+  if (!roles) for (const [id, c] of cc) {
+    const role = model.elements[id - 1].role, key = `${role}-${c.zone}`, old = sums.get(key)
+    if (old) { old.count++; old.A = Math.min(old.A, c.A); old.pPos = Math.max(old.pPos, c.pPos); old.pNeg = Math.min(old.pNeg, c.pNeg) }
+    else sums.set(key, { role, zone: c.zone, A: c.A, pPos: c.pPos, pNeg: c.pNeg, count: 1 })
+  }
+  return { members, byRole, service, maxRatio: Math.max(0, ...members.map((m) => m.ratio)), ng: members.filter((m) => m.ratio > 1).length + service.filter((s) => s.ratio > 1).length, cc: [...sums.values()] }
 }
 
 /** 퍼린 처짐 (m) — 단순보 5wL⁴/384EI, w = max(지붕활하중, 적설) × 퍼린 간격 × cosθ */
