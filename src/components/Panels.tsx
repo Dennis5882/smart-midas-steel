@@ -1,6 +1,5 @@
 /* 우측 패널 — 활동 로그 · 모델 상태 · 해석 결과 */
 import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from 'react'
-import { downloadDrawings, downloadQuantities, openReport, downloadReportPdf } from '../actions/outputs'
 import { profileOf } from '../codes'
 import { buildLoadPayloads, type LoadInfo } from '../domain/loads'
 import { buildPortal } from '../domain/portal'
@@ -10,7 +9,8 @@ import type { OptSummary } from '../domain/optimize'
 import { connGrade, roleGrade } from '../domain/status'
 import { GradeChip, siteSourceText, StatusCard } from './Status'
 import { dimValue } from '../report/dims'
-import { StaleBanner } from './Workflow'
+import { StaleBanner } from './StaleBanner'
+import { selectTask } from '../state/ui'
 import { MemberTable, SummaryCards } from './MemberTable'
 import { lengthText, ROLES, type FactoryModel, type FactorySpec } from '../domain/types'
 import { t, tc, type I18nKey } from '../i18n'
@@ -273,10 +273,7 @@ export function ResultsPanel() {
       <StaleBanner />
       {s.built && (
         <div className="confirm-row" style={{ marginTop: 0, marginBottom: 12 }}>
-          <button className="btn btn-c" disabled={s.busy} onClick={() => void downloadReportPdf()}>{t('g_design_5')}</button>
-          <button className="btn btn-ghost" disabled={s.busy} onClick={openReport}>{t('btn_html')}</button>
-          <button className="btn btn-ghost" disabled={s.busy} onClick={downloadDrawings}>{t('g_design_3')}</button>
-          <button className="btn btn-ghost" disabled={s.busy} onClick={downloadQuantities}>{t('g_design_6')}</button>
+          <button className="btn btn-c" onClick={() => selectTask('outputs')}>{t('flow_outputs')}</button>
         </div>
       )}
       <SummaryCards />

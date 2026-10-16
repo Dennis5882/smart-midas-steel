@@ -19,6 +19,13 @@ export const THEMES = ['navy', 'light', 'cyber'] as const
 export type Theme = (typeof THEMES)[number]
 export type PanelId = 'logP' | 'modelP' | 'viewP' | 'resP'
 export type LogType = 'api' | 'ok' | 'err' | 'info' | 'warn'
+export type TaskId = 'model' | 'analysis' | 'design' | 'optimize' | 'outputs' | 'history'
+export interface Activity {
+  id: number; at: number; source: 'job' | 'notice' | 'artifact'; level: 'info' | 'warn' | 'error'
+  html?: string | LText; kind?: JobKind; parent?: number; acknowledged?: boolean
+  status?: 'running' | 'done' | 'failed' | 'cancelled'; elapsed?: number
+  name?: string; revision?: number; resultRevision?: number; code?: CodeId
+}
 export type CamId = 'iso' | 'front' | 'side' | 'top'
 /** 3D 표시 토글 — 주골조(기둥·지붕보)·2차부재(퍼린·거트·스트럿·풍주)·가새·지점 */
 export type Vis3D = Record<ElementRole | 'support' | 'node', boolean>
@@ -29,7 +36,7 @@ export interface LogEntry { id: number; ts: string; type: LogType; html: string 
 export type ChatMsg = { ts?: string } & (
   | { id: number; role: 'user' | 'bot'; kind: 'html'; html: string | LText }
   | { id: number; role: 'bot'; kind: 'thinking' }
-  | { id: number; role: 'bot'; kind: 'plan'; spec: FactorySpec; epoch: number; mode: BuildMode; tpl?: TemplateKey }
+  | { id: number; role: 'bot'; kind: 'plan'; spec: FactorySpec; epoch: number; mode: BuildMode; tpl?: TemplateKey; modelRevision?: number }
 )
 
 /** Gen 에 보낸 모델 — 스펙·형상·하중 요약 */
@@ -38,7 +45,7 @@ export interface Built { spec: FactorySpec; model: FactoryModel; info: LoadInfo;
 
 /** 진행 중 작업 — stage = 문구 키, step/total = 이 단계 MAPI 호출 수, iter = 최적화 반복 [n, 최대] */
 export type JobKind = 'build' | 'anal' | 'design' | 'opt' | 'pdf' | 'restore'
-export interface Job { kind: JobKind; stage: string; step: number; total: number; detail: string; t0: number; cancel: boolean; iter?: [number, number] }
+export interface Job { kind: JobKind; stage: string; step: number; total: number; detail: string; t0: number; cancel: boolean; iter?: [number, number]; activityId?: number }
 
 /** 반력 합계 (하중 케이스별) */
 export interface ReactionSum { lc: string; fx: number; fy: number; fz: number }
@@ -91,6 +98,15 @@ export const S = {
   ratioView: false,
   log: [] as LogEntry[],
   msgs: [] as ChatMsg[],
+  /** One current modeling editor. Hidden on the start screen, kept mounted to retain raw inputs and step. */
+  activePlan: null as Extract<ChatMsg, { kind: 'plan' }> | null,
+  draftSpec: null as FactorySpec | null,
+  workspaceView: 'start' as 'start' | 'model',
+  task: 'model' as TaskId,
+  draftInvalid: false,
+  modelRevision: 0,
+  resultRevision: 0,
+  activity: [] as Activity[],
   /** 실행되면 증가 — 이전 계획 카드의 버튼을 모두 잠근다 */
   buildEpoch: 0,
   /** 편집 중인 스펙 미리보기 (아직 Gen 에 보내지 않은 형상) */

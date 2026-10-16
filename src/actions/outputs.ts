@@ -6,10 +6,17 @@ import { buildReport } from '../report/report'
 import { LOSS, quantities } from '../domain/quantities'
 import type { I18nKey } from '../i18n'
 import { S } from '../state/store'
-import { addMsg, log } from '../state/ui'
+import { addMsg, log, recordArtifact } from '../state/ui'
+import { unavailable } from '../state/taskFlow'
 import { beginJob, checkCancel, endJob, failMsg, stage } from './job'
 
-const stamp = () => new Date().toISOString().slice(0, 10).split('-').join('')
+const stamp = () => new Intl.DateTimeFormat('sv-SE').format(new Date()).replaceAll('-', '')
+function canOutput(): boolean {
+  const reason = unavailable(S, 'outputs')
+  if (!reason) return true
+  addMsg('bot', lt(reason), 'warn')
+  return false
+}
 
 function download(name: string, text: string, type: string): void {
   downloadBlob(name, new Blob([text], { type }))
@@ -22,15 +29,19 @@ function downloadBlob(name: string, blob: Blob): void {
   a.download = name
   document.body.appendChild(a)
   a.click()
+  recordArtifact(name)
   a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 10_000)
 }
 
 export function openReport(): void {
+  if (!canOutput()) return
   if (!S.built) { addMsg('bot', lt('no_model')); return }
   const html = reportHtml()
   const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }))
   const w = window.open(url, '_blank')
+  if (w) recordArtifact(`steel_report_${stamp()}.html`)
+  setTimeout(() => URL.revokeObjectURL(url), 60_000)
   if (!w) download(`steel_report_${stamp()}.html`, html, 'text/html') // 팝업 차단 시 파일로
   log(t('log_report'), 'ok')
   addMsg('bot', S.design ? t('report_done') : t('report_partial'))
@@ -40,6 +51,7 @@ const reportHtml = () => buildReport({ built: S.built!, reactions: S.reactions, 
 
 /** Generate and validate the PDF locally before starting the file download. */
 export async function downloadReportPdf(): Promise<void> {
+  if (!canOutput()) return
   if (!S.built) { addMsg('bot', lt('no_model')); return }
   if (!beginJob('pdf')) return
   try {
@@ -62,6 +74,7 @@ export async function downloadReportPdf(): Promise<void> {
 
 /** 물량 CSV (UTF-8 BOM — 엑셀에서 바로 열림) */
 export function downloadQuantities(): void {
+  if (!canOutput()) return
   if (!S.built) { addMsg('bot', lt('no_model')); return }
   const { spec, model } = S.built
   const q = quantities(spec, model, S.connections)
@@ -85,6 +98,7 @@ export function downloadQuantities(): void {
 }
 
 export function downloadDrawings(): void {
+  if (!canOutput()) return
   if (!S.built) { addMsg('bot', lt('no_model')); return }
   const dxf = buildDxf({ spec: S.built.spec, model: S.built.model, connections: S.connections, title: 'STEEL PORTAL FACTORY' })
   download(`steel_drawings_${stamp()}.dxf`, dxf, 'application/dxf')

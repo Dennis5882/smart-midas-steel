@@ -1,4 +1,4 @@
-/* 세션 — 채팅 입력 처리, 설정(테마·기준), 연결 테스트, 입력창 제어 */
+/* Typed UI actions, optional legacy text adapter, settings and connection tests. */
 import { fetchReactions, runAnalysis } from '../actions/analysis'
 import { runDesignCheck } from '../actions/design'
 import { runOptimize } from '../actions/optimize'
@@ -10,21 +10,34 @@ import { defaultSpecFor, normalizeBays, type FactorySpec } from '../domain/types
 import { getLang, langUrl, t, lt } from '../i18n'
 import { verifyConn } from '../mapi/client'
 import { S, notify, type Theme } from '../state/store'
-import { addMsg, addPlanMsg, escapeHtml, previewSpec, tab } from '../state/ui'
-import { parseCommand } from './parse'
+import { specChanged } from '../state/workflow'
+import { addMsg, addPlanMsg, escapeHtml, previewSpec, tab, selectTask } from '../state/ui'
+import { unavailable } from '../state/taskFlow'
+import type { TaskId } from '../state/store'
+import { parseCommand, type Intent } from './parse'
 
-const BUSY_BLOCKED = new Set<string>(['analyze', 'design', 'optimize', 'report', 'drawings', 'pdf', 'quantities', 'reactions', 'conn'])
+const BUSY_BLOCKED = new Set<string>(['new', 'analyze', 'design', 'optimize', 'report', 'drawings', 'pdf', 'quantities', 'reactions', 'conn'])
 
 /** 사용자 입력 1건 처리 (로컬 명령) */
 export async function send(raw: string): Promise<void> {
   const txt = raw.trim()
   if (!txt) return
   addMsg('user', escapeHtml(txt))
-  const c = parseCommand(txt)
-  /* 작업 중에는 Gen 호출·결과를 쓰는 명령을 막는다 (결과가 바뀌는 중이라 출력도 막음). 도움말·스펙 카드·상태는 허용 */
-  if (S.busy && BUSY_BLOCKED.has(c.intent)) { addMsg('bot', lt('busy')); return }
-  switch (c.intent) {
-    case 'help': addMsg('bot', lt('help_html')); break
+  await executeAction(parseCommand(txt))
+}
+
+/** UI actions use typed IDs; translated labels and the optional text parser never determine button behavior. */
+export async function executeAction(c: Intent): Promise<void> {
+  /* Busy jobs and pending confirmations cannot replace inputs or launch another Gen/output action. */
+  if ((S.busy || S.confirm) && BUSY_BLOCKED.has(c.intent)) { addMsg('bot', lt('busy')); return }
+  const task = ({ analyze: 'analysis', reactions: 'analysis', design: 'design', optimize: 'optimize', report: 'outputs', pdf: 'outputs', drawings: 'outputs', quantities: 'outputs' } as Record<string, TaskId>)[c.intent]
+  if (task) {
+    const reason = unavailable(S, task)
+    if (reason) { addMsg('bot', lt(reason), 'warn'); return }
+    selectTask(task)
+  }
+  try { switch (c.intent) {
+    case 'help': addMsg('bot', lt('ws_help')); break
     case 'clear': clearChat(); break
     case 'release_notes': S.rnOpen = true; notify(); break
     case 'copy_link': {
@@ -34,8 +47,12 @@ export async function send(raw: string): Promise<void> {
       break
     }
     case 'new': {
+      if (S.activePlan?.spec.code === S.code && S.activePlan.mode === c.mode && (c.mode === 'free' || S.activePlan.tpl === c.tpl) && !Object.keys(c.params).length) {
+        openCurrentModel(); break
+      }
       /* 지역·하중·단면 = 기준 기본값 + 직전 입력. 기본 모델링은 형상을 템플릿으로 덮고 베이 목록을 지운다 */
-      const base: FactorySpec = { ...defaultSpecFor(S.code), ...(S.lastSpec.code === S.code ? S.lastSpec : {}) }
+      const previous = S.draftSpec?.code === S.code ? S.draftSpec : S.lastSpec
+      const base: FactorySpec = { ...defaultSpecFor(S.code), ...(previous.code === S.code ? previous : {}) }
       const geo = c.mode === 'template' ? { ...TEMPLATES[c.tpl ?? 'general'], bayList: undefined } : {}
       const spec = normalizeBays({ ...base, ...geo, ...c.params, code: S.code })
       addPlanMsg(spec, c.mode, c.tpl)
@@ -70,13 +87,35 @@ export async function send(raw: string): Promise<void> {
       addMsg('bot', r.cls === 'ok' ? t('conn_ok', S.program || 'gen') : escapeHtml(r.text))
       break
     }
-    default: addMsg('bot', lt('unknown', escapeHtml(txt)))
+    default: addMsg('bot', lt('ws_help'))
+  } } catch (e) {
+    addMsg('bot', escapeHtml(e instanceof Error ? e.message : String(e)), 'error')
   }
+}
+
+/** Reopen the same editor. After Gen changed the model (build/optimization), start from its current specification. */
+export function openCurrentModel(): void {
+  if (S.busy || S.confirm) return
+  S.task = 'model'
+  if (S.built?.spec.code === S.code && (!S.activePlan || (S.activePlan.epoch !== S.buildEpoch && specChanged(S.draftSpec, S.built.spec)) || (S.opt && (S.activePlan.modelRevision ?? 0) < S.modelRevision))) {
+    const mode = S.activePlan?.mode ?? (S.built.spec.bayList ? 'free' : 'template')
+    addPlanMsg(S.built.spec, mode, S.activePlan?.tpl)
+  } else if (S.activePlan?.spec.code === S.code) {
+    S.activePlan = { ...S.activePlan, epoch: S.buildEpoch, modelRevision: S.modelRevision }
+    S.workspaceView = 'model'
+  } else {
+    const spec = S.lastSpec.code === S.code ? S.lastSpec : defaultSpecFor(S.code)
+    addPlanMsg(spec, spec.bayList ? 'free' : 'template', 'general')
+  }
+  if (S.draftSpec) previewSpec(S.draftSpec)
+  tab('viewP')
+  notify()
 }
 
 export function clearChat(): void {
   S.msgs = []
-  addMsg('bot', lt('cleared'))
+  S.activity.forEach((a) => { if (a.source === 'notice') a.acknowledged = true })
+  notify()
 }
 
 export function setTheme(th: Theme): void {
@@ -119,7 +158,5 @@ export async function testConn(): Promise<TestOut> {
   }
 }
 
-/* ── 입력창 제어 (가이드 패널용) — Composer 가 등록 ── */
-let composerRun: ((txt: string) => Promise<void>) | null = null
-export function registerComposer(run: ((txt: string) => Promise<void>) | null): void { composerRun = run }
-export function runCmd(txt: string): Promise<void> { return composerRun ? composerRun(txt) : send(txt) }
+/** Compatibility adapter for text-based callers; application buttons call executeAction directly. */
+export const runCmd = send

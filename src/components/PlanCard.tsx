@@ -15,7 +15,7 @@ import { checkScope, NO_FEATURES, type ScopeFeatures } from '../domain/scope'
 import { lengthText, type FactorySpec } from '../domain/types'
 import { t, tc } from '../i18n'
 import { fieldConflicts, fieldStep, groupsFor, initVals, invalidFields, toSpec, type Group, type Path } from './planFields'
-import { S, useStore, type ChatMsg } from '../state/store'
+import { S, notify, useStore, type ChatMsg } from '../state/store'
 import { draw3D, previewSpec, tab } from '../state/ui'
 
 type PlanMsg = Extract<ChatMsg, { kind: 'plan' }>
@@ -57,12 +57,11 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
   const [selectedTpl, setSelectedTpl] = useState(msg.tpl ?? 'general')
   const formId = useId()
   const [vals, setVals] = useState(() => initVals(msg.spec))
-  const [cancelled, setCancelled] = useState(false)
   const dirty = useRef(false)
   const [feat, setFeat] = useState<ScopeFeatures>(() => msg.spec.features ?? NO_FEATURES)
   const spec = useMemo(() => ({ ...toSpec(msg.spec, vals, free), features: feat }), [msg.spec, vals, free, feat])
   const blocked = checkScope(spec).blocked
-  const live = s.buildEpoch === msg.epoch && !cancelled
+  const live = s.buildEpoch === msg.epoch && s.workspaceView === 'model' && s.task === 'model' && !(s.opt && (msg.modelRevision ?? 0) < s.modelRevision)
   const groups = groupsFor(spec.code, free)
   const invalid = invalidFields(spec, vals, free)
   /* 칸 사이 충돌(치수 한계·간격 과대)도 그 칸의 오류로 — 해당 단계에서 막는다 */
@@ -70,6 +69,22 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
   const errors = [...invalid, ...conflicts.map((c) => c.field)]
   /* 자유골조는 한 화면 직접 편집 → 오류를 바로 표시. 위저드는 다음 단계로 넘어가려 할 때 */
   const showErrors = attempted || free
+
+  useEffect(() => {
+    if (!live || s.busy) return
+    const invalid = errors.length > 0 || blocked
+    if (S.draftInvalid !== invalid) { S.draftInvalid = invalid; notify() }
+  }, [live, s.busy, errors.length, blocked])
+
+  useEffect(() => {
+    if (live && !s.busy && !errors.length && !blocked) { S.draftSpec = spec; notify() }
+  }, [spec, live, s.busy, errors.length, blocked])
+
+  const closeEditor = () => {
+    S.workspaceView = 'start'
+    if (S.preview) draw3D()
+    notify()
+  }
 
   /* 편집 변경 → 3D 미리보기 (첫 렌더 제외) */
   useEffect(() => {
@@ -135,10 +150,10 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
   if (!free) return <ModelWizard spec={spec} step={step} visited={visited} disabled={!live || s.busy}
     onStep={navigate} blocked={blocked} invalid={errors.length > 0} attempted={attempted}
     onBuild={() => { if (errors.length || blocked) { setAttempted(true); return }; void buildFactory(spec) }}
-    onCancel={() => { setCancelled(true); if (S.preview) draw3D() }}>
+    onCancel={closeEditor}>
     {step === 0 && <>
       <div className="mw-templates">{TEMPLATE_KEYS.map((key) => <button type="button" key={key} aria-pressed={selectedTpl === key}
-        disabled={!live || s.busy} onClick={() => { setSelectedTpl(key); dirty.current = true; setVals((old) => ({ ...old, ...Object.fromEntries(Object.entries(TEMPLATES[key]).map(([k, v]) => [k, String(v)])) })) }}>
+        disabled={!live || s.busy} onClick={() => { setSelectedTpl(key); if (S.activePlan?.id === msg.id) S.activePlan = { ...S.activePlan, tpl: key }; dirty.current = true; setVals((old) => ({ ...old, ...Object.fromEntries(Object.entries(TEMPLATES[key]).map(([k, v]) => [k, String(v)])) })); notify() }}>
         <strong>{t(`tpl_${key}`)}</strong><span>{TEMPLATES[key].span} m · {TEMPLATES[key].bays * TEMPLATES[key].baySpacing} m</span>
       </button>)}</div>
       <p className="mw-note">{t('mw_template_note')}</p>
@@ -204,7 +219,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
         <div className="confirm-row">
           <button className="btn btn-c" disabled={s.busy || blocked || errors.length > 0} title={blocked ? t('sc_blocked') : errors.length ? t('mw_invalid') : undefined}
             onClick={() => { if (errors.length || blocked) return; void buildFactory(spec) }}>{t('exec')}</button>
-          <button className="btn btn-ghost" onClick={() => { setCancelled(true); if (S.preview) draw3D() }}>{t('cancel')}</button>
+          <button className="btn btn-ghost" disabled={s.busy} onClick={closeEditor}>{t('ws_home')}</button>
         </div>
       )}
     </>

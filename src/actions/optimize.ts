@@ -86,6 +86,8 @@ export async function runOptimize(): Promise<void> {
     const connections = runConnections(b.spec, b.model, b.info, S.results!)
     S.design = d!
     S.connections = connections
+    S.draftSpec = b.spec
+    S.draftInvalid = false
     const wB = steelWeight(start, b.model, start.sections), wA = steelWeight(b.spec, b.model)
     const tB = roleTons(start, b.model, start.sections), tA = roleTons(b.spec, b.model)
     S.opt = {

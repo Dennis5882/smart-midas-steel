@@ -34,6 +34,7 @@ export async function buildFactory(spec: FactorySpec): Promise<void> {
     S.restorePoint = lastBackup
     const b = S.built!
     addMsg('bot', lt('build_done', model.nodes.length, model.elements.length, b.cases.length, b.combos))
+    S.task = 'analysis'
     draw3D()
     tab('modelP')
   } catch (e) {
@@ -99,6 +100,9 @@ export async function sendModel(spec: FactorySpec) {
   if (designCode) sent.DSTL = { 1: { DGNCODE: designCode } }
   S.built = { spec, model, info: l.info, cases, combos, comboNames, sent }
   S.lastSpec = spec
+  S.draftSpec = spec
+  S.draftInvalid = false
+  S.modelRevision++
   log(t('log_built'), 'ok')
   return model
 }

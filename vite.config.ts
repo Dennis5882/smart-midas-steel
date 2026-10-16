@@ -22,7 +22,7 @@ const metaOf = (code: string) => {
   return `<!--meta--><title>${title}</title>
 <meta name="description" content="${desc}">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="Smart MIDAS Steel">
+<meta property="og:site_name" content="${title}">
 <meta property="og:title" content="${title}">
 <meta property="og:description" content="${desc}">
 <meta property="og:locale" content="${OG_LOCALE[code] ?? code.replace('-', '_')}">

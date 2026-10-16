@@ -3,7 +3,7 @@ import type { BuildMode } from '../agent/parse'
 import type { TemplateKey } from '../domain/templates'
 import type { FactorySpec } from '../domain/types'
 import { render, type LText } from '../i18n'
-import { S, nextId, notify, type LogType, type PanelId } from './store'
+import { S, nextId, notify, type Activity, type LogType, type PanelId, type TaskId } from './store'
 
 const nowTs = () => new Date().toTimeString().slice(0, 8)
 const hm = () => new Date().toTimeString().slice(0, 5)
@@ -19,14 +19,40 @@ export function log(msg: string, type: LogType = 'api'): void {
 }
 
 /** html = 문자열(지금 언어로 확정) 또는 lt()/ltc() (그릴 때 번역 — 언어 변경 시 지난 메시지도 바뀜) */
-export function addMsg(role: 'user' | 'bot', html: string | LText): void {
+export function addMsg(role: 'user' | 'bot', html: string | LText, level?: Activity['level']): void {
   S.msgs.push({ id: nextId(), ts: hm(), role, kind: 'html', html })
+  if (role === 'bot') recordActivity({ source: 'notice', html, parent: S.job?.activityId, kind: S.job?.kind,
+    level: level ?? (S.job && S.lastFail?.kind === S.job.kind ? S.lastFail.cancelled ? 'warn' : 'error' : 'info') })
   notify()
 }
 
-/** 공장 스펙 카드 — template: 요약 카드(수정 → 편집) / free: 자유골조 편집 카드 */
+export function recordActivity(data: Omit<Activity, 'id' | 'at'>): number {
+  const id = nextId()
+  S.activity.push({ ...data, id, at: Date.now() })
+  notify()
+  return id
+}
+
+export function recordArtifact(name: string): void {
+  recordActivity({ source: 'artifact', name, level: 'info', revision: S.modelRevision, resultRevision: S.resultRevision, code: S.built?.spec.code })
+}
+
+export function selectTask(task: TaskId): void {
+  S.task = task
+  if (task !== 'model') S.preview = null
+  if (task === 'analysis' || task === 'design' || task === 'optimize') S.panel = 'resP'
+  if (task === 'model') S.panel = 'viewP'
+  if (task === 'model' && S.workspaceView === 'model' && S.activePlan) S.preview = S.draftSpec
+  notify()
+}
+
+/** Set the single active editor — template wizard or free-frame form. */
 export function addPlanMsg(spec: FactorySpec, mode: BuildMode = 'free', tpl?: TemplateKey): void {
-  S.msgs.push({ id: nextId(), ts: hm(), role: 'bot', kind: 'plan', spec, epoch: S.buildEpoch, mode, tpl })
+  S.activePlan = { id: nextId(), ts: hm(), role: 'bot', kind: 'plan', spec, epoch: S.buildEpoch, mode, tpl, modelRevision: S.modelRevision }
+  S.draftSpec = spec
+  S.draftInvalid = false
+  S.task = 'model'
+  S.workspaceView = 'model'
   notify()
 }
 

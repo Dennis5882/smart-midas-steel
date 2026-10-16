@@ -3,7 +3,7 @@
    취소: 협조식 — 플래그만 세우고 다음 MAPI 호출 직전에 Cancelled 를 던진다. Gen 이 처리 중인 호출(해석 등)은 끝까지 기다린다(중단 API 없음). */
 import { t, type I18nKey, lt } from '../i18n'
 import { S, notify, type Job, type JobKind } from '../state/store'
-import { addMsg } from '../state/ui'
+import { addMsg, recordActivity } from '../state/ui'
 import { ResultValidationError } from '../domain/resultValidation'
 import { GenChangedError } from './genSync'
 import { diffText } from '../domain/genSync'
@@ -17,12 +17,20 @@ export function beginJob(kind: JobKind): boolean {
   if (S.busy) { addMsg('bot', lt('busy')); return false }
   S.busy = true
   S.lastFail = null
+  if (kind !== 'pdf') S.resultRevision++
   S.job = { kind, stage: '', step: 0, total: 0, detail: '', t0: Date.now(), cancel: false }
+  S.job.activityId = recordActivity({ source: 'job', kind, status: 'running', level: 'info' })
   notify()
   return true
 }
 
 export function endJob(): void {
+  const entry = S.activity.find((a) => a.id === S.job?.activityId)
+  if (entry && S.job) {
+    entry.status = S.lastFail?.kind === S.job.kind ? S.lastFail.cancelled ? 'cancelled' : 'failed' : 'done'
+    entry.level = entry.status === 'failed' ? 'error' : entry.status === 'cancelled' ? 'warn' : 'info'
+    entry.elapsed = Date.now() - S.job.t0
+  }
   S.busy = false
   S.job = null
   notify()

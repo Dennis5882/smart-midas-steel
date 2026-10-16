@@ -12,6 +12,8 @@ const SUITES = [
   ['Gen sync', 'verify-sync.ts'],
   ['Input validation', 'verify-input.ts'],
   ['Workflow state', 'verify-workflow.ts'],
+  ['Click workspace', 'verify-workspace.ts'],
+  ['Task flow / history', 'verify-task-flow.ts'],
   ['Optimization pick', 'verify-opt.ts'],
   ['3D solid sections', 'verify-solid.ts'],
   ['Quantities', 'verify-quantities.ts'],

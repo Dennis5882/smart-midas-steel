@@ -72,7 +72,7 @@ export function ModelWizard({ spec, step, visited, disabled, blocked, invalid, a
     </div>
     <footer className="mw-footer">
       <div className="mw-footer-actions">
-        <button className="btn btn-ghost" disabled={disabled} onClick={step ? () => onStep(step - 1) : onCancel}>{step ? <ArrowLeft size={14} /> : null}{t(step ? 'mw_back' : 'cancel')}</button>
+        <button className="btn btn-ghost" disabled={disabled} onClick={step ? () => onStep(step - 1) : onCancel}>{step ? <ArrowLeft size={14} /> : null}{t(step ? 'mw_back' : 'ws_home')}</button>
         {step < 5 ? <button className="btn btn-c" disabled={disabled} onClick={() => onStep(step + 1)}>{t(step === 4 ? 'mw_to_review' : 'mw_next')}<ArrowRight size={14} /></button>
           : <button className="btn btn-c" disabled={disabled || blocked || invalid} onClick={onBuild}><Send size={14} />{t('mw_build')}</button>}
       </div>
