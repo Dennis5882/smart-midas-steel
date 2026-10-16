@@ -60,11 +60,13 @@ function readTheme(): Theme {
 
 /** 설계기준·화면 언어 — 서로 독립인데 **간체만 예외** (사용자 결정 2026-10-16):
     간체에서 새 작업은 CN 만. 작업 중(입력 카드·생성 모델)에 간체로 바꾸면 기존 기준(TW 포함) 유지.
-    그 밖의 언어는 사용자가 고른 기준을 유지 — 새로고침·언어 전환에도 (sms_code, 간체에서의 강제 CN 은 저장 안 함). */
+    그 밖의 언어는 사용자가 고른 기준을 유지 — 새로고침·언어 전환에도 (sms_code, 간체에서의 강제 CN 은 저장 안 함).
+    한국어(ko)는 고른 기준이 없으면 KR 로 시작 (사용자 결정 2026-10-16, 강제 아님 — 드롭다운에서 TW·CN 선택 가능). */
 export function codeForLang(lang: Lang, current: CodeId, saved: CodeId | null, hasWork: boolean): CodeId {
   if (hasWork) return current
   if (lang === 'zh-CN') return 'CN'
-  return saved ?? current
+  if (saved) return saved
+  return lang === 'ko' ? 'KR' : current
 }
 export function savedCode(): CodeId | null {
   try { const c = localStorage.getItem('sms_code'); return (CODE_IDS as string[]).includes(c ?? '') ? c as CodeId : null } catch { return null }

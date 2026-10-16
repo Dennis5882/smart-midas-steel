@@ -128,7 +128,8 @@ export function setTheme(th: Theme): void {
 }
 
 /** Project code changes retain geometry but reset code-dependent inputs. Existing Gen results stay tied to their model. */
-export async function setCode(id: CodeId): Promise<void> {
+/** auto = 언어 규칙(간체 CN·한국어 기본 KR)에 따른 변경 — 사용자 선택이 아니라 sms_code 에 저장하지 않는다 */
+export async function setCode(id: CodeId, opts: { auto?: boolean } = {}): Promise<void> {
   if (id === S.code || S.busy || S.confirm) return
   const previous = S.draftSpec ?? S.activePlan?.spec ?? S.built?.spec
   if (previous && !await confirmAction({ title: t('project_code_change'), body: t('project_code_confirm'), ok: t('project_code_apply') })) return
@@ -136,7 +137,7 @@ export async function setCode(id: CodeId): Promise<void> {
   const plan = S.activePlan
   S.buildEpoch++
   S.code = id
-  if (getLang() !== 'zh-CN') saveCode(id) // 간체의 CN 은 언어 규칙이라 사용자 선택으로 저장하지 않음
+  if (getLang() !== 'zh-CN' && !opts.auto) saveCode(id) // 간체의 CN·한국어 기본 KR 은 언어 규칙이라 사용자 선택으로 저장하지 않음
   const defaults = defaultSpecFor(id)
   S.lastSpec = previous ? { ...defaults, span: previous.span, bays: previous.bays, baySpacing: previous.baySpacing, bayList: previous.bayList?.slice(), eaveHeight: previous.eaveHeight, roofSlope: previous.roofSlope, baseFixity: previous.baseFixity, purlinSpacing: previous.purlinSpacing, girtSpacing: previous.girtSpacing, postSpacing: previous.postSpacing, sagRods: previous.sagRods, features: previous.features && { ...previous.features } } : defaults
   if (previous) {

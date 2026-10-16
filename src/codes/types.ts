@@ -6,7 +6,7 @@
 ════════════════════════════════════════════════════════════ */
 import type { Dict } from '../i18n'
 
-export type CodeId = 'TW' | 'CN'
+export type CodeId = 'TW' | 'CN' | 'KR'
 
 export interface SteelMaterial {
   /** 항복강도 Fy, 인장강도 Fu (MPa) */

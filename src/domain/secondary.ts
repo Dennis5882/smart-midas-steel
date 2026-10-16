@@ -22,6 +22,8 @@ export interface CCLoad { zone: CCZone; A: number; pPos: number; pNeg: number; d
 
 export function ccLoads(spec: FactorySpec, model: FactoryModel, info: LoadInfo): Map<number, CCLoad> {
   if (spec.code === 'CN') return cnCCLoads(spec, model, info)
+  /* KR 외장재설계용 풍하중(KDS 41 12 00 5.4·5.8)은 2단계 */
+  if (spec.code === 'KR') return new Map()
   const out = new Map<number, CCLoad>()
   const G = portalGeometry(spec)
   const gamma = profileOf(spec.code).materials[spec.material].gamma

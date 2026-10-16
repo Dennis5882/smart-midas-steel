@@ -19,7 +19,7 @@ export function Workspace({ guideCollapsed, onOpenGuide, onOpenMapi }: { guideCo
   useEffect(() => {
     /* 간체 = 새 작업 CN 만, 작업 중이면 기존 기준 유지, 그 밖 언어 = 사용자가 고른 기준 (store.codeForLang) */
     const want = codeForLang(lang, S.code, savedCode(), !!(S.activePlan || S.built))
-    if (want !== S.code) void setCode(want)
+    if (want !== S.code) void setCode(want, { auto: true })
   }, [lang])
   const plan = s.activePlan
   const restrictedCode = lang === 'zh-CN' && s.code !== 'CN'

@@ -34,14 +34,15 @@ const num = (s: string) => s.split('x').map(Number)
 
 export function sectionProps(name: string): SectionProps {
   const [kind, dims] = name.trim().split(/\s+/)
-  if (['RH', 'BH', 'HN', 'HW', 'HM', 'HT'].includes(kind)) {
+  /* KS21(한국): 'H 600x200x11/17' 압연 H, 'LH 150x75x3.2/4.5' 용접 경량 H형강 */
+  if (['RH', 'BH', 'HN', 'HW', 'HM', 'HT', 'H', 'LH'].includes(kind)) {
     const [H, B, tw, tf] = num(dims.replace('/', 'x'))
     const hw = H - 2 * tf
     const A = 2 * B * tf + hw * tw
     const Ix = (B * H ** 3 - (B - tw) * hw ** 3) / 12
     const Iy = (2 * tf * B ** 3 + hw * tw ** 3) / 12
     return {
-      name, kind: 'H', rolled: kind !== 'BH', d: H, bf: B, tw, tf, h: hw, A, Ix, Iy,
+      name, kind: 'H', rolled: kind !== 'BH' && kind !== 'LH', d: H, bf: B, tw, tf, h: hw, A, Ix, Iy,
       Sx: (2 * Ix) / H, Sy: (2 * Iy) / B,
       Zx: B * tf * (H - tf) + (tw * hw ** 2) / 4, Zy: (tf * B ** 2) / 2 + (hw * tw ** 2) / 4,
       rx: Math.sqrt(Ix / A), ry: Math.sqrt(Iy / A),

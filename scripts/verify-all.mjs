@@ -7,6 +7,7 @@ const SUITES = [
   ['TW hand-calc + golden', 'verify-tw.ts'],
   ['CN code anchors', 'verify-cn.ts'],
   ['CN golden', 'verify-golden.ts'],
+  ['KR code anchors', 'verify-kr.ts'],
   ['Result integrity', 'verify-results.ts'],
   ['Job / send / cancel', 'verify-job.ts'],
   ['Gen sync', 'verify-sync.ts'],

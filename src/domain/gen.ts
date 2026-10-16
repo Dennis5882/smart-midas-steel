@@ -23,6 +23,10 @@ export function buildGenPayloads(spec: FactorySpec, model: FactoryModel): GenPay
   const mat = prof.materials[spec.material]
   if (!mat) throw new Error(`unknown material: ${spec.material}`)
 
+  /* 퍼린·거트 재료를 따로 (CN Q235B · KR SS275) */
+  const twoMat = spec.code === 'CN' || spec.code === 'KR'
+  const secondary = spec.secondaryMaterial ?? (spec.code === 'KR' ? 'SS275' : 'Q235B')
+
   /* 단면: 사용된 이름을 등장 순서대로 번호 부여 */
   const sectId = new Map<string, number>()
   for (const e of model.elements) if (!sectId.has(e.section)) sectId.set(e.section, sectId.size + 1)
@@ -50,7 +54,7 @@ export function buildGenPayloads(spec: FactorySpec, model: FactoryModel): GenPay
 
   const ELEM: Record<string, unknown> = {}
   for (const e of model.elements) {
-    ELEM[e.id] = { TYPE: e.role === 'brace' ? 'TRUSS' : 'BEAM', MATL: spec.code === 'CN' && (e.role === 'purlin' || e.role === 'girt') ? 2 : 1, SECT: sectId.get(e.section), NODE: [e.n1, e.n2], ANGLE: ANGLE[e.role] ?? 0 }
+    ELEM[e.id] = { TYPE: e.role === 'brace' ? 'TRUSS' : 'BEAM', MATL: twoMat && (e.role === 'purlin' || e.role === 'girt') ? 2 : 1, SECT: sectId.get(e.section), NODE: [e.n1, e.n2], ANGLE: ANGLE[e.role] ?? 0 }
   }
 
   /* 단부 해제: 2차부재 양단 핀, 풍주는 지붕보에 닿는 상단만 핀(기초는 핀 지점이라 해제 불필요 — 양단 해제 시 기초 절점 회전 불안정) */
@@ -81,7 +85,7 @@ export function buildGenPayloads(spec: FactorySpec, model: FactoryModel): GenPay
   }
   return {
     UNIT: { 1: { FORCE: 'KN', DIST: 'M', HEAT: 'KJ', TEMPER: 'C' } },
-    MATL: { 1: material(spec.material), ...(spec.code === 'CN' ? { 2: material(spec.secondaryMaterial ?? 'Q235B') } : {}) },
+    MATL: { 1: material(spec.material), ...(twoMat ? { 2: material(secondary) } : {}) },
     SECT, NODE, ELEM, CONS, FRLS,
   }
 }

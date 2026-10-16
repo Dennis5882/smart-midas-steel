@@ -4,12 +4,14 @@
    공통 범위: 단층 단경간 박공 문형 골조, 일정 횡단면, 경량 지붕·벽, 크레인·메자닌 없음.
    CN 의 세부 범위는 validateCnSpec(GB 표 적용 한계) 을 그대로 쓴다. */
 import { validateCnSpec } from './cnLoads'
+import { validateKrSpec } from './krLoads'
+import { isPartialKR } from '../codes/krLateral'
 import { portalGeometry } from './portal'
 import { frameSpans, type FactorySpec } from './types'
 
 export type ScopeKey =
   | 'crane' | 'mezzanine' | 'multiSpan' | 'opening' | 'openingCN'
-  | 'span' | 'eave' | 'eaveHigh' | 'slope' | 'bayRatio' | 'baySpacing' | 'length' | 'hnR' | 'cn' | 'monoTW' | 'multi' | 'multiTW' | 'multiSnowCN'
+  | 'span' | 'eave' | 'eaveHigh' | 'slope' | 'bayRatio' | 'baySpacing' | 'length' | 'hnR' | 'cn' | 'monoTW' | 'multi' | 'multiTW' | 'multiSnowCN' | 'kr' | 'krPhase' | 'multiKR'
 export interface ScopeIssue { key: ScopeKey; level: 'block' | 'warn'; args: (string | number)[] }
 export interface ScopeResult { issues: ScopeIssue[]; blocked: boolean }
 
@@ -35,7 +37,7 @@ export function checkScope(spec: FactorySpec, f: ScopeFeatures = spec.features ?
   /* 큰 개구부: TW 는 부분 밀폐(GCpi ±0.55)로 근사 가능 — 개구부 골조는 별도. CN 은 폐쇄형만 */
   if (f.opening) {
     if (spec.code === 'CN') block('openingCN')
-    else warn('opening', spec.wind.enclosure === 'partial' ? 1 : 0)
+    else warn('opening', (spec.code === 'KR' ? !!spec.korea && isPartialKR(spec.korea.cpi) : spec.wind.enclosure === 'partial') ? 1 : 0)
   }
 
   /* 치수 한계 */
@@ -50,6 +52,8 @@ export function checkScope(spec: FactorySpec, f: ScopeFeatures = spec.features ?
     warn('multi')
     if (spec.code === 'TW') warn('multiTW')
     if (spec.code === 'CN' && Math.atan(spec.roofSlope) * 180 / Math.PI > 25) block('multiSnowCN')
+    /* KR: 표 5.7-1 에 다경간 표 없음 — θ ≥ 10° 는 첫 풍상면만 풍상 표·나머지 풍하 표, 불균형 적설(4.5.3) 처마 쪽 면 0.5S_f 가정 */
+    if (spec.code === 'KR') warn('multiKR')
   }
   if (spec.frame === 'mono') {
     if (spec.eaveHeight <= LIMITS.eave && G.ridgeZ > LIMITS.eave) block('eaveHigh', r2(G.ridgeZ))
@@ -64,12 +68,17 @@ export function checkScope(spec: FactorySpec, f: ScopeFeatures = spec.features ?
   const hn = G.hMean
   if (spec.code === 'TW' && hn > 12) warn('hnR', r2(hn))
 
+  /* KR: 접합부(KDS 14 31 25)·외장재 풍하중(5.4·5.8)·냉간성형(41 30 30)·내진상세(14 31 60)는 2단계 → 항상 전문가 검토 필요 */
+  if (spec.code === 'KR') {
+    warn('krPhase')
+    try { validateKrSpec(spec) } catch (e) { block('kr', e instanceof Error ? e.message : String(e)) }
+  }
   /* CN: GB 표 적용 한계 (validateCnSpec 메시지 그대로) */
   if (spec.code === 'CN') {
     try { validateCnSpec(spec) } catch (e) { block('cn', e instanceof Error ? e.message : String(e)) }
   }
   /* 같은 사유 중복 제거 (CN 은 스팬·처마·경사가 validateCnSpec 에도 걸림 → 일반 항목만 남김) */
   const dim = out.some((y) => y.key === 'span' || y.key === 'eave' || y.key === 'slope')
-  const issues = out.filter((x) => !(x.key === 'cn' && dim))
+  const issues = out.filter((x) => !((x.key === 'cn' || x.key === 'kr') && dim))
   return { issues, blocked: issues.some((x) => x.level === 'block') }
 }

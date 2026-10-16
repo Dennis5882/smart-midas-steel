@@ -14,8 +14,9 @@
 import type { Results } from '../actions/results'
 import { profileOf } from '../codes'
 import { CN_CATALOG } from './cnCatalog'
+import { KR_CATALOG } from './krCatalog'
 import { CATALOG } from './catalog'
-import { purlinDefl, runDesign, type DesignResult, type ServiceCheck } from './design'
+import { purlinDefl, purlinLimitDiv, runDesign, type DesignResult, type ServiceCheck } from './design'
 import type { LoadInfo } from './loads'
 import { portalGeometry } from './portal'
 import { sectionProps } from './sections'
@@ -127,7 +128,7 @@ export function proposeSections(spec: FactorySpec, model: FactoryModel, info: Lo
   const L = roleLengths(model)
   const gamma = profileOf(spec.code).materials[spec.material].gamma
   const tons = (r: ElementRole, sec: string) => (gamma * sectionProps(sec).A * 1e-6 * L[r]) / 9.80665
-  const byArea = (r: ElementRole) => [...(spec.code === 'CN' ? CN_CATALOG : CATALOG)[r]]
+  const byArea = (r: ElementRole) => [...(spec.code === 'CN' ? CN_CATALOG : spec.code === 'KR' ? KR_CATALOG : CATALOG)[r]]
     .filter((s) => sectionProps(s).A > (ctl.floors?.[r] ?? 0) + 1e-6)
     .sort((a, b) => sectionProps(a).A - sectionProps(b).A)
   const A = (s: string) => sectionProps(s).A
@@ -161,7 +162,7 @@ export function proposeSections(spec: FactorySpec, model: FactoryModel, info: Lo
     for (const sec of byArea(r)) {
       const s = strength(r, sec)
       if (s > tgt(r, sec)) continue
-      if (r === 'purlin' && purlinDefl(spec, info, sec) / (spec.baySpacing / (spec.code === 'CN' ? 150 : 360)) > target) { governs = 'service'; continue }
+      if (r === 'purlin' && purlinDefl(spec, info, sec) / (spec.baySpacing / purlinLimitDiv(spec.code)) > target) { governs = 'service'; continue }
       if (r === 'brace' && (driftY * braceA0) / sectionProps(sec).A > target) { governs = 'service'; continue }
       pick = sec; ratio = s
       break

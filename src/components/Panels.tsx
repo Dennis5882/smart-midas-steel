@@ -104,6 +104,12 @@ export function ModelPanel() {
         <KV k={t('kv_qh')} v={`${f3(info.wind.qh)} kN/m² (h = ${info.wind.hRef} m)`} />
         <KV k={t('kv_cpRoof')} v={`${f3(info.wind.windwardRoofCp.high)} / ${f3(info.wind.windwardRoofCp.low)}`} />
         {sp.code === 'CN' && <KV k={t('f_cn_snow')} v={`${f3(info.snow ?? 0)} kN/m²`} />}
+        {sp.code === 'KR' && info.kr && <>
+          <KV k={t('kv_kr_snow')} v={`S_s ${f3(info.snow ?? 0)} kN/m² (S_f ${f3(info.kr.Sf)}, C_s ${f3(info.kr.Cs)}${info.kr.snowMin ? `, min ${f3(info.kr.snowMin)}` : ''})`} />
+          <KV k={t('kv_kr_site')} v={`S ${info.kr.spectrum.S} · S_DS ${f3(info.kr.spectrum.SDS)} · S_D1 ${f3(info.kr.spectrum.SD1)} · ${t('kv_kr_sdc')} ${info.kr.sdc} · R ${info.kr.R} · I_E ${info.kr.IE}`} />
+          <KV k={t('kv_kr_gust')} v={`G_D X ${f3(info.kr.GD.X)} / Y ${f3(info.kr.GD.Y)} · G_pe X ${f3(info.kr.Gpe.X)} / Y ${f3(info.kr.Gpe.Y)} · C_pi ${info.kr.cpi.join(' / ')}`} />
+          <KV k={tc('KR', 'kv_across')} v={`W_LC ${f1(info.wind.across.WLX)} / ${f1(info.wind.across.WLY)} kN (γ ${f3(info.kr.gammaL.X)} / ${f3(info.kr.gammaL.Y)})`} />
+        </>}
         {sp.code === 'TW' && info.wind.across && <KV k={t('kv_across')} v={`W_L ${f1(info.wind.across.WLX)} / ${f1(info.wind.across.WLY)} kN · M_T ${f1(info.wind.across.MT)} kN·m`} />}
         <KV k={t('kv_combos')} v={sh.combos} />
       </div>
@@ -154,7 +160,7 @@ function DesignTables({ d }: { d: DesignResult }) {
             </tbody>
           </table>
         </div>
-        <div className="res-stat" style={{ marginTop: 10, marginBottom: 0 }}>{t(code === 'CN' ? 'rd_assump_CN' : 'rd_assump')}</div>
+        <div className="res-stat" style={{ marginTop: 10, marginBottom: 0 }}>{tc(code, 'rd_assump')}</div>
       </div>
       <div className="scard"><h3>{t('res_service')}</h3>
         <table>
@@ -180,7 +186,7 @@ function DesignTables({ d }: { d: DesignResult }) {
               ))}
             </tbody>
           </table>
-          <div className="res-stat" style={{ marginTop: 10, marginBottom: 0 }}>{t(code === 'CN' ? 'cc_note_CN' : 'cc_note')}</div>
+          <div className="res-stat" style={{ marginTop: 10, marginBottom: 0 }}>{tc(code, 'cc_note')}</div>
         </div>
       )}
     </>
@@ -221,7 +227,7 @@ function OptTables({ o }: { o: OptSummary }) {
           ))}
         </tbody>
       </table>
-      <div className="res-stat" style={{ marginTop: 10, marginBottom: 0 }}>{t(code === 'CN' ? 'opt_note_CN' : 'opt_note')}</div>
+      <div className="res-stat" style={{ marginTop: 10, marginBottom: 0 }}>{tc(code, 'opt_note')}</div>
     </div>
   )
 }

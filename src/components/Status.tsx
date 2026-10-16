@@ -46,6 +46,7 @@ export function StatusCard({ d, cs, spec }: { d: DesignResult | null; cs: ConnRe
 /** 지진 계수 출처 문구 — TW: 표2-1·2-4 자동값 / 사용자 입력(표값) / 표에 없음, CN: 프로젝트 입력 */
 export function siteSourceText(spec: FactorySpec): string {
   if (spec.code === 'CN') return t('site_src_CN')
+  if (spec.code === 'KR') { const k = spec.korea!; return t('site_src_KR', k.zone === '1' ? 'I' : 'II', k.S, k.site) }
   const s = siteSource(spec.seismic)
   return s.kind === 'table' ? t('site_src_table') : s.kind === 'user' ? t('site_src_user', s.SDS, s.SD1) : t('site_src_none')
 }

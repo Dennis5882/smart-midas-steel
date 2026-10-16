@@ -1,6 +1,7 @@
 /* i18n — 현재 언어 저장소 + t(). React 밖(액션)에서도 쓰이도록 plain 함수, 컴포넌트는 useLang() 으로 재렌더. */
 import { useSyncExternalStore } from 'react'
 import { en, type Dict } from './dict/en'
+import type { CodeId } from '../codes/types'
 import { ko } from './dict/ko'
 import { zhCN } from './dict/zh-CN'
 import { zhTW } from './dict/zh-TW'
@@ -70,20 +71,20 @@ export function t<K extends keyof Dict>(key: K, ...args: Dict[K] extends (...a: 
   return typeof v === 'function' ? v(...args) : v
 }
 
-/** Code-specific wording; engineering code remains independent of UI language. */
-export function tc<K extends keyof Dict>(code: 'TW' | 'CN' | undefined, key: K, ...args: Dict[K] extends (...a: infer A) => string ? A : []): string {
-  const alt = `${key}_CN` as keyof Dict
-  const chosen = code === 'CN' && Object.hasOwn(en, alt) ? alt : key
+/** Code-specific wording; engineering code remains independent of UI language. `<key>_CN`·`<key>_KR` 가 있으면 그 기준에서 사용 */
+export function tc<K extends keyof Dict>(code: CodeId | undefined, key: K, ...args: Dict[K] extends (...a: infer A) => string ? A : []): string {
+  const alt = `${key}_${code}` as keyof Dict
+  const chosen = (code === 'CN' || code === 'KR') && Object.hasOwn(en, alt) ? alt : key
   const v = (DICTS[current][chosen] ?? en[chosen]) as string | ((...a: unknown[]) => string)
   return typeof v === 'function' ? v(...args) : v
 }
 
 /** 나중에 번역할 문구 — 키와 인자(지금 값)만 저장, 그릴 때 현재 언어로 (채팅 메시지: 언어를 바꾸면 지난 메시지도 바뀜) */
-export interface LText { k: keyof Dict; a: unknown[]; code?: 'TW' | 'CN' }
+export interface LText { k: keyof Dict; a: unknown[]; code?: CodeId }
 export function lt<K extends keyof Dict>(key: K, ...args: Dict[K] extends (...a: infer A) => string ? A : []): LText {
   return { k: key, a: args }
 }
-export function ltc<K extends keyof Dict>(code: 'TW' | 'CN' | undefined, key: K, ...args: Dict[K] extends (...a: infer A) => string ? A : []): LText {
+export function ltc<K extends keyof Dict>(code: CodeId | undefined, key: K, ...args: Dict[K] extends (...a: infer A) => string ? A : []): LText {
   return { k: key, a: args, code }
 }
 export const isLText = (v: unknown): v is LText => !!v && typeof v === 'object' && 'k' in v && 'a' in v

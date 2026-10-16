@@ -6,6 +6,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { buildFactory } from '../actions/build'
 import { siteCoef, townsOf } from '../codes/twSites'
+import { ZONE_Z } from '../codes/krLateral'
 import type { TemplateKey } from '../domain/templates'
 import { TEMPLATES, TEMPLATE_KEYS } from '../domain/templates'
 import { ModelWizard, WIZARD_STEPS } from './ModelWizard'
@@ -27,8 +28,10 @@ function Summary({ spec, tpl }: { spec: FactorySpec; tpl?: TemplateKey }) {
   const k = tpl ?? 'general'
   const sec = spec.sections
   const row = (label: string, v: string) => <><span className="k">{label}</span> {v}<br /></>
+  const kr = spec.code === 'KR' ? spec.korea : undefined
   const site = spec.code === 'CN' && spec.china
     ? `w0 ${spec.china.w0} kN/m² · ${spec.china.terrain} · αmax ${spec.china.alphaMax} · Tg ${spec.china.Tg} s · S0 ${spec.china.snow} kN/m²`
+    : kr ? `V0 ${kr.V0} m/s · ${kr.exposure} · ${t(kr.zone === '1' ? 'zone_1' : 'zone_2')} · S ${kr.S} · ${kr.site} · Sg ${kr.Sg} kN/m²`
     : `${spec.seismic.county} ${spec.seismic.town} · ${t(`soil_${spec.seismic.soil}`)} · SDS ${spec.seismic.SDS} / SD1 ${spec.seismic.SD1} · V10 ${spec.wind.V10} m/s`
   return (
     <div className="plan">
@@ -104,6 +107,8 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
         const c = siteCoef(n['seismic.county'], n['seismic.town'], (+n['seismic.soil'] || 1) as 1 | 2 | 3)
         if (c) for (const k of ['SDS', 'SD1', 'SMS', 'SM1'] as const) n[`seismic.${k}`] = String(c[k])
       }
+      /* KR 지진구역 → S = Z × 2.0 (KDS 41 17 00 3.2, Z 는 KDS 17 10 00 표 4.2-2 통상값) */
+      if (msg.spec.code === 'KR' && p === 'korea.zone') n['korea.S'] = String(+(ZONE_Z[v as '1' | '2'] * 2).toFixed(3))
       return n
     })
   }
@@ -166,7 +171,8 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
       const advanced = g.title === 'sec_conn' ? filtered.fields
         : step === 2 ? filtered.fields.filter((f) => !['bays', 'baySpacing'].includes(f.path))
         : step === 3 ? filtered.fields.filter((f) => !['sections.column', 'sections.rafter', 'material'].includes(f.path))
-        : step === 4 && spec.code === 'TW' && g.title === 'sec_seismic' ? filtered.fields.filter((f) => !['seismic.county', 'seismic.town', 'seismic.soil'].includes(f.path)) : []
+        : step === 4 && spec.code === 'TW' && g.title === 'sec_seismic' ? filtered.fields.filter((f) => !['seismic.county', 'seismic.town', 'seismic.soil'].includes(f.path))
+        : step === 4 && spec.code === 'KR' ? filtered.fields.filter((f) => ['korea.Kzt', 'korea.KD', 'korea.roofZeta', 'korea.S'].includes(f.path)) : []
       const basic = filtered.fields.filter((f) => !advanced.includes(f))
       return <section className="mw-group" key={g.title}>
         {basic.length > 0 && <><h4>{t(g.title)}</h4>{fields({ ...g, fields: basic })}</>}
@@ -179,6 +185,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
       </section>
     })}
     {step === 4 && <p className="mw-note">{tc(spec.code, 'plan_tip')}</p>}
+    {step === 4 && spec.code === 'KR' && <p className="mw-note">{t('kr_scope_note')}</p>}
     {step > 0 && step < 5 && blocked && <ScopeBox spec={spec} feat={feat} setFeat={setFeat} disabled={!live || s.busy} />}
     {step === 5 && <>
       <Summary spec={spec} tpl={selectedTpl} />
@@ -198,6 +205,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
       <ScopeBox spec={spec} feat={feat} setFeat={setFeat} disabled={!live} />
       <div className="plan-editor">
         {spec.code === 'CN' && <div className="pe-tip">{t('cn_scope_note')}</div>}
+        {spec.code === 'KR' && <div className="pe-tip">{t('kr_scope_note')}</div>}
         {groupsFor(spec.code, free, spec.frame).map((g) => (
           <div key={g.title} style={{ marginBottom: 12 }}>
             <div className="sec-divider" style={{ margin: '4px 0 10px' }}>{t(g.title)}</div>

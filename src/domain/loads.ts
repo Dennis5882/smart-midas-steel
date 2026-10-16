@@ -12,9 +12,12 @@ import type { Face, FactoryModel, FactorySpec, Node } from './types'
 import { nodeWeights } from './weights'
 import { BASIN } from '../codes/twSites'
 import { buildCnLoads } from './cnLoads'
+import { buildKrLoads, type KrLoadInfo } from './krLoads'
 
 export interface LoadInfo {
   snow?: number
+  /** KR: KDS 중간값 (스펙트럼·가스트·적설 계수) — 계산서 표시 */
+  kr?: KrLoadInfo
   /** 지붕 활하중 (kN/m², 수평투영) */
   roofLive: number
   seismic: Record<'X' | 'Y', { T: number; c: number; cStar: number; cV: number; cMin: number; cM: number; gov: string; V: number; Fu: number; R: number; Mt: number }> & { W: number }
@@ -49,6 +52,7 @@ const OUT: Record<Exclude<Face, 'roof'>, [number, number]> = { x0: [-1, 0], xL: 
 
 export function buildLoadPayloads(spec: FactorySpec, model: FactoryModel): LoadPayloads {
   if (spec.code === 'CN') return buildCnLoads(spec, model)
+  if (spec.code === 'KR') return buildKrLoads(spec, model)
   const prof = profileOf(spec.code)
   const lat = prof.lateral
   const { span, eaveHeight, roofSlope } = spec

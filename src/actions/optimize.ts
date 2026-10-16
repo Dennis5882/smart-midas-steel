@@ -8,7 +8,7 @@ import { runDesign, type DesignResult } from '../domain/design'
 import { pickBest, proposeSections, roleTons, steelWeight, type OptControl, type OptIter, type OptRow, type Sections } from '../domain/optimize'
 import { sectionProps } from '../domain/sections'
 import { ROLES } from '../domain/types'
-import { t, lt } from '../i18n'
+import { t, lt, ltc } from '../i18n'
 import { S, notify } from '../state/store'
 import { addMsg, draw3D, log, tab } from '../state/ui'
 import { analyzeCore } from './analysis'
@@ -28,7 +28,7 @@ export async function runOptimize(): Promise<void> {
   if (!beginJob('opt')) return
   S.results = null; S.design = null; S.connections = null; S.opt = null; S.ratioView = false
   notify()
-  addMsg('bot', lt(S.built.spec.code === 'CN' ? 'opt_start_CN' : 'opt_start', MAX_ITER))
+  addMsg('bot', ltc(S.built.spec.code, 'opt_start', MAX_ITER))
   tab('logP')
   const start = S.built.spec
   const iters: OptIter[] = []

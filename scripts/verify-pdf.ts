@@ -15,6 +15,8 @@ import { runConnections } from '../src/domain/connections'
 import { runDesign } from '../src/domain/design'
 import { FIXTURE, decodeResults } from './tw-golden'
 import type { ReportInput } from '../src/report/report'
+import { krSynthetic } from './kr-synth'
+import { defaultSpecFor } from '../src/domain/types'
 
 ;(globalThis as any).document = { documentElement: { lang: 'ko', dataset: {} } }
 const { buildReport } = await import('../src/report/report')
@@ -25,9 +27,12 @@ mkdirSync('output/pdf', { recursive: true })
 const fx = JSON.parse(gunzipSync(readFileSync(FIXTURE)).toString())
 const model = buildPortal(fx.spec), loads = buildLoadPayloads(fx.spec, model), results = decodeResults(fx.results)
 const input: ReportInput = { built: { spec: fx.spec, model, info: loads.info, cases: Object.values(loads.STLD).map((v: any) => v.NAME), combos: Object.keys(loads.info.comboKind).length, comboNames: Object.keys(loads.info.comboKind) }, reactions: fx.reactions, design: runDesign(fx.spec, model, loads.info, results), connections: runConnections(fx.spec, model, loads.info, results) }
-for (const lang of ['ko', 'en', 'zh-TW', 'zh-CN'] as const) {
+/* KR — 합성 결과(경로·글꼴 확인용) */
+const krSpec = defaultSpecFor('KR'), kr = krSynthetic(krSpec)
+const krInput: ReportInput = { built: { spec: krSpec, model: kr.model, info: kr.loads.info, cases: kr.cases, combos: kr.combos.length, comboNames: kr.combos }, reactions: fx.reactions, design: runDesign(krSpec, kr.model, kr.loads.info, kr.results), connections: runConnections(krSpec, kr.model, kr.loads.info, kr.results) }
+for (const [code, inp] of [['TW', input], ['KR', krInput]] as const) for (const lang of ['ko', 'en', 'zh-TW', 'zh-CN'] as const) {
   setLang(lang)
-  const html = buildReport(input)
+  const html = buildReport(inp)
   const doc = new DOMParser().parseFromString(html, 'text/html')
   /* 언어별 글꼴 + 계산서의 모든 글자가 축소 글꼴에 있는지 (없으면 PDF 에 빈 네모) */
   const htmlLang = (doc as any).documentElement.getAttribute('lang') ?? ''
@@ -42,7 +47,7 @@ for (const lang of ['ko', 'en', 'zh-TW', 'zh-CN'] as const) {
   const buffer = await pdfMake.createPdf(def).getBuffer()
   const pdf = await PDFDocument.load(buffer)
   assert.ok(pdf.getPageCount() >= 8)
-  const path = `output/pdf/steel-report-TW-${lang}.pdf`
+  const path = `output/pdf/steel-report-${code}-${lang}.pdf`
   writeFileSync(path, buffer)
   console.log(JSON.stringify({ path, font: font.split(/[\\/]/).pop(), pages: pdf.getPageCount(), bytes: buffer.length }))
 }

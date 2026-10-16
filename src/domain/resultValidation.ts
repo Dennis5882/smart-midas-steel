@@ -62,7 +62,7 @@ export function validateDesignResults(spec: FactorySpec, model: FactoryModel, in
   if (roles) return // Candidate sections use the already checked service result.
   const { nodes } = serviceNodes(spec, model)
   requireResult(nodes.length > 0, 'DISPLACEMENT', 'missing')
-  const cases = new Set(['LR', 'EX', 'EY', ...(spec.code === 'TW' ? ['ETX', 'ETY'] : ['D']), ...info.wind.variants.flatMap((w) => w.parts.map((p) => p.lc))])
+  const cases = new Set(['LR', 'EX', 'EY', ...(spec.code !== 'CN' ? ['ETX', 'ETY'] : ['D']), ...info.wind.variants.flatMap((w) => w.parts.map((p) => p.lc))])
   // Snow cases are defined by the model's combinations, never by returned data.
   for (const c of combos) for (const s of c.match(/SN\d*/g) ?? []) cases.add(s)
   for (const c of cases) for (const n of nodes) {

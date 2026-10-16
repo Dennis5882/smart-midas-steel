@@ -11,6 +11,7 @@
    그 외 B = B1 (Cm = 1.0, 보수적). */
 import { profileOf } from '../codes'
 import { runCnDesign } from './cnDesign'
+import { KR_DEFL, krPurlinDefl, runKrDesign } from './krDesign'
 import { b1Of, b2Of, capacity, cbOf, check, kSway, SLENDER_LIMIT, type Capacity, type CheckResult } from '../codes/twSteel'
 import type { Results } from '../actions/results'
 import type { LoadInfo } from './loads'
@@ -29,7 +30,7 @@ export interface MemberCheck {
   combo: string
   /** 지배 지점 0..4 (I, 1/4, 2/4, 3/4, J), 가새는 -1 */
   part: number
-  eq: CheckResult['eq'] | 'KL/r' | 'C5' | 'C3.3' | `GB ${string}`
+  eq: CheckResult['eq'] | 'KL/r' | 'C5' | 'C3.3' | `GB ${string}` | `KDS ${string}`
   forces: { P: number; Mx: number; My: number; V: number }
   cap: Pick<Capacity, 'phiPnc' | 'phiPnt' | 'phiMnx' | 'phiMny' | 'phiVn' | 'mxMode' | 'compact' | 'KLr' | 'lambdaC'>
   B: number
@@ -73,6 +74,7 @@ const comboDir = (c: string): 'X' | 'Y' | null => (/(W|E)X/.test(c) ? 'X' : /(W|
 
 /** 퍼린 활하중 처짐 (m) — 단순보 5wL⁴/384EI, w = 지붕 활하중 × 퍼린 간격 × cosθ */
 export function purlinDefl(spec: FactorySpec, info: LoadInfo, section: string): number {
+  if (spec.code === 'KR') return krPurlinDefl(spec, info, section)
   const mat = profileOf(spec.code).materials[spec.material]
   const G = portalGeometry(spec)
   const wLR = spec.code === 'CN'
@@ -81,9 +83,13 @@ export function purlinDefl(spec: FactorySpec, info: LoadInfo, section: string): 
   return (5 * wLR * spec.baySpacing ** 4) / (384 * mat.E * 1e3 * (sectionProps(section).Ix * 1e-12)) // m (E kPa, I m⁴)
 }
 
+/** 퍼린 처짐 한계 = 베이 / 이 값 — TW LRFD 11.5.3 L/360, CN GB 50017 부록 B L/150, KR 프로젝트 기준 L/240 */
+export const purlinLimitDiv = (code: FactorySpec['code']) => (code === 'CN' ? 150 : code === 'KR' ? KR_DEFL.purlin : 360)
+
 /** roles 를 주면 그 역할 부재만 검토하고 사용성은 생략 (단면 최적화 후보 평가용) */
 export function runDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo, res: Results, roles?: readonly ElementRole[]): DesignResult {
   if (spec.code === 'CN') return runCnDesign(spec, model, info, res, roles)
+  if (spec.code === 'KR') return runKrDesign(spec, model, info, res, roles)
   validateDesignResults(spec, model, info, res, roles)
   const prof = profileOf(spec.code)
   const mat = prof.materials[spec.material]
