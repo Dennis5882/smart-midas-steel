@@ -4,6 +4,8 @@
    퍼린·거트 강축 = 베이, 약축·L_b = 베이/(새그로드+1) (약축 모멘트 ×1/(n+1)²), 스트럿 = 베이, 풍주 강축 = 높이·약축 = 거트 간격, 가새 KL = 대각선/2.
    사용성 — KDS 에 수치 한계 없음(14 31 55 4.1.3·4.1.4): 프로젝트 기준으로 표시. 지진 층간변위만 KDS 41 17 00 7.2.8·표 8.2-1 규정값. */
 import { cbKR, krB1, krB2, krCapacity, krCheck, krKSway, SLENDER_KR, type KrCapacity } from '../codes/krSteel'
+import { krCfCapacity, krCfCheck } from '../codes/krColdFormed'
+import { ccDims, effSx } from '../codes/twColdFormed'
 import { fyKR } from '../codes/kr'
 import type { Results } from '../actions/results'
 import type { CCSummary, DesignResult, MemberCheck, ServiceCheck } from './design'
@@ -22,34 +24,85 @@ export const KR_WIND_DRIFT = { factor: 0.65, limit: 1 / 150 }
 /** 조합 이름의 주 횡력 방향 — 첫 'WX…'·'±EX'·'+NX' (지진 직교 0.3 성분은 뒤에 옴) */
 const comboDir = (c: string): 'X' | 'Y' | null => (c.match(/(?:W|E|N)([XY])/)?.[1] as 'X' | 'Y' | undefined) ?? null
 
-export function runKrDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo, res: Results, roles?: readonly ElementRole[]): DesignResult {
-  validateDesignResults(spec, model, info, res, roles)
+/** 부재별 유효길이 (mm) — 강축 KLx·약축 KLy·횡비틀림 L_b. 앱 검토와 Gen KDS 대조(live-kr --gen-check LENG)가 같은 값을 쓴다.
+    14 31 15 4.3.4(5)① 기초 G — 핀 10, 고정 1. 기둥 상단 G = (Ic/Lc)/(Ir/Lr) */
+export function krLengths(spec: FactorySpec, model: FactoryModel): Map<number, { KLx: number; KLy: number; Lb: number; K: number; L: number }> {
   const G = portalGeometry(spec), nodes = new Map(model.nodes.map((n) => [n.id, n]))
   const col = sectionProps(spec.sections.column), raf = sectionProps(spec.sections.rafter)
-  /* 14 31 15 4.3.4(5)① 기초 G — 핀 10, 고정 1. 기둥 상단 G = (Ic/Lc)/(Ir/Lr) */
   const Kat = new Map(G.eaveXs.map((x) => [x, krKSway((col.Ix / G.zAt(x)) / (raf.Ix / G.rafterLen), spec.baseFixity === 'fixed' ? 1 : 10)]))
   const Lsec = spec.baySpacing / (spec.sagRods + 1)
   const mm = (m: number) => m * 1000
-  const members: MemberCheck[] = [], service: ServiceCheck[] = []
-  /* 퍼린·거트 외장재설계용 풍하중 (KDS 41 12 00 5.4·5.8) — krSecondary */
-  const cc = krCCLoads(spec, model, info)
-  let b2Max = 1
+  const out = new Map<number, { KLx: number; KLy: number; Lb: number; K: number; L: number }>()
   for (const e of model.elements) {
-    if (roles && !roles.includes(e.role)) continue
-    const a = nodes.get(e.n1)!, b = nodes.get(e.n2)!, sp = sectionProps(e.section)
+    const a = nodes.get(e.n1)!, b = nodes.get(e.n2)!
     const Lel = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z)
-    const lens = e.role === 'column' ? { KLx: mm((e.lean ? 1 : Kat.get(a.x)!) * G.zAt(a.x)), KLy: mm(Lel), Lb: mm(Lel) }
+    const K = e.role === 'column' && !e.lean ? Kat.get(a.x)! : 1
+    const l = e.role === 'column' ? { KLx: mm(K * G.zAt(a.x)), KLy: mm(Lel), Lb: mm(Lel) }
       : e.role === 'rafter' ? { KLx: mm(G.slopeLen), KLy: mm(Lel), Lb: mm(Lel) }
       : e.role === 'purlin' || e.role === 'girt' ? { KLx: mm(Lel), KLy: mm(Math.min(Lel, Lsec)), Lb: mm(Math.min(Lel, Lsec)) }
       : e.role === 'post' ? { KLx: mm(G.zAt(a.x)), KLy: mm(Lel), Lb: mm(Lel) }
       : e.role === 'brace' ? { KLx: mm(Lel / 2), KLy: mm(Lel / 2), Lb: mm(Lel / 2) }
       : { KLx: mm(Lel), KLy: mm(Lel), Lb: mm(Lel) }
+    out.set(e.id, { ...l, K, L: mm(Lel) })
+  }
+  return out
+}
+
+export function runKrDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo, res: Results, roles?: readonly ElementRole[]): DesignResult {
+  validateDesignResults(spec, model, info, res, roles)
+  const G = portalGeometry(spec), nodes = new Map(model.nodes.map((n) => [n.id, n]))
+  const lengths = krLengths(spec, model)
+  const mm = (m: number) => m * 1000
+  const members: MemberCheck[] = [], service: ServiceCheck[] = []
+  /* 퍼린·거트 외장재설계용 풍하중 (KDS 41 12 00 5.4·5.8) — krSecondary */
+  const cc = krCCLoads(spec, model, info)
+  /* 증폭지진 조합(amplified)은 일반 부재 검토에서 제외 — 기둥 축력(14 31 60 4.1.3)·접합부만 */
+  const basic = (c: string) => (info.comboKind?.[c] ?? 'basic') === 'basic'
+  const amplified = (c: string) => info.comboKind?.[c] === 'amplified'
+  const k = spec.korea!
+  let b2Max = 1
+  for (const e of model.elements) {
+    if (roles && !roles.includes(e.role)) continue
+    const a = nodes.get(e.n1)!, b = nodes.get(e.n2)!, sp = sectionProps(e.section)
+    const Lel = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z)
+    const lens = lengths.get(e.id)!
     const material = e.role === 'purlin' || e.role === 'girt' ? spec.secondaryMaterial ?? spec.material : spec.material
     const Fy = fyKR(material, Math.max(sp.tf, sp.tw))
     const frame = e.role === 'column' || e.role === 'rafter'
     const myScale = e.role === 'purlin' || e.role === 'girt' ? 1 / (spec.sagRods + 1) ** 2 : 1
     let best: MemberCheck | null = null
     let maxComp = 0
+    /* 냉간성형 립 C형강 퍼린·거트 — KDS 41 30 30 (해석 부재력 + 외장재 풍압). 압축 플랜지 구속: 퍼린 중력 방향 휨이면 외장재가 구속 */
+    if ((e.role === 'purlin' || e.role === 'girt') && sp.kind === 'CC') {
+      const cf = krCfCapacity(e.section, sp, Fy, { Lx: lens.KLx, Ly: lens.KLy, Lt: lens.Lb, Lb: lens.Lb, Lm: lens.Lb }, 1)
+      const considerCF = (combo: string, part: number, f: MemberCheck['forces'], braced: boolean) => {
+        const r = krCfCheck(cf, f, braced)
+        if (best && r.ratio <= best.ratio) return
+        best = {
+          id: e.id, role: e.role, section: e.section, ratio: r.ratio, combo, part, eq: r.eq, forces: f,
+          cap: { phiPnc: cf.phiPnc, phiPnt: cf.phiPnt, phiMnx: braced ? cf.phiMnxBraced : cf.phiMnxLTB, phiMny: cf.phiMny, phiVn: cf.phiVn,
+            mxMode: braced ? 'CF' : `CF-${cf.mode}`, compact: 'noncompact', KLr: cf.KLr, lambdaC: Math.sqrt(Fy / Math.max(cf.Fn, 1e-9)) },
+          B: 1, Cb: 1, lengths: lens, slender: { value: 0, limit: 0 }, notes: cf.notes,
+        }
+      }
+      const beam = res.beam.get(e.id)
+      const grav = beam ? [...beam.entries()].find(([c]) => basic(c) && !/[EWN][XY]/.test(c)) : undefined
+      const sag = grav ? Math.sign(grav[1][2]?.My ?? 0) || 1 : 1
+      for (const [combo, pts] of beam ?? []) {
+        if (!basic(combo)) continue
+        const braced = e.role === 'purlin' && Math.sign(pts[2]?.My ?? 0) === sag
+        pts.forEach((p, i) => { maxComp = Math.max(maxComp, -p.P); considerCF(combo, i, { P: p.P, Mx: Math.abs(p.My), My: Math.abs(p.Mz) * myScale, V: Math.abs(p.Vz) }, braced) })
+      }
+      for (const d of cc.get(e.id)?.demands ?? []) considerCF(d.combo, 2, d.f, d.braced)
+      if (!best) throw new Error(`KDS: missing analysis forces for element ${e.id}`)
+      const m = best as MemberCheck
+      m.slender = maxComp > 1e-3
+        ? { value: Math.max(lens.KLx / sp.rx, lens.KLy / sp.ry), limit: SLENDER_KR.compression }
+        : { value: Math.max(lens.KLx, lens.KLy) / Math.min(sp.rx, sp.ry), limit: SLENDER_KR.tension }
+      if (m.slender.value / m.slender.limit > m.ratio) { m.ratio = m.slender.value / m.slender.limit; m.eq = 'KL/r' }
+      members.push(m)
+      continue
+    }
     const consider = (combo: string, part: number, f: MemberCheck['forces'], cap: KrCapacity, B: number, Cb: number) => {
       const r = krCheck(cap, f, B)
       if (best && r.ratio <= best.ratio) return
@@ -61,9 +114,10 @@ export function runKrDesign(spec: FactorySpec, model: FactoryModel, info: LoadIn
     }
     if (e.role === 'brace') {
       const cap = krCapacity(sp, Fy, lens, 1)
-      for (const [combo, P] of res.truss.get(e.id) ?? []) { if (P < 0) maxComp = Math.max(maxComp, -P); consider(combo, -1, { P, Mx: 0, My: 0, V: 0 }, cap, 1, 1) }
+      for (const [combo, P] of res.truss.get(e.id) ?? []) { if (!basic(combo)) continue; if (P < 0) maxComp = Math.max(maxComp, -P); consider(combo, -1, { P, Mx: 0, My: 0, V: 0 }, cap, 1, 1) }
     } else {
       for (const [combo, pts] of res.beam.get(e.id) ?? []) {
+        if (!basic(combo)) continue
         const Cb = cbKR(pts.map((p) => p.My))
         const Pc = Math.max(0, ...pts.map((p) => -p.P))
         maxComp = Math.max(maxComp, Pc)
@@ -93,6 +147,20 @@ export function runKrDesign(spec: FactorySpec, model: FactoryModel, info: LoadIn
       ? { value: Math.max(lens.KLx / sp.rx, lens.KLy / sp.ry), limit: SLENDER_KR.compression }
       : { value: Math.max(lens.KLx, lens.KLy) / Math.min(sp.rx, sp.ry), limit: SLENDER_KR.tension }
     if (m.slender.value / m.slender.limit > m.ratio) { m.ratio = m.slender.value / m.slender.limit; m.eq = 'KL/r' }
+    /* 14 31 60 4.1.3 기둥 — 내진상세 계통이고 증폭 안 한 조합으로 Pu/φPn > 0.4 이면 증폭지진 조합 축력으로 검토 (축력만) */
+    if (e.role === 'column' && (k.systemX === 'OMF' || k.systemY === 'OCBF')) {
+      const cap = krCapacity(sp, Fy, lens, 1), Pb = maxComp
+      if (Pb / cap.phiPnc > 0.4) {
+        let Pa = 0, ca = ''
+        for (const [combo, pts] of res.beam.get(e.id) ?? []) if (amplified(combo)) for (const p of pts) if (-p.P > Pa) { Pa = -p.P; ca = combo }
+        if (Pa / cap.phiPnc > m.ratio) { m.ratio = Pa / cap.phiPnc; m.eq = 'KDS 14 31 60 4.1.3'; m.combo = ca; m.forces = { P: -Pa, Mx: 0, My: 0, V: 0 } }
+      }
+    }
+    /* 14 31 60 4.7 보통중심가새골조 — 가새는 내진 조밀단면(표 4.1-1 주 c): 원형강관 D/t ≤ 0.044E/Fy */
+    if (e.role === 'brace' && k.systemY === 'OCBF' && sp.kind === 'P') {
+      const r = (sp.d / sp.tw) / (0.044 * 210000 / Fy)
+      if (r > m.ratio) { m.ratio = r; m.eq = 'KDS 14 31 60 4.7 D/t' }
+    }
     /* 웨브 세장(미구현) H 는 NG 로 */
     if (m.notes.some((n) => n.startsWith('web slender'))) m.ratio = Math.max(m.ratio, 9.99)
     members.push(m)
@@ -120,8 +188,9 @@ export function runKrDesign(spec: FactorySpec, model: FactoryModel, info: LoadIn
       let dxe = 0
       for (const n of eaves) for (const sg of [1, -1]) dxe = Math.max(dxe, Math.abs(disp(`E${d}`, n.id)[comp] + sg * disp(`ET${d}`, n.id)[comp]))
       const s = info.seismic[d]
-      const delta = kr.Cd * dxe / kr.IE
-      const thetaPD = s.V > 0 ? info.seismic.W * delta / (s.V * spec.eaveHeight * kr.Cd) : 0
+      const Cd = kr.sys[d].Cd
+      const delta = Cd * dxe / kr.IE
+      const thetaPD = s.V > 0 ? info.seismic.W * delta / (s.V * spec.eaveHeight * Cd) : 0
       const ad = thetaPD > 0.1 ? 1 / (1 - thetaPD) : 1
       push(ek, ad * delta / spec.eaveHeight, kr.driftLimit, `Cd·(E${d}±ET${d})/I_E${ad > 1 ? ` × ${ad.toFixed(3)}` : ''}`, `KDS 41 17 00 7.2.8 · table 8.2-1 (${kr.driftLimit}h, θ = ${thetaPD.toFixed(3)})`)
     }
@@ -152,5 +221,8 @@ export function runKrDesign(spec: FactorySpec, model: FactoryModel, info: LoadIn
 export function krPurlinDefl(spec: FactorySpec, info: LoadInfo, section: string): number {
   const G = portalGeometry(spec)
   const w = Math.max(info.roofLive, info.snow ?? 0) * G.sRoof * Math.cos(G.theta)
-  return 5 * w * spec.baySpacing ** 4 / (384 * 210000e3 * sectionProps(section).Ix * 1e-12)
+  const sp = sectionProps(section)
+  /* 냉간성형: 4.10.1 유효 단면2차모멘트 — 응력 Fy 유효폭으로 (사용성 응력보다 낮은 I → 보수적) */
+  const I = sp.kind === 'CC' ? effSx(ccDims(section), 275, 210000).Ie : sp.Ix
+  return 5 * w * spec.baySpacing ** 4 / (384 * 210000e3 * I * 1e-12)
 }

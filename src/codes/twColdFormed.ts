@@ -49,6 +49,8 @@ function sumSegs(segs: Seg[], t: number) {
 /** 립 C형강 치수 (mm) — 'CC HxBxC/t' 를 sectionProps 가 가진 d·bf·tw 와 립 길이로 */
 export interface CCDims { H: number; B: number; C: number; t: number }
 export const ccDims = (name: string): CCDims => {
+  /* KS21(한국) 'LC-150x65x20x3.2' — 두께도 x 구분 */
+  if (name.trim().startsWith('LC-')) { const [H, B, C, t] = name.trim().slice(3).split('x').map(Number); return { H, B, C, t } }
   const [size, ts] = name.trim().split(/\s+/)[1].split('/')
   const [H, B, C] = size.split('x').map(Number)
   return { H, B, C, t: +ts }
@@ -104,7 +106,7 @@ export function effArea(g: CCDims, f: number, E: number) {
 }
 
 /** 전단중심 거리 m (웨브 중심선 기준, AISI Manual 립 C) 와 Cw (중심선) */
-function shearCenter(g: CCDims, Ix: number) {
+export function shearCenter(g: CCDims, Ix: number) {
   const a = g.H - g.t, b = g.B - g.t, c = g.C - g.t / 2, t = g.t
   const m = ((b * t) / (12 * Ix)) * (6 * c * a ** 2 + 3 * b * a ** 2 - 8 * c ** 3)
   const Cw = ((a ** 2 * b ** 2 * t) / 12) *

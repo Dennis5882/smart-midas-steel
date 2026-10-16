@@ -12,7 +12,7 @@ import { ccRangeKR } from '../codes/krWindCC'
 import { KR, roofLiveKR } from '../codes/kr'
 import {
   CPI_KR, csKR, distK, flatRoofCpeKR, flatSnowKR, gustKR, isPartialKR, IS_KR, IW_KR, kzKR, leewardRoofCpeKR, periodKR, roofGustKR,
-  sdcKR, SEISMIC_GRADE, slopeCsKR, spectrumKR, STEEL_GENERAL, velocityKR, wallCpeKR, windwardRoofCpeKR, areaKa, type SpectrumKR,
+  sdcKR, SEISMIC_GRADE, regionZoneKR, sMinKR, slopeCsKR, spectrumKR, SYSTEMS_KR, velocityKR, wallCpeKR, windwardRoofCpeKR, areaKa, type SpectrumKR,
 } from '../codes/krLateral'
 import type { ComboKind, LoadCaseType } from '../codes'
 import type { LoadInfo, LoadPayloads } from './loads'
@@ -23,7 +23,9 @@ import { baySpans, frameSpans, type Face, type FactoryModel, type FactorySpec, t
 
 /** 계산서·결과 탭 표시용 KDS 중간값 */
 export interface KrLoadInfo {
-  spectrum: SpectrumKR; sdc: 'A' | 'B' | 'C' | 'D'; IE: number; grade: '특' | 'I' | 'II'; R: number; Cd: number; driftLimit: number; orth30: boolean
+  spectrum: SpectrumKR; sdc: 'A' | 'B' | 'C' | 'D'; IE: number; grade: '특' | 'I' | 'II'; driftLimit: number; orth30: boolean
+  /** 방향별 지진력저항시스템 (표 6.2-1) — 6.3 직교 방향마다 각자의 R·Ω0·Cd */
+  sys: Record<'X' | 'Y', { key: string; R: number; Om: number; Cd: number; row: string }>
   VH: number; Kzr: number; Iw: number; GD: { X: number; Y: number }; Gpe: { X: number; Y: number }; resonant: { X: boolean; Y: boolean }; nR0: number
   cpi: readonly [number, number]; gammaL: { X: number; Y: number }
   Sf: number; Is: number; Cs: number; Ss: number; snowMin: number; rain: number; unbalanced: 'none' | 'gable' | 'multi'
@@ -39,6 +41,10 @@ export function validateKrSpec(spec: FactorySpec): void {
   if (!(k.Sg >= 0.5 && k.Sg <= 10)) throw new Error('KDS 41 12 00 4.2.1(3): Sg must be ≥ 0.5 kN/m²')
   if (!(k.Ce >= 0.8 && k.Ce <= 1.2 && k.Ct >= 1 && k.Ct <= 1.2)) throw new Error('KDS 41 12 00 4.3: Ce 0.8–1.2, Ct 1.0–1.2')
   if (!(k.S > 0 && k.S <= 0.4)) throw new Error('KDS 41 17 00 3.2: S must be 0–0.4 g')
+  /* KDS 17 10 00 표 4.2-1 — 고른 행정구역의 지진구역과 일치, KDS 41 17 00 3.2 — 지진위험지도 S ≥ 0.8·Z·2.0 */
+  const rz = regionZoneKR(k.region)
+  if (rz && rz !== k.zone) throw new Error(`KDS 17 10 00 table 4.2-1: ${k.region} is seismic zone ${rz === '1' ? 'I' : 'II'}`)
+  if (k.S < sMinKR(k.zone) - 1e-9) throw new Error(`KDS 41 17 00 3.2: S ≥ 0.8 × Z × 2.0 = ${sMinKR(k.zone).toFixed(3)} g`)
   if (!(k.cpi in CPI_KR)) throw new Error('KDS 41 12 00 table 5.7-4: invalid enclosure class')
   /* 5.6.2 강체(n_D > 1 Hz) G_D 만 구현 — 근사주기 Ta ≥ 1 s 면 5.6.1 유연 G_D 필요 */
   if (periodKR('moment', portalGeometry(spec).hMean) >= 1) throw new Error('KDS 41 12 00 5.6.1: flexible building (n_D ≤ 1 Hz) gust factor is not implemented')
@@ -133,7 +139,8 @@ export function buildKrLoads(spec: FactorySpec, model: FactoryModel): LoadPayloa
   const sp = spectrumKR(k.S, k.site)
   const sg = SEISMIC_GRADE[imp]
   const sdc = sdcKR(sp.SDS, sp.SD1, imp)
-  const { R, Cd } = STEEL_GENERAL
+  const sys = { X: { key: k.systemX ?? 'general', ...SYSTEMS_KR[k.systemX ?? 'general'] }, Y: { key: k.systemY ?? 'general', ...SYSTEMS_KR[k.systemY ?? 'general'] } }
+  const detailed = sys.X.key !== 'general' || sys.Y.key !== 'general'
   const snowW = flat.Sf > 1.5 ? 0.2 : 0 // 7.2.1 ④ 평지붕 적설 > 1.5 kN/m² 이면 20%
   const weights = nodeWeights(spec, model, (id) => (dead.get(id) ?? 0) + snowW * (snowLine.get(id) ?? 0))
   const W = [...weights.values()].reduce((a, b) => a + b, 0)
@@ -141,6 +148,7 @@ export function buildKrLoads(spec: FactorySpec, model: FactoryModel): LoadPayloa
   const seismic = { W } as LoadInfo['seismic']
   for (const d of ['X', 'Y'] as const) {
     const T = periodKR(d === 'X' ? 'moment' : 'braced', hn)
+    const R = sys[d].R
     const cs = csKR(T, sp, R, sg.IE)
     const V = cs.c * W, kk = distK(T)
     const denom = model.nodes.reduce((s, n) => s + (weights.get(n.id) ?? 0) * n.z ** kk, 0)
@@ -338,6 +346,18 @@ export function buildKrLoads(spec: FactorySpec, model: FactoryModel): LoadPayloa
     }
   }
 
+  /* 증폭지진하중 (KDS 41 17 00 8.1.2.3, 8.1-1): Em = Ω0·E ± 0.2S_DS·D — 내진상세 계통(R > 3)을 고른 경우만.
+     (1.2 + 0.2S_DS)D + Ω0E + 0.2S (1.7-5 기반) · (0.9 − 0.2S_DS)D + Ω0E (1.7-7 기반). 성분마다 그 방향 계통의 Ω0 (6.3).
+     용도 'amplified' — 일반 부재 검토에는 쓰지 않고 접합·주각(14 31 60 4.1.5·4.5·4.7.3)·기둥 축력(4.1.3)만 */
+  if (detailed) {
+    for (const [ref, dF, sF] of [['A5', 1.2 + 0.2 * sp.SDS, 0.2], ['A7', 0.9 - 0.2 * sp.SDS, 0]] as const) for (const v of eVariants) {
+      const parts: Part[] = [{ lc: 'D', f: dF }, ...(sF && snowCases.includes('SN') ? [{ lc: 'SN', f: sF }] : []), ...v.parts.map((p) => ({ ...p, f: p.f * sys[p.lc.endsWith('X') ? 'X' : 'Y'].Om }))]
+      const name = `${ref}${v.tag}`
+      comboKind[name] = 'amplified'
+      LCOM[++no] = { NAME: name, ACTIVE: 'ACTIVE', iTYPE: 0, DESC: 'KDS 41 17 00 8.1-1 (Ω0)', vCOMB: parts.map((p) => ({ ANAL: 'ST', LCNAME: p.lc, FACTOR: p.f })) }
+    }
+  }
+
   const STLD: Record<string, unknown> = {}
   const cases: [string, string][] = [['D', 'D'], ['LR', 'LR'], ...snowCases.map((n): [string, string] => [n, 'S']), ['EX', 'E'], ['EY', 'E'], ['ETX', 'E'], ['ETY', 'E'],
     ...windCases.map((w): [string, string] => [w.name, 'W']), ...(enclosed ? [['WLX', 'W'], ['WLY', 'W']] as [string, string][] : []),
@@ -345,14 +365,14 @@ export function buildKrLoads(spec: FactorySpec, model: FactoryModel): LoadPayloa
   cases.forEach(([NAME, TYPE], i) => { STLD[i + 1] = { NAME, TYPE, DESC: `KDS ${NAME}` } })
 
   const kr: KrLoadInfo = {
-    spectrum: sp, sdc, IE: sg.IE, grade: sg.grade, R, Cd, driftLimit: sg.drift, orth30,
+    spectrum: sp, sdc, IE: sg.IE, grade: sg.grade, sys, driftLimit: sg.drift, orth30,
     VH, Kzr, Iw: IW_KR[imp], GD, Gpe, resonant: { X: gX.resonant, Y: gY.resonant }, nR0, cpi, gammaL,
     Sf: Sf0, Is, Cs, Ss, snowMin: flat.min, rain, unbalanced,
   }
   return {
     STLD, BODF: { 1: { LCNAME: 'D', GROUP_NAME: '', FV: [0, 0, -1] } }, BMLD, CNLD, 'LCOM-GEN': LCOM,
     info: {
-      roofLive: qLive, snow: Ss, seismic, comboKind, omega: { X: 1, Y: 1 }, kr,
+      roofLive: qLive, snow: Ss, seismic, comboKind, omega: { X: sys.X.Om, Y: sys.Y.Om }, kr,
       wind: {
         qh: qH, hRef: H, cases: roofCases,
         windwardRoofCp: { low: Math.min(...roofCases.filter((c) => c.dir === 'X').map((c) => c.roofCp)), high: Math.max(...roofCases.filter((c) => c.dir === 'X').map((c) => c.roofCp)) },

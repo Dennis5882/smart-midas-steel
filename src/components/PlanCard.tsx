@@ -6,7 +6,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { buildFactory } from '../actions/build'
 import { siteCoef, townsOf } from '../codes/twSites'
-import { ZONE_Z } from '../codes/krLateral'
+import { regionZoneKR, ZONE_Z } from '../codes/krLateral'
 import type { TemplateKey } from '../domain/templates'
 import { TEMPLATES, TEMPLATE_KEYS } from '../domain/templates'
 import { ModelWizard, WIZARD_STEPS } from './ModelWizard'
@@ -108,7 +108,10 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
         if (c) for (const k of ['SDS', 'SD1', 'SMS', 'SM1'] as const) n[`seismic.${k}`] = String(c[k])
       }
       /* KR 지진구역 → S = Z × 2.0 (KDS 41 17 00 3.2, Z 는 KDS 17 10 00 표 4.2-2 통상값) */
-      if (msg.spec.code === 'KR' && p === 'korea.zone') n['korea.S'] = String(+(ZONE_Z[v as '1' | '2'] * 2).toFixed(3))
+      if (msg.spec.code === 'KR' && p === 'korea.zone') { n['korea.S'] = String(+(ZONE_Z[v as '1' | '2'] * 2).toFixed(3)); n['korea.region'] = 'manual' }
+      /* 행정구역 → 지진구역(KDS 17 10 00 표 4.2-1) → S = Z × 2.0 */
+      const rz = msg.spec.code === 'KR' && p === 'korea.region' ? regionZoneKR(v) : undefined
+      if (rz) { n['korea.zone'] = rz; n['korea.S'] = String(+(ZONE_Z[rz] * 2).toFixed(3)) }
       return n
     })
   }

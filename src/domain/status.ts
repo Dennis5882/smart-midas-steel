@@ -43,7 +43,7 @@ export function connGrade(c: ConnResult): Graded {
   const r: Reason[] = []
   if (c.ratio > 1) r.push('ng')
   if (c.notes.includes('rotTest')) r.push('rotTest')
-  if (c.notes.some((n) => n.startsWith('gb'))) r.push('gbDetail')
+  if (c.notes.some((n) => n.startsWith('gb') || n === 'krFoundation')) r.push('gbDetail')
   if (c.dims.stiffener || c.notes.includes('stiffeners')) r.push('stiffener')
   if (c.notes.some((n) => n.startsWith('doubler'))) r.push('doubler')
   return graded(r)

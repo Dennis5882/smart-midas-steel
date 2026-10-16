@@ -1,5 +1,6 @@
 /* 구조 계산서 (M5) — 현재 상태(스펙·하중·해석·설계·접합부)로 인쇄용 단일 HTML 을 만든다.
    화면 언어(t)를 따르며, 기호·조항 번호는 원문 표기 유지. 브라우저 인쇄 → PDF. */
+import { ZONE_Z } from '../codes/krLateral'
 import { profileOf } from '../codes'
 import type { ConnResult } from '../domain/connections'
 import type { DesignResult } from '../domain/design'
@@ -122,10 +123,11 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   ]))
   if (spec.code === 'KR' && kr) parts.push(table(['KDS 41 17 00', 'X', 'Y'], [
     [L('kv_site_src'), esc(siteSourceText(spec)), ''],
+    ['Z (KDS 17 10 00 표 4.2-1·4.2-2)', `${spec.korea!.region && spec.korea!.region !== 'manual' ? `${esc(spec.korea!.region)} → ` : ''}${spec.korea!.zone === '1' ? 'I' : 'II'} · Z ${ZONE_Z[spec.korea!.zone]} · S = Z × 2.0 = ${f(ZONE_Z[spec.korea!.zone] * 2, 3)} (4.2-2, I 2,400년 2.0)`, ''],
     ['S · F<sub>a</sub> · F<sub>v</sub>', `${kr.spectrum.S} · ${f(kr.spectrum.Fa, 3)} · ${f(kr.spectrum.Fv, 3)}`, ''],
     ['S<sub>DS</sub> / S<sub>D1</sub> (4.2-4·5)', `${f(kr.spectrum.SDS, 4)} / ${f(kr.spectrum.SD1, 4)}`, ''],
     [`${L('kv_kr_sdc')} · ${L('kv_kr_grade')} · I<sub>E</sub>`, `${kr.sdc} · ${kr.grade} · ${kr.IE}`, ''],
-    ['R · Ω<sub>0</sub> · C<sub>d</sub> (표 6.2-1)', `${kr.R} · 3 · ${kr.Cd}`, ''],
+    ['R · Ω<sub>0</sub> · C<sub>d</sub> (표 6.2-1)', (['X', 'Y'] as const).map((d) => `${d}: ${kr.sys[d].R} · ${kr.sys[d].Om} · ${kr.sys[d].Cd} (${kr.sys[d].row})`).join(' / '), ''],
     ['T<sub>a</sub> (s, 7.2-6)', f(info.seismic.X.T, 3), f(info.seismic.Y.T, 3)],
     ['C<sub>s</sub> (7.2-2~5)', f(info.seismic.X.c, 4), f(info.seismic.Y.c, 4)],
     ['gov.', info.seismic.X.gov, info.seismic.Y.gov],
@@ -206,7 +208,7 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
     parts.push(`<h3>${L(`cn_type_${c.type}`)} — ${ok(c.ratio)} ${grade(connGrade(c))} <span class="note">(${esc(c.combo)}, ${L('rd_elem')} ${c.elem})</span></h3>`)
     parts.push(`<p>${esc(dimsText(c.dims))}</p>`)
     if (c.notes.includes('rotTest')) parts.push(`<p class="note">${L('cn_note_rot')}</p>`)
-    for (const [note, key] of [['gbFoundation', 'cn_note_foundation'], ['gbJointDetail', 'cn_note_joint'], ['gbBraceDetail', 'cn_note_brace']] as const) if (c.notes.includes(note)) parts.push(`<p class="note">${L(key)}</p>`)
+    for (const [note, key] of [['gbFoundation', 'cn_note_foundation'], ['krFoundation', 'kr_note_foundation'], ['gbJointDetail', 'cn_note_joint'], ['gbBraceDetail', 'cn_note_brace']] as const) if (c.notes.includes(note)) parts.push(`<p class="note">${L(key)}</p>`)
     parts.push(table([t('sv_item'), t('cn_demand'), t('cn_capacity'), t('rd_ratio'), t('sv_clause')],
       c.checks.map((k) => [L(`cn_${k.item}` as I18nKey), `${f(k.demand)} ${k.unit}`, `${f(k.capacity)} ${k.unit}`,
         c.dims.stiffener && k.item === 'flangeBend' ? `${f(k.ratio, 3)} → ${L('cn_stiffener')}` : ok(k.ratio), esc(k.clause)])))

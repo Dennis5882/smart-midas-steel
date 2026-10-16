@@ -60,7 +60,11 @@ export interface FactorySpec {
   /** KDS 입력 (code === KR 에서만). 풍 KDS 41 12 00 5장: V0 기본풍속(m/s, 그림 5.5-1), 지표면조도 A~D, K_zt 지형계수, K_D 풍향계수, cpi 표 5.7-4 밀폐 분류,
       roofZeta 지붕 1차 감쇠비(5.6.4). 적설 4장: Sg 기본지상설하중(kN/m², 그림 4.2-1), Ce 노출계수, Ct 온도계수.
       지진 KDS 41 17 00: zone 지진구역 I/II, S 유효지반가속도(= Z × 2.0), site 지반종류 S1~S5. importance = KDS 41 10 05 중요도(특·1·2·3) — I_W·I_s·내진등급 */
-  korea?: { V0: number; exposure: ExposureKR; Kzt: number; KD: number; cpi: CpiKR; roofZeta: number; Sg: number; Ce: number; Ct: number; zone: '1' | '2'; S: number; site: SiteKR; importance: ImportanceKR }
+  korea?: { V0: number; exposure: ExposureKR; Kzt: number; KD: number; cpi: CpiKR; roofZeta: number; Sg: number; Ce: number; Ct: number; zone: '1' | '2'; S: number; site: SiteKR; importance: ImportanceKR
+    /** 지진력저항시스템 (KDS 41 17 00 표 6.2-1) — 없으면 '일반규정만'(R 3). X 보통모멘트골조, Y 보통중심가새골조 → KDS 14 31 60 상세 */
+    systemX?: 'general' | 'OMF'; systemY?: 'general' | 'OCBF'
+    /** 행정구역 (KDS 17 10 00 표 4.2-1) — 'manual' 이면 구역을 직접 고름 */
+    region?: string }
 }
 
 /** 베이별 간격 (m) — 등간격이면 baySpacing × bays */
@@ -138,8 +142,9 @@ export const CN_DEFAULT_SPEC: FactorySpec = {
 /* 한국 샘플: 서울(지진구역 I, S = 0.11 × 2.0), 지반 S4(4.1.1 ③ 자료 부족 시), V0 28 m/s·Sg 0.5 kN/m² 는 지도 판독 예시값 — 프로젝트 지역으로 바꿀 것.
    단면 = KS21.sdb. 퍼린·거트는 용접 경량 H(LH) — KS21 에 립 C형강이 없음 (냉간성형은 2단계) */
 export const KR_DEFAULT_SPEC: FactorySpec = {
-  ...DEFAULT_SPEC, code: 'KR', material: 'SS275', secondaryMaterial: 'SS275',
-  sections: { column: 'H 600x200x11/17', rafter: 'H 600x200x11/17', purlin: 'LH 200x100x3.2/4.5', girt: 'LH 150x75x3.2/4.5', strut: 'H 150x150x7/10',
+  /* 퍼린·거트 = KS21 립 C형강 + SSC275 (KDS 41 30 30, 2026-10-16) */
+  ...DEFAULT_SPEC, code: 'KR', material: 'SS275', secondaryMaterial: 'SSC275',
+  sections: { column: 'H 600x200x11/17', rafter: 'H 600x200x11/17', purlin: 'LC-200x75x20x3.2', girt: 'LC-150x75x20x3.2', strut: 'H 150x150x7/10',
     post: 'H 300x150x6.5/9', brace: 'P 139.8x4.5' },
   korea: { V0: 28, exposure: 'C', Kzt: 1, KD: 1, cpi: 'wallsLeaky', roofZeta: 0.02, Sg: 0.5, Ce: 1.0, Ct: 1.0, zone: '1', S: 0.22, site: 'S4', importance: '2' },
 }

@@ -2,7 +2,7 @@
    잘못된 칸이 하나라도 있으면 두 모드 모두 생성 불가 — 기존 값으로 조용히 대체해 전송하지 않는다. */
 import { profileOf } from '../codes'
 import { counties, townsOf } from '../codes/twSites'
-import { CPI_KEYS, SITES_KR } from '../codes/krLateral'
+import { CPI_KEYS, SITES_KR, REGIONS_KR } from '../codes/krLateral'
 import { sectionProps } from '../domain/sections'
 import { portalGeometry } from '../domain/portal'
 import { LIMITS } from '../domain/scope'
@@ -22,6 +22,8 @@ export interface Field {
   /** 허용 최솟값 (기본: 0 초과) */
   min?: number
   options?: (spec: FactorySpec) => { value: string; label: string }[]
+  /** 스펙에 값이 없을 때 입력 칸 초기값 (선택 항목 추가 전 저장된 스펙 호환) */
+  fallback?: string
   full?: boolean
 }
 export interface Group { title: I18nKey; fields: Field[] }
@@ -104,7 +106,7 @@ export const CN_GROUPS: Group[] = [
     { path: 'china.anchorFt', label: 'f_cn_anchor', unit: 'MPa', kind: 'select', numeric: true, options: () => [140, 180].map((n) => ({ value: String(n), label: `${n}` })) },
   ] },
 ]
-/* 한국 KDS — 풍(41 12 00 5장)·지진(41 17 00)·적설(41 12 00 4장). 접합부 입력은 2단계(KDS 14 31 25)에서 */
+/* 한국 KDS — 풍(41 12 00 5장)·지진(41 17 00, 표 6.2-1 계통)·적설(41 12 00 4장)·접합(14 31 25 — 콘크리트 fck·앵커 Fu) */
 export const KR_GROUPS: Group[] = [
   { title: 'sec_wind', fields: [
     { path: 'korea.V0', label: 'f_kr_V0', unit: 'm/s', kind: 'num', min: 20 },
@@ -116,14 +118,21 @@ export const KR_GROUPS: Group[] = [
   ] },
   { title: 'sec_seismic', fields: [
     { path: 'korea.importance', label: 'f_kr_imp', kind: 'select', options: () => (['S', '1', '2', '3'] as const).map((v) => ({ value: v, label: t(`imp_${v}`) })) },
+    { path: 'korea.region', label: 'f_kr_region', kind: 'select', fallback: 'manual', options: () => [{ value: 'manual', label: t('region_manual') }, ...REGIONS_KR.map((r) => ({ value: r.key, label: `${r.key} (${t(r.zone === '1' ? 'zone_1' : 'zone_2')})` }))] },
     { path: 'korea.zone', label: 'f_kr_zone', kind: 'select', options: () => [{ value: '1', label: t('zone_1') }, { value: '2', label: t('zone_2') }] },
     { path: 'korea.S', label: 'f_kr_S', unit: 'g', kind: 'num' },
     { path: 'korea.site', label: 'f_kr_site', kind: 'select', options: () => SITES_KR.map((v) => ({ value: v, label: t(`site_${v}`) })) },
+    { path: 'korea.systemX', label: 'f_kr_sysX', kind: 'select', fallback: 'general', options: () => (['general', 'OMF'] as const).map((v) => ({ value: v, label: t(`sys_kr_${v}`) })) },
+    { path: 'korea.systemY', label: 'f_kr_sysY', kind: 'select', fallback: 'general', options: () => (['general', 'OCBF'] as const).map((v) => ({ value: v, label: t(`sys_kr_${v}`) })) },
   ] },
   { title: 'sec_kr_snow', fields: [
     { path: 'korea.Sg', label: 'f_kr_Sg', unit: 'kN/m²', kind: 'num', min: 0.5 },
     { path: 'korea.Ce', label: 'f_kr_Ce', kind: 'select', numeric: true, options: () => [0.8, 0.9, 1.0, 1.1, 1.2].map((n) => ({ value: String(n), label: t('ce_opt', n) })) },
     { path: 'korea.Ct', label: 'f_kr_Ct', kind: 'select', numeric: true, options: () => [{ value: '1', label: t('ct_heated') }, { value: '1.2', label: t('ct_unheated') }] },
+  ] },
+  { title: 'sec_conn', fields: [
+    { path: 'fc', label: 'f_fc', unit: 'MPa', kind: 'num' },
+    { path: 'anchorFu', label: 'f_anchorFu', unit: 'MPa', kind: 'num' },
   ] },
 ]
 const BAY_LIST: Field = { path: 'bayList', label: 'f_bayList', unit: 'm', kind: 'list', full: true }
@@ -167,7 +176,7 @@ export function toSpec(base: FactorySpec, vals: Record<Path, string>, free: bool
 }
 
 export const initVals = (sp: FactorySpec): Record<Path, string> => ({
-  ...Object.fromEntries(FIELDS.map((f) => [f.path, String(getPath(sp, f.path) ?? '')])),
+  ...Object.fromEntries(FIELDS.map((f) => [f.path, String(getPath(sp, f.path) ?? f.fallback ?? '')])),
   bayList: baySpans(sp).join(', '),
   frame: sp.frame ?? 'gable',
   /* 다경간으로 바꾸면 처음엔 지금 스팬 두 개 */

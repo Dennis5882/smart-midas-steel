@@ -106,7 +106,7 @@ export function ModelPanel() {
         {sp.code === 'CN' && <KV k={t('f_cn_snow')} v={`${f3(info.snow ?? 0)} kN/m²`} />}
         {sp.code === 'KR' && info.kr && <>
           <KV k={t('kv_kr_snow')} v={`S_s ${f3(info.snow ?? 0)} kN/m² (S_f ${f3(info.kr.Sf)}, C_s ${f3(info.kr.Cs)}${info.kr.snowMin ? `, min ${f3(info.kr.snowMin)}` : ''})`} />
-          <KV k={t('kv_kr_site')} v={`S ${info.kr.spectrum.S} · S_DS ${f3(info.kr.spectrum.SDS)} · S_D1 ${f3(info.kr.spectrum.SD1)} · ${t('kv_kr_sdc')} ${info.kr.sdc} · R ${info.kr.R} · I_E ${info.kr.IE}`} />
+          <KV k={t('kv_kr_site')} v={`S ${info.kr.spectrum.S} · S_DS ${f3(info.kr.spectrum.SDS)} · S_D1 ${f3(info.kr.spectrum.SD1)} · ${t('kv_kr_sdc')} ${info.kr.sdc} · R ${info.kr.sys.X.R}/${info.kr.sys.Y.R} · I_E ${info.kr.IE}`} />
           <KV k={t('kv_kr_gust')} v={`G_D X ${f3(info.kr.GD.X)} / Y ${f3(info.kr.GD.Y)} · G_pe X ${f3(info.kr.Gpe.X)} / Y ${f3(info.kr.Gpe.Y)} · C_pi ${info.kr.cpi.join(' / ')}`} />
           <KV k={tc('KR', 'kv_across')} v={`W_LC ${f1(info.wind.across.WLX)} / ${f1(info.wind.across.WLY)} kN (γ ${f3(info.kr.gammaL.X)} / ${f3(info.kr.gammaL.Y)})`} />
         </>}
@@ -249,7 +249,7 @@ function ConnTables({ cs }: { cs: ConnResult[] }) {
           })()}
           <div style={{ fontSize: '.78rem', color: 'var(--muted)', margin: '4px 0 6px' }}>
             {Object.values(c.dims).map(dimValue).join(' · ')}
-            {c.notes.map((n) => <span key={n} style={{ color: 'var(--amber)' }}> · {n === 'gbFoundation' ? t('cn_note_foundation') : n === 'gbJointDetail' ? t('cn_note_joint') : n === 'gbBraceDetail' ? t('cn_note_brace') : n.startsWith('doubler') ? `${t('cn_note_doubler')} ${n.slice(8)}` : n === 'stiffeners' ? t('cn_note_stiffeners') : n === 'rotTest' ? t('cn_note_rot') : n}</span>)}
+            {c.notes.map((n) => <span key={n} style={{ color: 'var(--amber)' }}> · {n === 'gbFoundation' ? t('cn_note_foundation') : n === 'krFoundation' ? t('kr_note_foundation') : n === 'gbJointDetail' ? t('cn_note_joint') : n === 'gbBraceDetail' ? t('cn_note_brace') : n.startsWith('doubler') ? `${t('cn_note_doubler')} ${n.slice(8)}` : n === 'stiffeners' ? t('cn_note_stiffeners') : n === 'rotTest' ? t('cn_note_rot') : n}</span>)}
           </div>
           <table>
             <thead><tr><th>{t('sv_item')}</th><th>{t('cn_demand')}</th><th>{t('cn_capacity')}</th><th>{t('rd_ratio')}</th><th>{t('sv_clause')}</th></tr></thead>

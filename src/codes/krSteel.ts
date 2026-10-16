@@ -182,3 +182,5 @@ export function krKSway(Ga: number, Gb: number): number {
 
 /** 4.1.1 인장재 L/r 300 (가급적), 4.2.2 압축재 KL/r 200 (가급적) */
 export const SLENDER_KR = { compression: 200, tension: 300 }
+/** KDS 14 31 60 표 3.2-1 재료초과강도계수 Ry — SS275·SM275·SM355 1.2, SN·SHN 1.1 */
+export const ryKR = (material: string) => (/^SN|^SHN/.test(material) ? 1.1 : 1.2)

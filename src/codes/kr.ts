@@ -10,7 +10,9 @@ import { csKR, kzrKR, periodKR, spectrumKR, type ExposureKR } from './krLateral'
 
 /** 표 3.3-1 — 판두께 구간별 Fy (MPa): ≤16 / ≤40 / ≤75 / ≤100 */
 const FY_TABLE: Record<string, number[]> = {
-  SS275: [275, 265, 245, 245], SM275: [275, 265, 255, 245], SM355: [355, 345, 335, 325], SN275: [275, 275, 255, 255], SN355: [355, 355, 335, 335],
+  SS275: [275, 265, 245, 245],
+  /* KDS 41 30 30 표 3.2-1 KS D 3530 일반 구조용 경량 형강 SSC275 (판두께 1.6~6.0 mm) */
+  SSC275: [275, 275, 275, 275], SM275: [275, 265, 255, 245], SM355: [355, 345, 335, 325], SN275: [275, 275, 255, 255], SN355: [355, 355, 335, 335],
 }
 export function fyKR(material: string, t: number): number {
   const row = FY_TABLE[material]
@@ -36,13 +38,16 @@ export const KR: CodeProfile = {
     SM355: { fy: 355, fu: 490, E: 210000, nu: 0.3, gamma: 77, gen: { standard: 'KS22(S)', db: 'SM355' } },
     SN275: { fy: 275, fu: 410, E: 210000, nu: 0.3, gamma: 77, gen: { standard: 'KS22(S)', db: 'SN275' } },
     SN355: { fy: 355, fu: 490, E: 210000, nu: 0.3, gamma: 77, gen: { standard: 'KS22(S)', db: 'SN355' } },
+    /* 냉간성형 퍼린·거트 (Gen KS22(S) 'SSC275' 라이브 수용 2026-10-16) */
+    SSC275: { fy: 275, fu: 410, E: 210000, nu: 0.3, gamma: 77, gen: { standard: 'KS22(S)', db: 'SSC275' } },
   },
   defaultMaterial: 'SS275',
   fyAt: fyKR,
   gen: {
     sectionDb: 'KS21',
     /* KS21.sdb 접두 → SHAPE: H·LH = H, P = P, B = B */
-    shapeOf: (name) => { const p = name.split(' ')[0]; return p === 'LH' ? 'H' : p },
+    /* 립 C형강 'LC-150x65x20x3.2' → SHAPE 'CC' (라이브 수용 2026-10-16) */
+    shapeOf: (name) => { if (name.startsWith('LC-')) return 'CC'; const p = name.split(' ')[0]; return p === 'LH' ? 'H' : p },
   },
   /* 공통 인터페이스용 어댑터 — KR 하중은 domain/krLoads.ts 가 krLateral 식을 직접 쓴다 */
   lateral: {

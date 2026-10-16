@@ -51,7 +51,7 @@ function langPages(): Plugin {
 }
 
 /** 빌드 날짜 (KST, YYYY-MM-DD) — 하단 바 표시 */
-const buildDate = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10)
+const buildDate = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 16).replace('T', ' ') // KST 날짜 + 시각
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), langPages()],

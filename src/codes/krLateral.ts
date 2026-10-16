@@ -1,10 +1,20 @@
 /* 한국 KDS — 지진·풍·적설 식 (순수 함수). 원문 KB: COde/KR/knowledge/
    - KDS 41 17 00 (2022): 3.2 S = Z × 2.0, 4.2 설계응답스펙트럼·표 4.2-1/4.2-2 Fa·Fv, 5.2 내진설계범주, 7.2.2 Cs, 7.2.4 Ta, 표 7.2-1 Cu, 7.2.5 k
    - KDS 41 12 00 (2022): 5.5 속도압, 5.6.2 강체 G_D, 5.6.4 지붕 G_pe, 표 5.7-1 외압계수, 표 5.7-4 내압계수, 4.3·4.4·4.5 적설
-   지진구역계수 Z(KDS 17 10 00 표 4.2-2)는 KB 에 없어 통상값(I 0.11 · II 0.07)을 쓰고 입력으로 고칠 수 있게 한다. */
+   지진구역·Z 는 KDS 17 10 00 (2024) 표 4.2-1·4.2-2 (KB 추가 2026-10-16 — 이전엔 통상값으로 썼던 0.11·0.07 과 일치), S = Z × I(2,400년 2.0). */
 
 /* ── 지진 ── */
 export const ZONE_Z: Record<'1' | '2', number> = { 1: 0.11, 2: 0.07 }
+/** KDS 17 10 00 (2024) 표 4.2-1 지진구역 — 특·광역시·특별자치시, 도, 강원은 시·군별 (남부 7 = I, 북부 11 = II). 표 4.2-2 Z = 0.11 / 0.07 */
+export const REGIONS_KR: readonly { key: string; zone: '1' | '2' }[] = [
+  ...['서울', '인천', '대전', '부산', '대구', '울산', '광주', '세종', '경기', '충북', '충남', '경북', '경남', '전북', '전남'].map((key) => ({ key, zone: '1' as const })),
+  ...['영월', '정선', '삼척', '강릉', '동해', '원주', '태백'].map((c) => ({ key: `강원 ${c}`, zone: '1' as const })),
+  ...['홍천', '철원', '화천', '횡성', '평창', '양구', '인제', '고성', '양양', '춘천', '속초'].map((c) => ({ key: `강원 ${c}`, zone: '2' as const })),
+  { key: '제주', zone: '2' },
+]
+export const regionZoneKR = (key: string | undefined) => REGIONS_KR.find((r) => r.key === key)?.zone
+/** KDS 41 17 00 3.2: S = Z × I(2,400년 2.0) — 국가지진위험지도 값은 이 값의 80% 이상 */
+export const sMinKR = (zone: '1' | '2') => 0.8 * ZONE_Z[zone] * 2.0
 export type SiteKR = 'S1' | 'S2' | 'S3' | 'S4' | 'S5'
 export const SITES_KR: SiteKR[] = ['S1', 'S2', 'S3', 'S4', 'S5']
 const FA: Record<SiteKR, number[]> = { S1: [1.12, 1.12, 1.12], S2: [1.4, 1.4, 1.3], S3: [1.7, 1.5, 1.3], S4: [1.6, 1.4, 1.2], S5: [1.8, 1.3, 1.3] }
@@ -37,6 +47,14 @@ export function sdcKR(SDS: number, SD1: number, imp: ImportanceKR): 'A' | 'B' | 
 
 /** 표 6.2-1 '강구조기준의 일반규정만을 만족하는 철골구조시스템' — R 3, Ω0 3, Cd 3 (범주 D 높이 60 m) */
 export const STEEL_GENERAL = { R: 3, Om: 3, Cd: 3, limD: 60 } as const
+/** 표 6.2-1 지진력저항시스템 — 일반규정만(8) R 3·Ω0 3·Cd 3 / 보통모멘트골조(3-c) 3.5·3·3 / 보통중심가새골조(2-d) 3.25·2·3.25.
+    R > 3 이면 KDS 14 31 60 내진상세 적용 (41 17 00 10.1). 세 계통 모두 범주 D 높이 제한 없음(일반규정만 60 m) */
+export const SYSTEMS_KR = {
+  general: { R: 3, Om: 3, Cd: 3, row: '8' },
+  OMF: { R: 3.5, Om: 3, Cd: 3, row: '3-c' },
+  OCBF: { R: 3.25, Om: 2, Cd: 3.25, row: '2-d' },
+} as const
+export type SystemKR = keyof typeof SYSTEMS_KR
 
 /** 7.2.4 근사고유주기 Ta = Ct·hn^x — 철골모멘트골조 0.0724·0.8, 기타골조(가새 방향) 0.0488·0.75 */
 export function periodKR(kind: 'moment' | 'braced', hn: number): number {

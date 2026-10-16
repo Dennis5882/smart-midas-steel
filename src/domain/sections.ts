@@ -33,7 +33,9 @@ export interface SectionProps {
 const num = (s: string) => s.split('x').map(Number)
 
 export function sectionProps(name: string): SectionProps {
-  const [kind, dims] = name.trim().split(/\s+/)
+  /* KS21 립 C형강 'LC-150x65x20x3.2' → CC 와 같은 계산 (두께 x 구분) */
+  const lc = name.trim().match(/^LC-(\d[\d.x]*)$/)
+  const [kind, dims] = lc ? ['CC', lc[1]] : name.trim().split(/\s+/)
   /* KS21(한국): 'H 600x200x11/17' 압연 H, 'LH 150x75x3.2/4.5' 용접 경량 H형강 */
   if (['RH', 'BH', 'HN', 'HW', 'HM', 'HT', 'H', 'LH'].includes(kind)) {
     const [H, B, tw, tf] = num(dims.replace('/', 'x'))

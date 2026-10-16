@@ -12,6 +12,7 @@
 import { anchorRod, concreteBearing, ellipse, f10t, filletPerMm, pickPlate } from '../codes/twConnection'
 import { profileOf } from '../codes'
 import { runCnConnections } from './cnConnections'
+import { runKrConnections } from './krConnections'
 import { validateDesignResults } from './resultValidation'
 import { ROLES } from './types'
 import type { Results } from '../actions/results'
@@ -227,8 +228,7 @@ function endPlateFor(spec: FactorySpec, forces: EndForce[], boltD: number, beamN
 export function runConnections(spec: FactorySpec, model: FactoryModel, info: LoadInfo, res: Results): ConnResult[] {
   validateDesignResults(spec, model, info, res, ROLES)
   if (spec.code === 'CN') return runCnConnections(spec, model, res)
-  /* KR 접합부(KDS 14 31 25)는 2단계 — 적용범위 경고 'krPhase' 로 결과 등급을 '전문가 검토 필요'로 둔다 */
-  if (spec.code === 'KR') return []
+  if (spec.code === 'KR') return runKrConnections(spec, model, info, res)
   const kind = (c: string) => info.comboKind?.[c] ?? 'basic'
   const basic = (c: string) => kind(c) === 'basic'
   const withAmp = (c: string) => kind(c) !== 'gravity'

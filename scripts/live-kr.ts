@@ -1,9 +1,9 @@
 /* 한국 KDS 라이브 회귀 (명시적 실행). MAPI-Key 는 stdin 으로만 받아 메모리에만 둔다 — 파일·인자 금지.
    현재 Gen 문서를 자동 저장한 뒤 시험 모델을 만든다.
    실행: printf '<key>
-' | node --import tsx scripts/live-kr.ts [--frame mono|multi] [--optimize] [--gen-check] [--assert-pass]
+' | node --import tsx scripts/live-kr.ts [--frame mono|multi] [--optimize] [--gen-check] [--gen-default] [--systems] [--assert-pass]
    --gen-check: PUT DESIGN/STEEL/DSTL 'KDS 41 30 : 2022' → POST .../CODE-ANAL(60 s 제한 — SDK 에 RC 판 정지 보고) → post/STEELCODECHECK,
-   Gen KDS 강도비를 앱 검토와 역할별로 대조. Gen 기본 설계 옵션(부재 길이·K 자동)이라 수치는 참고 대조. */
+   Gen KDS 강도비를 앱 검토와 역할별로 대조. 기본: 앱 유효길이(krLengths)를 LENG(K = 1)·DCTL·MBTP 로 맞춘 뒤 대조, --gen-default 면 Gen 기본 설계 옵션. */
 import { createInterface } from 'node:readline'
 import { writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -45,7 +45,10 @@ try {
   } else {
     const fr = process.argv.indexOf('--frame') > 0 ? process.argv[process.argv.indexOf('--frame') + 1] : 'gable'
     const { normalizeSpans } = await import('../src/domain/types')
-    await sendModel(normalizeSpans({ ...structuredClone(KR_DEFAULT_SPEC), ...(fr === 'mono' ? { frame: 'mono' as const } : fr === 'multi' ? { frame: 'multi' as const, spanList: [24, 24] } : {}) }))
+    const base = structuredClone(KR_DEFAULT_SPEC)
+    /* --systems: X 보통모멘트골조·Y 보통중심가새골조 (KDS 14 31 60 상세, 증폭지진 조합 포함) */
+    if (process.argv.includes('--systems')) base.korea = { ...base.korea!, systemX: 'OMF', systemY: 'OCBF' }
+    await sendModel(normalizeSpans({ ...base, ...(fr === 'mono' ? { frame: 'mono' as const } : fr === 'multi' ? { frame: 'multi' as const, spanList: [24, 24] } : {}) }))
     console.log(`KR model transmitted (${fr}): nodes ${S.built!.model.nodes.length}, cases ${S.built!.cases.length}, combos ${S.built!.combos}.`)
     await analyzeCore()
     console.log('KR analysis completed.')
@@ -78,7 +81,23 @@ try {
       /* Gen 강재 설계는 강재 설계용 조합이 따로 필요 — 없으면 CODE-ANAL 'failed:LoadCombination'(라이브 2026-10-16). 앱 조합을 STRENGTH 로 복사 */
       const steelCombos = Object.fromEntries(Object.entries<any>(S.built!.sent!['LCOM-GEN']).map(([k, c]) => [k, { NAME: c.NAME, ACTIVE: 'STRENGTH', iTYPE: 0, DESC: c.DESC, vCOMB: c.vCOMB }]))
       await mapi('POST', '/db/LCOM-STEEL', { Assign: steelCombos }, 'KDS steel design combinations')
+      /* 앱과 같은 길이 가정으로 맞춤 (--gen-default 면 Gen 기본값 그대로): 유효길이를 LENG 에 직접(K = 1), 골조 X 횡이동·Y 비횡이동, 부재 유형 */
+      if (!process.argv.includes('--gen-default')) {
+        const { krLengths } = await import('../src/domain/krDesign')
+        const lens = krLengths(S.built!.spec, S.built!.model)
+        const D = '/DESIGN/STEEL/KDS-41-30-2022'
+        const step = async (what: string, f: () => Promise<unknown>) => { try { await f(); console.log(`Gen ${what}: ok`) } catch (e) { console.log(`Gen ${what}: ${e instanceof Error ? e.message : e}`) } }
+        await step('DCTL', () => mapi('PUT', `${D}/DCTL`, { Assign: { 1: { FRAMEX: 'Unbraced Sway', FRAMEY: 'Braced Non-sway', bAUTOKF: false, DT: '3D' } } }, 'KDS frame'))
+        await step('DCO', () => mapi('PUT', `${D}/DCO`, { Assign: { 1: { LAT_BRACE: false, SEISMIC: false } } }, 'KDS options'))
+        const type = (r: string) => (r === 'column' || r === 'post' || r === 'strut' ? 'COLUMN' : r === 'brace' ? 'BRACE' : 'BEAM')
+        await step('MBTP', () => mapi('POST', `${D}/MBTP`, { Assign: Object.fromEntries(S.built!.model.elements.map((e) => [e.id, { TYPE: type(e.role) }])) }, 'KDS member type'))
+        await step('KFAC', () => mapi('POST', `${D}/KFAC`, { Assign: Object.fromEntries(S.built!.model.elements.map((e) => [e.id, { Ky: 1, Kz: 1 }])) }, 'KDS K = 1'))
+        await step('LENG', () => mapi('POST', `${D}/LENG`, { Assign: Object.fromEntries([...lens].map(([id, l]) => [id, { LY: l.KLx / 1000, LZ: l.KLy / 1000, LB: l.Lb / 1000 }])) }, 'KDS lengths'))
+      }
       /* 설계 코드 지정 후 CODE-ANAL 이 'Please perform analysis.'(라이브 2026-10-16) → 같은 모델 재해석. analyzeCore 는 앱 결과를 비우므로 쓰지 않음 */
+      /* 해석 전 항상 자동 저장 (C:/temp/sms_model_*.mgbx) — 저장 안 된 변경으로 doc/anal 하면 Gen 이 저장 위치를 묻는 창을 띄움 (사용자 요청 2026-10-16) */
+      const { autoSave } = await import('../src/actions/save')
+      console.log('Gen autosave:', await autoSave('model'))
       console.log('Gen reanalysis:', JSON.stringify(await mapi('POST', '/doc/anal', {}, 'reanalysis for KDS check')))
       console.log('Gen CODE-ANAL:', JSON.stringify(await timed(mapi('POST', '/DESIGN/STEEL/KDS-41-30-2022/CODE-ANAL', { Argument: {} }, 'KDS code check'), 60000)))
       const r: any = await timed(mapi('POST', '/post/STEELCODECHECK', { Argument: {} }, 'KDS check table'), 60000)
@@ -86,7 +105,14 @@ try {
       const genBy = new Map<number, number>(rows.map((x) => [Number(x.ELEM ?? x.ID), Number(x.RAT)]))
       const byRole: Record<string, { app: number; gen: number; n: number }> = {}
       for (const m of S.design!.members) { const g = genBy.get(m.id); if (g === undefined || !Number.isFinite(g)) continue; const o = byRole[m.role] ??= { app: 0, gen: 0, n: 0 }; o.app = Math.max(o.app, m.ratio); o.gen = Math.max(o.gen, g); o.n++ }
-      console.log(JSON.stringify({ phase: 'gen-cross-check', genRows: rows.length, keys: rows[0] ? Object.keys(rows[0]) : [], byRole }, null, 2))
+      console.log(JSON.stringify({ phase: 'gen-cross-check', aligned: !process.argv.includes('--gen-default'), genRows: rows.length, keys: rows[0] ? Object.keys(rows[0]) : [], byRole }, null, 2))
+      /* Gen 이 실제로 쓴 길이 확인 — 역할별 첫 요소 CODE-TABLE (Len·Lb·Ly·Lz·Ky·Kz·Cb·RatPc) */
+      try {
+        const ids = [...new Set(S.built!.model.elements.map((e) => e.role))].map((r) => S.built!.model.elements.find((e) => e.role === r)!.id)
+        const t: any = await mapi('POST', '/DESIGN/STEEL/KDS-41-30-2022/CODE-TABLE', { Argument: { TABLE_TYPE: 'MEMB', ELEMS: { KEYS: ids }, UNIT: { FORCE: 'KN', DIST: 'M' }, COMPONENTS: ['MEMB', 'SECT', 'CHK', 'LCB', 'Len', 'Lb', 'Ly', 'Lz', 'Ky', 'Kz', 'Cb', 'RatPc'] } }, 'KDS code table')
+        const tab = t?.['Result Table'] ?? Object.values(t ?? {})[0]
+        console.log('Gen CODE-TABLE head:', JSON.stringify(tab?.HEAD)); for (const row of (tab?.DATA ?? []).slice(0, 12)) console.log('  ', JSON.stringify(row))
+      } catch (e) { console.log('Gen CODE-TABLE:', e instanceof Error ? e.message : e) }
     } catch (e) { console.log('Gen cross-check unavailable:', e instanceof Error ? e.message : String(e)) }
   }
   const report = buildReport({ built: S.built!, reactions: S.reactions, design: S.design, connections: S.connections, opt: S.opt })

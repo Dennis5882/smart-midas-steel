@@ -11,7 +11,7 @@ import { frameSpans, type FactorySpec } from './types'
 
 export type ScopeKey =
   | 'crane' | 'mezzanine' | 'multiSpan' | 'opening' | 'openingCN'
-  | 'span' | 'eave' | 'eaveHigh' | 'slope' | 'bayRatio' | 'baySpacing' | 'length' | 'hnR' | 'cn' | 'monoTW' | 'multi' | 'multiTW' | 'multiSnowCN' | 'kr' | 'krPhase' | 'multiKR'
+  | 'span' | 'eave' | 'eaveHigh' | 'slope' | 'bayRatio' | 'baySpacing' | 'length' | 'hnR' | 'cn' | 'monoTW' | 'multi' | 'multiTW' | 'multiSnowCN' | 'kr' | 'multiKR'
 export interface ScopeIssue { key: ScopeKey; level: 'block' | 'warn'; args: (string | number)[] }
 export interface ScopeResult { issues: ScopeIssue[]; blocked: boolean }
 
@@ -68,9 +68,8 @@ export function checkScope(spec: FactorySpec, f: ScopeFeatures = spec.features ?
   const hn = G.hMean
   if (spec.code === 'TW' && hn > 12) warn('hnR', r2(hn))
 
-  /* KR: 접합부(KDS 14 31 25)·냉간성형(41 30 30)·내진상세(14 31 60)는 2단계 → 항상 전문가 검토 필요 */
+  /* KR: 접합부·외장재 풍하중·냉간성형·내진상세(OMF·OCBF) 구현 — 남은 범위 밖(콘크리트 정착 등)은 결과별 메모로 */
   if (spec.code === 'KR') {
-    warn('krPhase')
     try { validateKrSpec(spec) } catch (e) { block('kr', e instanceof Error ? e.message : String(e)) }
   }
   /* CN: GB 표 적용 한계 (validateCnSpec 메시지 그대로) */

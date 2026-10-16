@@ -22,7 +22,7 @@ else if (releases[0].version !== pkg.version)
 const ids = new Set()
 releases.forEach((r, i) => {
   if (!/^\d+\.\d+\.\d+$/.test(r.version)) errors.push(`bad version "${r.version}"`)
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date)) errors.push(`${r.version}: bad date "${r.date}"`)
+  if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(r.date)) errors.push(`${r.version}: bad date "${r.date}" (KST 'YYYY-MM-DD HH:mm')`)
   if (!(Number.isInteger(r.items) && r.items > 0)) errors.push(`${r.version}: items must be ≥ 1`)
   if (r.id !== 'v' + r.version.replace(/\./g, '_')) errors.push(`${r.version}: id must be v${r.version.replace(/\./g, '_')}`)
   if (ids.has(r.id)) errors.push(`duplicate id ${r.id}`)

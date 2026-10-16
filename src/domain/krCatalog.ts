@@ -1,6 +1,6 @@
 /* 한국(KR) 단면 후보 — Gen NX `Dbase/KS21.sdb` 에서 추출한 단면명 그대로 (2026-10-16, MIDAS GEN NX 설치본).
-   H = 압연 H형강, LH = 용접 경량 H형강(KS D 3558, 퍼린·거트), P = 원형강관 60~318.5.
-   KS21 에는 립 C형강(KS D 3530)이 없다 → 1단계는 퍼린·거트에 LH·H (KDS 14 31 10 으로 전부 검토). 냉간성형 C형강(KDS 41 30 30)은 2단계. */
+   H = 압연 H형강, LH = 용접 경량 H형강(KS D 3558, 퍼린·거트), LC = 립 C형강(KS D 3530 'LC-HxBxCxt', SHAPE CC — 라이브 수용 2026-10-16), P = 원형강관 60~318.5.
+   ※ 처음 추출 때 하이픈 이름(LC-)을 놓쳐 'KS21 에 립 C형강 없음'으로 기록했던 것을 정정. 립 C 는 KDS 41 30 30 (codes/krColdFormed). */
 import type { ElementRole } from './types'
 
 export const KR_H: readonly string[] = [
@@ -43,6 +43,55 @@ export const KR_PIPE: readonly string[] = [
 ]
 
 /** 역할별 후보 — 골조·스트럿·풍주 = H, 퍼린·거트 = LH + 작은 H, 가새 = P */
+/** 립 C형강 45 (KS21) — 퍼린·거트 냉간성형 후보 */
+export const KR_LC: readonly string[] = [
+  'LC-60x30x10x1.6',
+  'LC-60x30x10x2.0',
+  'LC-60x30x10x2.3',
+  'LC-70x40x25x1.6',
+  'LC-75x35x15x2.3',
+  'LC-75x45x15x1.6',
+  'LC-75x45x15x2.0',
+  'LC-75x45x15x2.3',
+  'LC-90x45x20x1.6',
+  'LC-90x45x20x2.3',
+  'LC-90x45x20x3.2',
+  'LC-100x50x20x1.6',
+  'LC-100x50x20x2.0',
+  'LC-100x50x20x2.3',
+  'LC-100x50x20x2.8',
+  'LC-100x50x20x3.2',
+  'LC-100x50x20x4.0',
+  'LC-100x50x20x4.5',
+  'LC-120x40x20x3.2',
+  'LC-120x60x20x2.3',
+  'LC-120x60x20x3.2',
+  'LC-120x60x25x4.5',
+  'LC-125x50x20x2.3',
+  'LC-125x50x20x3.2',
+  'LC-125x50x20x4.0',
+  'LC-125x50x20x4.5',
+  'LC-150x50x20x2.3',
+  'LC-150x50x20x3.2',
+  'LC-150x50x20x4.5',
+  'LC-150x65x20x2.3',
+  'LC-150x65x20x3.2',
+  'LC-150x65x20x4.0',
+  'LC-150x75x20x3.2',
+  'LC-150x75x20x4.0',
+  'LC-150x75x20x4.5',
+  'LC-150x75x25x3.2',
+  'LC-150x75x25x4.0',
+  'LC-150x75x25x4.5',
+  'LC-200x75x20x3.2',
+  'LC-200x75x20x4.0',
+  'LC-200x75x20x4.5',
+  'LC-200x75x25x3.2',
+  'LC-200x75x25x4.0',
+  'LC-200x75x25x4.5',
+  'LC-250x75x25x4.5',
+]
+
 export const KR_CATALOG: Record<ElementRole, readonly string[]> = {
-  column: KR_H, rafter: KR_H, strut: KR_H, post: KR_H, purlin: [...KR_LH, ...KR_H.slice(0, 12)], girt: [...KR_LH, ...KR_H.slice(0, 12)], brace: KR_PIPE,
+  column: KR_H, rafter: KR_H, strut: KR_H, post: KR_H, purlin: [...KR_LC, ...KR_LH, ...KR_H.slice(0, 12)], girt: [...KR_LC, ...KR_LH, ...KR_H.slice(0, 12)], brace: KR_PIPE,
 }
