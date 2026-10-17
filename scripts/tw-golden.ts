@@ -7,6 +7,8 @@ import { runDesign } from '../src/domain/design'
 import { buildLoadPayloads } from '../src/domain/loads'
 import { buildPortal } from '../src/domain/portal'
 import type { FactorySpec } from '../src/domain/types'
+import { lateralSwayKr } from '../src/domain/krSway'
+import { serviceNodes } from '../src/domain/resultValidation'
 
 /** 국가별 기준 모델 fixture — TW tw-sample, CN cn-sample, KR kr-sample */
 export const fixtureFor = (code: 'TW' | 'CN' | 'KR') => fileURLToPath(new URL(`./fixtures/${code.toLowerCase()}-sample.json.gz`, import.meta.url))
@@ -32,9 +34,9 @@ export const encodeResults = (r: Results): EncodedResults => ({
 export const decodeResults = (r: EncodedResults): Results => ({
   beam: new Map(r.beam.map(([e, m]) => [e, new Map(m.map(([c, ps]) => [c, ps.map(([P, Vy, Vz, My, Mz]) => ({ P, Vy, Vz, My, Mz }))]))])),
   truss: new Map(r.truss.map(([e, m]) => [e, new Map(m)])),
-  sway: new Map(r.sway),
-  disp: new Map(r.disp.map(([c, m]) => [c, new Map(m)])),
-  combos: r.combos,
+  sway: new Map(structuredClone(r.sway)),
+  disp: new Map(r.disp.map(([c, m]) => [c, new Map(m.map(([id, d]) => [id, { ...d }]))])),
+  combos: [...r.combos],
 })
 
 const r6 = (x: number) => Math.round(x * 1e6) / 1e6
@@ -43,6 +45,7 @@ const r6 = (x: number) => Math.round(x * 1e6) / 1e6
 export function golden(spec: FactorySpec, res: Results) {
   const model = buildPortal(spec)
   const info = buildLoadPayloads(spec, model).info
+  if (spec.code === 'KR') lateralSwayKr(res, serviceNodes(spec, model).tops.map((n) => n.id), info.seismic)
   const d = runDesign(spec, model, info, res)
   const cs = runConnections(spec, model, info, res)
   return {

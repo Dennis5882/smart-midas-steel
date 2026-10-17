@@ -8,7 +8,7 @@ import { gzipSync } from 'node:zlib'
 
 const arg = process.argv[process.argv.indexOf('--code') + 1]
 const code = arg === 'CN' || arg === 'KR' ? arg : 'TW'
-const key = await readMapiKey(`Code ${code}.`)
+let key = await readMapiKey(`Code ${code}.`)
 ;(globalThis as any).document = { documentElement: { lang: 'ko', dataset: {} } }
 const { S } = await import('../src/state/store')
 const { defaultSpecFor } = await import('../src/domain/types')

@@ -29,7 +29,8 @@ export function serviceNodes(spec: FactorySpec, model: FactoryModel) {
   const G = portalGeometry(spec)
   const eaves = model.nodes.filter(G.isEaveNode)
   const ridge = model.nodes.filter(G.isDeflNode)
-  return { eaves, nodes: [...new Map([...eaves, ...ridge].map((n) => [n.id, n])).values()] }
+  const internal = model.nodes.filter((n) => G.leanXs.some((x) => Math.abs(n.x - x) < 1e-7) && Math.abs(n.z - G.zAt(n.x)) < 1e-7)
+  return { eaves, tops: [...eaves, ...internal], nodes: [...new Map([...eaves, ...ridge, ...internal].map((n) => [n.id, n])).values()] }
 }
 
 /* 전체 검증을 통과한 결과 객체 → 그때의 모델 형태(조합 + 요소 ID·역할). 같은 결과·같은 형태면 다시 훑지 않는다 —
@@ -64,7 +65,7 @@ export function validateDesignResults(spec: FactorySpec, model: FactoryModel, in
   requireResult(nodes.length > 0, 'DISPLACEMENT', 'missing')
   const cases = new Set(['LR', 'EX', 'EY', ...(spec.code !== 'CN' ? ['ETX', 'ETY'] : ['D']), ...info.wind.variants.flatMap((w) => w.parts.map((p) => p.lc))])
   // Snow cases are defined by the model's combinations, never by returned data.
-  for (const c of combos) for (const s of c.match(/SN\d*/g) ?? []) cases.add(s)
+  for (const c of combos) for (const s of c.match(/S(?:N|V|H)\d*/g) ?? []) cases.add(s)
   for (const c of cases) for (const n of nodes) {
     const v = res.disp.get(c)?.get(n.id)
     requireResult(v && [v.dx, v.dy, v.dz].every(Number.isFinite), 'DISPLACEMENT', 'missing', `${c} · ${n.id}`)

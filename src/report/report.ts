@@ -19,6 +19,7 @@ import { lengthText, ROLES } from '../domain/types'
 import { getLang, htmlLang, t, tc, type I18nKey } from '../i18n'
 import type { Built, ReactionSum } from '../state/store'
 import { APP_VERSION } from '../version'
+import { blockedMembers, restraintKeys, support } from '../domain/validity'
 
 const esc = (s: unknown) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!)
 const f = (x: number, d = 2) => (Number.isFinite(x) ? x.toFixed(d) : '—')
@@ -70,10 +71,12 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   h2('rep_s1')
   parts.push(table([t('sv_item'), t('sv_value')], [
     [L('kv_code'), `${esc(t(prof.labelKey))} — ${esc(tc(spec.code, 'rep_code_refs'))}`],
-    [L('kv_span'), `${spec.span} m`], [L('kv_length'), lengthText(spec)],
+    [L('f_frame'), t(`frame_${spec.frame ?? 'gable'}`)],
+    [L('kv_span'), `${spec.span} m${spec.frame === 'multi' && spec.spanList ? ` (${spec.spanList.join(' + ')} m)` : ''}`], [L('kv_length'), lengthText(spec)],
     [L('kv_eave'), `${spec.eaveHeight} m`], [L('kv_slope'), `${spec.roofSlope} (${f((G.theta * 180) / Math.PI, 1)}°)`],
     [L('kv_base'), L(spec.baseFixity === 'fixed' ? 'base_fixed' : 'base_pinned')],
     [L('f_purlinSp'), `${f(G.sRoof, 3)} m`], [L('f_girtSp'), `${f(G.gWall, 3)} m`], [L('f_postSp'), `${spec.postSpacing} m`], [L('f_sagRods'), spec.sagRods],
+    ...restraintKeys(spec).map((k) => [t(`restraint_${k}`), t(`restraint_${support(spec, k)}`)]),
     [L('st_node'), model.nodes.length], [L('st_elem'), model.elements.length],
   ]))
   const rolesIn = ROLES.filter((r) => model.elements.some((e) => e.role === r))
@@ -161,7 +164,11 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   /* 6. 부재 설계 */
   h2('rep_s6')
   if (design) {
-    parts.push(`<p class="note">${esc(tc(spec.code, 'rd_assump'))}</p>`)
+    if (blockedMembers(design)) parts.push(`<p class="note gr-fail">${L('flow_invalid_design')}</p>`)
+    const issues = [...new Set(design.members.flatMap((m) => (m.issues ?? []).map((i) => i.key === 'restraint' ? t('restraint_note') : `${t('rs_applicability')}: ${i.detail}`)))]
+    for (const issue of issues) parts.push(`<p class="note">${esc(issue)}</p>`)
+    parts.push(`<p class="note">${L('restraint_lengths')} ${esc(tc(spec.code, 'rd_assump'))}</p>`)
+    if (spec.code === 'TW') parts.push(`<p class="note keep" style="break-inside:avoid">${L('tw_note_distortion')}</p>`)
     parts.push(table([t('rd_role'), t('rd_section'), t('rd_elem'), t('rd_combo'), 'Pu', 'Mux', 'Muy', 'Vu', 'φPn', 'φMnx', 'φMny', 'φVn', 'Cb', 'B', 'KL/r', t('rd_eq'), t('rd_ratio'), t('rd_status')],
       ROLES.filter((r) => design.byRole[r]).map((r) => {
         const m = design.byRole[r]!
@@ -240,7 +247,7 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
     [L('q_loss'), esc(t('q_loss_v', LOSS.member * 100, LOSS.plate * 100))], [L('q_orderT'), `<b>${f(q.orderT, 2)} t</b>`],
     [L('q_paint'), `${f(q.paintM2, 0)} m²`], [L('q_weld'), `${L('q_cjp')} ${f(q.cjpM, 1)} m · ${L('q_fillet')} ${f(q.filletM, 1)} m *`],
   ]))
-  parts.push(`<p class="note">${L('q_note')}</p>`)
+  parts.push(`<p class="note">${L('q_note')} ${L('q_excluded_note')}</p>`)
   if (opt) {
     parts.push(`<h3>${L('res_opt')}</h3>`)
     parts.push(table([t('rd_role'), t('op_before'), t('op_after'), t('rd_ratio'), t('op_gov'), t('op_tons')],
@@ -252,9 +259,11 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
 
   /* 10. 가정·한계 */
   h2('rep_s10')
+  parts.push(`<p>${L('restraint_lengths')}</p>`)
+  if (spec.code === 'KR') parts.push(`<p>${L('kr_note_b2')}</p>`)
   if (spec.code === 'KR') parts.push(`<p>${L('kr_scope_note')}</p><p>${L('rd_assump_KR')}</p><p>${L('kr_note_phase2')}</p><p>${L('kr_note_service')}</p>`)
   else if (spec.code === 'CN') parts.push(`<p>${L('cn_scope_note')}</p><p>${L('rd_assump_CN')}</p><p>${L('cn_note_foundation')}</p><p>${L('cn_note_joint')}</p><p>${L('cn_note_brace')}</p>`)
-  else parts.push(t('rep_assump_html'))
+  else parts.push(t('rep_assump_html'), `<p class="note">${L('tw_note_original')}</p>`)
 
   /* 부록. 도면 — DXF 와 같은 시트 (SVG) */
   parts.push(`<section class="dwg"><h2>${esc(tc(spec.code, 'rep_s11'))}</h2><p class="note">${L('rep_dwg_note')}</p>`)

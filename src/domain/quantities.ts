@@ -25,6 +25,7 @@ export interface BoltRow { type: ConnType; kind: 'bolt' | 'anchor'; size: string
 export interface WeldRow { type: ConnType; cjp: number; fillet: number; conns: number }
 export interface PaintRow { role: ElementRole; section: string; area: number }
 export interface Quantities {
+  excluded: readonly string[]
   members: ScheduleRow[]; memberT: number
   plates: PlateRow[]; plateT: number
   bolts: BoltRow[]
@@ -55,7 +56,12 @@ function legacyParts(c: ConnResult, colH: number, rafD: number): ConnectionParts
   const dbl = read('doubler', /PL\s*(\d+(?:\.\d+)?)/)?.[1] ?? c.notes.find((n) => n.startsWith('doubler'))?.match(/(\d+(?:\.\d+)?)/)?.[1]
   if (dbl) p.plates.push({ part: 'doubler', width: colH, length: rafD, thickness: +dbl, count: 1, estimated: true })
   const g = read('gusset', /PL\s*(\d+(?:\.\d+)?)(?:\s*[x×]\s*(\d+(?:\.\d+)?))?/)
-  if (g) p.plates.push({ part: 'gusset', width: g[2] ? +g[1] : 200, length: g[2] ? +g[1] : 200, thickness: +(g[2] ?? g[1]), count: 1, estimated: true })
+  if (g) {
+    const full = String(d.gusset).match(plateRe)
+    p.plates.push(full
+      ? { part: 'gusset', width: +full[1], length: +full[2], thickness: +full[3], count: 1, estimated: true }
+      : { part: 'gusset', width: g[2] ? +g[1] : 200, length: g[2] ? +g[1] : 200, thickness: +(g[2] ?? g[1]), count: 1, estimated: true })
+  }
   for (const [key, kind] of [['anchors', 'anchor'], ['bolts', 'bolt']] as const) {
     const m = read(key, nM)
     if (m) p.fasteners.push({ kind, diameter: +m[2], count: +m[1] })
@@ -98,7 +104,12 @@ export function quantities(spec: FactorySpec, model: FactoryModel, conns: ConnRe
     }
     /* 용접 (단부판 접합): 주각 = 기둥–베이스판, 처마 = 지붕보–단부판, 마루 = 양쪽 지붕보–단부판 */
     const mem = c.type === 'base' ? col : raf
-    if (c.type !== 'brace') {
+    if (parts.welds) {
+      for (const w of parts.welds) {
+        if (!(Number.isFinite(w.length) && w.length > 0 && Number.isInteger(w.count) && w.count > 0)) throw new QuantityError(`${c.type}.weld`)
+        welds.push({ type: c.type, cjp: w.type === 'cjp' ? w.length * w.count / 1000 : 0, fillet: w.type === 'fillet' ? w.length * w.count / 1000 : 0, conns: countOf[c.type] })
+      }
+    } else if (c.type !== 'brace') {
       const k = c.type === 'apex' ? 2 : 1
       welds.push({ type: c.type, cjp: (2 * mem.bf * k) / 1000, fillet: (2 * mem.h * k) / 1000, conns: countOf[c.type] })
     }
@@ -109,6 +120,7 @@ export function quantities(spec: FactorySpec, model: FactoryModel, conns: ConnRe
   const plateT = plates.reduce((s, p) => s + p.kg, 0) / 1000
   const netT = sch.total + plateT
   return {
+    excluded: ['gable-post bases', 'purlin/girt cleats', 'fly braces and their connections', 'sag rods and anchors', 'brace intersection connectors', 'cladding and other hardware', ...(spec.frame === 'multi' ? ['interior column-top / valley connections and gutters'] : [])],
     members: sch.rows, memberT: sch.total,
     plates, plateT,
     bolts,

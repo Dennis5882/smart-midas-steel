@@ -7,7 +7,8 @@
    - 7.3 전단 φv = 0.90, kv = 5 (무보강), (7.3-1~3)
    - 8.2 조합 (8.2-1a/b), Mu = B·M (B = max(B1, B2), 아래 단순화)
    단순화(표시): 비조밀(λp<λ≤λr) 플랜지·웨브 국부좌굴은 Mp→Mr 직선 보간(AISC-LRFD 부록 F 형식, 원문 본문에 식 없음),
-   세장 단면(λ>λr, 부록1)은 Q 계수 미적용·경고, 립 C형강(冷軋型鋼)은 탄성 단면·유효폭 미고려(참고 값). */
+   압축 세장 판요소는 부록1 Qs·Qa를 적용하며, 미지원 세장 H형강 휨은 sectionRange로 차단한다.
+   립 C형강의 실제 검토 경로는 twColdFormed.ts이며 이 파일의 CC 탄성 분기는 구형 호출 호환용이다. */
 import type { SectionProps } from '../domain/sections'
 
 const KN_TF = 1 / 9.80665 // kN → tf
@@ -65,10 +66,28 @@ export function cbOf(m: number[]): number {
 }
 
 /** 압축재 강도 (6.2) — tf, cm */
-function compression(Ag: number, Fy: number, E: number, KLr: number) {
+function compression(Ag: number, Fy: number, E: number, KLr: number, Q = 1) {
   const lc = (KLr / Math.PI) * Math.sqrt(Fy / E)
-  const Fcr = lc <= 1.5 ? Math.exp(-0.419 * lc ** 2) * Fy : (0.877 / lc ** 2) * Fy
+  const Fcr = lc * Math.sqrt(Q) <= 1.5 ? Q * Math.exp(-0.419 * Q * lc ** 2) * Fy : (0.877 / lc ** 2) * Fy
   return { lc, phiPn: 0.85 * Ag * Fcr }
+}
+
+/** LRFD appendix 1, A-1-3/4/8/9/11/12. Fy,E in tf/cm2.
+ * Gross area and radii retained. H web stress follows appendix 1(2):
+ * min(phi_c Fcr with Q=Qs, phi_b Fy Qs); no unverified stress iteration.
+ */
+export function compressionQ(sp: SectionProps, Fy: number, E: number, KLr: number) {
+  if (sp.kind === 'P') return { Qs: 1, Qa: sp.d / sp.tw <= 232 / Fy ? 1 : Math.min(1, 77 / (Fy * sp.d / sp.tw) + 2 / 3), applicable: sp.d / sp.tw < 914 / Fy }
+  if (sp.kind !== 'H') return { Qs: 1, Qa: 1, applicable: true }
+  const bt = sp.bf / (2 * sp.tf), ht = sp.h / sp.tw
+  const kc = Math.max(.35, Math.min(.763, 4 / Math.sqrt(ht)))
+  const x = bt * Math.sqrt(Fy / kc)
+  const flangeLimit = sp.rolled ? 25 / Math.sqrt(Fy) : 20 / Math.sqrt(Fy - 1.16)
+  const Qs = bt <= flangeLimit ? 1 : Math.min(1, Math.max(0, x <= 30 ? 1 : x < 53 ? 1.415 - .0143 * x : 1840 / x ** 2))
+  const phiFcr = compression(sp.A / 100, Fy, E, KLr, Qs).phiPn / (sp.A / 100)
+  const f = Math.min(phiFcr, .9 * Fy * Qs)
+  const be = ht < 68 / Math.sqrt(f) ? sp.h : Math.min(sp.h, 87 * sp.tw / Math.sqrt(f) * (1 - 15 / (ht * Math.sqrt(f))))
+  return { Qs, Qa: Math.max(0, 1 - (sp.h - be) * sp.tw / sp.A), applicable: true }
 }
 
 /** 부재 설계강도 — sp: 단면(mm), FyMPa·EMPa, L: 길이(mm), Pu·Cb 는 웨브 λp 와 LTB 에 사용 */
@@ -79,7 +98,10 @@ export function capacity(sp: SectionProps, FyMPa: number, EMPa: number, L: Membe
   const A = sp.A / 100, Iy = sp.Iy / 1e4, Sx = sp.Sx / 1e3, Sy = sp.Sy / 1e3, Zx = sp.Zx / 1e3, Zy = sp.Zy / 1e3
   const rx = sp.rx / 10, ry = sp.ry / 10, J = sp.J / 1e4, Cw = sp.Cw / 1e6
   const KLr = Math.max(L.KLx / 10 / rx, L.KLy / 10 / ry)
-  const { lc, phiPn } = compression(A, Fy, E, KLr)
+  const q = compressionQ(sp, Fy, E, KLr)
+  const { lc, phiPn } = compression(A, Fy, E, KLr, q.Qs * q.Qa)
+  if (q.Qs * q.Qa < 1) notes.push(`LRFD A-1: Qs=${q.Qs.toFixed(4)}, Qa=${q.Qa.toFixed(4)}`)
+  if (!q.applicable) notes.push('TW applicability: LRFD A-1 D/t >= 914/Fy')
   const phiPnt = 0.9 * A * Fy
   const toKN = (tf: number) => tf / KN_TF
   const toKNm = (tfcm: number) => tfcm / KN_TF / 100
@@ -124,7 +146,7 @@ export function capacity(sp: SectionProps, FyMPa: number, EMPa: number, L: Membe
   const wR = 260 / sq
   /* 순압축 세장 판정 — 플랜지 25/√Fy(압연)·20/√(Fy−Fr)(용접), 웨브 68/√Fy */
   const cfR = sp.rolled ? 25 / sq : 20 / Math.sqrt(Fy - Fr)
-  if (PuComp_kN > 0 && (bt > cfR || htw > 68 / sq)) notes.push('壓力 細長肢材 (附錄1, Q not applied)')
+  if (PuComp_kN > 0 && (bt > cfR || htw > 68 / sq)) notes.push('LRFD A-1 compression Q applied')
 
   const Mp = Fy * Zx, Mr = FL * Sx
   /* 횡비틀림 (7.2.2·7.2.3) */
@@ -143,10 +165,10 @@ export function capacity(sp: SectionProps, FyMPa: number, EMPa: number, L: Membe
   if (bt > fP) {
     compact = bt > fR ? 'slender' : 'noncompact'
     MnFLB = bt > fR ? Mr : Mp - (Mp - Mr) * ((bt - fP) / (fR - fP))
-    if (bt > fR) notes.push('翼板 細長 (b/t > λr)')
+    if (bt > fR) notes.push('TW applicability: LRFD appendix 3 slender flange flexure')
   }
   if (htw > wP) {
-    if (htw > wR) { compact = 'slender'; notes.push('腹板 細長 (h/tw > λr)') } else if (compact === 'compact') compact = 'noncompact'
+    if (htw > wR) { compact = 'slender'; notes.push('TW applicability: LRFD appendix 3 slender web flexure') } else if (compact === 'compact') compact = 'noncompact'
     MnWLB = htw > wR ? Fy * Sx : Mp - (Mp - Fy * Sx) * ((htw - wP) / (wR - wP))
   }
   const Mnx = Math.min(MnLTB, MnFLB, MnWLB)

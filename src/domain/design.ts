@@ -19,6 +19,8 @@ import { portalGeometry } from './portal'
 import { cfCapacity, cfCheck } from '../codes/twColdFormed'
 import { ccLoads } from './secondary'
 import { validateDesignResults } from './resultValidation'
+import { roofDeflection } from './roofDeflection'
+import { sagCount, support, withRestraintIssues, type DesignIssue } from './validity'
 import { sectionProps } from './sections'
 import type { ElementRole, FactoryModel, FactorySpec } from './types'
 
@@ -27,10 +29,13 @@ export interface MemberCheck {
   role: ElementRole
   section: string
   ratio: number
+  /** KR strength envelope before the separate slenderness/detail check. */
+  strengthRatio?: number
+  strengthGoverning?: { combo: string; eq: MemberCheck['eq']; part: number; B: number; Cb: number }
   combo: string
   /** 지배 지점 0..4 (I, 1/4, 2/4, 3/4, J), 가새는 -1 */
   part: number
-  eq: CheckResult['eq'] | 'KL/r' | 'C5' | 'C3.3' | `GB ${string}` | `KDS ${string}`
+  eq: CheckResult['eq'] | 'KL/r' | 'C5' | 'C3.3' | `TW CF ${string}` | `GB ${string}` | `KDS ${string}`
   forces: { P: number; Mx: number; My: number; V: number }
   cap: Pick<Capacity, 'phiPnc' | 'phiPnt' | 'phiMnx' | 'phiMny' | 'phiVn' | 'mxMode' | 'compact' | 'KLr' | 'lambdaC'>
   B: number
@@ -38,6 +43,7 @@ export interface MemberCheck {
   lengths: { KLx: number; KLy: number; Lb: number }
   slender: { value: number; limit: number }
   notes: string[]
+  issues?: DesignIssue[]
 }
 
 export interface ServiceCheck {
@@ -90,8 +96,8 @@ export const purlinLimitDiv = (code: FactorySpec['code']) => (code === 'CN' ? 15
 
 /** roles 를 주면 그 역할 부재만 검토하고 사용성은 생략 (단면 최적화 후보 평가용) */
 export function runDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo, res: Results, roles?: readonly ElementRole[]): DesignResult {
-  if (spec.code === 'CN') return runCnDesign(spec, model, info, res, roles)
-  if (spec.code === 'KR') return runKrDesign(spec, model, info, res, roles)
+  if (spec.code === 'CN') return withRestraintIssues(spec, runCnDesign(spec, model, info, res, roles))
+  if (spec.code === 'KR') return withRestraintIssues(spec, runKrDesign(spec, model, info, res, roles))
   validateDesignResults(spec, model, info, res, roles)
   const prof = profileOf(spec.code)
   const mat = prof.materials[spec.material]
@@ -104,16 +110,18 @@ export function runDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
   /* 기둥 열마다 높이 h = 그 열 처마 높이 (편경사는 좌우 다름, 박공은 같음) */
   const Kcol = (h: number) => kSway((col.Ix / h) / (raf.Ix / G.rafterLen), spec.baseFixity === 'fixed' ? 1 : 10)
   const KcolAt = new Map(G.eaveXs.map((x) => [x, Kcol(G.zAt(x))]))
-  const Lsec = (spec.baySpacing / (spec.sagRods + 1))
+  const Lsec = (spec.baySpacing / (sagCount(spec) + 1))
 
   const lengthsOf = (role: ElementRole, Lel: number, e: { n1: number; n2: number; lean?: true }) => {
+    const flyL = support(spec, 'flyBraces') === 'none' ? (role === 'rafter' ? G.slopeLen : G.zAt(nodes.get(e.n1)!.x)) : Lel
+    const crossL = support(spec, 'braceCrossing') === 'none' ? Lel : Lel / 2
     switch (role) {
       /* 흔들림 기둥(다경간 내부): 양단 핀 → 면내 K = 1, L = 기둥 전체 높이 */
-      case 'column': { const x = nodes.get(e.n1)!.x; return { KLx: mm((e.lean ? 1 : KcolAt.get(x)!) * G.zAt(x)), KLy: mm(Lel), Lb: mm(Lel) } }
-      case 'rafter': return { KLx: mm(G.slopeLen), KLy: mm(Lel), Lb: mm(Lel) }
+      case 'column': { const x = nodes.get(e.n1)!.x; return { KLx: mm((e.lean ? 1 : KcolAt.get(x)!) * G.zAt(x)), KLy: mm(flyL), Lb: mm(flyL) } }
+      case 'rafter': return { KLx: mm(G.slopeLen), KLy: mm(flyL), Lb: mm(flyL) }
       case 'purlin': case 'girt': return { KLx: mm(Lel), KLy: mm(Math.min(Lel, Lsec)), Lb: mm(Math.min(Lel, Lsec)) }
-      case 'post': return { KLx: mm(G.zAt(nodes.get(e.n1)!.x)), KLy: mm(Lel), Lb: mm(Lel) }
-      case 'brace': return { KLx: mm(Lel / 2), KLy: mm(Lel / 2), Lb: mm(Lel / 2) }
+      case 'post': return { KLx: mm(G.zAt(nodes.get(e.n1)!.x)), KLy: mm(flyL), Lb: mm(flyL) }
+      case 'brace': return { KLx: mm(crossL), KLy: mm(crossL), Lb: mm(crossL) }
       default: return { KLx: mm(Lel), KLy: mm(Lel), Lb: mm(Lel) }
     }
   }
@@ -131,7 +139,7 @@ export function runDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
     const sp = sectionProps(e.section)
     const { KLx, KLy, Lb } = lengthsOf(e.role, Lel, e)
     const cf = cfCapacity(e.section, sp, mat.fy, mat.E, { Lx: KLx, Ly: KLy, Lt: Lb, Lb }, 1)
-    const myScale = 1 / (spec.sagRods + 1) ** 2
+    const myScale = 1 / (sagCount(spec) + 1) ** 2
     let best: MemberCheck | null = null
     const consider = (combo: string, part: number, f: MemberCheck['forces'], braced: boolean) => {
       const r = cfCheck(cf, f, braced)
@@ -139,8 +147,9 @@ export function runDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
       best = {
         id: e.id, role: e.role, section: e.section, ratio: r.ratio, combo, part, eq: r.eq, forces: f,
         cap: { phiPnc: cf.phiPnc, phiPnt: cf.phiPnt, phiMnx: braced ? cf.phiMnxBraced : cf.phiMnxLTB, phiMny: cf.phiMny, phiVn: cf.phiVn,
-          mxMode: braced ? 'CF' : 'CF-LTB', compact: 'noncompact', KLr: cf.KLr, lambdaC: Math.sqrt(mat.fy / Math.max(cf.Fn, 1e-9)) },
+          mxMode: !braced && cf.phiMnxLTB < cf.phiMnxBraced ? 'CF-LTB' : cf.notes.includes('CF-distortional') ? 'CF-distortional' : 'CF', compact: 'noncompact', KLr: cf.KLr, lambdaC: Math.sqrt(mat.fy / Math.max(cf.Fn, 1e-9)) },
         B: 1, Cb: 1, lengths: { KLx, KLy, Lb }, slender: { value: 0, limit: 0 }, notes: cf.notes,
+        issues: cf.applicable ? [] : [{ key: 'coldFormedRange', level: 'blocked', detail: 'TW CF 1.1 / 3.2 / 4.2 / 4.5' }],
       }
     }
     const beam = res.beam.get(e.id)
@@ -188,6 +197,7 @@ export function runDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
           id: e.id, role: e.role, section: e.section, ratio: r.ratio, combo, part, eq: r.eq, forces: f,
           cap: { phiPnc: cap.phiPnc, phiPnt: cap.phiPnt, phiMnx: cap.phiMnx, phiMny: cap.phiMny, phiVn: cap.phiVn, mxMode: cap.mxMode, compact: cap.compact, KLr: cap.KLr, lambdaC: cap.lambdaC },
           B, Cb, lengths: { KLx, KLy, Lb }, slender: { value: 0, limit: 0 }, notes: cap.notes,
+          issues: cap.notes.filter((n) => n.startsWith('TW applicability:')).map((detail) => ({ key: 'sectionRange', level: 'blocked', detail })),
         }
       }
     }
@@ -227,7 +237,7 @@ export function runDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
           B = Math.max(B1, d ? b2(d) : Math.max(b2('X'), b2('Y')))
         }
         /* 퍼린·거트 약축: 해석 모델에 새그로드가 없어 베이 전체 경간으로 계산됨 → 경간 L/(n+1) 기준으로 1/(n+1)² 축소 */
-        const myScale = e.role === 'purlin' || e.role === 'girt' ? 1 / (spec.sagRods + 1) ** 2 : 1
+        const myScale = e.role === 'purlin' || e.role === 'girt' ? 1 / (sagCount(spec) + 1) ** 2 : 1
         pts.forEach((p, i) => consider(combo, i, { P: p.P, Mx: Math.abs(p.My), My: Math.abs(p.Mz) * myScale, V: Math.abs(p.Vz) }, cap, B, Cb))
       }
       if (e.role === 'column' && ampCombo) {
@@ -254,7 +264,6 @@ export function runDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
   const service: ServiceCheck[] = []
   if (roles) return { ...summarize(members, service), col13 }
   const eaveIds = model.nodes.filter(G.isEaveNode).map((n) => n.id)
-  const ridgeIds = model.nodes.filter(G.isDeflNode).map((n) => n.id)
   /* 風力規範 4.2: 50년 풍 층간변위각 ≤ 5/1000 — 순풍향·횡풍향·비틀림을 2.12 로 조합 (info.wind.variants, 양 풍향 모두) */
   const wv = info.wind.variants?.length ? info.wind.variants : [...res.disp.keys()].filter((c) => /^W[XY]\d/.test(c)).map((c) => ({ tag: c, dir: 'X' as const, parts: [{ lc: c, f: 1 }] }))
   for (const [key, comp] of [['windDriftX', 'dx'], ['windDriftY', 'dy']] as const) {
@@ -280,10 +289,7 @@ export function runDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
   /* LRFD 11.5.3: 활하중 처짐 ≤ 스팬/360 — 지붕보: 마루 − 처마 평균 (LR), 퍼린: 단순보 5wL⁴/384EI */
   const lr = res.disp.get('LR')
   if (lr) {
-    const ridgeDz = Math.max(...ridgeIds.map((id) => Math.abs(lr.get(id)?.dz ?? 0)))
-    const eaveDz = eaveIds.reduce((a, id) => a + Math.abs(lr.get(id)?.dz ?? 0), 0) / Math.max(1, eaveIds.length)
-    const d = Math.abs(ridgeDz - eaveDz)
-    service.push({ key: 'rafterDefl', value: d, limit: spec.span / 360, ratio: d / (spec.span / 360), case: 'LR', clause: 'LRFD 11.5.3' })
+    service.push({ key: 'rafterDefl', ...roofDeflection(spec, model, res, ['LR'], 360), clause: 'LRFD 11.5.3' })
   }
   const Lp = spec.baySpacing
   const dPur = purlinDefl(spec, info, spec.sections.purlin)
@@ -300,7 +306,7 @@ export function runDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
   out.cc = [...ccSum.values()].sort((x, y) => (x.role === y.role ? String(x.zone).localeCompare(String(y.zone)) : x.role === 'purlin' ? -1 : 1))
   const c13 = col13 as ColumnAxial13 | null
   if (c13 && !c13.exempt && c13.ratio > 1) out.ng++
-  return { ...out, col13: c13 }
+  return withRestraintIssues(spec, { ...out, col13: c13 })
 }
 
 function summarize(members: MemberCheck[], service: ServiceCheck[]): DesignResult {

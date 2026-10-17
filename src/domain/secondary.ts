@@ -1,3 +1,4 @@
+import { sagCount } from './validity'
 /* 2차부재(퍼린·거트) 국부 풍압 하중 (순수 함수) — 대만 風力規範 3장 局部構材及外部被覆物.
    受風面積 < 65 m² 인 퍼린·거트는 MWFRS(2장) 대신 3.2 의 p = q(h)[(GCp) − (GCpi)] 로 설계 (3.1).
    단순보(양단 핀): Mx = wL²/8, V = wL/2. 조합 (LRFD 2.2): 정압 1.2D + 0.5L + 1.6W, 부압 0.9D + 1.6W.
@@ -33,7 +34,7 @@ export function ccLoads(spec: FactorySpec, model: FactoryModel, info: LoadInfo):
   const a = zoneWidth(info.wind.hRef, Math.min(spec.span, G.length))
   const nodes = new Map(model.nodes.map((n) => [n.id, n]))
   const cos = Math.cos(G.theta), sin = Math.sin(G.theta)
-  const nSeg = spec.sagRods + 1
+  const nSeg = sagCount(spec) + 1
   for (const e of model.elements) {
     if (e.role !== 'purlin' && e.role !== 'girt') continue
     const p1 = nodes.get(e.n1)!, p2 = nodes.get(e.n2)!

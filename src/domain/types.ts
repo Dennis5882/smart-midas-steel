@@ -36,6 +36,9 @@ export interface FactorySpec {
   postSpacing: number
   /** 퍼린·거트 새그로드(횡지지) 수 / 베이 — 설계 비지지길이 Lb = 베이 간격 / (n+1) */
   sagRods: number
+  /** Physical restraint details: assumed keeps a visible review condition;
+   * none removes the length reduction; confirmed records project verification. */
+  restraints?: { flyBraces?: 'assumed' | 'confirmed' | 'none'; sagRods?: 'assumed' | 'confirmed' | 'none'; braceCrossing?: 'assumed' | 'confirmed' | 'none' }
   /** 지진 입력 — county·town·soil 로 표2-1/2-4 조회해 SDS·SD1·SMS·SM1 을 채움(직접 수정 가능). I: 용도계수, Rx/Ry: 구조계 R (표1-3).
       county '臺北盆地' = 微分區 (地盤 放大 없음, Ra·V* 대북분지 식) */
   seismic: { county: string; town: string; soil: 1 | 2 | 3; SDS: number; SD1: number; SMS: number; SM1: number; I: number; Rx: number; Ry: number }

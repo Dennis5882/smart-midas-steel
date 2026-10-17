@@ -2,8 +2,8 @@
    fail       : 강도비 > 1 (NG)
    expert     : 계산은 통과했지만 앱이 다루지 않는 상세가 남음 → 전문가 검토 필요
                 (TW 처마 접합 회전 능력 시험 근거 13.6.1 / CN 기초·접합·가새 상세)
-   prelim     : 계산식이 규범 원문과 대조되지 않은 예비 검토
-                (냉간성형 립 C형강: TW 는 AISI S100 유효폭 — 대만 冷軋型鋼 원문 미대조, CN 은 GB/T 50018 보수 근사)
+   prelim     : 냉간성형 검토 범위가 제한된 예비 검토
+                (TW 원문 4~8장 반영 후에도 약축·편심 비틀림·웨브 지압·접합 상세 미지원, CN 은 GB/T 50018 보수 근사)
    reinforced : 무보강이면 NG, 스티프너·더블러 플레이트를 넣어 통과
    pass       : 구현된 계산 항목 통과
    한 항목에 여러 사유가 겹치면 위 순서의 앞쪽이 등급이 되고, 사유는 모두 남긴다. */
@@ -11,24 +11,27 @@ import type { ConnResult } from './connections'
 import type { DesignResult, MemberCheck } from './design'
 import type { ScopeResult } from './scope'
 import type { ElementRole } from './types'
+import type { DesignIssue } from './validity'
 
 export type Grade = 'fail' | 'expert' | 'prelim' | 'reinforced' | 'pass'
 export const GRADES: Grade[] = ['fail', 'expert', 'prelim', 'reinforced', 'pass']
 const worse = (a: Grade, b: Grade): Grade => (GRADES.indexOf(a) <= GRADES.indexOf(b) ? a : b)
 export const worstOf = (gs: Grade[]): Grade => gs.reduce(worse, 'pass')
 
-export type Reason = 'ng' | 'coldFormed' | 'stiffener' | 'doubler' | 'rotTest' | 'gbDetail'
-const REASON_GRADE: Record<Reason, Grade> = { ng: 'fail', rotTest: 'expert', gbDetail: 'expert', coldFormed: 'prelim', stiffener: 'reinforced', doubler: 'reinforced' }
+export type Reason = 'ng' | 'coldFormed' | 'stiffener' | 'doubler' | 'rotTest' | 'gbDetail' | 'applicability' | 'restraint'
+const REASON_GRADE: Record<Reason, Grade> = { ng: 'fail', rotTest: 'expert', gbDetail: 'expert', coldFormed: 'prelim', stiffener: 'reinforced', doubler: 'reinforced', applicability: 'fail', restraint: 'expert' }
 export interface Graded { grade: Grade; reasons: Reason[] }
 const graded = (reasons: Reason[]): Graded => ({ grade: worstOf(reasons.map((r) => REASON_GRADE[r])), reasons })
 
-/** 냉간성형 립 C형강 — 단면명 'CC …' (TW CNS2020·CN GB50018-02 공통) */
-export const isColdFormed = (section: string) => section.trim().startsWith('CC ')
+/** Lipped C: TW/CN CC names and KR KS21 LC names share remaining detail limits. */
+export const isColdFormed = (section: string) => /^(CC\s|LC-)/.test(section.trim())
 
-export function memberGrade(m: Pick<MemberCheck, 'ratio' | 'section'>): Graded {
+export function memberGrade(m: Pick<MemberCheck, 'ratio' | 'section'> & { issues?: DesignIssue[] }): Graded {
   const r: Reason[] = []
   if (m.ratio > 1) r.push('ng')
   if (isColdFormed(m.section)) r.push('coldFormed')
+  if (m.issues?.some((i) => i.level === 'blocked')) r.push('applicability')
+  if (m.issues?.some((i) => i.level === 'review')) r.push('restraint')
   return graded(r)
 }
 

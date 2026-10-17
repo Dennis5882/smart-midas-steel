@@ -2,11 +2,12 @@
    memory only. Saves the current Gen document before creating a test model.
    Run: npx tsx scripts/live-cn.ts [--optimize]. Never put credentials here. */
 import { readMapiKey } from './mapi-key'
+import { blockedMembers } from '../src/domain/validity'
 import { writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-const key = await readMapiKey()
+let key = await readMapiKey()
 ;(globalThis as any).document = { documentElement: { lang: 'ko', dataset: {} } }
 const { S } = await import('../src/state/store')
 const { CN_DEFAULT_SPEC } = await import('../src/domain/types')
@@ -69,7 +70,10 @@ try {
   for (const m of S.design!.members) if (!Number.isFinite(m.ratio) || m.ratio < 0) throw new Error(`Invalid design ratio: ${m.id}`)
   const output = join(tmpdir(), 'smart-midas-cn-live')
   writeFileSync(output + '.html', report); writeFileSync(output + '.dxf', dxf)
+  const { encodeResults } = await import('./tw-golden')
+  const { gzipSync } = await import('node:zlib')
+  writeFileSync(output + '-results.json.gz', gzipSync(JSON.stringify(encodeResults(S.results!))))
   writeFileSync(output + '-summary.json', JSON.stringify({ spec: S.built!.spec, reactions: S.reactions, design: S.design, connections: S.connections, opt: S.opt }, null, 2))
   console.log(JSON.stringify({ phase: 'outputs', report: output + '.html', dxf: output + '.dxf', apiErrors: S.log.filter((x) => x.type === 'err').map((x) => x.html), status: 'completed' }))
-  if (process.argv.includes('--assert-pass') && (S.design!.ng || S.connections!.some((c) => c.ratio > 1) || S.log.some((x) => x.type === 'err'))) throw new Error('CN live regression: NG or API error remains')
+  if (process.argv.includes('--assert-pass') && (S.design!.ng || blockedMembers(S.design) || S.connections!.some((c) => c.ratio > 1) || S.log.some((x) => x.type === 'err'))) throw new Error('CN live regression: NG or API error remains')
 } finally { S.mapiKey = ''; process.stdin.pause() }

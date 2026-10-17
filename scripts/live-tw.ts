@@ -3,11 +3,12 @@
    실행: node --import tsx scripts/live-tw.ts [--optimize] [--frame mono|multi] [--out <경로 접두사>]
    출력: <out>.html (계산서) · .dxf · -summary.json (스펙·반력·검토·접합·최적화 — 계산서 재생성용) */
 import { readMapiKey } from './mapi-key'
+import { blockedMembers } from '../src/domain/validity'
 import { writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-const key = await readMapiKey()
+let key = await readMapiKey()
 ;(globalThis as any).document = { documentElement: { lang: 'ko', dataset: {} } }
 const { S } = await import('../src/state/store')
 const { DEFAULT_SPEC, normalizeSpans } = await import('../src/domain/types')
@@ -29,7 +30,7 @@ const t0 = Date.now()
 const sec = () => `${((Date.now() - t0) / 1000).toFixed(0)}s`
 try {
   const fr = arg('--frame')
-  const spec = normalizeSpans({ ...structuredClone(DEFAULT_SPEC), ...(fr === 'mono' ? { frame: 'mono' as const } : fr === 'multi' ? { frame: 'multi' as const, spanList: [24, 24] } : {}) })
+  const spec = normalizeSpans({ ...structuredClone(DEFAULT_SPEC), ...(fr === 'mono' ? { frame: 'mono' as const } : fr === 'multi' ? { frame: 'multi' as const, spanList: process.argv.includes('--spans') ? process.argv[process.argv.indexOf('--spans') + 1].split(',').map(Number) : [24, 24] } : {}) })
   if (checkScope(spec).blocked) throw new Error('sample spec is out of scope')
   await sendModel(spec)
   console.log(`[${sec()}] TW model sent: nodes ${S.built!.model.nodes.length}, elems ${S.built!.model.elements.length}, cases ${S.built!.cases.length}, combos ${S.built!.combos}`)
@@ -67,7 +68,11 @@ try {
   const report = buildReport({ built: S.built!, reactions: S.reactions, design: S.design, connections: S.connections, opt: S.opt })
   const dxf = buildDxf({ spec: S.built!.spec, model: S.built!.model, connections: S.connections, title: 'TAIWAN LRFD PORTAL FACTORY' })
   writeFileSync(output + '.html', report); writeFileSync(output + '.dxf', dxf)
+  const { encodeResults } = await import('./tw-golden')
+  const { gzipSync } = await import('node:zlib')
+  writeFileSync(output + '-results.json.gz', gzipSync(JSON.stringify(encodeResults(S.results!))))
   writeFileSync(output + '-summary.json', JSON.stringify({ spec: S.built!.spec, reactions: S.reactions, design: S.design, connections: S.connections, opt: S.opt }, null, 2))
   const errs = S.log.filter((x) => x.type === 'err').map((x) => x.html)
   console.log(`[${sec()}] outputs: ${output}.html / .dxf / -summary.json; API errors ${errs.length}${errs.length ? ': ' + errs.join(' | ') : ''}`)
+  if (process.argv.includes('--assert-pass') && (S.design!.ng || blockedMembers(S.design) || S.connections!.some((c) => c.ratio > 1) || errs.length)) throw new Error('TW live regression: NG, applicability violation or API error remains')
 } finally { S.mapiKey = ''; process.stdin.pause() }

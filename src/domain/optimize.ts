@@ -1,7 +1,7 @@
 /* 단면 자동 최적화 (순수 함수) — 현재 해석 결과로 역할별 최경량 통과 단면을 고른다.
    방법:
    - 후보 = CNS2020 카탈로그(catalog.ts), 단면적(= 단위중량) 오름차순.
-   - 강도: 그 역할 부재 전부를 후보 단면으로 바꿔 같은 부재력으로 LRFD 검토(design.ts) → 최대비 ≤ 목표. H형강 세장 단면(부록1 Q 미적용)은 제외.
+   - 강도: 그 역할 부재 전부를 후보 단면으로 바꿔 같은 부재력으로 LRFD 검토(design.ts) → 최대비 ≤ 목표. 미지원 세장 H형강 휨은 제외.
    - 2차부재(퍼린·거트·스트럿·풍주·가새)는 핀 단순보·트러스라 부재력이 자기 단면과 거의 무관 → 한 번에 확정.
    - 골조(기둥·지붕보)는 부재력이 강성비에 따라 재분배되므로 근사 → 액션이 재전송·재해석으로 반복 검증.
      사용성은 현재 해석값을 강성비로 환산해 추정:
@@ -21,6 +21,8 @@ import { cnGirtDeflRatio, cnPostDeflRatio } from './cnDesign'
 import type { LoadInfo } from './loads'
 import { portalGeometry } from './portal'
 import { sectionProps } from './sections'
+import { blockedMembers } from './validity'
+import { runConnections } from './connections'
 import { ROLES, type ElementRole, type FactoryModel, type FactorySpec } from './types'
 
 /** 목표 강도비·추정 사용성비 — 1.0 미만으로 두어 재해석 후 재분배·추정 오차 여유 */
@@ -49,15 +51,15 @@ export interface OptProposal {
 
 /** 반복 1회 기록 — 액션이 쌓는다 */
 /** 반복 기록 — weight = 부재 강재량, plateT = 접합 판재, connMax·connNg = 그 반복 결과로 산정한 접합부 */
-export interface OptIter { it: number; sections: Sections; weight: number; plateT: number; maxRatio: number; svcMax: number; ng: number; connMax: number; connNg: number }
+export interface OptIter { it: number; sections: Sections; weight: number; plateT: number; maxRatio: number; svcMax: number; ng: number; connMax: number; connNg: number; invalid?: number }
 
 /** 최종안 선택 (TW·CN 공통) — 유효 = 부재·사용성 NG 0 이고 접합부 NG 0. 유효안 중 (부재 + 접합 판재) 최경량.
     유효안이 없으면 NG 합(부재·사용성 + 접합) 최소 → 최대비 최소, valid = false 로 알린다. */
 export function pickBest(iters: OptIter[]): { best: OptIter; valid: boolean } {
-  const valid = iters.filter((x) => x.ng === 0 && x.connNg === 0)
+  const valid = iters.filter((x) => x.ng === 0 && x.connNg === 0 && !(x.invalid ?? 0))
   const total = (x: OptIter) => x.weight + x.plateT
   if (valid.length) return { best: valid.reduce((a, x) => (total(x) < total(a) ? x : a)), valid: true }
-  const bad = (x: OptIter) => x.ng + x.connNg
+  const bad = (x: OptIter) => x.ng + x.connNg + (x.invalid ?? 0)
   return { best: iters.reduce((a, x) => (bad(x) < bad(a) || (bad(x) === bad(a) && Math.max(x.maxRatio, x.connMax) < Math.max(a.maxRatio, a.connMax)) ? x : a)), valid: false }
 }
 
@@ -142,6 +144,7 @@ export function proposeSections(spec: FactorySpec, model: FactoryModel, info: Lo
     const sections = { ...base, [r]: sec }
     const m: FactoryModel = { nodes: model.nodes, elements: model.elements.map((e) => (e.role === r ? { ...e, section: sec } : e)) }
     const d = runDesign({ ...spec, sections }, m, info, res, [r])
+    if (blockedMembers(d)) return Infinity
     if (sectionProps(sec).kind === 'H' && d.members.some((x) => x.cap.compact === 'slender')) return Infinity
     /* 기둥: 13.4.1 축력(면제 아닐 때) 포함 */
     return r === 'column' && d.col13 && !d.col13.exempt ? Math.max(d.maxRatio, d.col13.ratio) : d.maxRatio
@@ -188,6 +191,11 @@ export function proposeSections(spec: FactorySpec, model: FactoryModel, info: Lo
       if (best && t >= best.t) continue
       const f = frameStiff(spec, c.s, r.s)
       if ((driftX * f0.k) / f.k > target || (defl * f.defl) / f0.defl > target) { svcLimited = true; continue }
+      // Check the available connection layout while choosing the frame pair.
+      // A stronger beam alone does not ensure an eight-bolt end plate can pass.
+      const candidate = { ...spec, sections: { ...sections, column: c.s, rafter: r.s } }
+      const candidateModel = { ...model, elements: model.elements.map((e) => ({ ...e, section: candidate.sections[e.role] })) }
+      if (runConnections(candidate, candidateModel, info, res).some((x) => x.type !== 'brace' && x.ratio > 1)) continue
       best = { c, r, t }
     }
     if (best) {

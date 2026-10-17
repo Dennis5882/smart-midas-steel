@@ -87,7 +87,10 @@ export function reportPdfDefinition(doc: Document, serialize: (el: Element) => s
     }
     if (tag === 'ul') return [{ ul: children(el).map((li) => ({ text: inline(li) })), unbreakable: true, margin: [0, 3, 0, 8] }]
     if (/^h[123]$/.test(tag)) return [{ text: inline(el), fontSize: tag === 'h1' ? 18 : tag === 'h2' ? 13 : 10, bold: true, color: tag === 'h1' ? '#111111' : '#1f3a8a', margin: [0, tag === 'h1' ? 0 : 12, 0, 6], headlineLevel: +tag[1] }]
-    if (tag === 'p' || tag === 'figcaption' || (tag === 'div' && !children(el).some((c) => /^(div|ul|p|table)$/i.test(c.tagName)))) return [{ text: inline(el), margin: [0, 3, 0, 6], ...(classes(el).some((c) => ['note', 'meta'].includes(c)) ? { fontSize: 8, color: '#555' } : {}) }]
+    if (tag === 'p' || tag === 'figcaption' || (tag === 'div' && !children(el).some((c) => /^(div|ul|p|table)$/i.test(c.tagName)))) {
+      const paragraph: Content = { text: inline(el), margin: [0, 3, 0, 6], ...(classes(el).some((c) => ['note', 'meta'].includes(c)) ? { fontSize: 8, color: '#555' } : {}) }
+      return classes(el).includes('keep') ? [{ stack: [paragraph], unbreakable: true }] : [paragraph]
+    }
     const out: Content[] = []
     for (const n of Array.from(el.childNodes)) {
       if (n.nodeType === 1) out.push(...block(n as Element))

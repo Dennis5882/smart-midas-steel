@@ -7,6 +7,7 @@ import type { Built } from '../state/store'
 import { mapi } from '../mapi/client'
 import { stage } from './job'
 import { requireResult, resultNumber, serviceNodes, validateDesignResults } from '../domain/resultValidation'
+import { lateralSwayKr } from '../domain/krSway'
 
 export interface ForcePt { P: number; Vy: number; Vz: number; My: number; Mz: number }
 export interface Results {
@@ -85,7 +86,7 @@ export async function fetchResults(b: Built): Promise<Results> {
   }
 
   /* B2 입력 — 조합별 반력 합(ΣPu = ΣFZ, ΣH = |ΣFX|·|ΣFY|), 처마 절점(기둥 상단) 평균 변위 */
-  const { eaves: eaveNodes, nodes: svcNodes } = serviceNodes(spec, model)
+  const { eaves: eaveNodes, tops: columnTops, nodes: svcNodes } = serviceNodes(spec, model)
   const base = model.nodes.find((n) => n.z === 0)!
   const rx = await table('REACTIONG', 'R', [base.id], cb, {}, ['Node', 'Load', 'FX', 'FY', 'FZ'])
   const sums = new Map<string, number[]>()
@@ -130,6 +131,7 @@ export async function fetchResults(b: Built): Promise<Results> {
   }
   for (const c of svcCases) for (const n of svcNodes) requireResult(disp.get(c)?.has(n.id), 'DISPLACEMENTG', 'missing', `${n.id} · ${c}`)
   const results = { beam, truss, sway, disp, combos }
+  if (spec.code === 'KR') lateralSwayKr(results, columnTops.map((n) => n.id), b.info.seismic)
   validateDesignResults(spec, model, b.info, results)
   return results
 }

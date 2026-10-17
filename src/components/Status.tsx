@@ -8,6 +8,7 @@ import type { ConnResult } from '../domain/connections'
 import type { DesignResult } from '../domain/design'
 import { GRADES, summarizeStatus, type Grade, type Reason, type StatusSummary } from '../domain/status'
 import { t, tc } from '../i18n'
+import { blockedMembers, restraintKeys, support } from '../domain/validity'
 
 export function GradeChip({ g, reasons }: { g: Grade; reasons?: Reason[] }) {
   const why = (reasons ?? []).filter((r) => r !== 'ng').map((r) => t(`rs_${r}`)).join(' · ')
@@ -34,6 +35,10 @@ export function StatusCard({ d, cs, spec }: { d: DesignResult | null; cs: ConnRe
       {d && <div className="kv"><span className="k">{t('st_members')} ({d.members.length})</span><span className="v">{counts(sum.members)}</span></div>}
       {d && <div className="kv"><span className="k">{t('st_service')} ({sum.service.total})</span><span className="v">{sum.service.ng ? `NG ${sum.service.ng}` : 'OK'}</span></div>}
       {!!cs?.length && <div className="kv"><span className="k">{t('st_conns')} ({cs.length})</span><span className="v">{counts(sum.conns)}</span></div>}
+      {restraintKeys(spec).map((k) => <div className="kv" key={k}><span className="k">{t(`restraint_${k}`)}</span><span className="v">{t(`restraint_${support(spec, k)}`)}</span></div>)}
+      {!!blockedMembers(d) && <p className="mw-error" role="alert">{t('flow_invalid_design')}</p>}
+      {d && [...new Set(d.members.flatMap((m) => (m.issues ?? []).filter((i) => i.level === 'blocked').map((i) => i.detail)))].map((text) => <p className="pe-tip" key={text}>{text}</p>)}
+      {d?.members.some((m) => m.issues?.some((i) => i.key === 'restraint')) && <p className="pe-tip">{t('restraint_note')}</p>}
       {scope.issues.map((i, n) => <div key={n} className="res-stat" style={{ color: 'var(--amber)', margin: '4px 0 0' }}>⚠ {t('sec_scope')}: {scopeMsg(i)}</div>)}
       <div className="res-stat" style={{ marginTop: 8, marginBottom: 0 }}>
         {used.map((g) => <div key={g}><span className="grade" data-g={g} style={{ marginLeft: 0 }}>{t(`gr_${g}`)}</span> {t(`gr_${g}_d`)}</div>)}

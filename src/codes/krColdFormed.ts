@@ -64,6 +64,7 @@ export interface KrCFCapacity {
   Fn: number; Fcrd: number; mode: 'yield' | 'LTB' | 'distortional' | 'local'
   KLr: number
   notes: string[]
+  applicable: boolean
 }
 
 export function krCfCapacity(name: string, sp: SectionProps, Fy: number, L: CFLengths & { Lm: number }, Cb: number): KrCFCapacity {
@@ -81,7 +82,8 @@ export function krCfCapacity(name: string, sp: SectionProps, Fy: number, L: CFLe
   const wF = g.B - 2 * g.t, dL = g.C - g.t, wW = g.H - 2 * g.t
   const S = 1.28 * Math.sqrt(E / Fy), Ia = wF / g.t > 0.328 * S ? Math.min(399 * g.t ** 4 * ((wF / g.t) / S - 0.328) ** 3, g.t ** 4 * (115 * (wF / g.t) / S + 5)) : 0
   const Is = (dL ** 3 * g.t) / 12
-  if (wF / g.t > (Is >= Ia ? 90 : 60) || dL / g.t > 60 || wW / g.t >= 200 || g.C / g.B > 0.7 || Fy >= 552) notes.push('KDS 41 30 30 table 1.6-1 limits')
+  const applicable = !(wF / g.t > (Is >= Ia ? 90 : 60) || dL / g.t > 60 || wW / g.t >= 200 || g.C / g.B > 0.7 || Fy >= 552)
+  if (!applicable) notes.push('KDS 41 30 30 table 1.6-1 limits')
 
   /* 휨 — 4.4.2 Mne, 4.4.3 Mnℓ, 4.4.4 Mnd */
   const Sf = Ix / (g.H / 2), My = Sf * Fy
@@ -116,7 +118,7 @@ export function krCfCapacity(name: string, sp: SectionProps, Fy: number, L: CFLe
     phiMnxBraced, phiMnxLTB, phiMnlo: (0.9 * MnlB) / 1e6, phiMnxt: (0.9 * Sf * Fy) / 1e6,
     phiMny: (0.9 * Sy * Fy) / 1e6, phiVn: (0.95 * Vn) / 1e3,
     PEx: (A * sEx) / 1e3, PEy: (A * sEy) / 1e3,
-    Fn, Fcrd: fd.Fcrd, mode, KLr: Math.max(L.Lx / rx, L.Ly / ry), notes,
+    Fn, Fcrd: fd.Fcrd, mode, KLr: Math.max(L.Lx / rx, L.Ly / ry), notes, applicable,
   }
 }
 

@@ -3,6 +3,7 @@
    좌표: 모델 m → mm. 그리드: 프레임선 1..n+1 (Y), 기둥열 A·B (X). */
 import type { ConnResult } from '../domain/connections'
 import { profileOf } from '../codes'
+import { restraintKeys, support } from '../domain/validity'
 import { portalGeometry } from '../domain/portal'
 import { memberSchedule } from '../domain/schedule'
 import type { ElementRole, FactoryModel, FactorySpec, Node } from '../domain/types'
@@ -148,7 +149,7 @@ function drawSheets({ spec, model, connections, title }: DrawingInput): Dxf {
     const W = 26000, rowH = 600
     const sch = memberSchedule(spec, model)
     const conns = connections ?? []
-    const H = (sch.rows.length + conns.length + 10) * rowH + 6000
+    const H = (sch.rows.length + conns.length + 16) * rowH + 6000
     sheet(W, H, 'S5  SCHEDULES')
     let y = H - 2000
     const cols = [0, 3500, 9500, 12500, 16000, 19500]
@@ -163,6 +164,11 @@ function drawSheets({ spec, model, connections, title }: DrawingInput): Dxf {
     rowTxt(['TYPE', 'DETAIL', 'RATIO'], cc)
     const CN: Record<string, string> = { base: 'Column base', knee: 'Knee', apex: 'Apex splice', brace: 'Brace end' }
     for (const c of conns) rowTxt([CN[c.type], Object.values(c.dims).join(', ').slice(0, 110), c.ratio.toFixed(3)], cc)
+    y -= rowH
+    rowTxt(['RESTRAINTS: ' + restraintKeys(spec).map((k) => `${k}=${support(spec, k)}`).join('; ')])
+    rowTxt(['Assumed restraints need design verification of stiffness, connections and anchorage.'])
+    rowTxt(['EXCLUDED: gable-post bases, cleats, fly braces, sag rods, brace crossing connectors, cladding.'])
+    if (spec.frame === 'multi') rowTxt(['MULTI-SPAN: interior column-top / valley connections and gutters require separate design and takeoff.'])
     /* 표제란 */
     const tbY = -M + 300, tbW = 12000
     d.rect('BORDER', ox + W + M - tbW - 300, tbY, tbW, 3000)

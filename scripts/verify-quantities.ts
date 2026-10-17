@@ -33,7 +33,12 @@ const cn = runCnConnections(fractional, fm, results)
 assert.equal(cn.find((x) => x.type === 'knee')!.parts!.plates.find((p) => p.part === 'stiffener')!.width, 83.75)
 const numeric = quantities(fractional, fm, cn)
 assert.ok(numeric.plates.some((p) => p.part === 'shearKey'))
-assert.deepEqual(numeric, quantities(fractional, fm, cn.map(({ parts: _, ...x }) => x)))
+// Legacy dimensions never encoded the newly detailed brace weld lengths.
+const legacy = quantities(fractional, fm, cn.map(({ parts: _, ...x }) => x))
+assert.deepEqual(numeric.plates, legacy.plates)
+assert.deepEqual(numeric.bolts, legacy.bolts)
+near(numeric.netT, legacy.netT)
+assert.ok(numeric.filletM > legacy.filletM)
 const renamed = structuredClone(cn)
 for (const x of renamed) x.dims = { plate: 'display only' }
 assert.deepEqual(numeric, quantities(fractional, fm, renamed))

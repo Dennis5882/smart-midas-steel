@@ -76,14 +76,15 @@ const bandName = (i: number) => { const hi = BANDS[i][0], lo = i ? BANDS[i - 1][
 
 const LIGHT = { ambient: 0.55, diffuse: 0.8, specular: 0.15, roughness: 0.6 }
 
-function traces(m: FactoryModel, spec: FactorySpec, P: Pal, ratio: Map<number, number> | null, vis: Vis3D, solid: boolean) {
+function traces(m: FactoryModel, spec: FactorySpec, P: Pal, ratio: Map<number, number> | null, vis: Vis3D, solid: boolean, invalid: Set<number>) {
   const cs = getComputedStyle(document.documentElement)
   const byId = new Map(m.nodes.map((n) => [n.id, n]))
   const out: any[] = []
   /* 묶음: 강도비 보기 = 구간, 아니면 부재 종류 */
   const groups: { key: string; name: string; color: string; width: number; visible: boolean; has: (id: number, role: ElementRole) => boolean }[] = ratio
-    ? BANDS.map(([, v, fb], i) => ({ key: `b${i}`, name: bandName(i), color: cs.getPropertyValue(v).trim() || fb, width: 4, visible: true, has: (id: number) => bandOf(ratio.get(id) ?? 0) === i }))
+    ? BANDS.map(([, v, fb], i) => ({ key: `b${i}`, name: bandName(i), color: cs.getPropertyValue(v).trim() || fb, width: 4, visible: true, has: (id: number) => !invalid.has(id) && bandOf(ratio.get(id) ?? 0) === i }))
     : ROLES.map((r) => ({ key: r, name: t(`role_${r}`), color: P.role[r], width: ROLE_VAR[r][2], visible: vis[r], has: (_: number, role: ElementRole) => role === r }))
+  if (ratio && invalid.size) groups.push({ key: 'invalid', name: t('rs_applicability'), color: cs.getPropertyValue('--violet').trim() || '#9b8cff', width: 6, visible: true, has: (id: number) => invalid.has(id) })
   if (solid) {
     const meshes = solidMeshes(m, risingAt(spec), spec.roofSlope, (e) => groups.find((g) => g.has(e.id, e.role))?.key ?? null)
     for (const g of groups) {
@@ -132,6 +133,7 @@ export function View3D() {
   const model = useMemo(() => (s.preview ? buildPortal(s.preview) : s.built?.model ?? null), [s.viewNonce, s.built])
   /* 강도비 색상 — 설계 검토 결과가 있고 미리보기가 아닐 때만 */
   const ratio = useMemo(() => (s.ratioView && !s.preview && s.design ? new Map(s.design.members.map((m) => [m.id, m.ratio])) : null), [s.ratioView, s.preview, s.design])
+  const invalid = useMemo(() => new Set(s.design?.members.filter((m) => m.issues?.some((i) => i.level === 'blocked')).map((m) => m.id) ?? []), [s.design])
   const solid = s.render3d === 'solid'
 
   useEffect(() => {
@@ -143,7 +145,7 @@ export function View3D() {
       const P = palette()
       const c = S.cam
       const ax = (hide: boolean, title: string) => (hide ? { ...axis(title, P), ...HIDDEN_AX } : axis(title, P))
-      void Plotly.react(el, traces(model, spec, P, ratio, S.vis3d, solid), {
+      void Plotly.react(el, traces(model, spec, P, ratio, S.vis3d, solid, invalid), {
         paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', margin: { l: 0, r: 0, t: ratio ? 28 : 0, b: 0 },
         font: { family: FONT, color: P.txt }, showlegend: !!ratio,
         /* 시점 버튼·맞춤을 누를 때만 카메라를 다시 적용 — 토글·표시 방식 변경은 사용자 시점 유지 */
@@ -164,7 +166,7 @@ export function View3D() {
       } as any)
     })
     return () => { alive = false }
-  }, [model, spec, ratio, s.cam, s.theme, lang, s.vis3d, solid])
+  }, [model, spec, ratio, invalid, s.cam, s.theme, lang, s.vis3d, solid])
 
   /** 확대·축소 — 지금 시점 기준 (원근: 카메라 거리, 정투영: 축 비율) */
   const zoom = (f: number) => void loadPlotly().then((Plotly) => {

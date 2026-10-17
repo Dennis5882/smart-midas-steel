@@ -27,7 +27,7 @@ for (const code of ['TW', 'CN'] as const) {
   S.analyzed = true; eq(unavailable(S, 'design'), null)
   eq(unavailable(S, 'outputs'), null)
   eq(unavailable(S, 'optimize'), 'flow_need_design')
-  S.design = {} as NonNullable<typeof S.design>; S.connections = []
+  S.design = { members: [] } as unknown as NonNullable<typeof S.design>; S.connections = []
   eq(unavailable(S, 'outputs'), null)
   S.mapiKey = ''; eq(unavailable(S, 'outputs'), null) // Local outputs do not require an API key.
   S.draftSpec = { ...spec, span: spec.span + 1 }
@@ -42,6 +42,13 @@ for (const code of ['TW', 'CN'] as const) {
   ;(globalThis as any).document.createElement = () => { downloads++; throw new Error('unexpected output') }
   downloadDrawings(); downloadQuantities(); openReport(); await downloadReportPdf()
   eq(downloads, 0)
+  S.draftInvalid = false
+  S.design = { members: [{ issues: [{ key: 'effectiveLength', level: 'blocked', detail: 'B2 > 1.5' }] }] } as unknown as NonNullable<typeof S.design>
+  eq(unavailable(S, 'outputs'), 'flow_invalid_design')
+  eq(taskStatus(S, 'design'), 'failed')
+  downloadDrawings(); downloadQuantities(); openReport(); await downloadReportPdf()
+  eq(downloads, 0)
+  S.design = { members: [] } as unknown as NonNullable<typeof S.design>
   S.draftInvalid = false; S.genChanged = 1
   eq(unavailable(S, 'outputs'), 'wf_stale_gen')
   // Gen-checking jobs stay runnable: their first step re-compares Gen, so reverting in Gen clears the block.

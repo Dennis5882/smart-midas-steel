@@ -160,7 +160,7 @@ function DesignTables({ d }: { d: DesignResult }) {
             </tbody>
           </table>
         </div>
-        <div className="res-stat" style={{ marginTop: 10, marginBottom: 0 }}>{tc(code, 'rd_assump')}</div>
+        <div className="res-stat" style={{ marginTop: 10, marginBottom: 0 }}>{t('restraint_lengths')} {tc(code, 'rd_assump')}</div>
       </div>
       <div className="scard"><h3>{t('res_service')}</h3>
         <table>

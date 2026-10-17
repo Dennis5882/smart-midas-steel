@@ -1,6 +1,8 @@
 /* 냉간성형 립 C형강(CC) 부재 강도 (순수 함수, N·mm·MPa).
    근거: 대만 「冷軋型鋼構造建築物結構設計規範」 — 鋼構造 LRFD 1.1 이 냉간성형재를 적용 범위에서 제외하고 이 규범을 따르도록 함.
-   ⚠ 원문이 KB 에 없음(COde/TW 에 미수록). 이 규범의 모체인 AISI S100(유효폭법) 식으로 구현 — 원문 대조 전.
+   원문 대조: COde/TW/knowledge/cold-formed-steel-code (2026-10-17).
+   PDF 제작일 2015-10은 판본 연도가 아님. 유효폭 4.3~4.5, 휨 6.2, 전단 6.3~6.4,
+   압축 7.2~7.3, 조합 8.2~8.3. 단면형상변형은 TW 전용 twDistortional 사용.
    - B2.1 유효폭 ρ = (1 − 0.22/λ)/λ (λ > 0.673), λ = (1.052/√k)(w/t)√(f/E)
    - B2.3 응력 경사 웨브 k = 4 + 2(1+ψ)³ + 2(1+ψ), b1 = be/(3+ψ), b2 = be/2 (ψ > 0.236) / be − b1
    - B3.1·B3.2 비보강 요소(립) k = 0.43
@@ -11,6 +13,7 @@
    - C5.2.2 압축+휨 (P/φPn ≤ 0.15 단순식, 초과 시 1/α 증폭식), C5.1 인장+휨, 인장 Tn = Ag·Fy (φt 0.95)
    단순화: 모서리 R = 0 (평판 폭 = 외곽 − 2t), 약축 휨 φMny = 0.90·Sy·Fy (유효폭 미적용, 참고), 립 각도 90°. */
 import type { SectionProps } from '../domain/sections'
+import { distortionalTW } from './twDistortional'
 
 const rho = (lam: number) => (lam <= 0.673 ? 1 : Math.max(0, (1 - 0.22 / lam) / lam))
 const lamOf = (k: number, w: number, t: number, f: number, E: number) => (1.052 / Math.sqrt(k)) * (w / t) * Math.sqrt(Math.max(f, 1e-9) / E)
@@ -130,6 +133,10 @@ export interface CFCapacity {
   Se: number; Fc: number; Fn: number; Ae: number
   KLr: number
   notes: string[]
+  applicable: boolean
+  phiMnxt: number
+  phiMnxo: number
+  FdB: number; FdC: number
 }
 
 export function cfCapacity(name: string, sp: SectionProps, Fy: number, E: number, L: CFLengths, Cb: number): CFCapacity {
@@ -147,6 +154,9 @@ export function cfCapacity(name: string, sp: SectionProps, Fy: number, E: number
   const sigEy = (Ly: number) => (Math.PI ** 2 * E) / (Ly / ry) ** 2
   const sigT = (Lt: number) => (G * J + (Math.PI ** 2 * E * Cw) / Lt ** 2) / (A * r0 ** 2)
   const notes: string[] = []
+  const applicable = Fy >= 165 && Fy <= 550 && g.t > 0 && g.t <= 25.4 && (g.B - 2 * g.t) / g.t <= 60 && (g.C - g.t) / g.t <= 60
+    && (g.H - 2 * g.t) / g.t <= 200 && g.C / (g.B - 2 * g.t) <= 0.8
+  if (!applicable) notes.push('TW CF 1.1 / 3.2 / 4.2 / 4.5 limits')
 
   /* 휨: 단면 강도 + 횡비틀림 (C3.1.2.1, 대칭축 휨) */
   const se = effSx(g, Fy, E)
@@ -154,8 +164,16 @@ export function cfCapacity(name: string, sp: SectionProps, Fy: number, E: number
   const FeL = (Cb * r0 * A * Math.sqrt(sigEy(L.Lb) * sigT(L.Lb))) / Sf
   const Fc = FeL >= 2.78 * Fy ? Fy : FeL > 0.56 * Fy ? (10 / 9) * Fy * (1 - (10 * Fy) / (36 * FeL)) : FeL
   const Sc = effSx(g, Fc, E).Se
-  const phiMnxBraced = (0.95 * se.Se * Fy) / 1e6
+  // Even a laterally braced compression flange must satisfy 6.2.3.
+  // Use full strong-axis length for distortion: a sag rod is not assumed to
+  // prevent rotation of the flange-web junction.
+  const FdB = distortionalTW(g, E, 'flexure', L.Lx).Fcrd
+  const My = Sf * Fy, Mcrd = Sf * FdB, ld = Math.sqrt(My / Mcrd)
+  const Mnd = ld <= 0.673 ? My : (1 - 0.22 * Math.sqrt(Mcrd / My)) * Math.sqrt(Mcrd / My) * My
+  const phiMd = 0.9 * Mnd / 1e6
+  const phiMnxBraced = Math.min((0.95 * se.Se * Fy) / 1e6, phiMd)
   const phiMnxLTB = Math.min(phiMnxBraced, (0.9 * Sc * Fc) / 1e6)
+  if (phiMd <= phiMnxBraced) notes.push('CF-distortional')
   if (Fc < Fy) notes.push('CF-LTB')
 
   /* 압축 C4: 휨좌굴(y) · 휨비틀림(x–θ) */
@@ -166,32 +184,41 @@ export function cfCapacity(name: string, sp: SectionProps, Fy: number, E: number
   const lc = Math.sqrt(Fy / Fe)
   const Fn = lc <= 1.5 ? 0.658 ** (lc ** 2) * Fy : (0.877 / lc ** 2) * Fy
   const Ae = effArea(g, Fn, E)
+  const FdC = distortionalTW(g, E, 'compression', L.Lx).Fcrd
+  const Py = A * Fy, Pcrd = A * FdC, ldc = Math.sqrt(Py / Pcrd)
+  const Pnd = ldc <= 0.561 ? Py : (1 - 0.25 * (Pcrd / Py) ** 0.6) * (Pcrd / Py) ** 0.6 * Py
   /* 전단 C3.2.1 */
   const h = g.H - 2 * g.t, kv = 5.34
   const ht = h / g.t
   const Vn = ht <= Math.sqrt((E * kv) / Fy) ? 0.6 * Fy * h * g.t
     : ht <= 1.51 * Math.sqrt((E * kv) / Fy) ? 0.6 * g.t ** 2 * Math.sqrt(kv * Fy * E) : (0.904 * E * kv * g.t ** 3) / h
   return {
-    phiPnc: (0.85 * Ae * Fn) / 1e3, phiPnt: (0.95 * A * Fy) / 1e3, phiPno: (0.85 * effArea(g, Fy, E) * Fy) / 1e3,
+    phiPnc: (0.85 * Math.min(Ae * Fn, Pnd)) / 1e3, phiPnt: (0.95 * A * Fy) / 1e3, phiPno: (0.85 * Math.min(effArea(g, Fy, E) * Fy, Pnd)) / 1e3,
     phiMnxBraced, phiMnxLTB, phiMny: (0.9 * Sy * Fy) / 1e6, phiVn: (0.95 * Vn) / 1e3,
     PEx: (A * sEx) / 1e3, PEy: (A * sEy) / 1e3,
-    Se: se.Se, Fc, Fn, Ae, KLr: Math.max(L.Lx / rx, L.Ly / ry), notes,
+    Se: se.Se, Fc, Fn, Ae, KLr: Math.max(L.Lx / rx, L.Ly / ry), notes, applicable, phiMnxt: 0.9 * Sf * Fy / 1e6, phiMnxo: 0.95 * se.Se * Fy / 1e6, FdB, FdC,
   }
 }
 
 /** C5 조합 — P(kN, + 인장), Mx·My (kN·m 절댓값), V (kN). braced = 압축 플랜지가 외장재에 구속 */
 export function cfCheck(cap: CFCapacity, f: { P: number; Mx: number; My: number; V: number }, braced: boolean) {
   const phiMx = braced ? cap.phiMnxBraced : cap.phiMnxLTB
-  let pm: number
-  if (f.P >= 0) pm = f.P / cap.phiPnt + f.Mx / phiMx + f.My / cap.phiMny // C5.1.2
+  let pm: number, eq: `TW CF ${string}`
+  if (f.P >= 0) {
+    const a = f.P / cap.phiPnt + f.Mx / cap.phiMnxt + f.My / cap.phiMny
+    const b = -f.P / cap.phiPnt + f.Mx / phiMx + f.My / cap.phiMny
+    pm = Math.max(a, b); eq = a >= b ? 'TW CF 8.2-3' : 'TW CF 8.2-4'
+  }
   else {
     const Pu = -f.P, pr = Pu / cap.phiPnc
-    if (pr <= 0.15) pm = pr + f.Mx / phiMx + f.My / cap.phiMny
+    if (pr <= 0.15) { pm = pr + f.Mx / phiMx + f.My / cap.phiMny; eq = 'TW CF 8.3-10' }
     else {
       const ax = Math.max(1e-3, 1 - Pu / cap.PEx), ay = Math.max(1e-3, 1 - Pu / cap.PEy)
-      pm = Math.max(pr + f.Mx / (phiMx * ax) + f.My / (cap.phiMny * ay), Pu / cap.phiPno + f.Mx / phiMx + f.My / cap.phiMny)
+      const a = pr + f.Mx / (phiMx * ax) + f.My / (cap.phiMny * ay)
+      const b = Pu / cap.phiPno + f.Mx / phiMx + f.My / cap.phiMny
+      pm = Math.max(a, b); eq = a >= b ? 'TW CF 8.3-8' : 'TW CF 8.3-9'
     }
   }
-  const mv = Math.sqrt((f.Mx / cap.phiMnxBraced) ** 2 + (f.V / cap.phiVn) ** 2) // C3.3.2
-  return { ratio: Math.max(pm, mv), eq: pm >= mv ? 'C5' as const : 'C3.3' as const }
+  const shearInteraction = Math.hypot(f.Mx / cap.phiMnxo, f.V / cap.phiVn) // TW 6.4-3, section strength without lateral/distortional buckling
+  return { ratio: Math.max(pm, shearInteraction), eq: pm >= shearInteraction ? eq : 'TW CF 6.4-3' as const }
 }

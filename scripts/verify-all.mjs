@@ -4,7 +4,9 @@
 import { spawnSync } from 'node:child_process'
 
 const SUITES = [
+  ['Review regression', 'verify-review-fixes.ts'],
   ['TW hand-calc + golden', 'verify-tw.ts'],
+  ['TW cold-formed + Q', 'verify-tw-coldformed.ts'],
   ['CN code anchors', 'verify-cn.ts'],
   ['CN golden', 'verify-golden.ts'],
   ['KR code anchors', 'verify-kr.ts'],

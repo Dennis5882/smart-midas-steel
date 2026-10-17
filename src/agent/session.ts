@@ -146,6 +146,7 @@ export async function setCode(id: CodeId, opts: { auto?: boolean } = {}): Promis
   const defaults = defaultSpecFor(id)
   S.lastSpec = previous ? { ...defaults, span: previous.span, bays: previous.bays, baySpacing: previous.baySpacing, bayList: previous.bayList?.slice(), eaveHeight: previous.eaveHeight, roofSlope: previous.roofSlope, baseFixity: previous.baseFixity, purlinSpacing: previous.purlinSpacing, girtSpacing: previous.girtSpacing, postSpacing: previous.postSpacing, sagRods: previous.sagRods, features: previous.features && { ...previous.features } } : defaults
   if (previous) {
+    S.lastSpec.restraints = previous.restraints && { ...previous.restraints }
     addPlanMsg(S.lastSpec, plan?.mode ?? (previous.bayList ? 'free' : 'template'), plan?.tpl ?? 'general')
     previewSpec(S.lastSpec)
     tab('viewP')

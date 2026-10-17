@@ -45,6 +45,7 @@ export const GROUPS: Group[] = [
     { path: 'girtSpacing', label: 'f_girtSp', unit: 'm', kind: 'num' },
     { path: 'postSpacing', label: 'f_postSp', unit: 'm', kind: 'num' },
     { path: 'sagRods', label: 'f_sagRods', kind: 'int', min: 0 },
+    ...(['flyBraces', 'sagRods', 'braceCrossing'] as const).map((key): Field => ({ path: `restraints.${key}`, label: `restraint_${key}`, kind: 'select', fallback: 'assumed', options: () => ['assumed', 'confirmed', 'none'].map((v) => ({ value: v, label: t(`restraint_${v}` as I18nKey) })) })),
   ] },
   { title: 'sec_sections', fields: [
     { path: 'sections.column', label: 'f_column', kind: 'text' },
@@ -150,6 +151,7 @@ export const groupsFor = (code: FactorySpec['code'], free = false, frame?: Frame
     : code === 'KR' ? [...GROUPS.filter((g) => !['sec_wind', 'sec_seismic', 'sec_conn'].includes(g.title)), ...KR_GROUPS] : GROUPS)
     .map((g) => free ? freeGeometry(g) : g)
     .map((g) => frame === 'multi' ? multiGeometry(g) : g)
+    .map((g) => code === 'CN' ? { ...g, fields: g.fields.filter((f) => f.path !== 'restraints.braceCrossing') } : g)
 export const FIELDS = [...GROUPS, ...CN_GROUPS, ...KR_GROUPS].flatMap((g) => g.fields)
 export const parseList = (raw: string) => raw.split(/[,，、\s]+/).filter(Boolean).map(Number)
 
@@ -166,6 +168,7 @@ export function toSpec(base: FactorySpec, vals: Record<Path, string>, free: bool
   const frame = (vals.frame || base.frame) as FrameType | undefined
   for (const f of groupsFor(base.code, free, frame).flatMap((g) => g.fields)) {
     const raw = vals[f.path]
+    if (f.path.startsWith('restraints.') && raw === 'assumed' && getPath(base, f.path) === undefined) continue
     if (f.kind === 'list') {
       const l = parseList(raw)
       if (l.length && l.every((v) => Number.isFinite(v) && v > 0)) sp = setPath(sp, f.path, l)
@@ -205,7 +208,7 @@ export function invalidField(f: Field, raw: string, spec: FactorySpec): boolean 
   return false
 }
 
-export const fieldStep = (f: Field) => ['frame', 'span', 'spanList', 'eaveHeight', 'roofSlope', 'baseFixity'].includes(f.path) ? 1
+export const fieldStep = (f: Field) => f.path.startsWith('restraints.') ? 2 : ['frame', 'span', 'spanList', 'eaveHeight', 'roofSlope', 'baseFixity'].includes(f.path) ? 1
   : ['bays', 'baySpacing', 'purlinSpacing', 'girtSpacing', 'postSpacing', 'sagRods'].includes(f.path) ? 2
   : f.path.startsWith('sections.') || f.path === 'material' || ['fc', 'anchorFu', 'china.concreteBearing', 'china.anchorFt'].includes(f.path) ? 3 : 4
 

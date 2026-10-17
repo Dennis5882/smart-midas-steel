@@ -9,6 +9,8 @@ import { purlinDefl, type DesignResult, type MemberCheck, type ServiceCheck, typ
 import type { FactorySpec, FactoryModel, ElementRole } from './types'
 import type { LoadInfo } from './loads'
 import { portalGeometry } from './portal'
+import { roofDeflection } from './roofDeflection'
+import { sagCount, support } from './validity'
 import { sectionProps } from './sections'
 import { ccQCN, cnCCLoads } from './cnSecondary'
 import { validateDesignResults } from './resultValidation'
@@ -63,11 +65,12 @@ export function runCnDesign(spec: FactorySpec, model: FactoryModel, info: LoadIn
     if (roles && !roles.includes(e.role)) continue
     const a = nodes.get(e.n1)!, b = nodes.get(e.n2)!, sp = sectionProps(e.section)
     const L = 1000 * Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z)
-    const secL = Math.min(L, 1000 * spec.baySpacing / (spec.sagRods + 1))
-    const lensOf = (combo: string) => e.role === 'column' ? { KLx: (e.lean ? 1 : Kat.get(a.x)! * etaOf(combo)) * G.zAt(a.x) * 1000, KLy: L, Lb: L } // 흔들림 기둥 K = 1
-      : e.role === 'rafter' ? { KLx: G.slopeLen * 1000, KLy: L, Lb: L }
+    const secL = Math.min(L, 1000 * spec.baySpacing / (sagCount(spec) + 1))
+    const flyL = support(spec, 'flyBraces') === 'none' ? 1000 * (e.role === 'rafter' ? G.slopeLen : G.zAt(a.x)) : L
+    const lensOf = (combo: string) => e.role === 'column' ? { KLx: (e.lean ? 1 : Kat.get(a.x)! * etaOf(combo)) * G.zAt(a.x) * 1000, KLy: flyL, Lb: flyL } // 흔들림 기둥 K = 1
+      : e.role === 'rafter' ? { KLx: G.slopeLen * 1000, KLy: flyL, Lb: flyL }
       : e.role === 'purlin' || e.role === 'girt' ? { KLx: L, KLy: secL, Lb: secL }
-      : e.role === 'post' ? { KLx: G.zAt(a.x) * 1000, KLy: L, Lb: L } : { KLx: L, KLy: L, Lb: L }
+      : e.role === 'post' ? { KLx: G.zAt(a.x) * 1000, KLy: flyL, Lb: flyL } : { KLx: L, KLy: L, Lb: L }
     const material = e.role === 'purlin' || e.role === 'girt' ? spec.secondaryMaterial ?? 'Q235B' : spec.material
     let best: MemberCheck | undefined
     let compression = false, maxSlender = 0
@@ -85,7 +88,7 @@ export function runCnDesign(spec: FactorySpec, model: FactoryModel, info: LoadIn
       if (!best || chk.ratio > best.ratio) best = { id: e.id, role: e.role, section: e.section, ratio: chk.ratio, combo, part, eq: chk.eq, forces, cap, B: chk.B, Cb: 1, lengths: lens, slender: { value: 0, limit: 0 }, notes: cap.notes }
     }
     if (e.role === 'brace') for (const [combo, P] of res.truss.get(e.id) ?? []) consider(combo, -1, { P, Mx: 0, My: 0, V: 0 })
-    else for (const [combo, pts] of res.beam.get(e.id) ?? []) for (const [part, p] of pts.entries()) consider(combo, part, { P: p.P, Mx: Math.abs(p.My), My: Math.abs(p.Mz) * (e.role === 'purlin' || e.role === 'girt' ? 1 / (spec.sagRods + 1) ** 2 : 1), V: Math.abs(p.Vz) })
+    else for (const [combo, pts] of res.beam.get(e.id) ?? []) for (const [part, p] of pts.entries()) consider(combo, part, { P: p.P, Mx: Math.abs(p.My), My: Math.abs(p.Mz) * (e.role === 'purlin' || e.role === 'girt' ? 1 / (sagCount(spec) + 1) ** 2 : 1), V: Math.abs(p.Vz) })
     for (const d of cc.get(e.id)?.demands ?? []) consider(d.combo, 2, d.f)
     if (!best) throw new Error(`GB: missing analysis forces for element ${e.id}`)
     const m = best as MemberCheck
@@ -119,19 +122,7 @@ export function runCnDesign(spec: FactorySpec, model: FactoryModel, info: LoadIn
       push(ek, Math.max(0, ...eaves.map((n) => Math.abs(disp(`E${d}`, n.id)[comp]) / n.z)), DRIFT_CN, `E${d}`, 'GB 51022 3.3.1: frequent earthquake h/60')
     }
     /* 표 3.3.2 지붕보 L/180 — L = 그 경간 전체(주 2), 처짐 = 마루(편坡는 경간 중앙) − 양쪽 기둥 상단 평균 */
-    const lines = [...G.eaveXs, ...G.leanXs].sort((p, q) => p - q)
-    const top = (x: number, y: number) => model.nodes.find((n) => Math.abs(n.x - x) < 1e-6 && Math.abs(n.y - y) < 1e-8 && Math.abs(n.z - G.zAt(x)) < 1e-6)
-    let maxDefl = 0, defLim = Infinity, at = ''
-    for (const lc of ['LR', ...res.disp.keys()].filter((x, i, a) => (x === 'LR' || x.startsWith('SN') || x.startsWith('SV') || x.startsWith('SH')) && a.indexOf(x) === i)) {
-      for (const r of model.nodes.filter(G.isDeflNode)) {
-        const left = lines.filter((x) => x < r.x - 1e-6).at(-1)!, right = lines.find((x) => x > r.x + 1e-6)!
-        const peers = [top(left, r.y), top(right, r.y)].filter((n): n is NonNullable<typeof n> => !!n)
-        const dz = (id: number) => disp('D', id).dz + disp(lc, id).dz
-        const v = Math.abs(dz(r.id) - peers.reduce((s, n) => s + dz(n.id), 0) / Math.max(1, peers.length)), lim = (right - left) / 180
-        if (v / lim > maxDefl / defLim) { maxDefl = v; defLim = lim; at = `D+${lc}` }
-      }
-    }
-    push('rafterDefl', maxDefl, Number.isFinite(defLim) ? defLim : spec.span / 180, at, 'GB 51022 3.3.2: rafter, profiled roof L/180 (full span)')
+    service.push({ key: 'rafterDefl', ...roofDeflection(spec, model, res, [...res.disp.keys()].filter((x) => x === 'LR' || /^(SN|SV|SH)/.test(x)), 180, true), clause: 'GB 51022 3.3.2: rafter, profiled roof L/180 (full span)' })
     push('purlinDefl', purlinDefl(spec, info, spec.sections.purlin), spec.baySpacing / 150, 'D+max(LR,S peak)', 'GB 51022 3.3.2: purlin, profiled roof L/150')
     const gL = Math.max(...G.spans)
     push('girtDefl', cnGirtDeflRatio(spec, info, spec.sections.girt) * gL * GIRT_DEFL_CN, gL * GIRT_DEFL_CN, 'W (C&C, β 1.5)', 'GB 51022 3.3.2: girt, profiled wall L/100')

@@ -1,3 +1,4 @@
+import { sagCount } from './validity'
 /* 한국 KDS 41 12 00 5.4·5.8 — 퍼린·거트 외장재설계용 풍하중 (순수 함수).
    KDS 1.2 용어: 외장재설계용 풍하중은 외장재와 이를 지지하는 파스너·퍼린·거트에 적용 → 주골조 풍압 대신 이 하중으로도 검토(둘 중 불리).
    W_C/A_C = q_H(Ĉpe − Ĉpi) (5.4-3), |p| ≥ 0.675 kN/m². 단순보(양단 핀): Mx = wL²/8, V = wL/2.
@@ -45,7 +46,7 @@ export function krCCLoads(spec: FactorySpec, model: FactoryModel, info: LoadInfo
     const eave = x <= aAll + 1e-9 || x >= spec.span - aAll - 1e-9
     return { edge: eave || (deg > 10 && G.ridges.some((r) => Math.abs(x - r) <= aAll + 1e-9)), a: aAll }
   }
-  const nSeg = spec.sagRods + 1
+  const nSeg = sagCount(spec) + 1
   for (const e of model.elements) {
     if (e.role !== 'purlin' && e.role !== 'girt') continue
     const p1 = nodes.get(e.n1)!, p2 = nodes.get(e.n2)!

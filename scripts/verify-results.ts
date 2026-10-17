@@ -7,7 +7,7 @@ import { gunzipSync } from 'node:zlib'
 import { decodeResults, FIXTURE } from './tw-golden'
 import { buildPortal } from '../src/domain/portal'
 import { buildLoadPayloads } from '../src/domain/loads'
-import { CN_DEFAULT_SPEC } from '../src/domain/types'
+import { CN_DEFAULT_SPEC, KR_DEFAULT_SPEC } from '../src/domain/types'
 import { runDesign } from '../src/domain/design'
 import { runConnections } from '../src/domain/connections'
 import { ResultValidationError, serviceNodes } from '../src/domain/resultValidation'
@@ -27,11 +27,11 @@ const tw = JSON.parse(gunzipSync(readFileSync(FIXTURE)).toString())
 let passed = 0, fault = ''
 const zero = () => ({ P: 0, Vy: 0, Vz: 0, My: 0, Mz: 0 })
 
-function input(cn: boolean): { built: Built; results: Results } {
-  const spec = structuredClone(cn ? CN_DEFAULT_SPEC : tw.spec), model = buildPortal(spec), loads = buildLoadPayloads(spec, model)
+function input(code: 'TW' | 'CN' | 'KR'): { built: Built; results: Results } {
+  const spec = structuredClone(code === 'CN' ? CN_DEFAULT_SPEC : code === 'KR' ? KR_DEFAULT_SPEC : tw.spec), model = buildPortal(spec), loads = buildLoadPayloads(spec, model)
   const comboNames = Object.keys(loads.info.comboKind), cases = Object.values(loads.STLD).map((x: any) => x.NAME)
   const built = { spec, model, info: loads.info, comboNames, combos: comboNames.length, cases }
-  if (!cn) return { built, results: decodeResults(structuredClone(tw.results)) }
+  if (code === 'TW') return { built, results: decodeResults(structuredClone(tw.results)) }
   const results: Results = { beam: new Map(), truss: new Map(), sway: new Map(), disp: new Map(), combos: comboNames }
   for (const e of model.elements) {
     if (e.role === 'brace') results.truss.set(e.id, new Map(comboNames.map((c) => [c, 0])))
@@ -42,9 +42,9 @@ function input(cn: boolean): { built: Built; results: Results } {
   return { built, results }
 }
 
-for (const cn of [false, true]) {
-  let source = input(cn)
-  const code = cn ? 'CN' : 'TW'
+for (const code of ['TW', 'CN', 'KR'] as const) {
+  const cn = code === 'CN'
+  let source = input(code)
   const design = () => runDesign(source.built.spec, source.built.model, source.built.info, source.results)
   assert.equal(design().members.length, source.built.model.elements.length); passed++
   const mutations: Record<string, (r: Results) => void> = {
@@ -62,17 +62,17 @@ for (const cn of [false, true]) {
     'NaN displacement': (r) => { r.disp.get('EX')!.values().next().value!.dx = NaN },
   }
   for (const [name, mutate] of Object.entries(mutations)) {
-    source = input(cn); mutate(source.results)
+    source = input(code); mutate(source.results)
     assert.throws(design, ResultValidationError, `${code} ${name}`); passed++
   }
-  source = input(cn); source.results.truss.clear()
+  source = input(code); source.results.truss.clear()
   assert.throws(() => runConnections(source.built.spec, source.built.model, source.built.info, source.results), ResultValidationError); passed++
-  source = input(cn); source.results.disp.delete(cn ? 'SN' : 'ETX')
+  source = input(code); source.results.disp.delete(cn ? 'SN' : 'ETX')
   assert.throws(design, ResultValidationError); passed++
 
   /* Exercise the real table parser: dropped cells/rows, station order,
      duplicate stations, missing reaction sums and partial node responses. */
-  source = input(cn)
+  source = input(code)
   const { built, results } = source
   S.mapiKey = `offline-results-${code}`
   ;(globalThis as any).fetch = async (_url: string, init: RequestInit) => {

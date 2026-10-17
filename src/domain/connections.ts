@@ -37,6 +37,8 @@ export interface ConnectionParts {
   /** All dimensions in mm; count is per physical connection. */
   plates: { part: PlatePart; width: number; length: number; thickness: number; count: number; estimated: boolean }[]
   fasteners: { kind: 'bolt' | 'anchor'; diameter: number; count: number }[]
+  /** Physical weld length in mm per connection; only supplied where detailed. */
+  welds?: { type: 'fillet' | 'cjp'; length: number; count: number }[]
 }
 export interface ConnResult {
   type: 'base' | 'knee' | 'apex' | 'brace'

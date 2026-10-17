@@ -2,6 +2,7 @@
 import type { AppState, TaskId } from './store'
 import type { FactorySpec } from '../domain/types'
 import type { I18nKey } from '../i18n'
+import { blockedMembers } from '../domain/validity'
 
 /** 키 순서·undefined 와 무관한 스펙 비교 (카드의 toSpec·normalizeBays 가 키 순서를 바꿀 수 있음) */
 const canon = (v: unknown): unknown => Array.isArray(v) ? v.map(canon)
@@ -30,7 +31,7 @@ export function unavailable(s: FlowState, task: TaskId): I18nKey | null {
   if (s.draftInvalid) return 'flow_invalid_draft'
   if (specChanged(s.draftSpec, s.built.spec)) return 'wf_stale_edited'
   /* 산출물은 모델만 있으면 가능 — 계산서는 부분판(검토 전 표시), 도면·물량은 접합 없이 부재만 */
-  if (task === 'outputs') return null
+  if (task === 'outputs') return blockedMembers(s.design) ? 'flow_invalid_design' : null
   if (task !== 'analysis' && !s.analyzed) return 'need_anal'
   if (task === 'optimize' && (!s.design || !s.connections)) return 'flow_need_design'
   if (!s.mapiKey.trim()) return 'flow_need_connection'
@@ -41,6 +42,7 @@ export type TaskStatus = 'todo' | 'ready' | 'done' | 'running' | 'failed' | 'can
 export function taskStatus(s: FlowState, task: TaskId): TaskStatus {
   if (s.job && taskOfJob(s.job.kind) === task) return 'running'
   if (isStale(s)) return 'stale'
+  if ((task === 'design' || task === 'outputs') && blockedMembers(s.design)) return 'failed'
   if (s.lastFail && taskOfJob(s.lastFail.kind) === task) return s.lastFail.cancelled ? 'cancelled' : 'failed'
   if (task === 'model') return s.built ? 'done' : 'ready'
   if (task === 'analysis' && s.analyzed || task === 'design' && s.design || task === 'optimize' && s.opt) return 'done'

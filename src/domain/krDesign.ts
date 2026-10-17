@@ -11,10 +11,12 @@ import type { Results } from '../actions/results'
 import type { CCSummary, DesignResult, MemberCheck, ServiceCheck } from './design'
 import type { LoadInfo } from './loads'
 import { portalGeometry } from './portal'
+import { roofDeflection } from './roofDeflection'
 import { sectionProps } from './sections'
 import { validateDesignResults } from './resultValidation'
 import { krCCLoads } from './krSecondary'
-import { frameSpans, type ElementRole, type FactoryModel, type FactorySpec } from './types'
+import { type ElementRole, type FactoryModel, type FactorySpec } from './types'
+import { sagCount, support } from './validity'
 
 /** 프로젝트 기준 처짐 한계 (스팬/값) — 지붕보·퍼린, 지붕활하중 또는 적설 */
 export const KR_DEFL = { rafter: 240, purlin: 240 }
@@ -30,18 +32,20 @@ export function krLengths(spec: FactorySpec, model: FactoryModel): Map<number, {
   const G = portalGeometry(spec), nodes = new Map(model.nodes.map((n) => [n.id, n]))
   const col = sectionProps(spec.sections.column), raf = sectionProps(spec.sections.rafter)
   const Kat = new Map(G.eaveXs.map((x) => [x, krKSway((col.Ix / G.zAt(x)) / (raf.Ix / G.rafterLen), spec.baseFixity === 'fixed' ? 1 : 10)]))
-  const Lsec = spec.baySpacing / (spec.sagRods + 1)
+  const Lsec = spec.baySpacing / (sagCount(spec) + 1)
   const mm = (m: number) => m * 1000
   const out = new Map<number, { KLx: number; KLy: number; Lb: number; K: number; L: number }>()
   for (const e of model.elements) {
     const a = nodes.get(e.n1)!, b = nodes.get(e.n2)!
     const Lel = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z)
     const K = e.role === 'column' && !e.lean ? Kat.get(a.x)! : 1
-    const l = e.role === 'column' ? { KLx: mm(K * G.zAt(a.x)), KLy: mm(Lel), Lb: mm(Lel) }
-      : e.role === 'rafter' ? { KLx: mm(G.slopeLen), KLy: mm(Lel), Lb: mm(Lel) }
+    const flyL = support(spec, 'flyBraces') === 'none' ? (e.role === 'rafter' ? G.slopeLen : G.zAt(a.x)) : Lel
+    const crossL = support(spec, 'braceCrossing') === 'none' ? Lel : Lel / 2
+    const l = e.role === 'column' ? { KLx: mm(K * G.zAt(a.x)), KLy: mm(flyL), Lb: mm(flyL) }
+      : e.role === 'rafter' ? { KLx: mm(G.slopeLen), KLy: mm(flyL), Lb: mm(flyL) }
       : e.role === 'purlin' || e.role === 'girt' ? { KLx: mm(Lel), KLy: mm(Math.min(Lel, Lsec)), Lb: mm(Math.min(Lel, Lsec)) }
-      : e.role === 'post' ? { KLx: mm(G.zAt(a.x)), KLy: mm(Lel), Lb: mm(Lel) }
-      : e.role === 'brace' ? { KLx: mm(Lel / 2), KLy: mm(Lel / 2), Lb: mm(Lel / 2) }
+      : e.role === 'post' ? { KLx: mm(G.zAt(a.x)), KLy: mm(flyL), Lb: mm(flyL) }
+      : e.role === 'brace' ? { KLx: mm(crossL), KLy: mm(crossL), Lb: mm(crossL) }
       : { KLx: mm(Lel), KLy: mm(Lel), Lb: mm(Lel) }
     out.set(e.id, { ...l, K, L: mm(Lel) })
   }
@@ -69,7 +73,7 @@ export function runKrDesign(spec: FactorySpec, model: FactoryModel, info: LoadIn
     const material = e.role === 'purlin' || e.role === 'girt' ? spec.secondaryMaterial ?? spec.material : spec.material
     const Fy = fyKR(material, Math.max(sp.tf, sp.tw))
     const frame = e.role === 'column' || e.role === 'rafter'
-    const myScale = e.role === 'purlin' || e.role === 'girt' ? 1 / (spec.sagRods + 1) ** 2 : 1
+    const myScale = e.role === 'purlin' || e.role === 'girt' ? 1 / (sagCount(spec) + 1) ** 2 : 1
     let best: MemberCheck | null = null
     let maxComp = 0
     /* 냉간성형 립 C형강 퍼린·거트 — KDS 41 30 30 (해석 부재력 + 외장재 풍압). 압축 플랜지 구속: 퍼린 중력 방향 휨이면 외장재가 구속 */
@@ -83,6 +87,7 @@ export function runKrDesign(spec: FactorySpec, model: FactoryModel, info: LoadIn
           cap: { phiPnc: cf.phiPnc, phiPnt: cf.phiPnt, phiMnx: braced ? cf.phiMnxBraced : cf.phiMnxLTB, phiMny: cf.phiMny, phiVn: cf.phiVn,
             mxMode: braced ? 'CF' : `CF-${cf.mode}`, compact: 'noncompact', KLr: cf.KLr, lambdaC: Math.sqrt(Fy / Math.max(cf.Fn, 1e-9)) },
           B: 1, Cb: 1, lengths: lens, slender: { value: 0, limit: 0 }, notes: cf.notes,
+          issues: cf.applicable ? [] : [{ key: 'coldFormedRange', level: 'blocked', detail: 'KDS 41 30 30 table 1.6-1' }],
         }
       }
       const beam = res.beam.get(e.id)
@@ -96,6 +101,8 @@ export function runKrDesign(spec: FactorySpec, model: FactoryModel, info: LoadIn
       for (const d of cc.get(e.id)?.demands ?? []) considerCF(d.combo, 2, d.f, d.braced)
       if (!best) throw new Error(`KDS: missing analysis forces for element ${e.id}`)
       const m = best as MemberCheck
+      m.strengthRatio = m.ratio
+      m.strengthGoverning = { combo: m.combo, eq: m.eq, part: m.part, B: m.B, Cb: m.Cb }
       m.slender = maxComp > 1e-3
         ? { value: Math.max(lens.KLx / sp.rx, lens.KLy / sp.ry), limit: SLENDER_KR.compression }
         : { value: Math.max(lens.KLx, lens.KLy) / Math.min(sp.rx, sp.ry), limit: SLENDER_KR.tension }
@@ -142,6 +149,8 @@ export function runKrDesign(spec: FactorySpec, model: FactoryModel, info: LoadIn
     }
     if (!best) throw new Error(`KDS: missing analysis forces for element ${e.id}`)
     const m = best as MemberCheck
+    m.strengthRatio = m.ratio
+    m.strengthGoverning = { combo: m.combo, eq: m.eq, part: m.part, B: m.B, Cb: m.Cb }
     /* 4.1.1·4.2.2 세장비 (가급적) — 압축 KL/r 200, 인장 L/r 300 */
     m.slender = maxComp > 1e-3
       ? { value: Math.max(lens.KLx / sp.rx, lens.KLy / sp.ry), limit: SLENDER_KR.compression }
@@ -166,10 +175,13 @@ export function runKrDesign(spec: FactorySpec, model: FactoryModel, info: LoadIn
     members.push(m)
   }
   /* 14 31 15 4.3.1 유효길이법 적용 조건 B2 ≤ 1.5 — 넘으면 골조 부재에 표시 (직접해석법 필요) */
-  if (b2Max > 1.5) for (const m of members) if (m.role === 'column' || m.role === 'rafter') m.notes = [...m.notes, `B2 ${b2Max.toFixed(2)} > 1.5 (KDS 14 31 15 4.3.1)`]
+  if (b2Max > 1.5) for (const m of members) if (m.role === 'column' || m.role === 'rafter') {
+    m.notes = [...m.notes, `B2 ${b2Max.toFixed(2)} > 1.5 (KDS 14 31 15 4.3.1)`]
+    m.issues = [...m.issues ?? [], { key: 'effectiveLength', level: 'blocked', detail: `B2=${b2Max.toFixed(3)} > 1.5; KDS 14 31 15 4.3.1` }]
+  }
 
   if (!roles) {
-    const eaves = model.nodes.filter(G.isEaveNode), ridges = model.nodes.filter(G.isDeflNode)
+    const eaves = model.nodes.filter(G.isEaveNode)
     const disp = (lc: string, id: number) => {
       const v = res.disp.get(lc)?.get(id)
       if (!v || ![v.dx, v.dy, v.dz].every(Number.isFinite)) throw new Error(`KDS: missing/invalid service displacement ${lc}, node ${id}`)
@@ -195,14 +207,7 @@ export function runKrDesign(spec: FactorySpec, model: FactoryModel, info: LoadIn
       push(ek, ad * delta / spec.eaveHeight, kr.driftLimit, `Cd·(E${d}±ET${d})/I_E${ad > 1 ? ` × ${ad.toFixed(3)}` : ''}`, `KDS 41 17 00 7.2.8 · table 8.2-1 (${kr.driftLimit}h, θ = ${thetaPD.toFixed(3)})`)
     }
     /* 지붕보 처짐 — 마루(또는 경간 중앙) − 같은 y 처마 평균, 지붕활하중·적설 케이스 중 최대 */
-    const wSpan = spec.frame === 'mono' ? spec.span : Math.max(...frameSpans(spec))
-    let maxDefl = 0, at = ''
-    for (const lc of [...res.disp.keys()].filter((x) => x === 'LR' || /^SN/.test(x))) for (const r of ridges) {
-      const peers = eaves.filter((n) => Math.abs(n.y - r.y) < 1e-8)
-      const v = Math.abs(disp(lc, r.id).dz - peers.reduce((t, n) => t + disp(lc, n.id).dz, 0) / Math.max(1, peers.length))
-      if (v > maxDefl) { maxDefl = v; at = lc }
-    }
-    push('rafterDefl', maxDefl, wSpan / KR_DEFL.rafter, at, `Project criterion L/${KR_DEFL.rafter} (KDS 14 31 55 4.1.3)`)
+    service.push({ key: 'rafterDefl', ...roofDeflection(spec, model, res, [...res.disp.keys()].filter((x) => x === 'LR' || /^SN/.test(x)), KR_DEFL.rafter), clause: `Project criterion L/${KR_DEFL.rafter} (KDS 14 31 55 4.1.3)` })
     const dp = krPurlinDefl(spec, info, spec.sections.purlin)
     push('purlinDefl', dp, spec.baySpacing / KR_DEFL.purlin, 'max(LR, SN)', `Project criterion L/${KR_DEFL.purlin} (KDS 14 31 55 4.1.3)`)
   }

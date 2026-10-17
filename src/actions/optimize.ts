@@ -16,6 +16,7 @@ import { sendModel } from './build'
 import { fetchResults } from './results'
 import { assertGenSync } from './genSync'
 import { quantities } from '../domain/quantities'
+import { blockedMembers } from '../domain/validity'
 import { beginJob, endJob, failMsg, setIter } from './job'
 
 const MAX_ITER = 5
@@ -47,9 +48,9 @@ export async function runOptimize(): Promise<void> {
       /* 접합부도 반복마다 산정 — 부재만 통과하고 접합이 NG 인 안을 최종안으로 고르지 않게 */
       const cs = runConnections(b.spec, b.model, b.info, S.results)
       const rec: OptIter = { it, sections: b.spec.sections, weight: steelWeight(b.spec, b.model), plateT: quantities(b.spec, b.model, cs).plateT,
-        maxRatio: d.maxRatio, svcMax, ng: d.ng, connMax: Math.max(0, ...cs.map((c) => c.ratio)), connNg: cs.filter((c) => c.ratio > 1).length }
+        maxRatio: d.maxRatio, svcMax, ng: d.ng, invalid: blockedMembers(d), connMax: Math.max(0, ...cs.map((c) => c.ratio)), connNg: cs.filter((c) => c.ratio > 1).length }
       iters.push(rec)
-      log(t('log_opt_iter', it, rec.weight.toFixed(2), d.maxRatio.toFixed(3), svcMax.toFixed(3), d.ng) + t('log_opt_conn', rec.connMax.toFixed(3), rec.connNg), d.ng || rec.connNg ? 'warn' : 'ok')
+      log(t('log_opt_iter', it, rec.weight.toFixed(2), d.maxRatio.toFixed(3), svcMax.toFixed(3), d.ng) + t('log_opt_conn', rec.connMax.toFixed(3), rec.connNg) + (rec.invalid ? ` · ${t('rs_applicability')}: ${rec.invalid}` : ''), d.ng || rec.connNg || rec.invalid ? 'warn' : 'ok')
       /* 재해석 NG 를 하한·금지로 기록 — 다음 제안이 같은(또는 더 가벼운) 단면으로 되돌아가지 않게 */
       for (const r of ROLES) {
         const m = d.byRole[r]
@@ -68,7 +69,7 @@ export async function runOptimize(): Promise<void> {
       if (it === MAX_ITER) break
       const p = proposeSections(b.spec, b.model, b.info, S.results, d, ctl)
       lastRows = p.rows
-      if (!p.changed) { converged = d.ng === 0; if (converged) break }
+      if (!p.changed) { converged = d.ng === 0 && !blockedMembers(d) && rec.connNg === 0; if (converged) break }
       if (!p.changed || iters.some((x) => key(x.sections) === key(p.sections))) break
       for (const r of p.rows) if (r.before !== r.after) log(`${t(`role_${r.role}`)}: ${r.before} → ${r.after} (${r.ratio.toFixed(2)})`, 'info')
       await sendModel({ ...b.spec, sections: p.sections })
@@ -94,7 +95,7 @@ export async function runOptimize(): Promise<void> {
     const tB = roleTons(start, b.model, start.sections), tA = roleTons(b.spec, b.model)
     S.opt = {
       before: start.sections, after: b.spec.sections, iters, weightBefore: wB, weightAfter: wA, converged,
-      ok: valid && S.design.ng === 0 && S.connections.every((c) => c.ratio <= 1),
+      ok: valid && !blockedMembers(S.design) && S.design.ng === 0 && S.connections.every((c) => c.ratio <= 1),
       rows: ROLES.filter((r) => b.model.elements.some((e) => e.role === r)).map((r) => ({
         role: r, before: start.sections[r], after: b.spec.sections[r], ratio: S.design!.byRole[r]?.ratio ?? 0,
         governs: lastRows.find((x) => x.role === r)?.governs ?? 'strength', tBefore: tB[r], tAfter: tA[r],

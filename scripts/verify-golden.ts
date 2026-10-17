@@ -28,7 +28,9 @@ near(Math.abs(rx('EY').fy), loads.info.seismic.Y.V, 1e-4, 'Gen EY reaction = V_Y
 if (code === 'CN' && loads.info.snow) near(Math.abs(rx('SN').fz), loads.info.snow * BL, 1e-4, 'Gen SN reaction = s·B·L')
 if (code === 'KR') near(Math.abs(rx('SN').fz), loads.info.kr!.Ss * BL, 1e-4, 'Gen SN reaction = S_s·B·L (KDS balanced)')
 
+const originalResults = JSON.stringify(fx.results)
 const now = golden(spec, decodeResults(fx.results))
+eq(JSON.stringify(fx.results), originalResults, 'golden evaluation must preserve captured Gen results')
 if (process.argv.includes('--update')) {
   writeFileSync(path, gzipSync(JSON.stringify({ ...fx, golden: now })))
   console.log('golden updated (design/connection answers only; Gen results unchanged)')

@@ -18,6 +18,7 @@ import { lengthText, type FactorySpec } from '../domain/types'
 import { t, tc } from '../i18n'
 import { fieldConflicts, fieldStep, groupsFor, initVals, invalidFields, toSpec, type Group, type Path } from './planFields'
 import { S, notify, useStore, type ChatMsg } from '../state/store'
+import { restraintKeys, support } from '../domain/validity'
 import { draw3D, previewSpec, tab } from '../state/ui'
 
 type PlanMsg = Extract<ChatMsg, { kind: 'plan' }>
@@ -45,6 +46,7 @@ function Summary({ spec, tpl }: { spec: FactorySpec; tpl?: TemplateKey }) {
       {row(t('f_eave'), `${spec.eaveHeight} m · ${t('f_slope')} ${spec.roofSlope} · ${t('f_base')} ${t(spec.baseFixity === 'fixed' ? 'base_fixed' : 'base_pinned')}`)}
       {row(t('f_column'), `${sec.column} · ${t('f_rafter')} ${sec.rafter}`)}
       {row(t('f_material'), spec.material)}
+      {restraintKeys(spec).map((k) => <div key={k}>{row(t(`restraint_${k}`), t(`restraint_${support(spec, k)}`))}</div>)}
       <div className="plan-sub">
         <span className="k">{t('f_purlin')}</span> {sec.purlin} · <span className="k">{t('f_girt')}</span> {sec.girt} · <span className="k">{t('f_brace')}</span> {sec.brace}<br />
         <span className="k">{t('ps_site')}</span> {site}
@@ -136,6 +138,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
         {f.figure && <FigureButton fig={f.figure} />}
       </div>
       {f.figure && <FigureNote fig={f.figure} />}
+      {f.path === 'restraints.flyBraces' && <small>{t('restraint_note')}</small>}
       {error && <small className="mw-error" id={`${id}-error`}>{conflict ? conflict.text : f.kind === 'list' ? t('mw_list_error') : f.path.startsWith('sections.') ? t('mw_section_error', msg.spec.sections.column)
         : !vals[f.path]?.trim() ? t('mw_required') : f.kind === 'int' && !Number.isInteger(Number(vals[f.path])) ? t('mw_integer')
         : f.kind === 'num' || f.kind === 'int' ? f.min === undefined ? t('mw_positive') : t('mw_min', f.min) : t('mw_field_error')}</small>}

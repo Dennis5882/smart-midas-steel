@@ -1,3 +1,4 @@
+import { blockedMembers, issueNotes } from '../domain/validity'
 /* 결과 요약 카드 + 부재 결과 표 (Data Table) — 부재 수백 개를 카드 목록 대신 표로.
    필터(부재 종류·NG 만·0.9 이상)·검색(요소·단면·조합)·열 정렬(강도비 내림차순 기본)·50행씩 더 보기·CSV(필터 결과, UTF-8 BOM). */
 import { useMemo, useState } from 'react'
@@ -6,6 +7,9 @@ import type { DesignResult, MemberCheck } from '../domain/design'
 import { ROLES } from '../domain/types'
 import { t, type I18nKey } from '../i18n'
 import { useStore } from '../state/store'
+import { unavailable } from '../state/taskFlow'
+import { memberGrade } from '../domain/status'
+import { GradeChip } from './Status'
 
 const ratioColor = (r: number) => (r > 1 ? 'var(--red)' : r > 0.9 ? 'var(--amber)' : 'var(--green)')
 
@@ -26,9 +30,10 @@ export function SummaryCards() {
     ['sum_max', d.maxRatio.toFixed(3), ratioColor(d.maxRatio)],
     ['sum_ng', String(ng), ng ? 'var(--red)' : 'var(--green)'],
   ]
+  if (blockedMembers(d)) cards.push(['rs_applicability', String(blockedMembers(d)), 'var(--red)'])
   if (s.opt) {
     const pct = s.opt.weightBefore > 0 ? ((s.opt.weightBefore - s.opt.weightAfter) / s.opt.weightBefore) * 100 : 0
-    cards.push(['sum_opt', `${pct.toFixed(1)}%`, 'var(--green)'])
+    cards.push(['sum_opt', `${pct.toFixed(1)}%`, s.opt.ok ? 'var(--green)' : 'var(--red)'])
   }
   return (
     <div className="sum-cards">
@@ -40,6 +45,8 @@ export function SummaryCards() {
 }
 
 export function MemberTable({ d }: { d: DesignResult }) {
+  const state = useStore()
+  const exportReason = unavailable(state, 'outputs')
   const [role, setRole] = useState<string>('all')
   const [filter, setFilter] = useState<Filter>('all')
   const [q, setQ] = useState('')
@@ -50,7 +57,7 @@ export function MemberTable({ d }: { d: DesignResult }) {
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase()
     const list = d.members.filter((m) => (role === 'all' || m.role === role)
-      && (filter === 'all' || (filter === 'ng' ? m.ratio > 1 : m.ratio >= 0.9))
+      && (filter === 'all' || (filter === 'ng' ? memberGrade(m).grade === 'fail' : m.ratio >= 0.9))
       && (!needle || String(m.id) === needle || m.section.toLowerCase().includes(needle) || m.combo.toLowerCase().includes(needle)))
     const val = (m: MemberCheck): number | string => sort.key === 'role' ? t(`role_${m.role}`) : m[sort.key]
     return list.sort((a, b) => { const x = val(a), y = val(b); const c = typeof x === 'number' ? x - (y as number) : String(x).localeCompare(String(y)); return sort.desc ? -c : c })
@@ -65,9 +72,10 @@ export function MemberTable({ d }: { d: DesignResult }) {
   )
 
   const csv = () => {
+    if (exportReason) return
     const esc = (v: string | number) => (/[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v))
-    const lines = [[t('rd_elem'), t('rd_role'), t('rd_section'), t('rd_ratio'), t('rd_eq'), t('rd_combo'), t('mt_part'), t('rd_mode')].map(esc).join(',')]
-    for (const m of rows) lines.push([m.id, t(`role_${m.role}`), m.section, m.ratio.toFixed(4), m.eq, m.combo, m.part >= 0 ? PART[m.part] : '', m.cap.mxMode].map(esc).join(','))
+    const lines = [[t('rd_elem'), t('rd_role'), t('rd_section'), t('rd_ratio'), t('rd_eq'), t('rd_combo'), t('mt_part'), t('rd_mode'), t('rd_status'), t('mt_notes')].map(esc).join(',')]
+    for (const m of rows) lines.push([m.id, t(`role_${m.role}`), m.section, m.ratio.toFixed(4), m.eq, m.combo, m.part >= 0 ? PART[m.part] : '', m.cap.mxMode, t(`gr_${memberGrade(m).grade}`), issueNotes(m).join(' / ')].map(esc).join(','))
     const url = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }))
     const a = document.createElement('a'); a.href = url; a.download = 'steel_members.csv'; a.click()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
@@ -84,20 +92,21 @@ export function MemberTable({ d }: { d: DesignResult }) {
           <button key={f} className={`vtog ${filter === f ? 'on' : 'off'} mt-f`} aria-pressed={filter === f} onClick={() => { setFilter(f); setShown(PAGE) }}>{t(`mt_f_${f}`)}</button>
         ))}
         <input className="mt-q" type="search" placeholder={t('mt_search')} aria-label={t('mt_search')} value={q} onChange={(e) => { setQ(e.target.value); setShown(PAGE) }} />
-        <button className="btn btn-ghost mt-csv" onClick={csv} disabled={!rows.length}>CSV</button>
+        <button className="btn btn-ghost mt-csv" onClick={csv} disabled={!rows.length || !!exportReason} title={exportReason ? t(exportReason) : undefined}>CSV</button>
       </div>
       <div style={{ overflow: 'auto' }}>
         <table className="mt-table">
-          <thead><tr>{head('id', 'rd_elem')}{head('role', 'rd_role')}{head('section', 'rd_section')}{head('ratio', 'rd_ratio')}<th>{t('rd_eq')}</th>{head('combo', 'rd_combo')}<th>{t('mt_part')}</th></tr></thead>
+          <thead><tr>{head('id', 'rd_elem')}{head('role', 'rd_role')}{head('section', 'rd_section')}{head('ratio', 'rd_ratio')}<th>{t('rd_status')}</th><th>{t('rd_eq')}</th>{head('combo', 'rd_combo')}<th>{t('mt_part')}</th></tr></thead>
           <tbody>
             {rows.slice(0, shown).map((m) => (
-              <tr key={m.id} title={m.notes.join(' / ')}>
+              <tr key={m.id} title={issueNotes(m).join(' / ')}>
                 <td>{m.id}</td><td>{t(`role_${m.role}`)}</td><td>{m.section}</td>
                 <td style={{ color: ratioColor(m.ratio), fontWeight: 700 }}>{m.ratio.toFixed(3)}{m.ratio > 1 ? ' ✕' : ''}</td>
+                <td>{(() => { const g = memberGrade(m); return <GradeChip g={g.grade} reasons={g.reasons} /> })()}</td>
                 <td>{m.eq}</td><td>{m.combo}</td><td>{m.part >= 0 ? PART[m.part] : '—'}</td>
               </tr>
             ))}
-            {!rows.length && <tr><td colSpan={7} style={{ color: 'var(--dim)', textAlign: 'center' }}>{t('mt_none')}</td></tr>}
+            {!rows.length && <tr><td colSpan={8} style={{ color: 'var(--dim)', textAlign: 'center' }}>{t('mt_none')}</td></tr>}
           </tbody>
         </table>
       </div>

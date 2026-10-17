@@ -8,6 +8,7 @@ import type { I18nKey } from '../i18n'
 import { S } from '../state/store'
 import { addMsg, log, recordArtifact } from '../state/ui'
 import { unavailable } from '../state/taskFlow'
+import { restraintKeys, support } from '../domain/validity'
 import { beginJob, checkCancel, endJob, failMsg, stage } from './job'
 
 const stamp = () => new Intl.DateTimeFormat('sv-SE').format(new Date()).replaceAll('-', '')
@@ -94,6 +95,9 @@ export function downloadQuantities(): void {
     [L('q_memberT'), q.memberT.toFixed(3), 't'], [L('q_plateT'), q.plateT.toFixed(3), 't'], [L('q_netT'), q.netT.toFixed(3), 't'],
     [L('q_loss'), t('q_loss_v', LOSS.member * 100, LOSS.plate * 100)], [L('q_orderT'), q.orderT.toFixed(3), 't'],
     [L('q_paint'), q.paintM2.toFixed(1), 'm2'], [`${L('q_weld')} — ${L('q_cjp')}`, q.cjpM.toFixed(1), 'm'], [`${L('q_weld')} — ${L('q_fillet')}`, q.filletM.toFixed(1), 'm'],
+    [], [L('q_excluded')], [L('q_note')], [L('q_excluded_note')],
+    ...restraintKeys(spec).map((k) => [t(`restraint_${k}`), t(`restraint_${support(spec, k)}`)]),
+    [t('restraint_note')],
   ]
   download(`steel_quantities_${stamp()}.csv`, '\ufeff' + rows.map((r) => r.map(cell).join(',')).join('\r\n'), 'text/csv;charset=utf-8')
   log(t('log_csv'), 'ok')

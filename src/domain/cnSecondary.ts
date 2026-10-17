@@ -1,3 +1,4 @@
+import { sagCount } from './validity'
 /* GB 51022-2015 4.2 퍼린·거트(외장재) 풍하중 — 폐쇄형.
    wk = β·μw·μz·w0, β = 1.5 (4.2.1), μz 는 10 m 미만이면 10 m 값. μw 는 내압 포함 (표 4.2.2-3 외벽, 4.2.2-4 쌍坡,
    4.2.2-5 다경간, 4.2.2-6 편坡), 유효 면적 A = l·c, c ≥ max(부담폭, l/3) (4.2.3).
@@ -67,7 +68,7 @@ export function cnCCLoads(spec: FactorySpec, model: FactoryModel, info: LoadInfo
     const sPeak = e.role === 'purlin' ? c.snow * c.snowMu * shape.peakAt(n1.x) : 0
     const S = sPeak * trib * Math.cos(G.theta) ** 2
     const wt = e.role === 'purlin' ? (1.3 * D + 1.05 * sPeak * trib * Math.cos(G.theta)) * Math.sin(G.theta) : 1.3 * D
-    const My = wt * (L / (spec.sagRods + 1)) ** 2 / 8
+    const My = wt * (L / (sagCount(spec) + 1)) ** 2 / 8
     const demand = (combo: string, w: number) => ({ combo, f: { P: 0, Mx: c.gamma0 * Math.abs(w) * L ** 2 / 8, My: c.gamma0 * My, V: c.gamma0 * Math.abs(w) * L / 2 }, braced: false })
     out.set(e.id, { zone: zone as CCLoad['zone'], A, pPos, pNeg, demands: [demand(`GB C&C+ z${zone}`, 1.3 * normalD + 1.05 * S + 1.5 * pPos * trib), demand(`GB C&C- z${zone}`, normalD + 1.5 * pNeg * trib)] })
   }
