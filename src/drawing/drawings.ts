@@ -5,6 +5,7 @@ import type { ConnResult } from '../domain/connections'
 import { profileOf } from '../codes'
 import { restraintKeys, support } from '../domain/validity'
 import { portalGeometry } from '../domain/portal'
+import {linkReview} from '../domain/phase6'
 import { memberSchedule } from '../domain/schedule'
 import type { ElementRole, FactoryModel, FactorySpec, Node } from '../domain/types'
 import { Dxf, toSvgSheets, type SvgLayerStyle } from './dxf'
@@ -68,7 +69,7 @@ function drawSheets({ spec, model, connections, title }: DrawingInput): Dxf {
       gridBubble(xa - 2000, ya, lab)
     }
     for (const e of model.elements) {
-      if (e.addition) continue
+      if (e.addition && e.addition!=='roof-trimmer') continue
       const [a, b] = ends(e)
       const plan = e.role === 'rafter' || e.role === 'purlin' || e.role === 'strut' || (e.role === 'brace' && e.face === 'roof')
       if (!plan) continue
@@ -160,7 +161,7 @@ function drawSheets({ spec, model, connections, title }: DrawingInput): Dxf {
     const rowTxt = (cells: string[], xs = cols) => { cells.forEach((c, i) => d.text('TEXT', ox + xs[i] + 150, y + 150, TXT * 0.9, c)); d.line('GRID', ox, y, ox + W, y); y -= rowH }
     d.text('TEXT', ox, y + 400, TXT * 1.2, 'MEMBER SCHEDULE'); y -= rowH
     rowTxt(['TYPE', 'SECTION', model.additions?'PHYSICAL':'ELEMS', 'LENGTH (m)', 'kg/m', 'WEIGHT (t)'])
-    for (const r of sch.rows) rowTxt([r.addition ? r.addition==='platform-column'?'Platform column':'Platform beam' : ROLE_EN[r.role], r.section, String(r.count), r.length.toFixed(1), r.kgPerM.toFixed(1), r.weight.toFixed(2)])
+    for (const r of sch.rows) rowTxt([r.addition ? ({'platform-column':'Platform column','platform-beam':'Platform beam','runway-beam':'Runway beam','opening-header':'Door header','roof-trimmer':'Roof trimmer','floor-trimmer':'Floor edge beam'}[r.addition]) : ROLE_EN[r.role], r.section, String(r.count), r.length.toFixed(1), r.kgPerM.toFixed(1), r.weight.toFixed(2)])
     rowTxt(['TOTAL', '', '', '', '', sch.total.toFixed(2)])
     y -= rowH
     d.text('TEXT', ox, y + 400, TXT * 1.2, 'CONNECTION SCHEDULE'); y -= rowH
@@ -173,7 +174,7 @@ function drawSheets({ spec, model, connections, title }: DrawingInput): Dxf {
     rowTxt(['Assumed restraints need design verification of stiffness, connections and anchorage.'])
     rowTxt(['EXCLUDED: gable-post bases, cleats, fly braces, sag rods, brace crossing connectors, cladding.'])
     if (spec.frame === 'multi') rowTxt(['MULTI-SPAN: interior column-top / valley connections and gutters require separate design and takeoff.'])
-    if (model.additions) rowTxt(['ADDITIONS: runway/brackets, platform connections and new foundations are excluded from details and takeoff.'])
+    if (model.additions) rowTxt(['ADDITIONS: rails/brackets, door hardware, connections and new foundations excluded. Modeled steel included.'])
     /* 표제란 */
     const tbY = -M + 300, tbW = 12000
     d.rect('BORDER', ox + W + M - tbW - 300, tbY, tbW, 3000)
@@ -190,7 +191,7 @@ function drawSheets({ spec, model, connections, title }: DrawingInput): Dxf {
     sheet(W,H,'S6  ADDITION PLAN - PRELIMINARY',6500)
     d.rect('GRID',ox,0,W,H)
     frameYs.forEach((y,i)=>{d.line('GRID',ox+mm(y),0,ox+mm(y),H);gridBubble(ox+mm(y),H+1500,String(i+1))})
-    for (const e of model.elements.filter((e)=>e.addition==='platform-beam')) {
+    for (const e of model.elements.filter((e)=>e.addition && e.addition!=='platform-column')) {
       const [a,b]=ends(e); d.line('STRUT',ox+mm(a.y),mm(a.x),ox+mm(b.y),mm(b.x))
     }
     for (const e of spec.additions?.equipment ?? []) {
@@ -204,7 +205,7 @@ function drawSheets({ spec, model, connections, title }: DrawingInput): Dxf {
     }
     if(c) for(const y of frameYs) for(const x of [0,spec.span]) d.circle('COLUMN',ox+mm(y),mm(x),200)
     d.text('TEXT',ox,-2200,TXT,p?`PLATFORM z=${p.elevation} m; D=${p.dead}, L=${p.live} kN/m2; BEAM ${p.beamSection}`:'Roof equipment locations / crane reaction support locations')
-    d.text('TEXT',ox,-3400,TXT*.8,'No runway/bracket, slab/diaphragm, equipment attachment or connection/foundation detailing.')
+    d.text('TEXT',ox,-3400,TXT*.8,'No rail/bracket, slab/diaphragm, door hardware or connection/foundation detailing.')
     d.text('TEXT',ox,-4600,TXT*.8,'See calculation report for physical member IDs, load sources and project factors.')
     ox+=W+2*M+3000
     const yF=frameYs[p?.firstBay ?? 0]
@@ -215,8 +216,41 @@ function drawSheets({ spec, model, connections, title }: DrawingInput): Dxf {
       d.line(LAYER_OF[e.role],ox+mm(a.x),mm(a.z),ox+mm(b.x),mm(b.z))
     }
     if(c) for(const x of [0,spec.span]) {d.circle('COLUMN',ox+mm(x),mm(c.elevation),200);d.text('TEXT',ox+mm(x),mm(c.elevation)+500,TXT*.8,`CRANE z=${c.elevation} m`,x?2:0)}
-    d.text('TEXT',ox,-2200,TXT*.8,'CRANE: support reactions only; wind/seismic concurrency, fatigue and runway design are separate.')
+    d.text('TEXT',ox,-2200,TXT*.8,c?.runway?'RUNWAY: column-axis simple beams; static samples, fatigue / local wheel bearing excluded.':'CRANE: support reactions only; wind/seismic concurrency, fatigue and runway design are separate.')
     d.text('TEXT',ox,-3400,TXT*.8,'PLATFORM: beam grillage; project review of stability, seismic system and foundations required.')
+    const o=spec.features?.opening?spec.additions?.wallOpening:undefined
+    if(c?.runway || o) {
+      ox+=mm(spec.span)+2*M+3000
+      sheet(W,mm(G.ridgeZ),'S8  RUNWAY / CLOSED DOOR ELEVATION - PRELIMINARY',6500)
+      const wallX=o?.face==='xL'?spec.span:0
+      for(const e of model.elements) {
+        const [a,b]=ends(e)
+        if(!near(a.x,wallX)||!near(b.x,wallX))continue
+        d.line(LAYER_OF[e.role],ox+mm(a.y),mm(a.z),ox+mm(b.y),mm(b.z))
+      }
+      if(o){d.rect('GRID',ox+mm(frameYs[o.bay]),0,mm(frameYs[o.bay+1]-frameYs[o.bay]),mm(o.height));d.text('TEXT',ox,-2200,TXT,`CLOSED DOOR: BAY ${o.bay+1}; H=${o.height.toFixed(3)} m; HEADER ${o.headerSection}`)}
+      if(c?.runway)d.text('TEXT',ox,-3400,TXT,`RUNWAY z=${c.elevation} m; ${c.runway.section}; PROJECT LIMIT L/${c.runway.deflectionDivisor}`)
+      d.text('TEXT',ox,-4600,TXT*.8,'Column jambs retained. Door pressure area retained. Closed-door wind only; hardware/detail design excluded.')
+    }
+    if(model.additions.voids?.length || spec.additions?.link) {
+      ox+=Math.max(W,mm(spec.span))+2*M+3000
+      sheet(W,H,'S9  OPENINGS / BUILDING INTERFACE - PRELIMINARY',9000)
+      d.rect('GRID',ox,0,W,H)
+      frameYs.forEach((y,i)=>{d.line('GRID',ox+mm(y),0,ox+mm(y),H);gridBubble(ox+mm(y),H+1500,String(i+1))})
+      let rowY=-2000
+      for(const v of model.additions.voids??[]) {
+        d.rect('STRUT',ox+mm(v.y0),mm(v.x0),mm(v.y1-v.y0),mm(v.x1-v.x0))
+        d.text('TEXT',ox,rowY,TXT,`${v.kind==='roof'?'CLOSED ROOF HATCH':'FLOOR VOID'} ${v.id}: A=${v.area.toFixed(2)} m2; z=${v.z0.toFixed(2)}..${v.z1.toFixed(2)} m`);rowY-=1200
+      }
+      const link=spec.additions?.link
+      if(link) {
+        d.circle('POST',ox+mm(frameYs[link.frame]),mm(link.face==='x0'?0:spec.span),300)
+        const r=linkReview(link)
+        d.text('TEXT',ox,rowY,TXT,`LINK INTERFACE ${link.mode}: FRAME ${link.frame+1}; z=${link.elevation} m; GAP=${link.availableGapMm} mm; DEMAND=${r.required} mm`);rowY-=1200
+        d.text('TEXT',ox,rowY,TXT*.8,'External building / bridge not modeled. Only confirmed interface reactions transfer to this factory.');rowY-=1200
+      }
+      d.text('TEXT',ox,rowY,TXT*.8,'Closed roof cover load area retained; floor void load area excluded. Connections and local details need separate review.')
+    }
   }
   return d
 }

@@ -51,13 +51,14 @@ export interface MemberCheck {
 }
 
 export interface ServiceCheck {
-  key: 'platformDefl' | 'craneDefl' | 'windDriftX' | 'windDriftY' | 'seisDriftX' | 'seisDriftY' | 'rafterDefl' | 'purlinDefl' | 'girtDefl' | 'postDefl'
+  key: 'roofOpeningDefl' | 'linkGap' | 'linkSeat' | 'platformDefl' | 'craneDefl' | 'runwayDefl' | 'windDriftX' | 'windDriftY' | 'seisDriftX' | 'seisDriftY' | 'rafterDefl' | 'purlinDefl' | 'girtDefl' | 'postDefl'
   value: number
   limit: number
   ratio: number
   case: string
   clause: string
 }
+export const isLengthService=(key:ServiceCheck['key'])=>key.endsWith('Defl')||key==='linkGap'||key==='linkSeat'
 
 /** LRFD 13.4.1 기둥 축력 — 휨 무시, 1.2PD + 0.5PL ± 1.4Fu·PE ≤ φPn. 일반 조합 Pu/φcPn ≤ 0.4 이면 면제 */
 export interface ColumnAxial13 { elem: number; puRatio: number; exempt: boolean; ratio: number; combo: string; P: number; phiPn: number }

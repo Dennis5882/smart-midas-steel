@@ -7,7 +7,9 @@ import type { DesignResult, MemberCheck } from './design'
 import type { FactoryModel, FactorySpec, ElementRole } from './types'
 import type { LoadInfo } from './loads'
 import { sectionProps } from './sections'
-import { activeCrane, activePlatform } from './additions'
+import { activeCrane, activePlatform, bayStations } from './additions'
+import {linkReview,simpleBeamDeflection} from './phase6'
+import {buildLoadPayloads} from './loads'
 
 /** Preliminary H-member checks. Splitting creates result stations, never lateral restraints. */
 export function additionDesign(s: FactorySpec, m: FactoryModel, info: LoadInfo, res: Results, d: DesignResult, roles?: readonly ElementRole[]): DesignResult {
@@ -42,11 +44,32 @@ export function additionDesign(s: FactorySpec, m: FactoryModel, info: LoadInfo, 
   for (const member of d.members) if (!d.byRole[member.role] || d.byRole[member.role]!.ratio < member.ratio) d.byRole[member.role]=member
   d.maxRatio = d.members.reduce((max,v)=>Math.max(max,v.ratio),0); d.ng=d.members.filter((v)=>v.ratio>1).length
   if (roles) return d
+  const roof=s.additions?.roofOpening
+  if(roof) {
+    const loads=buildLoadPayloads(s,m),cases=['LR',...(Object.values(loads.STLD) as {NAME:string}[]).map((v)=>v.NAME).filter((n)=>/^(SN|SH)/.test(n))]
+    let best={value:0,limit:1,ratio:0},lc='LR'
+    for(const e of m.elements.filter((v)=>v.addition==='roof-trimmer')) {
+      const a=nodes.get(e.n1)!,b=nodes.get(e.n2)!,L=Math.hypot(b.x-a.x,b.y-a.y,b.z-a.z),sp=sectionProps(e.section)
+      const items=(loads.BMLD[e.id] as {ITEMS:any[]}).ITEMS
+      const q=(name:string)=>items.filter((v)=>v.LCNAME===name&&v.DIRECTION==='GZ').reduce((sum,v)=>sum+v.P[0],0)
+      for(const name of cases) {
+        const value=simpleBeamDeflection(q('D')+q(name)-mat.gamma*sp.A*1e-6,L,mat.E,sp.Ix),limit=L/roof.deflectionDivisor,ratio=value/limit
+        if(ratio>best.ratio){best={value,limit,ratio};lc=name}
+      }
+    }
+    d.service.push({key:'roofOpeningDefl',...best,case:`D + ${lc}`,clause:`Web estimate 5qL^4/(384EI); app section properties; project L/${roof.deflectionDivisor}; no shear deflection`})
+  }
+  const link=s.additions?.link
+  if(link) {
+    const r=linkReview(link)
+    d.service.push({key:'linkGap',value:r.required/1000,limit:link.availableGapMm/1000,ratio:r.gapRatio,case:'PROJECT',clause:'Project |uA| + |uB| + thermal + tolerance; no coupled analysis'})
+    if(link.mode==='sliding')d.service.push({key:'linkSeat',value:r.required/1000,limit:(link.seatLengthMm-link.minBearingMm)/1000,ratio:r.seatRatio,case:'PROJECT',clause:'Project residual seating length; minimum bearing by designer'})
+  }
   const platform = activePlatform(s), crane = activeCrane(s)
   if (platform) {
     let best = {value:0,limit:1,ratio:0}
     for (const member of m.additions.members.filter((v)=>v.source===platform.id)) {
-      const es = m.elements.filter((e)=>member.elementIds.includes(e.id) && e.addition==='platform-beam')
+      const es = m.elements.filter((e)=>member.elementIds.includes(e.id) && (e.addition==='platform-beam'||e.addition==='floor-trimmer'))
       if (!es.length) continue
       const ids = [...new Set(es.flatMap((e)=>[e.n1,e.n2]))], ends = ids.filter((id)=>es.filter((e)=>e.n1===id||e.n2===id).length===1)
       if (ends.length!==2) continue
@@ -62,8 +85,25 @@ export function additionDesign(s: FactorySpec, m: FactoryModel, info: LoadInfo, 
     d.service.push({key:'platformDefl',...best,case:'D + PL',clause:`Project L/${platform.deflectionDivisor}; nodal relative deflection`})
   }
   if (crane) {
+    if(crane.runway) {
+      let best={value:0,limit:1,ratio:0}, lc=''
+      for(const member of m.additions.members.filter((v)=>v.key.startsWith(`${crane.id}:runway:`))) {
+        const es=m.elements.filter((e)=>member.elementIds.includes(e.id)),ids=[...new Set(es.flatMap((e)=>[e.n1,e.n2]))]
+        const ends=ids.filter((id)=>es.filter((e)=>e.n1===id||e.n2===id).length===1).map((id)=>nodes.get(id)!).sort((a,b)=>a.y-b.y)
+        const [a,b]=ends, L=b.y-a.y
+        for(const cc of m.additions.craneCases) {
+          const dz=(id:number)=>res.disp.get('D')!.get(id)!.dz+res.disp.get(cc.name)!.get(id)!.dz
+          for(const id of ids) {
+            const y=nodes.get(id)!.y, value=Math.abs(dz(id)-dz(a.id)-(dz(b.id)-dz(a.id))*(y-a.y)/L),limit=L/crane.runway.deflectionDivisor,ratio=value/limit
+            if(ratio>best.ratio){best={value,limit,ratio};lc=cc.name}
+          }
+        }
+      }
+      d.service.push({key:'runwayDefl',...best,case:`D + ${lc}`,clause:`Project L/${crane.runway.deflectionDivisor}; impacted static samples; relative nodal deflection`})
+    }
     let value=0, lc=''
-    for (const c of m.additions.craneCases) for (const n of m.nodes.filter((n)=>Math.abs(n.z-crane.elevation)<1e-7 && (n.x===0||n.x===s.span))) {
+    const stations=bayStations(s)
+    for (const c of m.additions.craneCases) for (const n of m.nodes.filter((n)=>Math.abs(n.z-crane.elevation)<1e-7 && (n.x===0||n.x===s.span) && stations.some((y)=>Math.abs(n.y-y)<1e-7))) {
       const base=res.disp.get('D')!.get(n.id)!, disp=res.disp.get(c.name)!.get(n.id)!
       const v=Math.hypot(base.dx+disp.dx,base.dy+disp.dy)
       if (v>value) {value=v;lc=c.name}

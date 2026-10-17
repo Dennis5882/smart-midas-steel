@@ -1,3 +1,5 @@
+import {p6En,p6Ko,p6TW,p6CN} from './phase6'
+import { p5En, p5Ko, p5TW, p5CN } from './phase5'
 const keys = ['add_title','add_equipment','add_crane','add_platform','add_add','add_remove','add_name','add_x','add_y','add_weight','add_mass','add_source','add_confirm','add_elevation','add_eccentricity','add_wheelSpacing','add_maxWheel','add_minWheel','add_impactFactor','add_lateral','add_braking','add_seismicWeight','add_driftLimitMm','add_x0','add_x1','add_firstBay','add_lastBay','add_beamSpacing','add_beamSection','add_columnSection','add_dead','add_live','add_liveMassFraction','add_deflectionDivisor','add_factors','add_accompanyingLive','add_invalid_equipment','add_invalid_crane','add_invalid_platform','add_invalid_factors','sc_additionInput','sc_additionReview','rs_addition','sv_platformDefl','sv_craneDefl','add_note','add_crane_note','add_platform_note','add_summary'] as const
 type AddKey = typeof keys[number]
 const dict = (values: string[]): Record<AddKey,string> => {
@@ -17,10 +19,11 @@ const baseCN = dict([
   '设备与结构附加项','屋面／固定设备','吊车对厂房框架的影响','夹层／设备平台','添加设备','删除','名称','X 位置','Y 位置','重量','地震重量比例','来源／项目依据','已确认项目输入值及适用条件','安装标高','牛腿偏心','轮距','最大轮压（每轮）','最小轮压（每轮）','竖向冲击系数','横向水平力总和','纵向制动力总和','吊车地震重量','项目水平位移限值','起点 X','终点 X','起始框架编号','结束框架编号','次梁最大间距','梁截面','柱截面','附加恒荷载','楼面活荷载','活荷载地震重量比例','项目挠度限值 L /','项目荷载系数','伴随活荷载系数','请检查设备位置、重量、来源与确认。','请检查吊车输入、来源与确认（最多 8 跨）。','请检查平台尺寸、H 型截面、来源与确认。','请检查项目系数、来源与确认。','请在地区／荷载步骤完成并确认附加输入。','附加结构为初步验算，须审查荷载同时性、抗震体系、稳定、连接与基础。','附加结构：须专业审查','平台相对挠度','吊车支承水平位移','设备荷载分配至邻近屋面支点。局部屋面承载及设备锚固须另行确认。生成前须确认来源。','单台吊车、每轨两轮、简支轨道反力及静态临界位置。提供重力＋吊车组合；风震同时性、疲劳、轨道梁与牛腿须另行设计。水平力为整台吊车总和。','无楼板及楼板刚性作用的梁格模型。既有柱于平台标高连接；新设柱基础固定。地震周期沿用厂房方法，须项目审查。','附加荷载／实体构件'
 ])
 
-export const addEn = {...baseEn, add_platformBeam:'Platform beam', add_platformColumn:'Platform column',add_catalog_note:'Marked sections require review of differences between Gen database properties and app approximations. Registration is not a strength approval.'}
 
-export const addKo = {...baseKo, add_platformBeam:'플랫폼 보', add_platformColumn:'플랫폼 기둥',add_catalog_note:'검토 표시 단면은 Gen DB 성능과 앱 근사값의 차이를 확인하세요. 등록 확인은 강도 통과를 의미하지 않습니다.'}
+export const addEn = {...baseEn, ...p5En, ...p6En, add_platformBeam:'Platform beam', add_platformColumn:'Platform column',add_catalog_note:'Marked sections require review of differences between Gen database properties and app approximations. Registration is not a strength approval.'}
 
-export const addTW = {...baseTW, add_platformBeam:'平台梁', add_platformColumn:'平台柱',add_catalog_note:'標記斷面須審查 Gen 資料庫斷面性質與程式近似值差異；登錄成功不代表強度通過。'}
+export const addKo = {...baseKo, ...p5Ko, ...p6Ko, add_platformBeam:'플랫폼 보', add_platformColumn:'플랫폼 기둥',add_catalog_note:'검토 표시 단면은 Gen DB 성능과 앱 근사값의 차이를 확인하세요. 등록 확인은 강도 통과를 의미하지 않습니다.'}
 
-export const addCN = {...baseCN, add_platformBeam:'平台梁', add_platformColumn:'平台柱',add_catalog_note:'标记截面须审查 Gen 数据库截面性质与程序近似值差异；注册成功不代表强度通过。'}
+export const addTW = {...baseTW, ...p5TW, ...p6TW, add_platformBeam:'平台梁', add_platformColumn:'平台柱',add_catalog_note:'標記斷面須審查 Gen 資料庫斷面性質與程式近似值差異；登錄成功不代表強度通過。'}
+
+export const addCN = {...baseCN, ...p5CN, ...p6CN, add_platformBeam:'平台梁', add_platformColumn:'平台柱',add_catalog_note:'标记截面须审查 Gen 数据库截面性质与程序近似值差异；注册成功不代表强度通过。'}

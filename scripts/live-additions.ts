@@ -19,7 +19,10 @@ const {fetchResults}=await import('../src/actions/results')
 const {runDesign}=await import('../src/domain/design')
 const {runConnections}=await import('../src/domain/connections')
 const {buildReport}=await import('../src/report/report')
-const {defaultAdditions,defaultPlatform}=await import('../src/domain/additions')
+const {defaultAdditions,defaultOpening,defaultPlatform}=await import('../src/domain/additions')
+const phase5=process.argv.includes('--phase5')
+const phase6=process.argv.includes('--phase6')
+const {phase6Spec}=await import('./addition-spec')
 const key=await readMapiKey(),client=new MidasClient({mapiKey:key,product:'gen',timeout:120000});S.mapiKey=key
 const token=new Date().toISOString().replace(/[-:.TZ]/g,''),folder=`output/additions-live-${token}`
 mkdirSync(folder,{recursive:true})
@@ -34,14 +37,22 @@ const state:any={backup,original,restored:false,cases:[]}
 const save=()=>writeFileSync(`${folder}/evidence.json`,JSON.stringify(state,null,2));save()
 try {
   for(const base of [DEFAULT_SPEC,CN_DEFAULT_SPEC,KR_DEFAULT_SPEC]) {
-    const s=structuredClone(base);s.bays=2;s.baySpacing=6;s.bayList=[5,7];s.features={crane:true,mezzanine:true,multiSpan:false,opening:false}
+    let s=structuredClone(base);s.bays=2;s.baySpacing=6;s.bayList=[5,7];s.features={crane:true,mezzanine:true,multiSpan:false,opening:false}
     s.additions=defaultAdditions(s)
     s.additions.equipment=[{id:'EQ1',name:'Roof equipment',x:7.2,y:3.1,weight:40,seismicFraction:.8,source:'Integration test',confirmed:true}]
     s.additions.crane={id:'CR1',elevation:5.2,eccentricity:.3,wheelSpacing:3,maxWheel:45,minWheel:10,impactFactor:1.1,lateral:8,braking:0,seismicWeight:30,driftLimitMm:10,source:'Integration test',confirmed:true}
     s.additions.platform={...defaultPlatform(s),x0:1,x1:11,elevation:3,source:'Integration test',confirmed:true}
     s.additions.factors={...s.additions.factors,source:'Integration test',confirmed:true}
+    if(phase5) {
+      s.bays=3;s.bayList=[5,7,4];s.baySpacing=7
+      s.features.opening=true
+      s.additions.wallOpening={...defaultOpening(s),bay:s.code==='CN'?0:1,source:'Closed door project test',confirmed:true}
+      s.additions.crane.lateral=0
+      s.additions.crane.runway={section:s.sections.rafter,deflectionDivisor:600,source:'Runway integration test',confirmed:true}
+    }
+    if(phase6)s=phase6Spec(base)
     S.code=s.code
-    console.log(`${s.code}: sending equipment + crane + platform`)
+    console.log(`${s.code}: sending ${phase6?'platform + closed roof hatch + floor void + interface reactions':`equipment + crane + platform${phase5?' + runway + closed door':''}`}`)
     await sendModel(s);await analyzeCore()
     console.log(`${s.code}: analyzed; retrieving ${S.built!.combos} combinations`)
     const b=S.built!,res=await fetchResults(b),d=runDesign(s,b.model,b.info,res),connections=runConnections(s,b.model,b.info,res)

@@ -4,7 +4,7 @@ import { profileOf } from '../codes'
 import { buildLoadPayloads, type LoadInfo } from '../domain/loads'
 import { buildPortal } from '../domain/portal'
 import type { ConnResult } from '../domain/connections'
-import type { DesignResult } from '../domain/design'
+import {isLengthService,type DesignResult} from '../domain/design'
 import type { OptSummary } from '../domain/optimize'
 import { connGrade, roleGrade } from '../domain/status'
 import { GradeChip, siteSourceText, StatusCard } from './Status'
@@ -120,7 +120,7 @@ export function ModelPanel() {
 const ratioColor = (r: number) => (r > 1 ? 'var(--red)' : r > 0.9 ? 'var(--amber)' : 'var(--green)')
 const PART = ['I', '1/4', '2/4', '3/4', 'J']
 /** 변위각은 1/n, 처짐은 mm */
-const svcVal = (k: string, v: number) => (k.endsWith('Defl') ? `${(v * 1000).toFixed(1)} mm` : `1/${Math.round(1 / Math.max(v, 1e-9))}`)
+const svcVal = (k: DesignResult['service'][number]['key'], v: number) => (isLengthService(k) ? `${(v * 1000).toFixed(1)} mm` : `1/${Math.round(1 / Math.max(v, 1e-9))}`)
 
 function Seis13Card({ d }: { d: DesignResult }) {
   const s = useStore()

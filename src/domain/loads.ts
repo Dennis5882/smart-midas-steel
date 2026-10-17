@@ -61,7 +61,41 @@ const OUT: Record<Exclude<Face, 'roof'>, [number, number]> = { x0: [-1, 0], xL: 
 export function buildLoadPayloads(spec: FactorySpec, model: FactoryModel): LoadPayloads {
   const errors = additionErrors(spec)
   if (errors.length) throw new Error(`Unconfirmed/invalid additions: ${errors.map((e)=>e.path).join(', ')}`)
-  const load = buildFactoryLoads(spec, factoryOnly(model))
+  const base=factoryOnly(model), removed=model.additions?.removedGirts ?? []
+  const virtual=removed.map((e,i)=>({...e,id:base.elements.length+i+1,loadOnly:true as const}))
+  const roof=model.additions?.roofCollectors??[]
+  const roofVirtual=roof.map((v,i)=>({...v.original,id:base.elements.length+virtual.length+i+1,loadOnly:true as const}))
+  const load = buildFactoryLoads(spec, {...base,elements:[...base.elements,...virtual,...roofVirtual]})
+  // Closed door loads follow the original horizontal cladding strips: lower strips
+  // transfer to jamb columns; the top strip loads the new header. No ghost steel.
+  const transfers=virtual.map((e)=>({e,items:(load.BMLD[e.id] as {ITEMS:any[]}|undefined)?.ITEMS ?? []}))
+  const roofTransfers=roofVirtual.map((e,i)=>({collector:roof[i],items:(load.BMLD[e.id] as {ITEMS:any[]}|undefined)?.ITEMS??[]}))
+  for(const e of [...virtual,...roofVirtual]) delete load.BMLD[e.id]
+  const header=model.elements.find((e)=>e.addition==='opening-header')
+  for(const {e,items} of transfers) {
+    const a=model.nodes[e.n1-1],b=model.nodes[e.n2-1],L=Math.hypot(b.x-a.x,b.y-a.y,b.z-a.z)
+    if(header && Math.abs(a.z-model.nodes[header.n1-1].z)<1e-7) {
+      load.BMLD[header.id]={ITEMS:items.map((it,i)=>({...it,ID:i+1}))}
+      continue
+    }
+    for(const it of items) {
+      if(it.TYPE!=='UNILOAD' || it.P[0]!==it.P[1] || !['GX','GY','GZ'].includes(it.DIRECTION)) throw new Error('Unsupported door load transfer')
+      for(const id of [e.n1,e.n2]) {
+        const rec=(load.CNLD[id] ??= {ITEMS:[]}) as {ITEMS:any[]}
+        let item=rec.ITEMS.find((v)=>v.LCNAME===it.LCNAME)
+        if(!item){item={ID:rec.ITEMS.length+1,LCNAME:it.LCNAME,GROUP_NAME:'',FX:0,FY:0,FZ:0,MX:0,MY:0,MZ:0};rec.ITEMS.push(item)}
+        item[{GX:'FX',GY:'FY',GZ:'FZ'}[it.DIRECTION as 'GX'|'GY'|'GZ']]+=it.P[0]*L/2
+      }
+    }
+  }
+  for(const {collector,items} of roofTransfers) for(const [i,key] of collector.keys.entries()) {
+    const share=collector.shares[i]
+    if(share<1e-9)continue
+    const target=model.elements.find((e)=>e.physicalKey===key)
+    if(!target)throw new Error('Roof collector has no physical trimmer')
+    const rec=(load.BMLD[target.id]??={ITEMS:[]}) as {ITEMS:any[]}
+    for(const it of items)rec.ITEMS.push({...it,ID:rec.ITEMS.length+1,P:it.P.map((v:number)=>v*share)})
+  }
   return buildAdditionLoads(spec, model, load)
 }
 

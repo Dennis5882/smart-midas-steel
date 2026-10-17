@@ -4,7 +4,9 @@
 - **한국어**로 소통. 코드 식별자·API 키워드는 영어 유지.
 
 ## 개요
-추가 구조 1~4단계(v2.0.0)는 `docs/factory-additions-phases-1-4.md` 참조. `FactorySpec.additions` → `applyAdditions` → Gen/하중 컴파일 흐름이며 크레인·플랫폼은 출처 확인 후 **예비검토**로 제공한다. 요소 분할 시 `physicalKey`·`designLength`를 보존한다. 추가 부재는 `Element.addition`으로 지붕/벽 하중·기존 접합·주골조 단면 변경에서 분리한다. 지진중량은 정적 등가하중에 한 번만 포함하며 NMAS/모달해석은 아직 추가하지 않았다. 풍·지진+크레인 동시 조합·주행보/브래킷 상세·플랫폼 내진시스템/접합·기초는 별도 검토. 5~6단계는 별도 진행한다. `verify-additions.ts`, `live-additions.ts` 추가; 라이브는 원본 저장·복원 12 DB 해시 일치 확인 필수.
+추가 구조 1~4단계(v2.0.0)는 `docs/factory-additions-phases-1-4.md`, 5단계(v2.1.0)는 `docs/factory-additions-phase-5.md` 참조. `FactorySpec.additions` → `applyAdditions` → Gen/하중 컴파일 흐름이며 출처 확인 후 **예비검토**로 제공한다. 요소 분할 시 `physicalKey`·`designLength`를 보존한다. 추가 부재는 `Element.addition`으로 지붕/벽 하중·기존 접합·주골조 단면 변경에서 분리한다. `crane.runway`는 기둥 축상 경간별 단순보·실제 차륜 절점 재하·처짐 검토(최대 4베이). `wallOpening`은 측벽 한 베이의 닫힌 문만 지원하며 가새 베이를 차단한다. 제거 거트는 `removedGirts`에 남겨 폐쇄 외피 하중만 컴파일하고, `loadOnly`로 강재 자중·물량에서 제외한다. 가상 거트의 하중 ID를 실제 Gen으로 보내지 않는다. 주행보 중간 절점은 실제 지지점·횡지지로 간주하지 않는다. 지진중량은 정적 등가하중에 한 번만 포함하며 NMAS/모달해석은 아직 추가하지 않았다. 풍·지진+크레인 동시 조합·피로·국부지압·횡전단/비틀림·브래킷 상세·문 개방 시 내압·접합·기초는 별도 검토.  `verify-phase5.ts`, `verify-additions.ts`, `live-additions.ts --phase5`로 검증하며 라이브는 원본 저장·복원 12 DB 해시 일치 확인 필수.
+
+6단계(v2.2.0)는 `docs/factory-additions-phase-6.md` 참조. `roofCollectors`는 닫힌 지붕 덮개 하중만 보강보로 전달하고 가상 강재를 Gen에 보내지 않는다. `floorOpening`은 플랫폼 내부 작은보와 빈 면적의 하중·질량을 제외한다. 연결부는 웹 이동·이격·받침 검토 및 확인된 6성분 반력 인터페이스만 지원한다. 분리형은 연결하지 않으며 일체형은 생성 차단한다. 외부 건물·연결교 형상이나 ELNK를 자동 생성하지 않는다. 지붕 처짐은 웹 단순보 추정으로 명시하고 연결부 사용성의 값·한계는 mm로 표시한다. `verify-phase6.ts`, `live-additions.ts --phase6`로 검증한다.
 
 MIDAS Gen 강구조물 자동 모델링 웹앱. 제품 스펙·미정 사항은 README.md.
 참고 프로젝트: `E:/AI Study/story` (Gen NX RC 에이전트 — 같은 스택·MAPI 직접 호출 방식).

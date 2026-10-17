@@ -50,9 +50,16 @@ export function buildAdditionLoads(s: FactorySpec, m: FactoryModel, load: LoadPa
     if (p && f.accompanyingLive) combo(`AL_${cc.name}`, [['D', f.dead], [cc.name, f.crane], ['PL',f.accompanyingLive], ['LR', f.accompanyingLive]])
     combo(`AU_${cc.name}`, [['D', 1], [cc.name, f.crane]])
   }
+  const link=s.additions?.link
+  if(link?.mode==='sliding')for(const cc of a.linkCases??[]) {
+    addCase(cc.name,'USER')
+    combo(`AD_${cc.name}`,[['D',f.dead],[cc.name,link.loadFactor],['LR',f.accompanyingLive]])
+    combo(`AU_${cc.name}`,[['D',1],[cc.name,link.loadFactor]])
+    if(p && f.accompanyingLive)combo(`AL_${cc.name}`,[['D',f.dead],[cc.name,link.loadFactor],['PL',f.accompanyingLive],['LR',f.accompanyingLive]])
+  }
   load.info.additions = { sources: a.sources, craneCases: a.craneCases, combinationBasis,
-    serviceCases: ['D', ...(p ? ['PL'] : []), ...a.craneCases.map((v) => v.name)],
-    factors: (p || c) ? f : undefined,
+    serviceCases: ['D', ...(p ? ['PL'] : []), ...a.craneCases.map((v) => v.name),...(a.linkCases??[]).map((v)=>v.name)],
+    factors: (p || c || link?.mode==='sliding') ? f : undefined,
     preliminary: true,
   }
   return load

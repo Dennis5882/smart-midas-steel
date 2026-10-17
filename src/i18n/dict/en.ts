@@ -516,6 +516,11 @@ export const en = {
   g_help_2: 'Release notes',
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_2_0_1: 'Closed roof hatches replace interior purlins with load transfer to H-section trimmers, with preliminary strength checks and a web estimate of simple-beam deflection.',
+  rn_v2_2_0_2: 'Added platform-grid floor openings. Void loads, seismic weight and internal secondary beams are removed, and edge beams are identified separately.',
+  rn_v2_2_0_3: 'Assess building-interface movement, gap and seating length, and transfer confirmed simultaneous reactions into this factory in Gen. External buildings, bridge geometry and integral coupled analysis are excluded.',
+  rn_v2_1_0_1: 'Added H-section runway beams, sampled static wheel loads and preliminary relative deflection checks. Fatigue, local bearing and bracket details require separate review.',
+  rn_v2_1_0_2: 'Model one closed door in an unbraced side-wall bay. Lower girts are removed, a header is added, and closed-door load transfer, drawings and steel quantities are updated together.',
   rn_v2_0_0_1: 'Trace physical members, element splits and load sources; count added seismic weights and steel quantities once.',
   rn_v2_0_0_2: 'Conditional roof equipment, crane frame effects and mezzanine/platform inputs now follow the Region / loads step.',
   rn_v2_0_0_3: 'Added preliminary country-specific strength checks, project service limits and report evidence. Runway details, openings and connecting buildings remain separate.',

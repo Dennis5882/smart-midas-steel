@@ -4,6 +4,8 @@
 import { spawnSync } from 'node:child_process'
 
 const SUITES = [
+  ['Openings / interface', 'verify-phase6.ts'],
+  ['Runway / closed doors', 'verify-phase5.ts'],
   ['Factory additions', 'verify-additions.ts'],
   ['Review regression', 'verify-review-fixes.ts'],
   ['TW hand-calc + golden', 'verify-tw.ts'],

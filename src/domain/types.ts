@@ -111,6 +111,8 @@ export const ROLES: ElementRole[] = ['column', 'rafter', 'purlin', 'girt', 'stru
 export type Face = 'x0' | 'xL' | 'y0' | 'yL' | 'roof'
 export interface Element { id: number; n1: number; n2: number; role: ElementRole; section: string; face?: Face; /** 흔들림 기둥(다경간 내부): 상단 핀·기초 핀, 면내 K = 1 */ lean?: true
   designLength?: number; physicalKey?: string; addition?: AdditionUsage; sourceId?: string
+  /** Virtual wall load collector: never sent to Gen or counted as structural steel. */
+  loadOnly?: true
 }
 
 /** 전역: X = 스팬 방향, Y = 길이 방향, Z = 높이 */

@@ -111,7 +111,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
     return () => clearTimeout(h)
   }, [spec, live, s.busy, previewInvalid, previewBlocked])
 
-  const invalidateAdditions = () => setAdditions((a)=>a ? {...a,equipment:a.equipment.map((e)=>({...e,confirmed:false})),crane:a.crane && {...a.crane,confirmed:false},platform:a.platform && {...a.platform,confirmed:false},factors:{...a.factors,confirmed:false}} : a)
+  const invalidateAdditions = () => setAdditions((a)=>a ? {...a,equipment:a.equipment.map((e)=>({...e,confirmed:false})),crane:a.crane && {...a.crane,confirmed:false,runway:a.crane.runway && {...a.crane.runway,confirmed:false}},wallOpening:a.wallOpening && {...a.wallOpening,confirmed:false},roofOpening:a.roofOpening && {...a.roofOpening,confirmed:false},floorOpening:a.floorOpening && {...a.floorOpening,confirmed:false},link:a.link && {...a.link,confirmed:false},platform:a.platform && {...a.platform,confirmed:false},factors:{...a.factors,confirmed:false}} : a)
   const set = (p: Path, v: string) => {
     dirty.current = true
     invalidateAdditions()

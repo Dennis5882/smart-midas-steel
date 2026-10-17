@@ -14,7 +14,7 @@ import { buildLoadPayloads } from '../src/domain/loads'
 import { runConnections } from '../src/domain/connections'
 import { runDesign } from '../src/domain/design'
 import { FIXTURE, decodeResults, fixtureFor } from './tw-golden'
-import {additionSpec} from './addition-spec'
+import {additionSpec,phase5Spec,phase6Spec} from './addition-spec'
 import {addKo,addEn,addTW,addCN} from '../src/i18n/dict/additions'
 import type { ReportInput } from '../src/report/report'
 import { krSynthetic } from './kr-synth'
@@ -38,7 +38,11 @@ const cModel = buildPortal(cfx.spec), cLoads = buildLoadPayloads(cfx.spec, cMode
 const cnInput: ReportInput = { built: { spec: cfx.spec, model: cModel, info: cLoads.info, cases: Object.values(cLoads.STLD).map((v: any) => v.NAME), combos: Object.keys(cLoads.info.comboKind).length, comboNames: Object.keys(cLoads.info.comboKind) }, reactions: cfx.reactions, design: runDesign(cfx.spec, cModel, cLoads.info, cRes), connections: runConnections(cfx.spec, cModel, cLoads.info, cRes) }
 const aSpec=additionSpec(defaultSpecFor('TW')),aModel=buildPortal(aSpec),aLoads=buildLoadPayloads(aSpec,aModel)
 const additionInput:ReportInput={built:{spec:aSpec,model:aModel,info:aLoads.info,cases:Object.values(aLoads.STLD).map((v:any)=>v.NAME),combos:Object.keys(aLoads.info.comboKind).length,comboNames:Object.keys(aLoads.info.comboKind)},reactions:null,design:null,connections:null}
-for (const [code, inp] of [['TW', input], ['KR', krInput], ['CN', cnInput], ['ADDITIONS',additionInput]] as const) for (const lang of ['ko', 'en', 'zh-TW', 'zh-CN'] as const) {
+const pSpec=phase5Spec(defaultSpecFor('TW')),pModel=buildPortal(pSpec),pLoads=buildLoadPayloads(pSpec,pModel)
+const phase5Input:ReportInput={built:{spec:pSpec,model:pModel,info:pLoads.info,cases:Object.values(pLoads.STLD).map((v:any)=>v.NAME),combos:Object.keys(pLoads.info.comboKind).length,comboNames:Object.keys(pLoads.info.comboKind)},reactions:null,design:null,connections:null}
+const qSpec=phase6Spec(defaultSpecFor('TW')),qModel=buildPortal(qSpec),qLoads=buildLoadPayloads(qSpec,qModel)
+const phase6Input:ReportInput={built:{spec:qSpec,model:qModel,info:qLoads.info,cases:Object.values(qLoads.STLD).map((v:any)=>v.NAME),combos:Object.keys(qLoads.info.comboKind).length,comboNames:Object.keys(qLoads.info.comboKind)},reactions:null,design:null,connections:null}
+for (const [code, inp] of [['TW', input], ['KR', krInput], ['CN', cnInput], ['ADDITIONS',additionInput],['PHASE5',phase5Input],['PHASE6',phase6Input]] as const) for (const lang of ['ko', 'en', 'zh-TW', 'zh-CN'] as const) {
   setLang(lang)
   const html = buildReport(inp)
   const doc = new DOMParser().parseFromString(html, 'text/html')

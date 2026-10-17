@@ -1,3 +1,4 @@
+import { additionLabelKey } from '../domain/additionTypes'
 /* 3D VIEW — Plotly 는 동적 import 로 첫 화면 번들에서 분리 (story View3D 와 같은 방식).
    S.preview(편집 중 스펙)가 있으면 그 형상, 없으면 Gen 에 보낸 모델. S.viewNonce 변경 시 재플롯.
    story 와 같은 정리: 범례 위쪽 가로, 표시 토글(주골조·2차부재·가새·지점·절점), 정투영(정면·측면·평면)은 시선 방향 축을 숨기고 화면을 채움.
@@ -84,7 +85,7 @@ function traces(m: FactoryModel, spec: FactorySpec, P: Pal, ratio: Map<number, n
   const groups: { key: string; name: string; color: string; width: number; visible: boolean; has: (id: number, role: ElementRole) => boolean }[] = ratio
     ? BANDS.map(([, v, fb], i) => ({ key: `b${i}`, name: bandName(i), color: cs.getPropertyValue(v).trim() || fb, width: 4, visible: true, has: (id: number) => !invalid.has(id) && bandOf(ratio.get(id) ?? 0) === i }))
     : ROLES.map((r) => ({ key: r, name: t(`role_${r}`), color: P.role[r], width: ROLE_VAR[r][2], visible: vis[r], has: (id: number, role: ElementRole) => role === r && !added.has(id) }))
-  if (!ratio) for (const [usage,role,label] of [['platform-beam','strut','add_platformBeam'],['platform-column','post','add_platformColumn']] as const) groups.push({key:usage,name:t(label),color:P.role[role],width:4,visible:vis[role],has:(id:number)=>added.get(id)===usage})
+  if (!ratio) for (const [usage,role,label] of [['platform-beam','strut','add_platformBeam'],['platform-column','post','add_platformColumn'],['runway-beam','strut','add_runway'],['opening-header','strut','add_header'],['roof-trimmer','strut','p6_roofBeam'],['floor-trimmer','strut','p6_floorBeam']] as const) groups.push({key:usage,name:t(label),color:P.role[role],width:4,visible:vis[role],has:(id:number)=>added.get(id)===usage})
   if (ratio && invalid.size) groups.push({ key: 'invalid', name: t('rs_applicability'), color: cs.getPropertyValue('--violet').trim() || '#9b8cff', width: 6, visible: true, has: (id: number) => invalid.has(id) })
   if (solid) {
     const meshes = solidMeshes(m, risingAt(spec), spec.roofSlope, (e) => groups.find((g) => g.has(e.id, e.role))?.key ?? null)
@@ -111,9 +112,13 @@ function traces(m: FactoryModel, spec: FactorySpec, P: Pal, ratio: Map<number, n
   /* 절점 — 마우스를 올리면 번호·좌표 */
   if (m.additions) {
     const G = portalGeometry(spec), equipment = spec.additions?.equipment ?? []
+    for(const v of m.additions.voids??[])out.push({type:'scatter3d',mode:'lines',name:t(v.kind==='roof'?'p6_roof':'p6_floor'),x:[v.x0,v.x1,v.x1,v.x0,v.x0],y:[v.y0,v.y0,v.y1,v.y1,v.y0],z:[v.z0,v.z1,v.z1,v.z0,v.z0],line:{color:P.role.strut,width:6,dash:'dash'},text:v.id,hovertemplate:'%{text}<extra></extra>'})
+    const link=spec.additions?.link
+    if(link){const y=G.spans.slice(0,link.frame).reduce((a,b)=>a+b,0);out.push({type:'scatter3d',mode:'markers',name:t('p6_link'),x:[link.face==='x0'?0:spec.span],y:[y],z:[link.elevation],marker:{color:P.role.post,size:8,symbol:'diamond'},text:link.id,hovertemplate:'%{text}<extra></extra>'})}
     if (equipment.length) out.push({type:'scatter3d',mode:'markers',name:t('add_equipment'),x:equipment.map((e)=>e.x),y:equipment.map((e)=>e.y),z:equipment.map((e)=>G.zAt(e.x)),text:equipment.map((e)=>`${e.name} / ${e.weight} kN / ${e.source}`),hovertemplate:'%{text}<extra></extra>',marker:{size:7,color:P.role.strut,symbol:'diamond'}})
     if (spec.features?.crane && spec.additions?.crane) {
-      const c=spec.additions.crane, supports=m.nodes.filter((n)=>Math.abs(n.z-c.elevation)<1e-7 && (n.x===0||n.x===spec.span))
+      const stations=G.spans.reduce<number[]>((a,v)=>[...a,a.at(-1)!+v],[0])
+      const c=spec.additions.crane, supports=m.nodes.filter((n)=>Math.abs(n.z-c.elevation)<1e-7 && (n.x===0||n.x===spec.span) && stations.some((y)=>Math.abs(n.y-y)<1e-7))
       out.push({type:'scatter3d',mode:'markers',name:t('add_crane'),x:supports.map((n)=>n.x),y:supports.map((n)=>n.y),z:supports.map((n)=>n.z),text:supports.map((n)=>`${t('add_crane')} / N${n.id}`),hovertemplate:'%{text}<extra></extra>',marker:{size:5,color:P.role.brace,symbol:'circle'}})
     }
   }
@@ -220,7 +225,7 @@ export function View3D() {
         {TOGGLES.filter(([k]) => (!ratio || k === 'support' || k === 'node') && (k === 'support' || k === 'node' || model?.elements.some((e) => e.role === k))).map(([k, color, label, mark]) => (
           <button key={k} className={`vtog ${s.vis3d[k] ? 'on' : 'off'}`} aria-pressed={s.vis3d[k]} title={t('view_toggle_tip')}
             onClick={() => { S.vis3d = { ...S.vis3d, [k]: !S.vis3d[k] }; notify() }}>
-            <span className={`swatch sw-${mark}`} style={{ background: `var(${color})` }} /><span>{t(label)}{model?.additions && (k==='strut'||k==='post') ? ` / ${t(k==='strut'?'add_platformBeam':'add_platformColumn')}` : ''}</span>
+            <span className={`swatch sw-${mark}`} style={{ background: `var(${color})` }} /><span>{t(label)}{model?.elements.some((e)=>e.role===k && e.addition) ? ` / ${[...new Set(model.elements.filter((e)=>e.role===k && e.addition).map((e)=>t(additionLabelKey(e.addition!))))].join(' / ')}` : ''}</span>
           </button>
         ))}
       </div>

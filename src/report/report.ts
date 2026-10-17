@@ -1,9 +1,11 @@
+import { additionLabelKey } from '../domain/additionTypes'
+import {activeFloorOpening,linkReview} from '../domain/phase6'
 /* 구조 계산서 (M5) — 현재 상태(스펙·하중·해석·설계·접합부)로 인쇄용 단일 HTML 을 만든다.
    화면 언어(t)를 따르며, 기호·조항 번호는 원문 표기 유지. 브라우저 인쇄 → PDF. */
 import { ZONE_Z } from '../codes/krLateral'
 import { profileOf } from '../codes'
 import type { ConnResult } from '../domain/connections'
-import type { DesignResult } from '../domain/design'
+import {isLengthService,type DesignResult} from '../domain/design'
 import type { OptSummary } from '../domain/optimize'
 import { portalGeometry } from '../domain/portal'
 import { LOSS, quantities } from '../domain/quantities'
@@ -83,17 +85,31 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
     parts.push(`<h3>${L('add_summary')}</h3><p>${L('sc_additionReview')}</p>`)
     parts.push(table(['ID','D (kN)','L (kN)','W seismic (kN)'],model.additions.sources.map((v)=>[esc(v.id),f(v.dead),f(v.live),f(v.seismic)])))
     const a=spec.additions!
-    const inputs=[...a.equipment, ...(spec.features?.crane && a.crane?[a.crane]:[]), ...(spec.features?.mezzanine && a.platform?[a.platform]:[])]
-    const units:Record<string,string>={x:'m',y:'m',x0:'m',x1:'m',elevation:'m',eccentricity:'m',wheelSpacing:'m',beamSpacing:'m',weight:'kN',maxWheel:'kN',minWheel:'kN',lateral:'kN',braking:'kN',seismicWeight:'kN',driftLimitMm:'mm',dead:'kN/m²',live:'kN/m²'}
-    const inputRows = (value: object, factors=false) => Object.entries(value).filter(([k])=>k!=='confirmed' && k!=='kind').map(([k,v])=>[
-      k==='id'?'ID':L((k==='seismicFraction'?'add_mass':`add_${k}`) as I18nKey),`${esc(/Bay$/.test(k)?Number(v)+1:v)}${!factors && units[k] ? ` ${units[k]}` : ''}`,
+    const inputs=[...a.equipment, ...(spec.features?.crane && a.crane?[a.crane]:[]), ...(spec.features?.mezzanine && a.platform?[a.platform]:[]), ...(spec.features?.opening && a.wallOpening?[a.wallOpening]:[])]
+    const units:Record<string,string>={x:'m',y:'m',x0:'m',x1:'m',height:'m',elevation:'m',eccentricity:'m',wheelSpacing:'m',beamSpacing:'m',weight:'kN',maxWheel:'kN',minWheel:'kN',lateral:'kN',braking:'kN',seismicWeight:'kN',driftLimitMm:'mm',dead:'kN/m²',live:'kN/m²'}
+    const inputRows = (value: object, factors=false) => Object.entries(value).filter(([k])=>k!=='confirmed' && k!=='kind' && k!=='runway').map(([k,v])=>[
+      k==='id'?'ID':L((k==='seismicFraction'?'add_mass':`add_${k}`) as I18nKey),`${esc((/Bay$/.test(k)||k==='bay')?Number(v)+1:v)}${!factors && units[k] ? ` ${units[k]}` : ''}`,
     ])
     for (const value of inputs) parts.push(table([t('sv_item'),t('sv_value')],inputRows(value)))
     if (spec.features?.crane) {
       parts.push(`<p>${L('add_crane_note')}</p>`)
+      if(a.crane?.runway) parts.push(`<h4>${L('add_runway')}</h4><p>${L('add_runway_note')}</p>`,table([t('sv_item'),t('sv_value')],inputRows(a.crane.runway)))
       parts.push(table([t('rd_combo'),'Y (m)','Pmax rail','FX sign','FY sign'],model.additions.craneCases.map((v)=>[esc(v.name),f(v.position,3),esc(v.maxRail),v.lateralSign,v.brakingSign])))
     }
     if (spec.features?.mezzanine) parts.push(`<p>${L('add_platform_note')}</p>`)
+    if (spec.features?.opening && a.wallOpening) parts.push(`<p>${L('add_opening_note')}</p>`)
+    for(const [value,title,note] of [[a.roofOpening,'p6_roof','p6_roofNote'],[activeFloorOpening(spec),'p6_floor','p6_floorNote'],[a.link,'p6_link','p6_linkNote']] as const)if(value) {
+      const label=(k:string)=>({id:'ID',bay:t('add_bay'),x0:t('add_x0'),x1:t('add_x1'),section:t('p6_roofBeam'),deflectionDivisor:t('add_deflectionDivisor'),source:t('add_source'),face:t('add_face'),elevation:t('add_elevation')}[k]??t(`p6_${k}` as I18nKey)??k)
+      const units=(k:string)=>['x0','x1','elevation'].includes(k)?' m':k.endsWith('Mm')?' mm':''
+      parts.push(`<h4>${L(title)}</h4><p>${L(note)}</p>`,table([t('sv_item'),t('sv_value')],Object.entries(value).filter(([k])=>!['confirmed','cases'].includes(k)).map(([k,v])=>[esc(label(k)),esc(k==='mode'?t(`p6_${v}` as I18nKey):typeof v==='number'?f(v+(k==='bay'||k==='frame'?1:0),k==='bay'||k==='frame'?0:3)+units(k):v)])))
+      if(title==='p6_roof')parts.push(`<p>${L('p6_roofDeflNote')}</p>`)
+    }
+    if(a.link) {
+      const l=a.link,r=linkReview(l)
+      parts.push(`<p>${esc(t('p6_required',f(r.required),f(r.gapReserve),f(r.seatReserve)))}</p>`)
+      if(l.mode==='sliding')parts.push(`<p>${L('p6_reactionNote')}</p>`,table(['Case',t('add_name'),'FX (kN)','FY (kN)','FZ (kN)','MX (kN·m)','MY (kN·m)','MZ (kN·m)'],l.cases.map((v,i)=>[model.additions!.linkCases?.[i]?.name??'',esc(v.name),...['fx','fy','fz','mx','my','mz'].map((k)=>f(v[k as 'fx']))])))
+    }
+    if(model.additions.voids?.length)parts.push(table(['ID','Kind','Area (m²)','X (m)','Y (m)','Z (m)'],model.additions.voids.map((v)=>[esc(v.id),L(v.kind==='roof'?'p6_roof':'p6_floor'),f(v.area),`${f(v.x0)} – ${f(v.x1)}`,`${f(v.y0)} – ${f(v.y1)}`,`${f(v.z0)} – ${f(v.z1)}`])))
     if (info.additions?.factors) parts.push(`<h4>${L('add_factors')}</h4>`,table([t('sv_item'),t('sv_value')],inputRows(info.additions.factors,true)))
     parts.push(table(['Physical member (added / split)','Element IDs','L (m)','Source'],model.additions.members.filter((v)=>v.source!=='factory'||v.elementIds.length>1).map((v)=>[esc(v.key),v.elementIds.join(', '),f(v.length),esc(v.source)])))
   }
@@ -105,7 +121,7 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   parts.push(`<p>${esc(spec.material)}: Fy = ${mat.fy} MPa, Fu = ${mat.fu} MPa, E = ${mat.E} MPa, γ = ${mat.gamma} kN/m³ (Gen NX ${esc(mat.gen.standard)} ${esc(mat.gen.db)})</p>`)
   const secRows = [...ROLES.map((r) => ({ r, name: spec.sections[r], addition:undefined as import('../domain/additionTypes').AdditionUsage | undefined })), ...model.elements.filter((e)=>e.addition).filter((e,i,es)=>es.findIndex((v)=>v.section===e.section && v.role===e.role)===i).map((e)=>({r:e.role,name:e.section,addition:e.addition}))].map(({ r, name, addition }) => {
     const p = sectionProps(name)
-    return [L(addition ? addition==='platform-column'?'add_platformColumn':'add_platformBeam' : `role_${r}`), esc(name), f(p.A / 100, 1), f(p.Ix / 1e4, 0), f(p.Zx / 1e3, 0), f(p.rx / 10, 2), f(p.ry / 10, 2)]
+    return [L(addition ? additionLabelKey(addition) : `role_${r}`), esc(name), f(p.A / 100, 1), f(p.Ix / 1e4, 0), f(p.Zx / 1e3, 0), f(p.rx / 10, 2), f(p.ry / 10, 2)]
   })
   parts.push(table([t('rd_role'), t('rd_section'), 'A (cm²)', 'Ix (cm⁴)', 'Zx (cm³)', 'rx (cm)', 'ry (cm)'], secRows))
 
@@ -227,8 +243,8 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
     /* 7. 사용성 */
     h2('rep_s7')
     parts.push(table([t('sv_item'), t('sv_value'), t('sv_limit'), t('rd_ratio'), t('sv_clause'), t('res_lc')], design.service.map((s) => [
-      L(`sv_${s.key}`), s.key.endsWith('Defl') ? `${f(s.value * 1000, 1)} mm` : `1/${Math.round(1 / Math.max(s.value, 1e-9))}`,
-      s.key.endsWith('Defl') ? `${f(s.limit * 1000, 1)} mm` : `1/${Math.round(1 / s.limit)}`, ok(s.ratio), esc(s.clause), esc(s.case)])))
+      L(`sv_${s.key}`), isLengthService(s.key) ? `${f(s.value * 1000, 1)} mm` : `1/${Math.round(1 / Math.max(s.value, 1e-9))}`,
+      isLengthService(s.key) ? `${f(s.limit * 1000, 1)} mm` : `1/${Math.round(1 / s.limit)}`, ok(s.ratio), esc(s.clause), esc(s.case)])))
   } else parts.push(`<p>${L('need_design')}</p>`)
 
   /* 8. 접합부 */
@@ -249,7 +265,7 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   const q = quantities(spec, model, connections)
   const paintOf = new Map(q.paint.map((x) => [`${x.role}|${x.section}|${x.addition ?? ''}`, x.area]))
   parts.push(table([t('rd_role'), t('rd_section'), t('rep_count'), t('rep_len'), 'kg/m', t('rep_wt'), `${t('q_paint')} (m²)`],
-    [...q.members.map((r) => [L(r.addition ? r.addition==='platform-column'?'add_platformColumn':'add_platformBeam' : `role_${r.role}`), esc(r.section), r.count, f(r.length, 1), f(r.kgPerM, 1), f(r.weight, 2), f(paintOf.get(`${r.role}|${r.section}|${r.addition ?? ''}`) ?? 0, 0)]),
+    [...q.members.map((r) => [L(r.addition ? additionLabelKey(r.addition) : `role_${r.role}`), esc(r.section), r.count, f(r.length, 1), f(r.kgPerM, 1), f(r.weight, 2), f(paintOf.get(`${r.role}|${r.section}|${r.addition ?? ''}`) ?? 0, 0)]),
      [`<b>${L('rep_total')}</b>`, '', '', '', '', `<b>${f(q.memberT, 2)}</b>`, `<b>${f(q.paintM2, 0)}</b>`]]))
   parts.push(`<p class="note">${esc(t('rep_wt_note', f((q.memberT * 1000) / (spec.span * G.length), 1)))}</p>`)
   if (q.plates.length) {

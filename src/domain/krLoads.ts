@@ -271,7 +271,7 @@ export function buildKrLoads(spec: FactorySpec, model: FactoryModel): LoadPayloa
       const name = `N${d}${tag}`
       for (const e of model.elements) {
         let w = vertical[lc]?.get(e.id) ?? 0
-        if (tag === 'D') w += mat.gamma * sectionProps(e.section).A * 1e-6
+        if (tag === 'D' && !e.loadOnly) w += mat.gamma * sectionProps(e.section).A * 1e-6
         if (e.role !== 'brace') { add(e.id, name, d === 'X' ? 'GX' : 'GY', 0.002 * w); continue }
         /* 가새 = Gen TRUSS — 보 하중 불가("Beam Loads cannot be entered", 라이브 2026-10-16) → 양 끝 절점에 반씩 */
         const F = 0.002 * w * elLen(e.id) / 2

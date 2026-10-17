@@ -63,7 +63,7 @@ export function buildGenPayloads(spec: FactorySpec, model: FactoryModel): GenPay
   /* 흔들림 기둥(다경간 내부) 상단 = 지붕보에 핀 */
   const leanStarts = new Set(model.elements.filter((e) => e.lean).map((e) => e.n1))
   for (const e of model.elements) {
-    if (e.addition === 'platform-beam') {
+    if (e.addition && e.addition !== 'platform-column') {
       const group = model.elements.filter((v) => v.physicalKey === e.physicalKey)
       const end = (id: number) => group.filter((v) => v.n1 === id || v.n2 === id).length === 1
       const pinI = end(e.n1), pinJ = end(e.n2)

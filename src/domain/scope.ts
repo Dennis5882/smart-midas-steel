@@ -1,4 +1,4 @@
-import { additionErrors, hasAdditions } from './additions'
+import { activeOpening, additionErrors, hasAdditions } from './additions'
 /* 적용범위 게이트 (평가 보고서 P0-4, 기획서 14장) — 자동설계가 맞는 건물인지 Gen 전송 전에 판정한다.
    block: 이 앱의 모델·하중으로는 표현할 수 없음 → [실행] 막음 (전문가 모드 = Gen NX 에서 직접 모델링)
    warn : 모델은 만들지만 가정이 흔들림 → 실행 가능, 결과 상태·계산서에 남김
@@ -38,7 +38,7 @@ export function checkScope(spec: FactorySpec, f: ScopeFeatures = spec.features ?
   if (hasAdditions({...spec, features:f})) warn('additionReview')
   if (f.multiSpan && spec.frame !== 'multi') block('multiSpan') // 다경간 형식을 고르면 지원
   /* 큰 개구부: TW 는 부분 밀폐(GCpi ±0.55)로 근사 가능 — 개구부 골조는 별도. CN 은 폐쇄형만 */
-  if (f.opening) {
+  if (f.opening && !activeOpening({...spec,features:f})) {
     if (spec.code === 'CN') block('openingCN')
     else warn('opening', (spec.code === 'KR' ? !!spec.korea && isPartialKR(spec.korea.cpi) : spec.wind.enclosure === 'partial') ? 1 : 0)
   }
