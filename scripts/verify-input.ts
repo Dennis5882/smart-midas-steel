@@ -1,8 +1,10 @@
 /* 스펙 입력 검증 회귀 — 기본 모델링·자유골조 공통 (planFields). 잘못된 값은 두 모드 모두 실행 차단, 기존 값으로 조용히 대체 전송 금지.
    실행: node --import tsx scripts/verify-input.ts */
 ;(globalThis as any).document = { documentElement: { lang: 'ko', dataset: {} } }
-const { CN_DEFAULT_SPEC, DEFAULT_SPEC } = await import('../src/domain/types')
-const { fieldConflicts, initVals, invalidFields, toSpec } = await import('../src/components/planFields')
+const { CN_DEFAULT_SPEC, DEFAULT_SPEC, defaultSpecFor, baySpans } = await import('../src/domain/types')
+const { fieldConflicts, fieldStep, initVals, invalidFields, toSpec } = await import('../src/components/planFields')
+const { portalGeometry } = await import('../src/domain/portal')
+const { steppedValue } = await import('../src/components/NumericInput')
 const { TEMPLATES, TEMPLATE_KEYS } = await import('../src/domain/templates')
 
 let fails = 0, n = 0
@@ -66,6 +68,35 @@ for (const [name, spec] of [['TW', DEFAULT_SPEC], ['CN', CN_DEFAULT_SPEC]] as co
     ok(fieldConflicts(toSpec(spec, vals, false), vals, false).length === 0, `${name}: template ${k} has no conflict`)
   }
 }
+
+// Guided modeling uses the same nonuniform geometry as free frames, with its own validation step.
+for (const code of ['TW', 'CN', 'KR'] as const) {
+  const base = defaultSpecFor(code)
+  const vals = { ...initVals(base), bayList: '3, 4, 4, 3', bays: '', baySpacing: '' }
+  const sp = toSpec(base, vals, false, true)
+  ok(invalidFields(sp, vals, false, true).length === 0, `${code}: guided individual bays ignore inactive uniform inputs`)
+  ok(sp.bays === 4 && sp.baySpacing === 4 && JSON.stringify(baySpans(sp)) === '[3,4,4,3]', `${code}: 4 bays, longest design span 4 m`)
+  ok(portalGeometry(sp).length === 14, `${code}: individual geometry length 14 m`)
+  for (const raw of ['', ', 4', '3, , 4', '3, 4,', '3, 0, 4', '3, -1, 4', '3, Infinity, 4', '3 4, 3']) {
+    const badVals = { ...vals, bayList: raw }
+    const draft = toSpec(base, badVals, false, true)
+    const error = invalidFields(draft, badVals, false, true).find((f) => f.path === 'bayList')
+    ok(!!error && fieldStep(error) === 2, `${code}: '${raw}' blocks the bays step`)
+    ok(JSON.stringify(baySpans(draft)) === JSON.stringify(baySpans(base)), `${code}: invalid list never silently drops a bay`)
+  }
+  const uniform = toSpec(sp, { ...initVals(sp), bays: '4', baySpacing: '3.5' }, false, false)
+  ok(!uniform.bayList && portalGeometry(uniform).length === 14, `${code}: switching to uniform clears the old nonuniform geometry`)
+  const equal = toSpec(base, { ...vals, bayList: '3, 3, 3, 3' }, false, true)
+  ok(!equal.bayList && equal.bays === 4 && equal.baySpacing === 3, `${code}: equal individual cells normalize without losing bay count`)
+}
+
+for (const [raw, direction, step, min, expected] of [
+  ['3', 1, 0.1, undefined, '3.1'], ['3.1', -1, 0.1, undefined, '3'],
+  ['0.1', 1, 0.01, undefined, '0.11'], ['0.045', -1, 0.001, 0.045, '0.045'],
+  ['0.5', -1, 0.01, 0.5, '0.5'], ['1', -1, 1, undefined, '1'],
+  ['1', -1, 1, 0, '0'], ['0', 1, 1, 0, '1'], ['0.05', -1, 0.1, undefined, '0.05'],
+  ['', 1, 0.1, undefined, null], ['abc', 1, 0.1, undefined, null], ['Infinity', 1, 0.1, undefined, null],
+] as const) ok(steppedValue(raw, direction, step, min) === expected, `Numeric stepping '${raw}' respects decimals, bounds and incomplete input`)
 
 console.log(fails ? `Input validation: ${fails}/${n} failed` : `Input validation: ${n} checks passed`)
 process.exit(fails ? 1 : 0)

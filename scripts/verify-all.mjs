@@ -15,6 +15,7 @@ const SUITES = [
   ['Job / send / cancel', 'verify-job.ts'],
   ['Gen sync', 'verify-sync.ts'],
   ['Input validation', 'verify-input.ts'],
+  ['Gen catalog audit', 'verify-catalog-audit.ts'],
   ['Spec change / job steps', 'verify-workflow.ts'],
   ['Click workspace', 'verify-workspace.ts'],
   ['Task flow / history', 'verify-task-flow.ts'],

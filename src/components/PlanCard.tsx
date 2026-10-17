@@ -10,13 +10,16 @@ import { regionZoneKR, ZONE_Z } from '../codes/krLateral'
 import type { TemplateKey } from '../domain/templates'
 import { TEMPLATES, TEMPLATE_KEYS } from '../domain/templates'
 import { ModelWizard, WIZARD_STEPS } from './ModelWizard'
+import { BaseFixityPicker, FrameTypePicker } from './FrameControls'
+import { BaySpacingEditor } from './BaySpacingEditor'
+import { NumericInput } from './NumericInput'
 import { FigureButton, FigureNote } from './FigureRef'
 import { siteSourceText } from './Status'
 import { ScopeBox } from './ScopeBox'
 import { checkScope, NO_FEATURES, type ScopeFeatures } from '../domain/scope'
 import { lengthText, type FactorySpec } from '../domain/types'
 import { t, tc } from '../i18n'
-import { fieldConflicts, fieldStep, groupsFor, initVals, invalidFields, toSpec, type Group, type Path } from './planFields'
+import { fieldConflicts, fieldStep, groupsFor, initVals, invalidFields, numericStep, toSpec, type Group, type Path } from './planFields'
 import { S, notify, useStore, type ChatMsg } from '../state/store'
 import { restraintKeys, support } from '../domain/validity'
 import { draw3D, previewSpec, tab } from '../state/ui'
@@ -64,15 +67,16 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
   const [selectedTpl, setSelectedTpl] = useState(msg.tpl ?? 'general')
   const formId = useId()
   const [vals, setVals] = useState(() => initVals(msg.spec))
+  const [individual, setIndividual] = useState(free || !!msg.spec.bayList?.length)
   const dirty = useRef(false)
   const [feat, setFeat] = useState<ScopeFeatures>(() => msg.spec.features ?? NO_FEATURES)
-  const spec = useMemo(() => ({ ...toSpec(msg.spec, vals, free), features: feat }), [msg.spec, vals, free, feat])
+  const spec = useMemo(() => ({ ...toSpec(msg.spec, vals, free, individual), features: feat }), [msg.spec, vals, free, individual, feat])
   const blocked = checkScope(spec).blocked
   const live = s.buildEpoch === msg.epoch && s.workspaceView === 'model' && s.task === 'model' && !(s.opt && (msg.modelRevision ?? 0) < s.modelRevision)
-  const groups = groupsFor(spec.code, free, spec.frame)
-  const invalid = invalidFields(spec, vals, free)
+  const groups = groupsFor(spec.code, free, spec.frame, individual)
+  const invalid = invalidFields(spec, vals, free, individual)
   /* 칸 사이 충돌(치수 한계·간격 과대)도 그 칸의 오류로 — 해당 단계에서 막는다 */
-  const conflicts = fieldConflicts(spec, vals, free)
+  const conflicts = fieldConflicts(spec, vals, free, individual)
   const errors = [...invalid, ...conflicts.map((c) => c.field)]
   /* 자유골조는 한 화면 직접 편집 → 오류를 바로 표시. 위저드는 다음 단계로 넘어가려 할 때 */
   const showErrors = attempted || free
@@ -104,6 +108,9 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
     dirty.current = true
     setVals((o) => {
       const n = { ...o, [p]: v }
+      if (!individual && (p === 'bays' || p === 'baySpacing') && Number.isInteger(+n.bays) && +n.bays > 0 && +n.bays <= 1000 && Number.isFinite(+n.baySpacing) && +n.baySpacing > 0) {
+        n.bayList = Array.from({ length: +n.bays }, () => n.baySpacing).join(', ')
+      }
       /* 工址 선택 → 표2-1·2-4 로 SDS·SD1·SMS·SM1 채움 (군 변경 시 첫 鄉鎮) */
       if (msg.spec.code === 'TW' && (p === 'seismic.county' || p === 'seismic.town' || p === 'seismic.soil')) {
         if (p === 'seismic.county') n['seismic.town'] = townsOf(v)[0] ?? ''
@@ -126,13 +133,18 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
     const conflict = bad ? undefined : conflicts.find((c) => c.field.path === f.path)
     const error = showErrors && (bad || !!conflict)
     return <div key={f.path} className={`pe-f${f.kind === 'text' || f.full ? ' pe-full' : ''}`}>
-      <label htmlFor={id}>{t(f.label)}</label>
+      <label htmlFor={f.path === 'baseFixity' ? undefined : id}>{t(f.label)}</label>
       <div className="pe-in">
-        {f.kind === 'select'
+        {f.path === 'baseFixity'
+          ? <BaseFixityPicker id={id} value={vals[f.path]} disabled={!live || s.busy || readonly} onChange={(v) => set(f.path, v)} />
+          : f.kind === 'select'
           ? <select id={id} value={vals[f.path]} disabled={!live || s.busy || readonly} onChange={(e) => set(f.path, e.target.value)} aria-invalid={error} aria-describedby={error ? `${id}-error` : undefined}>
               {f.options!(spec).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-          : <input id={id} value={vals[f.path]} disabled={!live || s.busy || readonly} inputMode={f.kind === 'text' || f.kind === 'list' ? 'text' : 'decimal'}
+          : f.kind === 'num' || f.kind === 'int'
+          ? <NumericInput id={id} value={vals[f.path]} disabled={!live || s.busy || readonly} step={numericStep(f)} min={f.min}
+              onValueChange={(v) => set(f.path, v)} title={t('numeric_wheel_hint')} aria-invalid={error} aria-describedby={error ? `${id}-error` : undefined} />
+          : <input id={id} className={f.path.startsWith('sections.') ? 'pe-code' : f.kind === 'list' ? 'pe-numeric-list' : undefined} value={vals[f.path]} disabled={!live || s.busy || readonly} inputMode="text"
               onChange={(e) => set(f.path, e.target.value)} aria-invalid={error} aria-describedby={error ? `${id}-error` : undefined} />}
         {f.unit && <span className="pe-u">{f.unit}</span>}
         {f.figure && <FigureButton fig={f.figure} />}
@@ -152,7 +164,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
       if (first) {
         setAttempted(true); setStep(fieldStep(first))
         /* 오류 칸으로 포커스 — 스크롤 아래·접힌 고급 칸이어도 문구가 보이게 (단계 전환·펼침 렌더 뒤) */
-        setTimeout(() => document.getElementById(`${formId}-${first.path}`)?.focus(), 60)
+        setTimeout(() => document.getElementById(`${formId}-${first.path === 'bayList' && !free ? 'bayList-0' : first.path}`)?.focus(), 60)
         return
       }
       if (blocked) { setAttempted(true); return }
@@ -168,14 +180,26 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
     onCancel={closeEditor}>
     {step === 0 && <>
       <div className="mw-templates">{TEMPLATE_KEYS.map((key) => <button type="button" key={key} aria-pressed={selectedTpl === key}
-        disabled={!live || s.busy} onClick={() => { setSelectedTpl(key); if (S.activePlan?.id === msg.id) S.activePlan = { ...S.activePlan, tpl: key }; dirty.current = true; setVals((old) => ({ ...old, ...Object.fromEntries(Object.entries(TEMPLATES[key]).map(([k, v]) => [k, String(v)])) })); notify() }}>
+        disabled={!live || s.busy} onClick={() => { setSelectedTpl(key); setIndividual(false); if (S.activePlan?.id === msg.id) S.activePlan = { ...S.activePlan, tpl: key }; dirty.current = true; setVals((old) => ({ ...old, ...Object.fromEntries(Object.entries(TEMPLATES[key]).map(([k, v]) => [k, String(v)])), bayList: Array.from({ length: TEMPLATES[key].bays }, () => TEMPLATES[key].baySpacing).join(', ') })); notify() }}>
         <strong>{t(`tpl_${key}`)}</strong><span>{TEMPLATES[key].span} m · {TEMPLATES[key].bays * TEMPLATES[key].baySpacing} m</span>
       </button>)}</div>
       <p className="mw-note">{t('mw_template_note')}</p>
       <ScopeBox spec={spec} feat={feat} setFeat={setFeat} disabled={!live || s.busy} />
     </>}
+    {step === 2 && <section className="mw-group">
+      <h4>{t('bay_spacing_title')}</h4>
+      <BaySpacingEditor id={`${formId}-bayList`} individual={individual} raw={vals.bayList} disabled={!live || s.busy}
+        invalid={showErrors && invalid.some((f) => f.path === 'bayList')}
+        onMode={(mode) => {
+          if (mode === individual) return
+          dirty.current = true
+          if (!mode) setVals((old) => ({ ...old, bays: String(spec.bays), baySpacing: String(spec.baySpacing) }))
+          setIndividual(mode); setAttempted(false)
+        }} onChange={(raw) => set('bayList', raw)} />
+      {!individual && fields({ title: 'sec_geometry', fields: groups.flatMap((g) => g.fields).filter((f) => ['bays', 'baySpacing'].includes(f.path)) })}
+    </section>}
     {step > 0 && step < 5 && groups.map((g) => {
-      const filtered = { ...g, fields: g.fields.filter((f) => fieldStep(f) === step) }
+      const filtered = { ...g, fields: g.fields.filter((f) => fieldStep(f) === step && !['frame', 'bays', 'baySpacing', 'bayList'].includes(f.path)) }
       if (!filtered.fields.length) return null
       const advanced = g.title === 'sec_conn' ? filtered.fields
         : step === 2 ? filtered.fields.filter((f) => !['bays', 'baySpacing'].includes(f.path))
@@ -184,7 +208,9 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
         : step === 4 && spec.code === 'KR' ? filtered.fields.filter((f) => ['korea.Kzt', 'korea.KD', 'korea.roofZeta', 'korea.S'].includes(f.path)) : []
       const basic = filtered.fields.filter((f) => !advanced.includes(f))
       return <section className="mw-group" key={g.title}>
-        {basic.length > 0 && <><h4>{t(g.title)}</h4>{fields({ ...g, fields: basic })}</>}
+        {basic.length > 0 && <><h4>{t(g.title)}</h4>
+          {step === 1 && g.title === 'sec_geometry' && <FrameTypePicker value={spec.frame ?? 'gable'} disabled={!live || s.busy} onChange={(frame) => set('frame', frame)} />}
+          {fields({ ...g, fields: basic })}</>}
         {advanced.length > 0 && <details className="mw-advanced" open={attempted && advanced.some((f) => errors.includes(f)) || undefined}>
           <summary>{t(g.title === 'sec_conn' ? 'sec_conn' : step === 2 || step === 3 ? 'mw_secondary' : 'mw_coefficients')}<span>{t('mw_advanced')}</span></summary>
           {fields({ ...g, fields: advanced })}

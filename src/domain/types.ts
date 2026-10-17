@@ -15,7 +15,7 @@ export interface FactorySpec {
   bays: number
   /** 베이 간격 (m) — bayList 가 있으면 그중 최댓값(퍼린·거트 경간 등 설계값, 보수적) */
   baySpacing: number
-  /** 자유골조: 베이별 간격 (m, y=0 박공부터). 있으면 bays = 길이, baySpacing = 최댓값 (normalizeBays) */
+  /** 베이별 간격 (m, y=0 박공부터). 기본 모델링·자유골조 공통. 있으면 bays = 길이, baySpacing = 최댓값 (normalizeBays) */
   bayList?: number[]
   /** 횡단면 형식 — 없으면 'gable'(단경간 박공). 'mono' = 단경간 편경사: x = 0 이 낮은 처마, x = 스팬이 높은 처마.
       'multi' = 다경간 박공: 경간마다 마루, 내부 기둥 = 흔들림 기둥(상·하단 핀), 골 높이 = 처마 */

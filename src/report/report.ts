@@ -271,9 +271,15 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   parts.push('</section>')
 
   const title = t('rep_title')
+  // Absolute app URL keeps self-hosted fonts available in downloaded HTML.
+  // The PDF renderer embeds its own regional Noto subset independently.
+  const uiFonts = typeof window !== 'undefined' && /^https?:$/.test(window.location.protocol)
+    ? new URL('/fonts/ui-fonts.css', window.location.href).href : '/fonts/ui-fonts.css'
   return `<!doctype html><html lang="${htmlLang(getLang())}"><head><meta charset="utf-8"><title>${esc(title)}</title>
+<link rel="stylesheet" href="${esc(uiFonts)}">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=Noto+Sans+KR:wght@400;500;600;700&amp;family=Noto+Sans+TC:wght@400;500;600;700&amp;family=Noto+Sans+SC:wght@400;500;600;700&amp;display=swap">
 <style>
-  body{font-family:'Noto Sans TC','Noto Sans KR','Noto Sans SC',sans-serif;color:#111;margin:24px auto;max-width:1000px;padding:0 16px;font-size:12px;line-height:1.55}
+  body{font-family:var(--font-ui,sans-serif);font-variant-numeric:tabular-nums;color:#111;margin:24px auto;max-width:1000px;padding:0 16px;font-size:12px;line-height:1.55}
   h1{font-size:20px;margin:0 0 4px} h2{font-size:15px;margin:22px 0 8px;padding-bottom:4px;border-bottom:2px solid #1f3a8a;color:#1f3a8a}
   h3{font-size:13px;margin:14px 0 6px} table{border-collapse:collapse;width:100%;margin:6px 0 10px;font-size:11px}
   th,td{border:1px solid #c8ccd4;padding:3px 6px;text-align:left} th{background:#eef1f7}

@@ -39,7 +39,6 @@ const CAMS: Record<CamId, { eye: { x: number; y: number; z: number }; up?: { x: 
   side: { eye: { x: 2.5, y: 0, z: 0 } },    // 길이 방향(Y–Z)
   top: { eye: { x: 0, y: 0, z: 2.5 }, up: { x: 0, y: 1, z: 0 } },
 }
-const FONT = 'IBM Plex Mono, Noto Sans KR, Noto Sans TC, Noto Sans SC'
 
 /** 범례 겸 표시 토글 — 부재 종류별 + 지점·절점 (Plotly 범례는 쓰지 않음: 같은 정보가 두 번 나오던 것 정리) */
 type Mark = 'line' | 'diamond' | 'dot'
@@ -115,11 +114,11 @@ function traces(m: FactoryModel, spec: FactorySpec, P: Pal, ratio: Map<number, n
   return out
 }
 
-function axis(title: string, P: Pal) {
+function axis(title: string, P: Pal, font: string) {
   return {
-    title: { text: title, font: { color: P.axis, size: 12, family: FONT } },
+    title: { text: title, font: { color: P.axis, size: 12, family: font } },
     color: P.axis, gridcolor: P.grid, zerolinecolor: P.grid, backgroundcolor: P.scene, showbackground: true,
-    tickfont: { color: P.axis, size: 10, family: FONT },
+    tickfont: { color: P.axis, size: 10, family: font },
   }
 }
 
@@ -143,17 +142,18 @@ export function View3D() {
     void loadPlotly().then((Plotly) => {
       if (!alive) return
       const P = palette()
+      const font = getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim() || 'monospace'
       const c = S.cam
-      const ax = (hide: boolean, title: string) => (hide ? { ...axis(title, P), ...HIDDEN_AX } : axis(title, P))
+      const ax = (hide: boolean, title: string) => (hide ? { ...axis(title, P, font), ...HIDDEN_AX } : axis(title, P, font))
       void Plotly.react(el, traces(model, spec, P, ratio, S.vis3d, solid, invalid), {
         paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', margin: { l: 0, r: 0, t: ratio ? 28 : 0, b: 0 },
-        font: { family: FONT, color: P.txt }, showlegend: !!ratio,
+        font: { family: font, color: P.txt }, showlegend: !!ratio,
         /* 시점 버튼·맞춤을 누를 때만 카메라를 다시 적용 — 토글·표시 방식 변경은 사용자 시점 유지 */
         uirevision: c,
         modebar: { orientation: 'h', bgcolor: 'rgba(0,0,0,0)', color: P.axis, activecolor: P.txt },
         /* 범례: 위쪽 가로 한 줄 (story) — 모델을 가리지 않음 */
         /* 강도비 보기에만 색 구간 범례 (부재 종류는 위 토글 줄이 범례) */
-        legend: { orientation: 'h', x: 0, y: 1.03, itemclick: false, itemdoubleclick: false, bgcolor: P.legend, bordercolor: P.legendBd, borderwidth: 1, font: { size: 11, color: P.txt, family: FONT } },
+        legend: { orientation: 'h', x: 0, y: 1.03, itemclick: false, itemdoubleclick: false, bgcolor: P.legend, bordercolor: P.legendBd, borderwidth: 1, font: { size: 11, color: P.txt, family: font } },
         scene: {
           ...sceneOf(model, c, 1),
           /* 정투영은 시선 방향 축을 숨김 — 정면(X–Z) Y, 측면(Y–Z) X, 평면 Z */

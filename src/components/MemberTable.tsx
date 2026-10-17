@@ -100,10 +100,10 @@ export function MemberTable({ d }: { d: DesignResult }) {
           <tbody>
             {rows.slice(0, shown).map((m) => (
               <tr key={m.id} title={issueNotes(m).join(' / ')}>
-                <td>{m.id}</td><td>{t(`role_${m.role}`)}</td><td>{m.section}</td>
-                <td style={{ color: ratioColor(m.ratio), fontWeight: 700 }}>{m.ratio.toFixed(3)}{m.ratio > 1 ? ' ✕' : ''}</td>
+                <td className="mono">{m.id}</td><td>{t(`role_${m.role}`)}</td><td className="mono">{m.section}</td>
+                <td className="mono" style={{ color: ratioColor(m.ratio), fontWeight: 700 }}>{m.ratio.toFixed(3)}{m.ratio > 1 ? ' ✕' : ''}</td>
                 <td>{(() => { const g = memberGrade(m); return <GradeChip g={g.grade} reasons={g.reasons} /> })()}</td>
-                <td>{m.eq}</td><td>{m.combo}</td><td>{m.part >= 0 ? PART[m.part] : '—'}</td>
+                <td className="mono">{m.eq}</td><td className="mono">{m.combo}</td><td className="mono">{m.part >= 0 ? PART[m.part] : '—'}</td>
               </tr>
             ))}
             {!rows.length && <tr><td colSpan={8} style={{ color: 'var(--dim)', textAlign: 'center' }}>{t('mt_none')}</td></tr>}

@@ -31,6 +31,14 @@ export interface Field {
 }
 export interface Group { title: I18nKey; fields: Field[] }
 
+/** Wheel/arrow increments follow the quantity's unit, never the UI language or design code. */
+export function numericStep(f: Field): number {
+  if (f.kind === 'int' || f.unit === 'MPa' || f.unit === 'm/s') return 1
+  if (f.path === 'china.damping' || f.path === 'korea.roofZeta') return 0.001
+  if (f.unit === 'm') return 0.1
+  return 0.01
+}
+
 export const GROUPS: Group[] = [
   { title: 'sec_geometry', fields: [
     { path: 'frame', label: 'f_frame', kind: 'select', options: () => FRAME_TYPES.map((v) => ({ value: v, label: t(`frame_${v}`) })) },
@@ -143,13 +151,13 @@ const BAY_LIST: Field = { path: 'bayList', label: 'f_bayList', unit: 'm', kind: 
 const SPAN_LIST: Field = { path: 'spanList', label: 'f_spanList', unit: 'm', kind: 'list', full: true }
 const multiGeometry = (g: Group): Group => g.title !== 'sec_geometry' ? g
   : { ...g, fields: g.fields.flatMap((f) => (f.path === 'span' ? [SPAN_LIST] : [f])) }
-/** 자유골조: 형상의 베이 수·간격 → 베이별 간격 목록 한 칸 */
-const freeGeometry = (g: Group): Group => g.title !== 'sec_geometry' ? g
+/** 개별 간격: 베이 수·공통 간격 대신 베이별 목록 (자유골조와 위저드 공통). */
+const individualGeometry = (g: Group): Group => g.title !== 'sec_geometry' ? g
   : { ...g, fields: [BAY_LIST, ...g.fields.filter((f) => f.path !== 'bays' && f.path !== 'baySpacing')] }
-export const groupsFor = (code: FactorySpec['code'], free = false, frame?: FrameType) =>
+export const groupsFor = (code: FactorySpec['code'], free = false, frame?: FrameType, individual = free) =>
   (code === 'CN' ? [...GROUPS.filter((g) => !['sec_wind', 'sec_seismic', 'sec_conn'].includes(g.title)), ...CN_GROUPS]
     : code === 'KR' ? [...GROUPS.filter((g) => !['sec_wind', 'sec_seismic', 'sec_conn'].includes(g.title)), ...KR_GROUPS] : GROUPS)
-    .map((g) => free ? freeGeometry(g) : g)
+    .map((g) => individual ? individualGeometry(g) : g)
     .map((g) => frame === 'multi' ? multiGeometry(g) : g)
     .map((g) => code === 'CN' ? { ...g, fields: g.fields.filter((f) => f.path !== 'restraints.braceCrossing') } : g)
 export const FIELDS = [...GROUPS, ...CN_GROUPS, ...KR_GROUPS].flatMap((g) => g.fields)
@@ -163,15 +171,15 @@ export function setPath<T>(o: T, p: Path, v: unknown): T {
 
 /** 입력 문자열 → 스펙. 잘못된 칸은 기존 값을 유지하지만 — 그 상태로는 생성되지 않는다(invalidFields 가 실행을 막음).
    여기서의 대체는 미리보기·요약이 깨지지 않게 하는 용도뿐이다. */
-export function toSpec(base: FactorySpec, vals: Record<Path, string>, free: boolean): FactorySpec {
-  let sp = free ? base : { ...base, bayList: undefined }
+export function toSpec(base: FactorySpec, vals: Record<Path, string>, free: boolean, individual = free): FactorySpec {
+  let sp = individual ? base : { ...base, bayList: undefined }
   const frame = (vals.frame || base.frame) as FrameType | undefined
-  for (const f of groupsFor(base.code, free, frame).flatMap((g) => g.fields)) {
+  for (const f of groupsFor(base.code, free, frame, individual).flatMap((g) => g.fields)) {
     const raw = vals[f.path]
     if (f.path.startsWith('restraints.') && raw === 'assumed' && getPath(base, f.path) === undefined) continue
     if (f.kind === 'list') {
       const l = parseList(raw)
-      if (l.length && l.every((v) => Number.isFinite(v) && v > 0)) sp = setPath(sp, f.path, l)
+      if (!listError(raw, f.path === 'bayList' && individual && !free)) sp = setPath(sp, f.path, l)
     } else if (f.kind === 'num' || f.kind === 'int') {
       const n = f.kind === 'int' ? Math.round(+raw) : +raw
       if (Number.isFinite(n) && (f.min !== undefined ? n >= f.min : n > 0)) sp = setPath(sp, f.path, n)
@@ -189,11 +197,14 @@ export const initVals = (sp: FactorySpec): Record<Path, string> => ({
 })
 
 /** 베이 목록 '6, 6, 7.5' — 비었거나, 숫자가 아니거나, 0 이하인 항목이 있으면 오류 */
-export const listError = (raw: string) => { const l = parseList(raw); return !l.length || l.some((v) => !Number.isFinite(v) || v <= 0) }
+export const listError = (raw: string, cells = false) => {
+  const l = cells ? raw.split(/[,，、]/).map(Number) : parseList(raw)
+  return /(^|[,，、])\s*([,，、]|$)/.test(raw) || !l.length || l.some((v) => !Number.isFinite(v) || v <= 0)
+}
 
-export function invalidField(f: Field, raw: string, spec: FactorySpec): boolean {
+export function invalidField(f: Field, raw: string, spec: FactorySpec, individualCells = false): boolean {
   if (!raw?.trim()) return true
-  if (f.kind === 'list') return listError(raw)
+  if (f.kind === 'list') return listError(raw, f.path === 'bayList' && individualCells)
   if (f.kind === 'select') return !f.options!(spec).some((o) => o.value === raw)
   if (f.kind === 'num' || f.kind === 'int') {
     const n = Number(raw)
@@ -209,12 +220,12 @@ export function invalidField(f: Field, raw: string, spec: FactorySpec): boolean 
 }
 
 export const fieldStep = (f: Field) => f.path.startsWith('restraints.') ? 2 : ['frame', 'span', 'spanList', 'eaveHeight', 'roofSlope', 'baseFixity'].includes(f.path) ? 1
-  : ['bays', 'baySpacing', 'purlinSpacing', 'girtSpacing', 'postSpacing', 'sagRods'].includes(f.path) ? 2
+  : ['bayList', 'bays', 'baySpacing', 'purlinSpacing', 'girtSpacing', 'postSpacing', 'sagRods'].includes(f.path) ? 2
   : f.path.startsWith('sections.') || f.path === 'material' || ['fc', 'anchorFu', 'china.concreteBearing', 'china.anchorFt'].includes(f.path) ? 3 : 4
 
 /** 잘못된 입력 칸 — 기본 모델링·자유골조 공통 (자유골조는 베이 수·간격 대신 베이 목록) */
-export const invalidFields = (spec: FactorySpec, vals: Record<Path, string>, free: boolean): Field[] =>
-  groupsFor(spec.code, free, spec.frame).flatMap((g) => g.fields).filter((f) => invalidField(f, vals[f.path], spec))
+export const invalidFields = (spec: FactorySpec, vals: Record<Path, string>, free: boolean, individual = free): Field[] =>
+  groupsFor(spec.code, free, spec.frame, individual).flatMap((g) => g.fields).filter((f) => invalidField(f, vals[f.path], spec, individual && !free))
 
 /** 칸 사이 충돌 — 각 칸은 올바르지만 함께 두면 모델이 성립하지 않는 경우. 위저드가 그 칸의 단계에서 바로 막는다.
    ① 치수 한계(적용범위 block 과 같은 값) ② 간격이 커서 처마~마루·기초~처마·박공 사이에 부재가 하나도 안 들어감
@@ -222,9 +233,9 @@ export const invalidFields = (spec: FactorySpec, vals: Record<Path, string>, fre
    관련 칸 중 하나라도 잘못이면 그 칸 오류가 먼저 — 여기서는 판단하지 않는다. */
 export interface Conflict { field: Field; text: string }
 const MIN_DIV = 1.5
-export function fieldConflicts(spec: FactorySpec, vals: Record<Path, string>, free: boolean): Conflict[] {
-  const fields = groupsFor(spec.code, free, spec.frame).flatMap((g) => g.fields)
-  const bad = new Set(fields.filter((f) => invalidField(f, vals[f.path], spec)).map((f) => f.path))
+export function fieldConflicts(spec: FactorySpec, vals: Record<Path, string>, free: boolean, individual = free): Conflict[] {
+  const fields = groupsFor(spec.code, free, spec.frame, individual).flatMap((g) => g.fields)
+  const bad = new Set(fields.filter((f) => invalidField(f, vals[f.path], spec, individual && !free)).map((f) => f.path))
   const ok = (...p: Path[]) => p.every((x) => !bad.has(x))
   const out: Conflict[] = []
   const add = (path: Path, text: string) => { const field = fields.find((f) => f.path === path); if (field) out.push({ field, text }) }

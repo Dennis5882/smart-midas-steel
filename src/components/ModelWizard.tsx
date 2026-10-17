@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, Building2, Send } from 'lucide-react'
 import { baySpans, frameSpans, type FactorySpec } from '../domain/types'
 import { t } from '../i18n'
+import { BaseSymbol } from './FrameControls'
 
 export const WIZARD_STEPS = ['mw_scope', 'mw_frame', 'mw_bays', 'mw_sections', 'mw_loads', 'mw_review'] as const
 const HINTS = ['mw_scope_hint', 'mw_frame_hint', 'mw_bays_hint', 'mw_sections_hint', 'mw_loads_hint', 'mw_review_hint'] as const
@@ -17,16 +18,17 @@ function GeometrySketch({ spec, plan }: { spec: FactorySpec; plan: boolean }) {
   const width = 220, scale = Math.min(width / spec.span, 112 / (spec.eaveHeight + rise))
   const left = (300 - spec.span * scale) / 2, right = 300 - left
   const eave = 145 - spec.eaveHeight * scale, ridge = eave - rise * scale
-  const n = Math.min(spec.bays, 16)
+  const bayX = [40, ...spans.map((_, i) => 40 + spans.slice(0, i + 1).reduce((a, b) => a + b, 0) * 220 / length)]
   return <div className="mw-sketch" aria-hidden="true">
     <svg viewBox="0 0 300 185" focusable="false">
       <defs><pattern id={gridId} width="15" height="15" patternUnits="userSpaceOnUse"><path d="M 15 0 L 0 0 0 15" fill="none" stroke="var(--border)" strokeWidth=".5" /></pattern></defs>
       <rect x="0" y="0" width="300" height="185" fill={`url(#${gridId})`} />
       {plan ? <>
         <path d="M40 38 H260 V139 H40 Z" fill="var(--tile)" stroke="var(--cyan)" strokeWidth="2" />
-        {Array.from({ length: n + 1 }, (_, i) => <path key={i} d={`M${40 + i * 220 / n} 38 V139`} stroke="var(--blue)" strokeWidth="1.5" />)}
+        {bayX.map((x, i) => <path key={i} d={`M${x} 38 V139`} stroke="var(--blue)" strokeWidth="1.5" />)}
+        {spans.length <= 16 && spans.map((span, i) => <text key={i} x={(bayX[i] + bayX[i + 1]) / 2} y="57" textAnchor="middle">{+span.toFixed(2)}</text>)}
         <path d="M40 88 H260" stroke="var(--muted)" strokeDasharray="4 4" />
-        <text x="150" y="163" textAnchor="middle">{+length.toFixed(2)} m · {spec.bays} × {spec.baySpacing} m</text>
+        <text x="150" y="163" textAnchor="middle">{+length.toFixed(2)} m · {t('f_bays')} {spec.bays}</text>
         <text x="150" y="24" textAnchor="middle">{t('mw_plan')}</text>
       </> : <>
         <path d={mono ? `M${left} 145 V${eave} L${right} ${ridge} V145`
@@ -34,9 +36,11 @@ function GeometrySketch({ spec, plan }: { spec: FactorySpec; plan: boolean }) {
           fill="var(--tile)" stroke="var(--cyan)" strokeWidth="4" strokeLinejoin="round" />
         {/* 다경간 내부 기둥 (흔들림 기둥) */}
         {widths.slice(0, -1).map((_, i) => { const x = left + widths.slice(0, i + 1).reduce((a, b) => a + b, 0) * scale; return <path key={i} d={`M${x} 145 V${eave}`} stroke="var(--cyan)" strokeWidth="2" strokeDasharray="4 3" /> })}
-        <path d={`M${left - 12} 149 H${left + 12} M${right - 12} 149 H${right + 12}`} stroke="var(--muted)" strokeWidth="2" />
-        <path d={`M${left} 163 H${right} M${left} 158 V168 M${right} 158 V168`} stroke="var(--muted)" />
-        <text x="150" y="180" textAnchor="middle">{spec.span} m</text>
+        <BaseSymbol x={left} y={145} fixed={spec.baseFixity === 'fixed'} />
+        <BaseSymbol x={right} y={145} fixed={spec.baseFixity === 'fixed'} />
+        {widths.slice(0, -1).map((_, i) => <BaseSymbol key={i} x={left + widths.slice(0, i + 1).reduce((a, b) => a + b, 0) * scale} y={145} fixed={false} />)}
+        <path d={`M${left} 170 H${right} M${left} 166 V174 M${right} 166 V174`} stroke="var(--muted)" />
+        <text x="150" y="183" textAnchor="middle">{spec.span} m</text>
         {/* 편경사: 낮은 처마는 왼쪽, 높은 처마는 오른쪽에 */}
         <text x={mono ? left - 8 : right + 8} y={(145 + eave) / 2} fontSize="10" textAnchor={mono ? 'end' : 'start'}>{spec.eaveHeight} m</text>
         {mono && <text x={right + 8} y={(145 + ridge) / 2} fontSize="10">{+(spec.eaveHeight + rise).toFixed(2)} m</text>}
@@ -73,7 +77,11 @@ export function ModelWizard({ spec, step, visited, disabled, blocked, invalid, a
     </button>)}</nav>
     <div className="mw-content" ref={content}>
       <div className="mw-stage-heading"><span className="mw-eyebrow">{t('mw_step', step + 1)}</span><h3 tabIndex={-1} ref={heading}>{t(WIZARD_STEPS[step])}</h3><p>{t(HINTS[step])}</p></div>
-      {(step === 1 || step === 2) && <GeometrySketch spec={spec} plan={step === 2} />}
+      {step === 1 && <div className="mw-frame-preview">
+        <GeometrySketch spec={spec} plan={false} />
+        <div className="mw-preview-caption"><span>{t(`frame_${spec.frame ?? 'gable'}`)}</span><span>{t('f_base')} · {t(spec.baseFixity === 'fixed' ? 'base_fixed' : 'base_pinned')}</span></div>
+      </div>}
+      {step === 2 && <GeometrySketch spec={spec} plan />}
       {step > 1 && <div className="mw-metrics"><span>{t('f_span')}<b>{spec.span}<small> m</small></b></span><span>{t('kv_length')}<b>{+length.toFixed(2)}<small> m</small></b></span><span>{t('f_eave')}<b>{spec.eaveHeight}<small> m</small></b></span></div>}
       {step === 5 && !blocked && !invalid && <div className="mw-ready"><CheckCircle2 size={18} />{t('mw_ready')}</div>}
       {children}

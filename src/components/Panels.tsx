@@ -149,9 +149,9 @@ function DesignTables({ d }: { d: DesignResult }) {
                 const m = d.byRole[r]!
                 return (
                   <tr key={r} title={m.notes.join(' / ')}>
-                    <td>{t(`role_${r}`)}</td><td>{m.section}</td><td>{m.id}{m.part >= 0 ? ` (${PART[m.part]})` : ''}</td>
-                    <td style={{ color: ratioColor(m.ratio), fontWeight: 700 }}>{m.ratio.toFixed(3)}</td>
-                    <td>{m.eq}</td><td>{m.combo}</td>
+                    <td>{t(`role_${r}`)}</td><td className="mono">{m.section}</td><td className="mono">{m.id}{m.part >= 0 ? ` (${PART[m.part]})` : ''}</td>
+                    <td className="mono" style={{ color: ratioColor(m.ratio), fontWeight: 700 }}>{m.ratio.toFixed(3)}</td>
+                    <td className="mono">{m.eq}</td><td className="mono">{m.combo}</td>
                     <td style={{ color: 'var(--muted)' }}>{m.eq === 'KL/r' ? `KL/r ${m.slender.value.toFixed(0)}/${m.slender.limit}` : m.cap.mxMode}{m.notes.length ? ' *' : ''}</td>
                     <td>{(() => { const g = roleGrade(d, r); return <GradeChip g={g.grade} reasons={g.reasons} /> })()}</td>
                   </tr>
@@ -168,8 +168,8 @@ function DesignTables({ d }: { d: DesignResult }) {
           <tbody>
             {d.service.map((sv) => (
               <tr key={sv.key}>
-                <td>{t(`sv_${sv.key}`)}</td><td>{svcVal(sv.key, sv.value)}</td><td>{svcVal(sv.key, sv.limit)}</td>
-                <td style={{ color: ratioColor(sv.ratio), fontWeight: 700 }}>{sv.ratio.toFixed(3)}</td><td style={{ color: 'var(--muted)' }}>{sv.clause}</td>
+                <td>{t(`sv_${sv.key}`)}</td><td className="mono">{svcVal(sv.key, sv.value)}</td><td className="mono">{svcVal(sv.key, sv.limit)}</td>
+                <td className="mono" style={{ color: ratioColor(sv.ratio), fontWeight: 700 }}>{sv.ratio.toFixed(3)}</td><td style={{ color: 'var(--muted)' }}>{sv.clause}</td>
               </tr>
             ))}
           </tbody>
@@ -182,7 +182,7 @@ function DesignTables({ d }: { d: DesignResult }) {
             <thead><tr><th>{t('rd_role')}</th><th>{t('cc_zone')}</th><th>{t('cc_area')}</th><th>p+ (kN/m²)</th><th>p− (kN/m²)</th><th>n</th></tr></thead>
             <tbody>
               {d.cc.map((c) => (
-                <tr key={`${c.role}${c.zone}`}><td>{t(`role_${c.role}`)}</td><td>{c.zone}</td><td>{c.A.toFixed(1)}</td><td>{c.pPos.toFixed(3)}</td><td>{c.pNeg.toFixed(3)}</td><td>{c.count}</td></tr>
+                <tr key={`${c.role}${c.zone}`}><td>{t(`role_${c.role}`)}</td><td className="mono">{c.zone}</td><td className="mono">{c.A.toFixed(1)}</td><td className="mono">{c.pPos.toFixed(3)}</td><td className="mono">{c.pNeg.toFixed(3)}</td><td className="mono">{c.count}</td></tr>
               ))}
             </tbody>
           </table>
@@ -205,14 +205,14 @@ function OptTables({ o }: { o: OptSummary }) {
             {o.rows.map((r) => (
               <tr key={r.role}>
                 <td>{t(`role_${r.role}`)}</td>
-                <td style={{ color: 'var(--muted)' }}>{r.before}</td>
-                <td style={r.after !== r.before ? { color: 'var(--txt-hi)', fontWeight: 700 } : undefined}>{r.after}</td>
-                <td style={{ color: ratioColor(r.ratio), fontWeight: 700 }}>{r.ratio.toFixed(3)}</td>
+                <td className="mono" style={{ color: 'var(--muted)' }}>{r.before}</td>
+                <td className="mono" style={r.after !== r.before ? { color: 'var(--txt-hi)', fontWeight: 700 } : undefined}>{r.after}</td>
+                <td className="mono" style={{ color: ratioColor(r.ratio), fontWeight: 700 }}>{r.ratio.toFixed(3)}</td>
                 <td style={{ color: 'var(--muted)' }}>{t(`op_gov_${r.governs}`)}</td>
-                <td>{f2(r.tBefore)} → {f2(r.tAfter)}</td>
+                <td className="mono">{f2(r.tBefore)} → {f2(r.tAfter)}</td>
               </tr>
             ))}
-            <tr><td colSpan={5}><b>{t('op_total')}</b></td><td><b>{f2(o.weightBefore)} → {f2(o.weightAfter)}</b></td></tr>
+            <tr><td colSpan={5}><b>{t('op_total')}</b></td><td className="mono"><b>{f2(o.weightBefore)} → {f2(o.weightAfter)}</b></td></tr>
           </tbody>
         </table>
       </div>
@@ -220,10 +220,10 @@ function OptTables({ o }: { o: OptSummary }) {
         <thead><tr><th>{t('op_iter')}</th><th>{t('op_tons')}</th><th>{t('rd_ratio')}</th><th>{t('op_svc')}</th><th>{t('op_conn')}</th><th>NG</th></tr></thead>
         <tbody>
           {o.iters.map((x) => (
-            <tr key={x.it}><td>{x.it}</td><td>{f2(x.weight)}</td>
-              <td style={{ color: ratioColor(x.maxRatio) }}>{x.maxRatio.toFixed(3)}</td>
-              <td style={{ color: ratioColor(x.svcMax) }}>{x.svcMax.toFixed(3)}</td>
-              <td style={{ color: ratioColor(x.connMax ?? 0) }}>{x.connMax?.toFixed(3) ?? '-'}</td><td>{x.ng + (x.connNg ?? 0)}</td></tr>
+            <tr key={x.it}><td className="mono">{x.it}</td><td className="mono">{f2(x.weight)}</td>
+              <td className="mono" style={{ color: ratioColor(x.maxRatio) }}>{x.maxRatio.toFixed(3)}</td>
+              <td className="mono" style={{ color: ratioColor(x.svcMax) }}>{x.svcMax.toFixed(3)}</td>
+              <td className="mono" style={{ color: ratioColor(x.connMax ?? 0) }}>{x.connMax?.toFixed(3) ?? '-'}</td><td className="mono">{x.ng + (x.connNg ?? 0)}</td></tr>
           ))}
         </tbody>
       </table>
@@ -256,10 +256,10 @@ function ConnTables({ cs }: { cs: ConnResult[] }) {
             <tbody>
               {c.checks.map((k) => (
                 <tr key={k.item}>
-                  <td>{t(`cn_${k.item}` as I18nKey)}</td><td>{k.demand.toFixed(2)} {k.unit}</td><td>{k.capacity.toFixed(2)} {k.unit}</td>
+                  <td>{t(`cn_${k.item}` as I18nKey)}</td><td className="mono">{k.demand.toFixed(2)} {k.unit}</td><td className="mono">{k.capacity.toFixed(2)} {k.unit}</td>
                   {c.dims.stiffener && k.item === 'flangeBend'
                     ? <td style={{ color: 'var(--muted)' }}>{k.ratio.toFixed(3)} → {t('cn_stiffener')}</td>
-                    : <td style={{ color: ratioColor(k.ratio), fontWeight: 700 }}>{k.ratio.toFixed(3)}</td>}
+                    : <td className="mono" style={{ color: ratioColor(k.ratio), fontWeight: 700 }}>{k.ratio.toFixed(3)}</td>}
                   <td style={{ color: 'var(--muted)' }}>{k.clause}</td>
                 </tr>
               ))}
@@ -294,7 +294,7 @@ export function ResultsPanel() {
             <thead><tr><th>{t('res_lc')}</th><th>FX (kN)</th><th>FY (kN)</th><th>FZ (kN)</th></tr></thead>
             <tbody>
               {s.reactions.map((r) => (
-                <tr key={r.lc}><td>{r.lc}</td><td>{f3(r.fx)}</td><td>{f3(r.fy)}</td><td>{f3(r.fz)}</td></tr>
+                <tr key={r.lc}><td className="mono">{r.lc}</td><td className="mono">{f3(r.fx)}</td><td className="mono">{f3(r.fy)}</td><td className="mono">{f3(r.fz)}</td></tr>
               ))}
             </tbody>
           </table>

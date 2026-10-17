@@ -1,6 +1,16 @@
 /* 영어 사전 — 키의 기준(폴백). 다른 언어는 `Dict` 타입으로 키 일치를 컴파일 시점에 검사.
    값이 HTML 인 키(…_html, welcome, 메시지류)는 dangerouslySetInnerHTML 로 렌더 — 사용자 입력을 넣지 말 것. */
 export const en = {
+  bay_mode: 'Spacing mode',
+  numeric_wheel_hint: 'Click to focus, then use the wheel or ↑↓ keys to adjust.',
+  bay_error: 'Enter a number greater than zero for every bay spacing.',
+  bay_uniform: 'Equal spacing',
+  bay_individual: 'Individual spacing',
+  bay_number: (n: number) => `Bay ${n}`,
+  bay_remove: (n: number) => `Remove bay ${n}`,
+  bay_add: 'Add bay',
+  bay_spacing_title: 'Column spacing',
+
   mt_notes: 'Review notes',
   cn_gussetNet: 'Gusset net effective section',
   kr_note_b2: 'B2 story stiffness uses the horizontal EX/EY reference cases with the maximum column-top displacement (including internal columns). H and displacement come from the same reference case; total vertical load remains specific to each strength combination (KDS 14 31 15, 4.5-6/7).',
@@ -504,6 +514,16 @@ export const en = {
   g_help_2: 'Release notes',
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v1_9_2_1: 'Separated the large elevation preview at the top and moved frame-type buttons into the geometry form below for a cleaner layout.',
+  rn_v1_9_1_1: 'Adjust focused numeric inputs with the mouse wheel or up/down arrow keys, including individual bay spacing.',
+  rn_v1_9_1_2: 'Increments follow the quantity and respect minimum values. Unfocused inputs preserve normal page scrolling.',
+  rn_v1_9_0_1: 'Guided modeling now offers equal or individual bay spacing, with per-bay inputs and add/remove controls.',
+  rn_v1_9_0_2: 'Column positions and total length follow the actual spacing. Empty or nonpositive spacing blocks progression and model creation.',
+  rn_v1_8_0_1: 'Select the frame type directly with three illustrated buttons and see geometry and dimensions update in a larger preview.',
+  rn_v1_8_0_2: 'Choose pinned or fixed column bases with illustrated buttons. Support symbols update in the elevation; internal leaning columns remain pinned.',
+  rn_v1_7_1_1: 'Korean uses self-hosted Pretendard web fonts, loading only the character subsets needed without installing fonts on the PC.',
+  rn_v1_7_1_2: 'Language fonts now use IBM Plex Sans for English, Noto Sans TC for Traditional Chinese and Microsoft YaHei UI first for Simplified Chinese.',
+  rn_v1_7_1_3: 'Buttons, explanations and table labels use the UI font; values, section names and logs use IBM Plex Mono. HTML reports follow the selected language font.',
   rn_v1_7_0_1: 'Checked the supplied Taiwan cold-formed original and added flexural/compression distortional buckling and both edge checks for tension plus bending.',
   rn_v1_7_0_2: 'Applied Taiwan compression Qs/Qa and linked cold-formed geometry/material limits and unsupported slender H-section flexure to grading and export gates.',
   rn_v1_7_0_3: 'Frame optimization now checks connection feasibility; reports state Taiwan cold-formed source evidence and the remaining limitations.',
