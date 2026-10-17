@@ -68,6 +68,7 @@ function drawSheets({ spec, model, connections, title }: DrawingInput): Dxf {
       gridBubble(xa - 2000, ya, lab)
     }
     for (const e of model.elements) {
+      if (e.addition) continue
       const [a, b] = ends(e)
       const plan = e.role === 'rafter' || e.role === 'purlin' || e.role === 'strut' || (e.role === 'brace' && e.face === 'roof')
       if (!plan) continue
@@ -75,7 +76,7 @@ function drawSheets({ spec, model, connections, title }: DrawingInput): Dxf {
       d.line(LAYER_OF[e.role], x1, y1, x2, y2)
     }
     /* 풍주 위치 (박공 프레임) */
-    for (const e of model.elements) if (e.role === 'post' && nodes.get(e.n1)!.z === 0) { const n = nodes.get(e.n1)!; const [x, y] = P(n.y, n.x); d.circle('POST', x, y, 200) }
+    for (const e of model.elements) if (!e.addition && e.role === 'post' && nodes.get(e.n1)!.z === 0) { const n = nodes.get(e.n1)!; const [x, y] = P(n.y, n.x); d.circle('POST', x, y, 200) }
     d.dim('DIM', ox, 0, ox + W, 0, 2500, TXT, spec.bayList?.length ? `${G.spans.map(mm).join(' + ')} = ${mm(G.length)}` : `${spec.bays} @ ${mm(spec.baySpacing)} = ${mm(G.length)}`)
     d.dim('DIM', ox + W, 0, ox + W, H, -2500, TXT, String(mm(spec.span)))
     d.text('TEXT', ox, -3200, TXT, `Purlin ${spec.sections.purlin} @ ${Math.round(mm(G.sRoof))}  Strut ${spec.sections.strut}  Roof brace ${spec.sections.brace}`)
@@ -88,6 +89,7 @@ function drawSheets({ spec, model, connections, title }: DrawingInput): Dxf {
     const W = mm(spec.span), H = mm(G.ridgeZ)
     sheet(W, H, `S2  TYPICAL FRAME ELEVATION (GRID ${Math.min(2, frameYs.length)})`, 6500) // 아래 주석: 주각 -4200, 경사 -5400
     for (const e of model.elements) {
+      if (e.addition) continue
       const [a, b] = ends(e)
       if (!(near(a.y, yF) && near(b.y, yF)) || (e.role !== 'column' && e.role !== 'rafter')) continue
       d.line(LAYER_OF[e.role], ox + mm(a.x), mm(a.z), ox + mm(b.x), mm(b.z))
@@ -117,6 +119,7 @@ function drawSheets({ spec, model, connections, title }: DrawingInput): Dxf {
     const W = mm(G.length), H = mm(spec.eaveHeight)
     sheet(W, H, 'S3  SIDE WALL ELEVATION (GRID A)')
     for (const e of model.elements) {
+      if (e.addition) continue
       const [a, b] = ends(e)
       const onWall = near(a.x, 0) && near(b.x, 0) && (e.role === 'column' || e.role === 'girt' || (e.role === 'brace' && e.face === 'x0') || (e.role === 'strut' && near(a.z, spec.eaveHeight)))
       if (onWall) d.line(LAYER_OF[e.role], ox + mm(a.y), mm(a.z), ox + mm(b.y), mm(b.z))
@@ -133,6 +136,7 @@ function drawSheets({ spec, model, connections, title }: DrawingInput): Dxf {
     const W = mm(spec.span), H = mm(G.ridgeZ)
     sheet(W, H, 'S4  GABLE WALL ELEVATION (GRID 1)')
     for (const e of model.elements) {
+      if (e.addition) continue
       const [a, b] = ends(e)
       if (!(near(a.y, 0) && near(b.y, 0))) continue
       if (e.role === 'column' || e.role === 'rafter' || e.role === 'post' || e.role === 'girt') d.line(LAYER_OF[e.role], ox + mm(a.x), mm(a.z), ox + mm(b.x), mm(b.z))
@@ -155,8 +159,8 @@ function drawSheets({ spec, model, connections, title }: DrawingInput): Dxf {
     const cols = [0, 3500, 9500, 12500, 16000, 19500]
     const rowTxt = (cells: string[], xs = cols) => { cells.forEach((c, i) => d.text('TEXT', ox + xs[i] + 150, y + 150, TXT * 0.9, c)); d.line('GRID', ox, y, ox + W, y); y -= rowH }
     d.text('TEXT', ox, y + 400, TXT * 1.2, 'MEMBER SCHEDULE'); y -= rowH
-    rowTxt(['TYPE', 'SECTION', 'ELEMS', 'LENGTH (m)', 'kg/m', 'WEIGHT (t)'])
-    for (const r of sch.rows) rowTxt([ROLE_EN[r.role], r.section, String(r.count), r.length.toFixed(1), r.kgPerM.toFixed(1), r.weight.toFixed(2)])
+    rowTxt(['TYPE', 'SECTION', model.additions?'PHYSICAL':'ELEMS', 'LENGTH (m)', 'kg/m', 'WEIGHT (t)'])
+    for (const r of sch.rows) rowTxt([r.addition ? r.addition==='platform-column'?'Platform column':'Platform beam' : ROLE_EN[r.role], r.section, String(r.count), r.length.toFixed(1), r.kgPerM.toFixed(1), r.weight.toFixed(2)])
     rowTxt(['TOTAL', '', '', '', '', sch.total.toFixed(2)])
     y -= rowH
     d.text('TEXT', ox, y + 400, TXT * 1.2, 'CONNECTION SCHEDULE'); y -= rowH
@@ -169,6 +173,7 @@ function drawSheets({ spec, model, connections, title }: DrawingInput): Dxf {
     rowTxt(['Assumed restraints need design verification of stiffness, connections and anchorage.'])
     rowTxt(['EXCLUDED: gable-post bases, cleats, fly braces, sag rods, brace crossing connectors, cladding.'])
     if (spec.frame === 'multi') rowTxt(['MULTI-SPAN: interior column-top / valley connections and gutters require separate design and takeoff.'])
+    if (model.additions) rowTxt(['ADDITIONS: runway/brackets, platform connections and new foundations are excluded from details and takeoff.'])
     /* 표제란 */
     const tbY = -M + 300, tbW = 12000
     d.rect('BORDER', ox + W + M - tbW - 300, tbY, tbW, 3000)
@@ -176,6 +181,42 @@ function drawSheets({ spec, model, connections, title }: DrawingInput): Dxf {
     d.text('TEXT', ox + W + M - tbW, tbY + 1500, TXT * 0.8, `SPAN ${spec.span} m x ${G.length} m, EAVE ${spec.eaveHeight} m, ${spec.material}`)
     d.text('TEXT', ox + W + M - tbW, tbY + 800, TXT * 0.8, `CODE: ${spec.code} ${profileOf(spec.code).method} (${spec.code === 'CN' ? 'GB50017-2017 / GB55006-2021' : spec.code === 'KR' ? 'KDS 41 30 10 / KDS 14 31 10' : `Gen NX ${profileOf(spec.code).gen.designCode}`})  UNITS: mm  DATE ${new Date().toISOString().slice(0, 10)}`)
     d.text('TEXT', ox + W + M - tbW, tbY + 200, TXT * 0.7, 'Generated by Smart MIDAS Steel - check before construction')
+  }
+  if (model.additions) {
+    ox += 26000 + 2 * M + 3000
+    const p=spec.features?.mezzanine ? spec.additions?.platform : undefined
+    const c=spec.features?.crane ? spec.additions?.crane : undefined
+    const W=mm(G.length),H=mm(spec.span)
+    sheet(W,H,'S6  ADDITION PLAN - PRELIMINARY',6500)
+    d.rect('GRID',ox,0,W,H)
+    frameYs.forEach((y,i)=>{d.line('GRID',ox+mm(y),0,ox+mm(y),H);gridBubble(ox+mm(y),H+1500,String(i+1))})
+    for (const e of model.elements.filter((e)=>e.addition==='platform-beam')) {
+      const [a,b]=ends(e); d.line('STRUT',ox+mm(a.y),mm(a.x),ox+mm(b.y),mm(b.x))
+    }
+    for (const e of spec.additions?.equipment ?? []) {
+      d.circle('TEXT',ox+mm(e.y),mm(e.x),300)
+      d.text('TEXT',ox+mm(e.y)+400,mm(e.x),TXT,`${e.name.replace(/[^\x20-\x7e]/g,'')||e.id}  ${e.weight} kN`)
+    }
+    if(p) {
+      const beamNodes=new Set(model.elements.filter((e)=>e.addition==='platform-beam').flatMap((e)=>[e.n1,e.n2]))
+      const supports=new Set(model.elements.filter((e)=>e.role==='column'||e.role==='post').flatMap((e)=>[e.n1,e.n2]).filter((id)=>beamNodes.has(id) && near(nodes.get(id)!.z,p.elevation)))
+      for(const id of supports){const n=nodes.get(id)!;d.circle('POST',ox+mm(n.y),mm(n.x),150)}
+    }
+    if(c) for(const y of frameYs) for(const x of [0,spec.span]) d.circle('COLUMN',ox+mm(y),mm(x),200)
+    d.text('TEXT',ox,-2200,TXT,p?`PLATFORM z=${p.elevation} m; D=${p.dead}, L=${p.live} kN/m2; BEAM ${p.beamSection}`:'Roof equipment locations / crane reaction support locations')
+    d.text('TEXT',ox,-3400,TXT*.8,'No runway/bracket, slab/diaphragm, equipment attachment or connection/foundation detailing.')
+    d.text('TEXT',ox,-4600,TXT*.8,'See calculation report for physical member IDs, load sources and project factors.')
+    ox+=W+2*M+3000
+    const yF=frameYs[p?.firstBay ?? 0]
+    sheet(mm(spec.span),mm(G.ridgeZ),'S7  ADDITION FRAME - PRELIMINARY',6500)
+    for(const e of model.elements) {
+      const [a,b]=ends(e)
+      if(!near(a.y,yF)||!near(b.y,yF)||(!e.addition && e.role!=='column' && e.role!=='rafter'))continue
+      d.line(LAYER_OF[e.role],ox+mm(a.x),mm(a.z),ox+mm(b.x),mm(b.z))
+    }
+    if(c) for(const x of [0,spec.span]) {d.circle('COLUMN',ox+mm(x),mm(c.elevation),200);d.text('TEXT',ox+mm(x),mm(c.elevation)+500,TXT*.8,`CRANE z=${c.elevation} m`,x?2:0)}
+    d.text('TEXT',ox,-2200,TXT*.8,'CRANE: support reactions only; wind/seismic concurrency, fatigue and runway design are separate.')
+    d.text('TEXT',ox,-3400,TXT*.8,'PLATFORM: beam grillage; project review of stability, seismic system and foundations required.')
   }
   return d
 }

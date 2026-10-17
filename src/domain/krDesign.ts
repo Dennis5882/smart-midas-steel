@@ -37,7 +37,7 @@ export function krLengths(spec: FactorySpec, model: FactoryModel): Map<number, {
   const out = new Map<number, { KLx: number; KLy: number; Lb: number; K: number; L: number }>()
   for (const e of model.elements) {
     const a = nodes.get(e.n1)!, b = nodes.get(e.n2)!
-    const Lel = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z)
+    const Lel = e.designLength ?? Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z)
     const K = e.role === 'column' && !e.lean ? Kat.get(a.x)! : 1
     const flyL = support(spec, 'flyBraces') === 'none' ? (e.role === 'rafter' ? G.slopeLen : G.zAt(a.x)) : Lel
     const crossL = support(spec, 'braceCrossing') === 'none' ? Lel : Lel / 2
@@ -68,7 +68,7 @@ export function runKrDesign(spec: FactorySpec, model: FactoryModel, info: LoadIn
   for (const e of model.elements) {
     if (roles && !roles.includes(e.role)) continue
     const a = nodes.get(e.n1)!, b = nodes.get(e.n2)!, sp = sectionProps(e.section)
-    const Lel = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z)
+    const Lel = e.designLength ?? Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z)
     const lens = lengths.get(e.id)!
     const material = e.role === 'purlin' || e.role === 'girt' ? spec.secondaryMaterial ?? spec.material : spec.material
     const Fy = fyKR(material, Math.max(sp.tf, sp.tw))

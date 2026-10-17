@@ -19,6 +19,7 @@ import type { LoadInfo, LoadPayloads } from './loads'
 import { portalGeometry } from './portal'
 import { sectionProps } from './sections'
 import { nodeWeights } from './weights'
+import { hasAdditions } from './additions'
 import { baySpans, frameSpans, type Face, type FactoryModel, type FactorySpec, type Node } from './types'
 
 /** 계산서·결과 탭 표시용 KDS 중간값 */
@@ -192,11 +193,11 @@ export function buildKrLoads(spec: FactorySpec, model: FactoryModel): LoadPayloa
 
   interface WindCase { name: string; dir: 'X' | 'Y'; from: 'x0' | 'xL' | 'y0' | 'yL'; r: 0 | 1; ci: 0 | 1 }
   const windCases: WindCase[] = []
-  const froms: ('x0' | 'xL')[] = G.symmetric ? ['x0'] : ['x0', 'xL']
+  const froms: ('x0' | 'xL')[] = G.symmetric && !hasAdditions(spec) ? ['x0'] : ['x0', 'xL']
   for (const from of froms) for (const r of [0, 1] as const) for (const ci of [0, 1] as const)
     windCases.push({ name: `WX${windCases.filter((w) => w.dir === 'X').length + 1}`, dir: 'X', from, r, ci })
   /* Y 풍: 길이 대칭이면 y0 쪽만 (yL 쪽은 거울) */
-  const bl0 = baySpans(spec), ySym0 = bl0.every((v, i) => Math.abs(v - bl0[bl0.length - 1 - i]) < 1e-9)
+  const bl0 = baySpans(spec), ySym0 = !hasAdditions(spec) && bl0.every((v, i) => Math.abs(v - bl0[bl0.length - 1 - i]) < 1e-9)
   for (const from of ySym0 ? ['y0'] as const : ['y0', 'yL'] as const) for (const r of [0, 1] as const) for (const ci of [0, 1] as const)
     windCases.push({ name: `WY${windCases.filter((w) => w.dir === 'Y').length + 1}`, dir: 'Y', from, r, ci })
   /** 풍상측부터 지붕면 순서 — 0 = 첫 풍상면(바람을 마주볼 때) */
@@ -291,7 +292,7 @@ export function buildKrLoads(spec: FactorySpec, model: FactoryModel): LoadPayloa
   /* ── 하중조합 (KDS 41 12 00 1.7.1) ──
      대칭 축소: 좌우 대칭(xSym, x → 스팬 − x)·길이 대칭(ySym, 베이 간격 회문)이면 거울상 조합은 거울 위치 부재의 결과와 같다 →
      각 궤도에서 하나만 (모든 부재를 검토하므로 최댓값 동일). 거울: x → (EX, ET 부호 반전) · y → (EY, ET 부호 반전) */
-  const xSym = G.symmetric
+  const xSym = G.symmetric && !hasAdditions(spec)
   const ySym = ySym0
   const orth30 = sdc === 'D' // 8.1.3.3 범주 D: 직교 100% + 30%
   const eVariants: { parts: Part[]; tag: string }[] = []

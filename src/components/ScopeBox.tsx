@@ -28,7 +28,7 @@ export function ScopeBox({ spec, feat, setFeat, disabled }: { spec: FactorySpec;
         </div>
       ))}
       <div className="pe-tip" style={{ marginTop: 6, fontWeight: 600, color: r.blocked ? 'var(--red)' : r.issues.length ? 'var(--amber)' : 'var(--green)' }}>
-        {t(r.blocked ? 'sc_blocked' : r.issues.length ? 'sc_warned' : 'sc_ok')}
+        {t(r.blocked ? r.issues.filter((i)=>i.level==='block').every((i)=>i.key==='additionInput') ? 'sc_additionInput' : 'sc_blocked' : r.issues.length ? 'sc_warned' : 'sc_ok')}
       </div>
     </div>
   )

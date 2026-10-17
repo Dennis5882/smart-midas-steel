@@ -1,7 +1,7 @@
 import type { DesignResult, MemberCheck } from './design'
 import type { FactorySpec } from './types'
 
-export interface DesignIssue { key: 'effectiveLength' | 'coldFormedRange' | 'sectionRange' | 'restraint'; level: 'blocked' | 'review'; detail: string }
+export interface DesignIssue { key: 'addition' | 'effectiveLength' | 'coldFormedRange' | 'sectionRange' | 'restraint'; level: 'blocked' | 'review'; detail: string }
 export const blockedMembers = (d: DesignResult | null | undefined) => d?.members.filter((m) => m.issues?.some((i) => i.level === 'blocked')).length ?? 0
 export const support = (s: FactorySpec, key: 'flyBraces' | 'sagRods' | 'braceCrossing') => s.restraints?.[key] ?? 'assumed'
 export const sagCount = (s: FactorySpec) => support(s, 'sagRods') === 'none' ? 0 : s.sagRods

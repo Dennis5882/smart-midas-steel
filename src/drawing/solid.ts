@@ -20,7 +20,7 @@ export const emptyMesh = (): Mesh => ({ x: [], y: [], z: [], i: [], j: [], k: []
 /** 강축 춤 방향(전역) — 부재 축 ex 에 직교하도록 보정 */
 function depthDir(e: Element, ex: V3, a: Node, rising: (x: number) => boolean, slope: number): V3 {
   let d: V3
-  switch (e.role) {
+  switch (e.addition === 'platform-column' ? 'column' : e.role) {
     case 'column': d = [1, 0, 0]; break
     case 'rafter': d = cross([0, 1, 0], ex); break // 골조면 안, 축에 직교
     case 'strut': d = [0, 0, 1]; break

@@ -64,7 +64,7 @@ export function runCnDesign(spec: FactorySpec, model: FactoryModel, info: LoadIn
   for (const e of model.elements) {
     if (roles && !roles.includes(e.role)) continue
     const a = nodes.get(e.n1)!, b = nodes.get(e.n2)!, sp = sectionProps(e.section)
-    const L = 1000 * Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z)
+    const L = 1000 * (e.designLength ?? Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z))
     const secL = Math.min(L, 1000 * spec.baySpacing / (sagCount(spec) + 1))
     const flyL = support(spec, 'flyBraces') === 'none' ? 1000 * (e.role === 'rafter' ? G.slopeLen : G.zAt(a.x)) : L
     const lensOf = (combo: string) => e.role === 'column' ? { KLx: (e.lean ? 1 : Kat.get(a.x)! * etaOf(combo)) * G.zAt(a.x) * 1000, KLy: flyL, Lb: flyL } // 흔들림 기둥 K = 1

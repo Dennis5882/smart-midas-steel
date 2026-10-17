@@ -3,23 +3,25 @@ import { profileOf } from '../codes'
 import { sectionProps } from './sections'
 import { ROLES, type ElementRole, type FactoryModel, type FactorySpec } from './types'
 
-export interface ScheduleRow { role: ElementRole; section: string; count: number; length: number; kgPerM: number; weight: number }
+export interface ScheduleRow { addition?: import('./additionTypes').AdditionUsage; role: ElementRole; section: string; count: number; length: number; kgPerM: number; weight: number }
 
 export function memberSchedule(spec: FactorySpec, model: FactoryModel): { rows: ScheduleRow[]; total: number } {
   const gamma = profileOf(spec.code).materials[spec.material].gamma // kN/m³
   const nodes = new Map(model.nodes.map((n) => [n.id, n]))
   const map = new Map<string, ScheduleRow>()
+  const counted = new Set<string>()
   for (const e of model.elements) {
     const a = nodes.get(e.n1)!, b = nodes.get(e.n2)!
     const L = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z)
-    const key = `${e.role}|${e.section}`
+    const key = `${e.role}|${e.section}|${e.addition ?? ''}`
     let r = map.get(key)
     if (!r) {
       const kgPerM = (gamma * sectionProps(e.section).A * 1e-6 * 1000) / 9.80665 // kN/m → kg/m
-      r = { role: e.role, section: e.section, count: 0, length: 0, kgPerM, weight: 0 }
+      r = { addition:e.addition, role: e.role, section: e.section, count: 0, length: 0, kgPerM, weight: 0 }
       map.set(key, r)
     }
-    r.count++
+    const physical = `${key}|${e.physicalKey ?? e.id}`
+    if (!counted.has(physical)) { r.count++; counted.add(physical) }
     r.length += L
   }
   const rows = [...map.values()].map((r) => ({ ...r, weight: (r.kgPerM * r.length) / 1000 })) // t

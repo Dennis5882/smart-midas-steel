@@ -18,8 +18,8 @@ export const GRADES: Grade[] = ['fail', 'expert', 'prelim', 'reinforced', 'pass'
 const worse = (a: Grade, b: Grade): Grade => (GRADES.indexOf(a) <= GRADES.indexOf(b) ? a : b)
 export const worstOf = (gs: Grade[]): Grade => gs.reduce(worse, 'pass')
 
-export type Reason = 'ng' | 'coldFormed' | 'stiffener' | 'doubler' | 'rotTest' | 'gbDetail' | 'applicability' | 'restraint'
-const REASON_GRADE: Record<Reason, Grade> = { ng: 'fail', rotTest: 'expert', gbDetail: 'expert', coldFormed: 'prelim', stiffener: 'reinforced', doubler: 'reinforced', applicability: 'fail', restraint: 'expert' }
+export type Reason = 'addition' | 'ng' | 'coldFormed' | 'stiffener' | 'doubler' | 'rotTest' | 'gbDetail' | 'applicability' | 'restraint'
+const REASON_GRADE: Record<Reason, Grade> = { addition:'expert', ng: 'fail', rotTest: 'expert', gbDetail: 'expert', coldFormed: 'prelim', stiffener: 'reinforced', doubler: 'reinforced', applicability: 'fail', restraint: 'expert' }
 export interface Graded { grade: Grade; reasons: Reason[] }
 const graded = (reasons: Reason[]): Graded => ({ grade: worstOf(reasons.map((r) => REASON_GRADE[r])), reasons })
 
@@ -31,7 +31,8 @@ export function memberGrade(m: Pick<MemberCheck, 'ratio' | 'section'> & { issues
   if (m.ratio > 1) r.push('ng')
   if (isColdFormed(m.section)) r.push('coldFormed')
   if (m.issues?.some((i) => i.level === 'blocked')) r.push('applicability')
-  if (m.issues?.some((i) => i.level === 'review')) r.push('restraint')
+  if (m.issues?.some((i) => i.level === 'review' && i.key==='restraint')) r.push('restraint')
+  if (m.issues?.some((i) => i.key==='addition')) r.push('addition')
   return graded(r)
 }
 

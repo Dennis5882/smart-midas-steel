@@ -1,6 +1,7 @@
 import type { CodeId } from '../codes'
 import type { CpiKR, ExposureKR, ImportanceKR, SiteKR } from '../codes/krLateral'
 import type { ScopeFeatures } from './scope'
+import type { AdditionModel, AdditionUsage, FactoryAdditions } from './additionTypes'
 
 /* 공장형 단경간 포털 프레임 입력 스펙. 단위: m, kN */
 export type FrameType = 'gable' | 'mono' | 'multi'
@@ -56,6 +57,7 @@ export interface FactorySpec {
   material: string
   /** 적용범위 질문 답 (크레인·메자닌·다경간·큰 개구부) — domain/scope.ts */
   features?: ScopeFeatures
+  additions?: FactoryAdditions
   /** China: secondary members may use a different certified steel grade. */
   secondaryMaterial?: string
   /** GB inputs, used only when code === CN. Pressures kN/m², periods s. */
@@ -107,10 +109,12 @@ export type ElementRole = 'column' | 'rafter' | 'purlin' | 'girt' | 'strut' | 'p
 export const ROLES: ElementRole[] = ['column', 'rafter', 'purlin', 'girt', 'strut', 'post', 'brace']
 /** wall: 벽 부재가 붙은 면 — 'x0'·'xL' = 측벽(x=0, x=스팬), 'y0'·'yL' = 박공벽(y=0, y=길이), 'roof' = 지붕 가새 */
 export type Face = 'x0' | 'xL' | 'y0' | 'yL' | 'roof'
-export interface Element { id: number; n1: number; n2: number; role: ElementRole; section: string; face?: Face; /** 흔들림 기둥(다경간 내부): 상단 핀·기초 핀, 면내 K = 1 */ lean?: true }
+export interface Element { id: number; n1: number; n2: number; role: ElementRole; section: string; face?: Face; /** 흔들림 기둥(다경간 내부): 상단 핀·기초 핀, 면내 K = 1 */ lean?: true
+  designLength?: number; physicalKey?: string; addition?: AdditionUsage; sourceId?: string
+}
 
 /** 전역: X = 스팬 방향, Y = 길이 방향, Z = 높이 */
-export interface FactoryModel { nodes: Node[]; elements: Element[] }
+export interface FactoryModel { nodes: Node[]; elements: Element[]; additions?: AdditionModel }
 
 export const DEFAULT_SPEC: FactorySpec = {
   code: 'TW',

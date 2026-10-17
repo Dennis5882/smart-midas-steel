@@ -54,7 +54,7 @@ export function buildGenPayloads(spec: FactorySpec, model: FactoryModel): GenPay
 
   const ELEM: Record<string, unknown> = {}
   for (const e of model.elements) {
-    ELEM[e.id] = { TYPE: e.role === 'brace' ? 'TRUSS' : 'BEAM', MATL: twoMat && (e.role === 'purlin' || e.role === 'girt') ? 2 : 1, SECT: sectId.get(e.section), NODE: [e.n1, e.n2], ANGLE: ANGLE[e.role] ?? 0 }
+    ELEM[e.id] = { TYPE: e.role === 'brace' ? 'TRUSS' : 'BEAM', MATL: twoMat && (e.role === 'purlin' || e.role === 'girt') ? 2 : 1, SECT: sectId.get(e.section), NODE: [e.n1, e.n2], ANGLE: e.addition ? 0 : ANGLE[e.role] ?? 0 }
   }
 
   /* 단부 해제: 2차부재 양단 핀, 풍주는 지붕보에 닿는 상단만 핀(기초는 핀 지점이라 해제 불필요 — 양단 해제 시 기초 절점 회전 불안정) */
@@ -63,6 +63,14 @@ export function buildGenPayloads(spec: FactorySpec, model: FactoryModel): GenPay
   /* 흔들림 기둥(다경간 내부) 상단 = 지붕보에 핀 */
   const leanStarts = new Set(model.elements.filter((e) => e.lean).map((e) => e.n1))
   for (const e of model.elements) {
+    if (e.addition === 'platform-beam') {
+      const group = model.elements.filter((v) => v.physicalKey === e.physicalKey)
+      const end = (id: number) => group.filter((v) => v.n1 === id || v.n2 === id).length === 1
+      const pinI = end(e.n1), pinJ = end(e.n2)
+      if (pinI || pinJ) FRLS[e.id] = { ITEMS: [{ ID: 1, bVALUE: false, FLAG_I: pinI ? PIN : FIX, VALUE_I: [0, 0, 0, 0, 0, 0, 0], FLAG_J: pinJ ? PIN : FIX, VALUE_J: [0, 0, 0, 0, 0, 0, 0] }] }
+      continue
+    }
+    if (e.addition === 'platform-column') continue
     const both = PINNED_BOTH.includes(e.role)
     const postTop = (e.role === 'post' && !postStarts.has(e.n2)) || (!!e.lean && !leanStarts.has(e.n2))
     if (!both && !postTop) continue
@@ -75,7 +83,7 @@ export function buildGenPayloads(spec: FactorySpec, model: FactoryModel): GenPay
   const CONS: Record<string, unknown> = {}
   for (const n of model.nodes) {
     /* GROUP_NAME 은 미리 정의된 경계 그룹만 허용(없는 이름이면 Unknown Error, 라이브 확인) → 생략 */
-    if (n.z === 0) CONS[n.id] = { ITEMS: [{ ID: n.id, CONSTRAINT: leanBase.has(n.id) ? '1110000' : code }] }
+    if (n.z === 0) CONS[n.id] = { ITEMS: [{ ID: n.id, CONSTRAINT: model.additions?.fixedBases.includes(n.id) ? '1111111' : leanBase.has(n.id) ? '1110000' : code }] }
   }
 
   const material = (name: string) => {

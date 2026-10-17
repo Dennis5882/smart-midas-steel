@@ -1,3 +1,6 @@
+import { AdditionEditor, initializeAdditions } from './AdditionEditor'
+import { additionErrors, hasAdditions } from '../domain/additions'
+import type { FactoryAdditions } from '../domain/additionTypes'
 /* 공장 스펙 카드 — 기본 모델링은 6단계 업무 흐름, 자유골조는 직접 편집.
    기본 모델링(mode 'template'): 범위 → 횡단면 → 베이 → 재료 → 하중 → 확인·생성.
    자유골조(mode 'free'): 처음부터 편집 카드, 베이 수·간격 대신 베이별 간격 목록.
@@ -69,15 +72,19 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
   const [vals, setVals] = useState(() => initVals(msg.spec))
   const [individual, setIndividual] = useState(free || !!msg.spec.bayList?.length)
   const dirty = useRef(false)
-  const [feat, setFeat] = useState<ScopeFeatures>(() => msg.spec.features ?? NO_FEATURES)
-  const spec = useMemo(() => ({ ...toSpec(msg.spec, vals, free, individual), features: feat }), [msg.spec, vals, free, individual, feat])
+  const [additions, setAdditions] = useState<FactoryAdditions | undefined>(()=>initializeAdditions(msg.spec))
+  const [feat, updateFeat] = useState<ScopeFeatures>(() => msg.spec.features ?? NO_FEATURES)
+  const spec = useMemo(() => ({ ...toSpec(msg.spec, vals, free, individual), features: feat, additions }), [msg.spec, vals, free, individual, feat, additions])
+  const setFeat = (f: ScopeFeatures) => { dirty.current = true; updateFeat(f); setAdditions(initializeAdditions({...spec, features:f}, additions)) }
   const blocked = checkScope(spec).blocked
   const live = s.buildEpoch === msg.epoch && s.workspaceView === 'model' && s.task === 'model' && !(s.opt && (msg.modelRevision ?? 0) < s.modelRevision)
   const groups = groupsFor(spec.code, free, spec.frame, individual)
   const invalid = invalidFields(spec, vals, free, individual)
   /* 칸 사이 충돌(치수 한계·간격 과대)도 그 칸의 오류로 — 해당 단계에서 막는다 */
   const conflicts = fieldConflicts(spec, vals, free, individual)
-  const errors = [...invalid, ...conflicts.map((c) => c.field)]
+  const errors = [...invalid, ...conflicts.map((c) => c.field), ...additionErrors(spec).map((e) => ({path:'additions.'+e.path, label:e.key, kind:'text' as const}))]
+  const previewInvalid = invalid.length > 0 || conflicts.length > 0 || additionErrors(spec,false).length > 0
+  const previewBlocked = checkScope(spec).issues.some((i)=>i.level==='block' && i.key!=='additionInput')
   /* 자유골조는 한 화면 직접 편집 → 오류를 바로 표시. 위저드는 다음 단계로 넘어가려 할 때 */
   const showErrors = attempted || free
 
@@ -99,13 +106,15 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
 
   /* 편집 변경 → 3D 미리보기 (첫 렌더 제외) */
   useEffect(() => {
-    if (!dirty.current || !live || s.busy || errors.length || blocked) return
+    if (!dirty.current || !live || s.busy || previewInvalid || previewBlocked) return
     const h = setTimeout(() => { tab('viewP'); previewSpec(spec) }, PREVIEW_DEBOUNCE_MS)
     return () => clearTimeout(h)
-  }, [spec, live, s.busy, blocked, errors.length])
+  }, [spec, live, s.busy, previewInvalid, previewBlocked])
 
+  const invalidateAdditions = () => setAdditions((a)=>a ? {...a,equipment:a.equipment.map((e)=>({...e,confirmed:false})),crane:a.crane && {...a.crane,confirmed:false},platform:a.platform && {...a.platform,confirmed:false},factors:{...a.factors,confirmed:false}} : a)
   const set = (p: Path, v: string) => {
     dirty.current = true
+    invalidateAdditions()
     setVals((o) => {
       const n = { ...o, [p]: v }
       if (!individual && (p === 'bays' || p === 'baySpacing') && Number.isInteger(+n.bays) && +n.bays > 0 && +n.bays <= 1000 && Number.isFinite(+n.baySpacing) && +n.baySpacing > 0) {
@@ -167,7 +176,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
         setTimeout(() => document.getElementById(`${formId}-${first.path === 'bayList' && !free ? 'bayList-0' : first.path}`)?.focus(), 60)
         return
       }
-      if (blocked) { setAttempted(true); return }
+      if (checkScope(spec).issues.some((i)=>i.level==='block' && i.key!=='additionInput')) { setAttempted(true); return }
     }
     setAttempted(false)
     setStep(target)
@@ -175,12 +184,12 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
   }
 
   if (!free) return <ModelWizard spec={spec} step={step} visited={visited} disabled={!live || s.busy}
-    onStep={navigate} blocked={blocked} invalid={errors.length > 0} attempted={attempted}
+    onStep={navigate} blocked={checkScope(spec).issues.some((i)=>i.level==='block' && i.key!=='additionInput')} invalid={errors.length > 0} attempted={attempted}
     onBuild={() => { if (errors.length || blocked) { setAttempted(true); return }; void buildFactory(spec) }}
     onCancel={closeEditor}>
     {step === 0 && <>
       <div className="mw-templates">{TEMPLATE_KEYS.map((key) => <button type="button" key={key} aria-pressed={selectedTpl === key}
-        disabled={!live || s.busy} onClick={() => { setSelectedTpl(key); setIndividual(false); if (S.activePlan?.id === msg.id) S.activePlan = { ...S.activePlan, tpl: key }; dirty.current = true; setVals((old) => ({ ...old, ...Object.fromEntries(Object.entries(TEMPLATES[key]).map(([k, v]) => [k, String(v)])), bayList: Array.from({ length: TEMPLATES[key].bays }, () => TEMPLATES[key].baySpacing).join(', ') })); notify() }}>
+        disabled={!live || s.busy} onClick={() => { setSelectedTpl(key); setIndividual(false); invalidateAdditions(); if (S.activePlan?.id === msg.id) S.activePlan = { ...S.activePlan, tpl: key }; dirty.current = true; setVals((old) => ({ ...old, ...Object.fromEntries(Object.entries(TEMPLATES[key]).map(([k, v]) => [k, String(v)])), bayList: Array.from({ length: TEMPLATES[key].bays }, () => TEMPLATES[key].baySpacing).join(', ') })); notify() }}>
         <strong>{t(`tpl_${key}`)}</strong><span>{TEMPLATES[key].span} m · {TEMPLATES[key].bays * TEMPLATES[key].baySpacing} m</span>
       </button>)}</div>
       <p className="mw-note">{t('mw_template_note')}</p>
@@ -219,10 +228,12 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
         {g.title === 'sec_seismic' && site && (site.fault || site.basin || site.note) && <div className="pe-tip">{site.fault ? t('site_fault', site.fault) : site.basin ? t('site_basin') : site.note}</div>}
       </section>
     })}
+    {step === 4 && <AdditionEditor idPrefix={`${formId}-additions`} spec={spec} value={additions} onChange={(v)=>{dirty.current=true;setAdditions(v)}} disabled={!live || s.busy} attempted={attempted}/> }
     {step === 4 && <p className="mw-note">{tc(spec.code, 'plan_tip')}</p>}
     {step === 4 && spec.code === 'KR' && <p className="mw-note">{t('kr_scope_note')}</p>}
-    {step > 0 && step < 5 && blocked && <ScopeBox spec={spec} feat={feat} setFeat={setFeat} disabled={!live || s.busy} />}
+    {step > 0 && step < 5 && checkScope(spec).issues.some((i)=>i.level==='block' && i.key!=='additionInput') && <ScopeBox spec={spec} feat={feat} setFeat={setFeat} disabled={!live || s.busy} />}
     {step === 5 && <>
+      {hasAdditions(spec) && <AdditionEditor spec={spec} value={additions} onChange={setAdditions} disabled/>}
       <Summary spec={spec} tpl={selectedTpl} />
       <ScopeBox spec={spec} feat={feat} setFeat={setFeat} disabled={!live || s.busy} />
       {WIZARD_STEPS.slice(1, 5).map((key, index) => <details className="mw-review" key={key}>
@@ -258,6 +269,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
         {free && <div className="pe-tip">{t('free_tip', spec.bays, lengthText(spec))}</div>}
         <div className="pe-tip">{tc(spec.code, 'plan_tip')}</div>
       </div>
+      <AdditionEditor idPrefix={`${formId}-additions`} spec={spec} value={additions} onChange={(v)=>{dirty.current=true;setAdditions(v)}} disabled={!live || s.busy} attempted={showErrors}/>
       {live && errors.length > 0 && <p className="mw-error mw-alert" role="alert">{t('mw_invalid')}</p>}
       {live && (
         <div className="confirm-row">

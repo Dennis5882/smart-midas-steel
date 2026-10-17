@@ -23,7 +23,7 @@ export type ConnType = ConnResult['type']
 export interface PlateRow { type: ConnType; part: PlatePart; size: string; perConn: number; conns: number; kg: number; est: boolean }
 export interface BoltRow { type: ConnType; kind: 'bolt' | 'anchor'; size: string; perConn: number; conns: number; total: number }
 export interface WeldRow { type: ConnType; cjp: number; fillet: number; conns: number }
-export interface PaintRow { role: ElementRole; section: string; area: number }
+export interface PaintRow { addition?: import('./additionTypes').AdditionUsage; role: ElementRole; section: string; area: number }
 export interface Quantities {
   excluded: readonly string[]
   members: ScheduleRow[]; memberT: number
@@ -115,12 +115,12 @@ export function quantities(spec: FactorySpec, model: FactoryModel, conns: ConnRe
     }
   }
 
-  const paint: PaintRow[] = sch.rows.map((r) => ({ role: r.role, section: r.section, area: (perimeter(r.section) / 1000) * r.length }))
+  const paint: PaintRow[] = sch.rows.map((r) => ({ addition:r.addition, role: r.role, section: r.section, area: (perimeter(r.section) / 1000) * r.length }))
   plates.sort((a, b) => ['base', 'knee', 'apex', 'brace'].indexOf(a.type) - ['base', 'knee', 'apex', 'brace'].indexOf(b.type) || ['plate', 'shearKey', 'stiffener', 'doubler', 'gusset'].indexOf(a.part) - ['plate', 'shearKey', 'stiffener', 'doubler', 'gusset'].indexOf(b.part))
   const plateT = plates.reduce((s, p) => s + p.kg, 0) / 1000
   const netT = sch.total + plateT
   return {
-    excluded: ['gable-post bases', 'purlin/girt cleats', 'fly braces and their connections', 'sag rods and anchors', 'brace intersection connectors', 'cladding and other hardware', ...(spec.frame === 'multi' ? ['interior column-top / valley connections and gutters'] : [])],
+    excluded: [...(model.additions ? ['crane runway/brackets and platform connections/foundations', 'equipment attachments'] : []), 'gable-post bases', 'purlin/girt cleats', 'fly braces and their connections', 'sag rods and anchors', 'brace intersection connectors', 'cladding and other hardware', ...(spec.frame === 'multi' ? ['interior column-top / valley connections and gutters'] : [])],
     members: sch.rows, memberT: sch.total,
     plates, plateT,
     bolts,

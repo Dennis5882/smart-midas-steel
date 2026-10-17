@@ -5,7 +5,7 @@
    토글·표시 방식을 바꿔도 사용자가 돌린 시점은 유지(uirevision = 시점). */
 import { useEffect, useMemo, useRef } from 'react'
 import { solidMeshes } from '../drawing/solid'
-import { buildPortal, risingAt } from '../domain/portal'
+import { buildPortal, portalGeometry, risingAt } from '../domain/portal'
 import { ROLES, type ElementRole, type FactoryModel, type FactorySpec } from '../domain/types'
 import { t, useLang, type I18nKey } from '../i18n'
 import { S, notify, useStore, type CamId, type Vis3D } from '../state/store'
@@ -79,10 +79,12 @@ function traces(m: FactoryModel, spec: FactorySpec, P: Pal, ratio: Map<number, n
   const cs = getComputedStyle(document.documentElement)
   const byId = new Map(m.nodes.map((n) => [n.id, n]))
   const out: any[] = []
+  const added = new Map(m.elements.filter((e)=>e.addition).map((e)=>[e.id,e.addition]))
   /* 묶음: 강도비 보기 = 구간, 아니면 부재 종류 */
   const groups: { key: string; name: string; color: string; width: number; visible: boolean; has: (id: number, role: ElementRole) => boolean }[] = ratio
     ? BANDS.map(([, v, fb], i) => ({ key: `b${i}`, name: bandName(i), color: cs.getPropertyValue(v).trim() || fb, width: 4, visible: true, has: (id: number) => !invalid.has(id) && bandOf(ratio.get(id) ?? 0) === i }))
-    : ROLES.map((r) => ({ key: r, name: t(`role_${r}`), color: P.role[r], width: ROLE_VAR[r][2], visible: vis[r], has: (_: number, role: ElementRole) => role === r }))
+    : ROLES.map((r) => ({ key: r, name: t(`role_${r}`), color: P.role[r], width: ROLE_VAR[r][2], visible: vis[r], has: (id: number, role: ElementRole) => role === r && !added.has(id) }))
+  if (!ratio) for (const [usage,role,label] of [['platform-beam','strut','add_platformBeam'],['platform-column','post','add_platformColumn']] as const) groups.push({key:usage,name:t(label),color:P.role[role],width:4,visible:vis[role],has:(id:number)=>added.get(id)===usage})
   if (ratio && invalid.size) groups.push({ key: 'invalid', name: t('rs_applicability'), color: cs.getPropertyValue('--violet').trim() || '#9b8cff', width: 6, visible: true, has: (id: number) => invalid.has(id) })
   if (solid) {
     const meshes = solidMeshes(m, risingAt(spec), spec.roofSlope, (e) => groups.find((g) => g.has(e.id, e.role))?.key ?? null)
@@ -107,6 +109,14 @@ function traces(m: FactoryModel, spec: FactorySpec, P: Pal, ratio: Map<number, n
     text: sup.map((n) => `N${n.id}  (${n.x}, ${n.y}, 0) m`), hovertemplate: '%{text}<extra></extra>',
     marker: { size: 4, color: P.sup, symbol: 'diamond', line: { color: P.supBd, width: 1 } } })
   /* 절점 — 마우스를 올리면 번호·좌표 */
+  if (m.additions) {
+    const G = portalGeometry(spec), equipment = spec.additions?.equipment ?? []
+    if (equipment.length) out.push({type:'scatter3d',mode:'markers',name:t('add_equipment'),x:equipment.map((e)=>e.x),y:equipment.map((e)=>e.y),z:equipment.map((e)=>G.zAt(e.x)),text:equipment.map((e)=>`${e.name} / ${e.weight} kN / ${e.source}`),hovertemplate:'%{text}<extra></extra>',marker:{size:7,color:P.role.strut,symbol:'diamond'}})
+    if (spec.features?.crane && spec.additions?.crane) {
+      const c=spec.additions.crane, supports=m.nodes.filter((n)=>Math.abs(n.z-c.elevation)<1e-7 && (n.x===0||n.x===spec.span))
+      out.push({type:'scatter3d',mode:'markers',name:t('add_crane'),x:supports.map((n)=>n.x),y:supports.map((n)=>n.y),z:supports.map((n)=>n.z),text:supports.map((n)=>`${t('add_crane')} / N${n.id}`),hovertemplate:'%{text}<extra></extra>',marker:{size:5,color:P.role.brace,symbol:'circle'}})
+    }
+  }
   out.push({ type: 'scatter3d', mode: 'markers', name: t('vis_node'), visible: vis.node,
     x: free.map((n) => n.x), y: free.map((n) => n.y), z: free.map((n) => n.z),
     text: free.map((n) => `N${n.id}  (${+n.x.toFixed(3)}, ${+n.y.toFixed(3)}, ${+n.z.toFixed(3)}) m`), hovertemplate: '%{text}<extra></extra>',
@@ -210,7 +220,7 @@ export function View3D() {
         {TOGGLES.filter(([k]) => (!ratio || k === 'support' || k === 'node') && (k === 'support' || k === 'node' || model?.elements.some((e) => e.role === k))).map(([k, color, label, mark]) => (
           <button key={k} className={`vtog ${s.vis3d[k] ? 'on' : 'off'}`} aria-pressed={s.vis3d[k]} title={t('view_toggle_tip')}
             onClick={() => { S.vis3d = { ...S.vis3d, [k]: !S.vis3d[k] }; notify() }}>
-            <span className={`swatch sw-${mark}`} style={{ background: `var(${color})` }} /><span>{t(label)}</span>
+            <span className={`swatch sw-${mark}`} style={{ background: `var(${color})` }} /><span>{t(label)}{model?.additions && (k==='strut'||k==='post') ? ` / ${t(k==='strut'?'add_platformBeam':'add_platformColumn')}` : ''}</span>
           </button>
         ))}
       </div>
@@ -219,6 +229,7 @@ export function View3D() {
         : <div className="res-empty" style={{ flex: 1 }}>{t('view_empty')}</div>}
       {model && (
         <div className="view-stats">
+          {model.additions && <span className="vs-item" title={t('sc_additionReview')}>{t('add_summary')} <span className="vs-val">{model.additions.sources.length}</span></span>}
           <span className="vs-item">{t('st_node')} <span className="vs-val">{model.nodes.length}</span></span>
           <span className="vs-item">{t('st_elem')} <span className="vs-val">{model.elements.length}</span></span>
           <span className="vs-item">{t('kv_span')} <span className="vs-val vs-hi">{span} m</span></span>

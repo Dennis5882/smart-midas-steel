@@ -79,15 +79,33 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
     ...restraintKeys(spec).map((k) => [t(`restraint_${k}`), t(`restraint_${support(spec, k)}`)]),
     [L('st_node'), model.nodes.length], [L('st_elem'), model.elements.length],
   ]))
+  if (model.additions) {
+    parts.push(`<h3>${L('add_summary')}</h3><p>${L('sc_additionReview')}</p>`)
+    parts.push(table(['ID','D (kN)','L (kN)','W seismic (kN)'],model.additions.sources.map((v)=>[esc(v.id),f(v.dead),f(v.live),f(v.seismic)])))
+    const a=spec.additions!
+    const inputs=[...a.equipment, ...(spec.features?.crane && a.crane?[a.crane]:[]), ...(spec.features?.mezzanine && a.platform?[a.platform]:[])]
+    const units:Record<string,string>={x:'m',y:'m',x0:'m',x1:'m',elevation:'m',eccentricity:'m',wheelSpacing:'m',beamSpacing:'m',weight:'kN',maxWheel:'kN',minWheel:'kN',lateral:'kN',braking:'kN',seismicWeight:'kN',driftLimitMm:'mm',dead:'kN/m²',live:'kN/m²'}
+    const inputRows = (value: object, factors=false) => Object.entries(value).filter(([k])=>k!=='confirmed' && k!=='kind').map(([k,v])=>[
+      k==='id'?'ID':L((k==='seismicFraction'?'add_mass':`add_${k}`) as I18nKey),`${esc(/Bay$/.test(k)?Number(v)+1:v)}${!factors && units[k] ? ` ${units[k]}` : ''}`,
+    ])
+    for (const value of inputs) parts.push(table([t('sv_item'),t('sv_value')],inputRows(value)))
+    if (spec.features?.crane) {
+      parts.push(`<p>${L('add_crane_note')}</p>`)
+      parts.push(table([t('rd_combo'),'Y (m)','Pmax rail','FX sign','FY sign'],model.additions.craneCases.map((v)=>[esc(v.name),f(v.position,3),esc(v.maxRail),v.lateralSign,v.brakingSign])))
+    }
+    if (spec.features?.mezzanine) parts.push(`<p>${L('add_platform_note')}</p>`)
+    if (info.additions?.factors) parts.push(`<h4>${L('add_factors')}</h4>`,table([t('sv_item'),t('sv_value')],inputRows(info.additions.factors,true)))
+    parts.push(table(['Physical member (added / split)','Element IDs','L (m)','Source'],model.additions.members.filter((v)=>v.source!=='factory'||v.elementIds.length>1).map((v)=>[esc(v.key),v.elementIds.join(', '),f(v.length),esc(v.source)])))
+  }
   const rolesIn = ROLES.filter((r) => model.elements.some((e) => e.role === r))
   parts.push(fig(isoSvg(model, { legend: rolesIn.map((r) => [ROLE_COLOR[r], t(`role_${r}`)]) }), t('rep_fig_model')))
 
   /* 2. 재료·단면 */
   h2('rep_s2')
   parts.push(`<p>${esc(spec.material)}: Fy = ${mat.fy} MPa, Fu = ${mat.fu} MPa, E = ${mat.E} MPa, γ = ${mat.gamma} kN/m³ (Gen NX ${esc(mat.gen.standard)} ${esc(mat.gen.db)})</p>`)
-  const secRows = ROLES.map((r) => ({ r, name: spec.sections[r] })).map(({ r, name }) => {
+  const secRows = [...ROLES.map((r) => ({ r, name: spec.sections[r], addition:undefined as import('../domain/additionTypes').AdditionUsage | undefined })), ...model.elements.filter((e)=>e.addition).filter((e,i,es)=>es.findIndex((v)=>v.section===e.section && v.role===e.role)===i).map((e)=>({r:e.role,name:e.section,addition:e.addition}))].map(({ r, name, addition }) => {
     const p = sectionProps(name)
-    return [L(`role_${r}`), esc(name), f(p.A / 100, 1), f(p.Ix / 1e4, 0), f(p.Zx / 1e3, 0), f(p.rx / 10, 2), f(p.ry / 10, 2)]
+    return [L(addition ? addition==='platform-column'?'add_platformColumn':'add_platformBeam' : `role_${r}`), esc(name), f(p.A / 100, 1), f(p.Ix / 1e4, 0), f(p.Zx / 1e3, 0), f(p.rx / 10, 2), f(p.ry / 10, 2)]
   })
   parts.push(table([t('rd_role'), t('rd_section'), 'A (cm²)', 'Ix (cm⁴)', 'Zx (cm³)', 'rx (cm)', 'ry (cm)'], secRows))
 
@@ -153,7 +171,9 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
 
   /* 4. 하중조합 */
   h2('rep_s4')
-  parts.push(table(['#', t('rd_combo')], built.comboNames.map((n, i) => [i + 1, esc(n)])))
+  parts.push(info.additions
+    ? table(['#',t('rd_combo'),t('add_source')],built.comboNames.map((n,i)=>[i+1,esc(n),esc(info.additions!.combinationBasis?.[n]??'')]))
+    : table(['#', t('rd_combo')], built.comboNames.map((n, i) => [i + 1, esc(n)])))
   parts.push(`<p class="note">${esc(tc(spec.code, 'rep_combo_txt'))}</p>`)
 
   /* 5. 해석 결과 */
@@ -227,9 +247,9 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   /* 9. 물량 */
   h2('rep_s9')
   const q = quantities(spec, model, connections)
-  const paintOf = new Map(q.paint.map((x) => [`${x.role}|${x.section}`, x.area]))
+  const paintOf = new Map(q.paint.map((x) => [`${x.role}|${x.section}|${x.addition ?? ''}`, x.area]))
   parts.push(table([t('rd_role'), t('rd_section'), t('rep_count'), t('rep_len'), 'kg/m', t('rep_wt'), `${t('q_paint')} (m²)`],
-    [...q.members.map((r) => [L(`role_${r.role}`), esc(r.section), r.count, f(r.length, 1), f(r.kgPerM, 1), f(r.weight, 2), f(paintOf.get(`${r.role}|${r.section}`) ?? 0, 0)]),
+    [...q.members.map((r) => [L(r.addition ? r.addition==='platform-column'?'add_platformColumn':'add_platformBeam' : `role_${r.role}`), esc(r.section), r.count, f(r.length, 1), f(r.kgPerM, 1), f(r.weight, 2), f(paintOf.get(`${r.role}|${r.section}|${r.addition ?? ''}`) ?? 0, 0)]),
      [`<b>${L('rep_total')}</b>`, '', '', '', '', `<b>${f(q.memberT, 2)}</b>`, `<b>${f(q.paintM2, 0)}</b>`]]))
   parts.push(`<p class="note">${esc(t('rep_wt_note', f((q.memberT * 1000) / (spec.span * G.length), 1)))}</p>`)
   if (q.plates.length) {

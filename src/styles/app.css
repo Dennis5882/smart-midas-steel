@@ -760,3 +760,9 @@ td.pos{color:var(--green)} td.neg{color:var(--red)}
 .grade[data-g=prelim]{color:var(--amber)}
 .grade[data-g=reinforced]{color:var(--blue)}
 .grade[data-g=pass]{color:var(--green)}
+
+/* Optional project additions follow the load-input stage. */
+.addition-editor fieldset { border: 1px solid var(--line2); border-radius: 10px; padding: 16px; margin: 16px 0; min-width: 0; }
+.addition-editor legend { padding: 0 8px; color: var(--text); font-weight: 600; }
+.addition-editor fieldset .pe-grid { margin: 8px 0; }
+.addition-editor input[type="checkbox"] { accent-color: var(--blue); margin-right: 6px; }

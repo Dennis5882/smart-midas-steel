@@ -1,7 +1,8 @@
+import { additionErrors, hasAdditions } from './additions'
 /* 적용범위 게이트 (평가 보고서 P0-4, 기획서 14장) — 자동설계가 맞는 건물인지 Gen 전송 전에 판정한다.
    block: 이 앱의 모델·하중으로는 표현할 수 없음 → [실행] 막음 (전문가 모드 = Gen NX 에서 직접 모델링)
    warn : 모델은 만들지만 가정이 흔들림 → 실행 가능, 결과 상태·계산서에 남김
-   공통 범위: 단층 단경간 박공 문형 골조, 일정 횡단면, 경량 지붕·벽, 크레인·메자닌 없음.
+   기본 범위: 단층 공장·일정 횡단면·경량 지붕/벽. 추가 구조는 확인된 입력에 한해 예비검토한다.
    CN 의 세부 범위는 validateCnSpec(GB 표 적용 한계) 을 그대로 쓴다. */
 import { validateCnSpec } from './cnLoads'
 import { validateKrSpec } from './krLoads'
@@ -10,7 +11,7 @@ import { portalGeometry } from './portal'
 import { frameSpans, type FactorySpec } from './types'
 
 export type ScopeKey =
-  | 'crane' | 'mezzanine' | 'multiSpan' | 'opening' | 'openingCN'
+  | 'additionInput' | 'additionReview' | 'crane' | 'mezzanine' | 'multiSpan' | 'opening' | 'openingCN'
   | 'span' | 'eave' | 'eaveHigh' | 'slope' | 'bayRatio' | 'baySpacing' | 'length' | 'hnR' | 'cn' | 'monoTW' | 'multi' | 'multiTW' | 'kr' | 'multiKR'
 export interface ScopeIssue { key: ScopeKey; level: 'block' | 'warn'; args: (string | number)[] }
 export interface ScopeResult { issues: ScopeIssue[]; blocked: boolean }
@@ -29,10 +30,12 @@ export function checkScope(spec: FactorySpec, f: ScopeFeatures = spec.features ?
   const warn = (key: ScopeKey, ...args: (string | number)[]) => out.push({ key, level: 'warn', args })
   const G = portalGeometry(spec)
 
-  /* 앱이 모델링하지 않는 구조 */
-  /* 크레인: 현재 전부 막음. 지원할 때 — 크레인(런웨이·브래킷)을 받는 기둥은 흔들림 기둥(핀) 금지, 강접 라멘 기둥으로 (다경간 내부 기둥 포함) */
-  if (f.crane) block('crane')
-  if (f.mezzanine) block('mezzanine')
+  /* 추가 구조: 입력/출처 확인 전에는 생성 차단, 확인 후에도 전문가 검토 사유를 유지한다.
+     크레인은 외곽 라멘 기둥에만 반력을 전달하며 내부 흔들림 기둥에는 재하하지 않는다. */
+  if (f.crane && !spec.additions?.crane) block('additionInput')
+  if (f.mezzanine && !spec.additions?.platform) block('additionInput')
+  if (additionErrors({...spec, features:f}).length) block('additionInput')
+  if (hasAdditions({...spec, features:f})) warn('additionReview')
   if (f.multiSpan && spec.frame !== 'multi') block('multiSpan') // 다경간 형식을 고르면 지원
   /* 큰 개구부: TW 는 부분 밀폐(GCpi ±0.55)로 근사 가능 — 개구부 골조는 별도. CN 은 폐쇄형만 */
   if (f.opening) {
@@ -77,6 +80,7 @@ export function checkScope(spec: FactorySpec, f: ScopeFeatures = spec.features ?
   }
   /* 같은 사유 중복 제거 (CN 은 스팬·처마·경사가 validateCnSpec 에도 걸림 → 일반 항목만 남김) */
   const dim = out.some((y) => y.key === 'span' || y.key === 'eave' || y.key === 'slope')
-  const issues = out.filter((x) => !((x.key === 'cn' || x.key === 'kr') && dim))
+  const unique = out.filter((v,i)=>out.findIndex((x)=>x.key===v.key && x.level===v.level)===i)
+  const issues = unique.filter((x) => !((x.key === 'cn' || x.key === 'kr') && dim))
   return { issues, blocked: issues.some((x) => x.level === 'block') }
 }

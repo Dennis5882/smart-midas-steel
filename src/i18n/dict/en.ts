@@ -1,6 +1,8 @@
+import { addEn } from './additions'
 /* 영어 사전 — 키의 기준(폴백). 다른 언어는 `Dict` 타입으로 키 일치를 컴파일 시점에 검사.
    값이 HTML 인 키(…_html, welcome, 메시지류)는 dangerouslySetInnerHTML 로 렌더 — 사용자 입력을 넣지 말 것. */
 export const en = {
+  ...addEn,
   bay_mode: 'Spacing mode',
   numeric_wheel_hint: 'Click to focus, then use the wheel or ↑↓ keys to adjust.',
   bay_error: 'Enter a number greater than zero for every bay spacing.',
@@ -344,7 +346,7 @@ export const en = {
   q_cjp: 'CJP',
   q_fillet: 'fillet',
   sec_scope: 'Scope',
-  sc_q: 'Tick what applies — this app designs single-storey, single-span gable factories (no crane or mezzanine).',
+  sc_q: 'Select applicable features. Crane and platform inputs appear in Region / loads.',
   feat_crane: 'Overhead crane',
   feat_mezzanine: 'Mezzanine / platform',
   feat_multiSpan: 'Multi-span / linked bays',
@@ -514,6 +516,9 @@ export const en = {
   g_help_2: 'Release notes',
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_0_0_1: 'Trace physical members, element splits and load sources; count added seismic weights and steel quantities once.',
+  rn_v2_0_0_2: 'Conditional roof equipment, crane frame effects and mezzanine/platform inputs now follow the Region / loads step.',
+  rn_v2_0_0_3: 'Added preliminary country-specific strength checks, project service limits and report evidence. Runway details, openings and connecting buildings remain separate.',
   rn_v1_9_2_1: 'Separated the large elevation preview at the top and moved frame-type buttons into the geometry form below for a cleaner layout.',
   rn_v1_9_1_1: 'Adjust focused numeric inputs with the mouse wheel or up/down arrow keys, including individual bay spacing.',
   rn_v1_9_1_2: 'Increments follow the quantity and respect minimum values. Unfocused inputs preserve normal page scrolling.',

@@ -83,6 +83,7 @@ function roleLengths(model: FactoryModel): Record<ElementRole, number> {
   const nodes = new Map(model.nodes.map((n) => [n.id, n]))
   const L = Object.fromEntries(ROLES.map((r) => [r, 0])) as Record<ElementRole, number>
   for (const e of model.elements) {
+    if (e.addition) continue
     const a = nodes.get(e.n1)!, b = nodes.get(e.n2)!
     L[e.role] += Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z)
   }
@@ -93,7 +94,13 @@ function roleLengths(model: FactoryModel): Record<ElementRole, number> {
 export function roleTons(spec: FactorySpec, model: FactoryModel, sections: Sections = spec.sections): Record<ElementRole, number> {
   const L = roleLengths(model)
   const gamma = profileOf(spec.code).materials[spec.material].gamma
-  return Object.fromEntries(ROLES.map((r) => [r, (gamma * sectionProps(sections[r]).A * 1e-6 * L[r]) / 9.80665])) as Record<ElementRole, number>
+  const out = Object.fromEntries(ROLES.map((r) => [r, (gamma * sectionProps(sections[r]).A * 1e-6 * L[r]) / 9.80665])) as Record<ElementRole, number>
+  const nodes = new Map(model.nodes.map((n) => [n.id,n]))
+  for (const e of model.elements.filter((e) => e.addition)) {
+    const a = nodes.get(e.n1)!, b = nodes.get(e.n2)!
+    out[e.role] += gamma * sectionProps(e.section).A * 1e-6 * Math.hypot(b.x-a.x,b.y-a.y,b.z-a.z) / 9.80665
+  }
+  return out
 }
 
 export const steelWeight = (spec: FactorySpec, model: FactoryModel, sections: Sections = spec.sections): number =>
@@ -142,7 +149,7 @@ export function proposeSections(spec: FactorySpec, model: FactoryModel, info: Lo
   /** 역할 r 을 sec 로 바꿨을 때 강도 최대비 (세장 H 는 Infinity) */
   const strength = (r: ElementRole, sec: string, base: Sections = cur): number => {
     const sections = { ...base, [r]: sec }
-    const m: FactoryModel = { nodes: model.nodes, elements: model.elements.map((e) => (e.role === r ? { ...e, section: sec } : e)) }
+    const m: FactoryModel = { ...model, elements: model.elements.map((e) => (!e.addition && e.role === r ? { ...e, section: sec } : e)) }
     const d = runDesign({ ...spec, sections }, m, info, res, [r])
     if (blockedMembers(d)) return Infinity
     if (sectionProps(sec).kind === 'H' && d.members.some((x) => x.cap.compact === 'slender')) return Infinity
@@ -194,7 +201,7 @@ export function proposeSections(spec: FactorySpec, model: FactoryModel, info: Lo
       // Check the available connection layout while choosing the frame pair.
       // A stronger beam alone does not ensure an eight-bolt end plate can pass.
       const candidate = { ...spec, sections: { ...sections, column: c.s, rafter: r.s } }
-      const candidateModel = { ...model, elements: model.elements.map((e) => ({ ...e, section: candidate.sections[e.role] })) }
+      const candidateModel = { ...model, elements: model.elements.map((e) => ({ ...e, section: e.addition ? e.section : candidate.sections[e.role] })) }
       if (runConnections(candidate, candidateModel, info, res).some((x) => x.type !== 'brace' && x.ratio > 1)) continue
       best = { c, r, t }
     }

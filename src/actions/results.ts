@@ -51,17 +51,14 @@ export async function fetchResults(b: Built): Promise<Results> {
 
   /* 보 부재력 */
   const beam = new Map<number, Map<string, ForcePt[]>>()
-  const beamRows: string[][] = []
-  const batchSize = spec.code === 'CN' ? 4 : cb.length
+  const batchSize = spec.code === 'CN' ? 4 : model.additions ? Math.max(1,Math.min(16,Math.floor(15000/Math.max(1,beamIds.length*5)))) : cb.length
   stage('st_results', Math.ceil(cb.length / batchSize) + (trussIds.length ? 1 : 0) + 3)
   for (let offset = 0; offset < cb.length; offset += batchSize) {
     const bf = await table('BEAMFORCE', spec.code === 'CN' ? `F${offset}` : 'F', beamIds, cb.slice(offset, offset + batchSize), { PARTS: ['PartI', 'Part1/4', 'Part2/4', 'Part3/4', 'PartJ'] },
       ['Elem', 'Load', 'Part', 'Axial', 'Shear-y', 'Shear-z', 'Moment-y', 'Moment-z'])
     requireResult(Array.isArray(bf.DATA) && bf.DATA.length > 0, 'BEAMFORCE', 'missing')
     /* push(...DATA) 금지 — TW 는 410×55×5 ≈ 11만 행이라 브라우저(크롬)에서 인자 펼치기가 스택 초과 (Node 는 통과해서 늦게 발견, 2026-10-15) */
-    for (const row of bf.DATA) beamRows.push(row)
-  }
-  for (const r of beamRows) {
+    for (const r of bf.DATA) {
     const [, el, lc, part, P, Vy, Vz, My, Mz] = r
     const id = num(el), station = STATIONS.indexOf(String(part).trim().replace(/\[\d+\]$/, ''))
     requireResult(beamSet.has(id) && comboSet.has(lc) && station >= 0, 'BEAMFORCE', 'unexpected', `${el} · ${lc} · ${part}`)
@@ -71,6 +68,7 @@ export async function fetchResults(b: Built): Promise<Results> {
     m.set(lc, arr)
     requireResult(!arr[station], 'BEAMFORCE', 'duplicate', `${el} · ${lc} · ${part}`)
     arr[station] = { P: num(P), Vy: num(Vy), Vz: num(Vz), My: num(My), Mz: num(Mz) }
+    }
   }
 
   /* 가새 축력 — 인장 +, I·J 중 절댓값 큰 쪽 */
@@ -119,7 +117,7 @@ export async function fetchResults(b: Built): Promise<Results> {
   }
 
   /* 사용성 — 처마·마루 절점 변위 (사용 하중 케이스) */
-  const svcCases = b.cases.filter((c) => spec.code === 'CN' || c !== 'D')
+  const svcCases = b.cases.filter((c) => spec.code === 'CN' || !!b.info.additions || c !== 'D')
   const us = await table('DISPLACEMENTG', 'S', svcNodes.map((n) => n.id), svcCases.map((c) => `${c}(ST)`), {}, ['Node', 'Load', 'DX', 'DY', 'DZ'])
   const disp = new Map<string, Map<number, { dx: number; dy: number; dz: number }>>()
   const svcCaseSet = new Set(svcCases), svcNodeSet = new Set(svcNodes.map((n) => n.id))

@@ -13,8 +13,12 @@ import { nodeWeights } from './weights'
 import { BASIN } from '../codes/twSites'
 import { buildCnLoads } from './cnLoads'
 import { buildKrLoads, type KrLoadInfo } from './krLoads'
+import { additionErrors, factoryOnly, hasAdditions } from './additions'
+import { buildAdditionLoads } from './additionLoads'
+import type { AdditionModel, AdditionFactors } from './additionTypes'
 
 export interface LoadInfo {
+  additions?: { sources: AdditionModel['sources']; craneCases: AdditionModel['craneCases']; serviceCases: string[]; factors?: AdditionFactors; combinationBasis?: Record<string,string>; preliminary: true }
   snow?: number
   /** CN: 퍼린 설계용 최대 적설 (kN/m², GB 51022 4.3.5-1 불균등 최악) — 없으면 snow */
   snowPeak?: number
@@ -55,6 +59,13 @@ interface Variant { parts: { lc: string; f: number }[]; tag: string }
 const OUT: Record<Exclude<Face, 'roof'>, [number, number]> = { x0: [-1, 0], xL: [1, 0], y0: [0, -1], yL: [0, 1] }
 
 export function buildLoadPayloads(spec: FactorySpec, model: FactoryModel): LoadPayloads {
+  const errors = additionErrors(spec)
+  if (errors.length) throw new Error(`Unconfirmed/invalid additions: ${errors.map((e)=>e.path).join(', ')}`)
+  const load = buildFactoryLoads(spec, factoryOnly(model))
+  return buildAdditionLoads(spec, model, load)
+}
+
+function buildFactoryLoads(spec: FactorySpec, model: FactoryModel): LoadPayloads {
   if (spec.code === 'CN') return buildCnLoads(spec, model)
   if (spec.code === 'KR') return buildKrLoads(spec, model)
   const prof = profileOf(spec.code)
@@ -156,15 +167,16 @@ export function buildLoadPayloads(spec: FactorySpec, model: FactoryModel): LoadP
   const ROOF_PARALLEL_CP = Math.max(hRef / span, hRef / length) <= 2.5 ? -0.7 : -0.8 // 표2.5 풍향 ∥ 용마루
 
   /** from: X 풍이 불어오는 측벽. 대칭(박공)은 x0 만 — 반대 방향은 미러. 비대칭(편경사)은 xL 풍도 별도 케이스(WX5~8) */
-  interface WindCase { name: string; dir: 'X' | 'Y'; s: 1 | -1; roofW: number; roofL: number; from?: 'xL' }
+  interface WindCase { name: string; dir: 'X' | 'Y'; s: 1 | -1; roofW: number; roofL: number; from?: 'xL'; fromY?: 'yL' }
   const windCases: WindCase[] = [
     { name: 'WX1', dir: 'X', s: 1, roofW: rc.high, roofL: rc.leeward }, { name: 'WX2', dir: 'X', s: -1, roofW: rc.high, roofL: rc.leeward },
     { name: 'WX3', dir: 'X', s: 1, roofW: rc.low, roofL: rc.leeward }, { name: 'WX4', dir: 'X', s: -1, roofW: rc.low, roofL: rc.leeward },
-    ...(G.symmetric ? [] : [
+    ...(G.symmetric && !hasAdditions(spec) ? [] : [
       { name: 'WX5', dir: 'X', s: 1, roofW: rc.high, roofL: rc.leeward, from: 'xL' }, { name: 'WX6', dir: 'X', s: -1, roofW: rc.high, roofL: rc.leeward, from: 'xL' },
       { name: 'WX7', dir: 'X', s: 1, roofW: rc.low, roofL: rc.leeward, from: 'xL' }, { name: 'WX8', dir: 'X', s: -1, roofW: rc.low, roofL: rc.leeward, from: 'xL' },
     ] as WindCase[]),
     { name: 'WY1', dir: 'Y', s: 1, roofW: ROOF_PARALLEL_CP, roofL: ROOF_PARALLEL_CP }, { name: 'WY2', dir: 'Y', s: -1, roofW: ROOF_PARALLEL_CP, roofL: ROOF_PARALLEL_CP },
+    ...(hasAdditions(spec) ? [{ name: 'WY3', dir: 'Y', s: 1, roofW: ROOF_PARALLEL_CP, roofL: ROOF_PARALLEL_CP, fromY: 'yL' }, { name: 'WY4', dir: 'Y', s: -1, roofW: ROOF_PARALLEL_CP, roofL: ROOF_PARALLEL_CP, fromY: 'yL' }] as WindCase[] : []),
   ]
   /** 表2.8 鋸齒狀屋頂 — 풍상 쪽부터 경사면 순서: D(첫 풍상면)·E(첫 풍하면)·D′·E′·D″ … 의 위치.
       첫 면이 풍을 마주보지 않으면(편경사 높은 쪽 풍) 그 면은 E 부터. 박공 = D·E 로 表2.5 와 같음 */
@@ -180,8 +192,8 @@ export function buildLoadPayloads(spec: FactorySpec, model: FactoryModel): LoadP
     const pi = qh * wc.s * gpi
     /** 벽면 순압력 p(z) — 풍상벽 0.8·q(z), 풍하벽 Cp(L/B)·q(h), 측벽 −0.7·q(h) */
     const wallP = (face: Exclude<Face, 'roof'>, z: number): number => {
-      const windward = wc.dir === 'X' ? (wc.from ?? 'x0') : 'y0'
-      const leeward = wc.dir === 'X' ? (wc.from ? 'x0' : 'xL') : 'yL'
+      const windward = wc.dir === 'X' ? (wc.from ?? 'x0') : wc.fromY ?? 'y0'
+      const leeward = wc.dir === 'X' ? (wc.from ? 'x0' : 'xL') : wc.fromY ? 'y0' : 'yL'
       const LB = wc.dir === 'X' ? span / length : length / span // L = 풍향 평행, B = 직각
       if (face === windward) return qOf(z) * Gf * lat.wallCp.windward - pi
       if (face === leeward) return qh * Gf * lat.wallCp.leeward(LB) - pi
@@ -261,7 +273,7 @@ export function buildLoadPayloads(spec: FactorySpec, model: FactoryModel): LoadP
     ...windCases.map((v) => ({ dir: v.dir, tag: ` ${v.name}`, parts: [{ lc: v.name, f: 1 }] })),
     ...windCases.flatMap((v) => ([1, -1] as const).flatMap((ts) =>
       /* 횡풍향 WLY(+X)는 비대칭(편경사)이면 −X 도 — WLX(+Y)는 길이 방향 대칭이라 미러 */
-      (v.dir === 'Y' && !G.symmetric ? [1, -1] as const : [1] as const).map((ls) => ({
+      ((v.dir === 'Y' && !G.symmetric) || hasAdditions(spec) ? [1, -1] as const : [1] as const).map((ls) => ({
         dir: v.dir, tag: ` ${v.name}${ls > 0 ? '+' : '-'}L${ts > 0 ? '+' : '-'}T`,
         parts: [{ lc: v.name, f: kD }, { lc: v.dir === 'X' ? 'WLX' : 'WLY', f: 0.7 * ls }, { lc: 'WT', f: 0.7 * ts }],
       })))),
@@ -275,7 +287,7 @@ export function buildLoadPayloads(spec: FactorySpec, model: FactoryModel): LoadP
     E: (['EX', 'EY'] as const).flatMap((n) => [
       { parts: [{ lc: n, f: 1 }, { lc: `ET${n[1]}`, f: 1 }], tag: ` +${n}` },
       { parts: [{ lc: n, f: -1 }, { lc: `ET${n[1]}`, f: -1 }], tag: ` -${n}` },
-      ...(G.symmetric ? [] : [
+      ...(G.symmetric && !hasAdditions(spec) ? [] : [
         { parts: [{ lc: n, f: 1 }, { lc: `ET${n[1]}`, f: -1 }], tag: ` +${n}-T` },
         { parts: [{ lc: n, f: -1 }, { lc: `ET${n[1]}`, f: 1 }], tag: ` -${n}+T` },
       ]),

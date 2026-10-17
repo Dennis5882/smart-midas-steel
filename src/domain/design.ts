@@ -1,3 +1,5 @@
+import { additionDesign } from './additionDesign'
+import { factoryOnly } from './additions'
 /* 부재 설계 검토 (M3) — 해석 결과 + 기준 프로필 강도식 → 부재별 강도비, 사용성.
    길이 가정 (보고서에 그대로 표기):
    - 기둥: 면내 K = 횡이동 골조 정렬도(4.8) · L = 처마높이, 면외 K = 1 · L = 거트 간격(거트 + 플라이브레이스가 양 플랜지 지지), Lb = 거트 간격
@@ -25,6 +27,8 @@ import { sectionProps } from './sections'
 import type { ElementRole, FactoryModel, FactorySpec } from './types'
 
 export interface MemberCheck {
+  addition?: import('./additionTypes').AdditionUsage
+  physicalKey?: string
   id: number
   role: ElementRole
   section: string
@@ -47,7 +51,7 @@ export interface MemberCheck {
 }
 
 export interface ServiceCheck {
-  key: 'windDriftX' | 'windDriftY' | 'seisDriftX' | 'seisDriftY' | 'rafterDefl' | 'purlinDefl' | 'girtDefl' | 'postDefl'
+  key: 'platformDefl' | 'craneDefl' | 'windDriftX' | 'windDriftY' | 'seisDriftX' | 'seisDriftY' | 'rafterDefl' | 'purlinDefl' | 'girtDefl' | 'postDefl'
   value: number
   limit: number
   ratio: number
@@ -96,6 +100,11 @@ export const purlinLimitDiv = (code: FactorySpec['code']) => (code === 'CN' ? 15
 
 /** roles 를 주면 그 역할 부재만 검토하고 사용성은 생략 (단면 최적화 후보 평가용) */
 export function runDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo, res: Results, roles?: readonly ElementRole[]): DesignResult {
+  validateDesignResults(spec, model, info, res, roles)
+  return additionDesign(spec, model, info, res, runFactoryDesign(spec, factoryOnly(model), info, res, roles), roles)
+}
+
+function runFactoryDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo, res: Results, roles?: readonly ElementRole[]): DesignResult {
   if (spec.code === 'CN') return withRestraintIssues(spec, runCnDesign(spec, model, info, res, roles))
   if (spec.code === 'KR') return withRestraintIssues(spec, runKrDesign(spec, model, info, res, roles))
   validateDesignResults(spec, model, info, res, roles)
@@ -184,7 +193,7 @@ export function runDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
       continue
     }
     const sp = sectionProps(e.section)
-    const Lel = dist(nodes.get(e.n1)!, nodes.get(e.n2)!)
+    const Lel = e.designLength ?? dist(nodes.get(e.n1)!, nodes.get(e.n2)!)
     const { KLx, KLy, Lb } = lengthsOf(e.role, Lel, e)
     const frame = e.role === 'column' || e.role === 'rafter'
     let best: MemberCheck | null = null

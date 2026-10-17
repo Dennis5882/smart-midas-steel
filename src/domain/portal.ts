@@ -1,4 +1,5 @@
 import { baySpans, frameSpans, type Element, type ElementRole, type Face, type FactoryModel, type FactorySpec, type FrameType, type Node } from './types'
+import { applyAdditions } from './additions'
 
 /** 지붕면 하나 (횡단면, x 증가 방향). rising = x 가 커질수록 높아짐 — 법선 (∓sinθ, 0, cosθ) 방향과 풍상·풍하 판정에 쓴다 */
 export interface RoofPlane { xa: number; xb: number; za: number; zb: number; rising: boolean }
@@ -291,5 +292,5 @@ export function buildPortal(spec: FactorySpec): FactoryModel {
       }
     }
   }
-  return { nodes, elements }
+  return applyAdditions(spec, { nodes, elements })
 }

@@ -59,7 +59,7 @@ export function MemberTable({ d }: { d: DesignResult }) {
     const list = d.members.filter((m) => (role === 'all' || m.role === role)
       && (filter === 'all' || (filter === 'ng' ? memberGrade(m).grade === 'fail' : m.ratio >= 0.9))
       && (!needle || String(m.id) === needle || m.section.toLowerCase().includes(needle) || m.combo.toLowerCase().includes(needle)))
-    const val = (m: MemberCheck): number | string => sort.key === 'role' ? t(`role_${m.role}`) : m[sort.key]
+    const val = (m: MemberCheck): number | string => sort.key === 'role' ? (m.addition ? t(m.addition==='platform-column'?'add_platformColumn':'add_platformBeam') : t(`role_${m.role}`)) : m[sort.key]
     return list.sort((a, b) => { const x = val(a), y = val(b); const c = typeof x === 'number' ? x - (y as number) : String(x).localeCompare(String(y)); return sort.desc ? -c : c })
   }, [d, role, filter, q, sort])
 
@@ -75,7 +75,7 @@ export function MemberTable({ d }: { d: DesignResult }) {
     if (exportReason) return
     const esc = (v: string | number) => (/[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v))
     const lines = [[t('rd_elem'), t('rd_role'), t('rd_section'), t('rd_ratio'), t('rd_eq'), t('rd_combo'), t('mt_part'), t('rd_mode'), t('rd_status'), t('mt_notes')].map(esc).join(',')]
-    for (const m of rows) lines.push([m.id, t(`role_${m.role}`), m.section, m.ratio.toFixed(4), m.eq, m.combo, m.part >= 0 ? PART[m.part] : '', m.cap.mxMode, t(`gr_${memberGrade(m).grade}`), issueNotes(m).join(' / ')].map(esc).join(','))
+    for (const m of rows) lines.push([m.id, (m.addition ? t(m.addition==='platform-column'?'add_platformColumn':'add_platformBeam') : t(`role_${m.role}`)), m.section, m.ratio.toFixed(4), m.eq, m.combo, m.part >= 0 ? PART[m.part] : '', m.cap.mxMode, t(`gr_${memberGrade(m).grade}`), issueNotes(m).join(' / ')].map(esc).join(','))
     const url = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }))
     const a = document.createElement('a'); a.href = url; a.download = 'steel_members.csv'; a.click()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
@@ -100,7 +100,7 @@ export function MemberTable({ d }: { d: DesignResult }) {
           <tbody>
             {rows.slice(0, shown).map((m) => (
               <tr key={m.id} title={issueNotes(m).join(' / ')}>
-                <td className="mono">{m.id}</td><td>{t(`role_${m.role}`)}</td><td className="mono">{m.section}</td>
+                <td className="mono">{m.id}</td><td>{(m.addition ? t(m.addition==='platform-column'?'add_platformColumn':'add_platformBeam') : t(`role_${m.role}`))}</td><td className="mono">{m.section}</td>
                 <td className="mono" style={{ color: ratioColor(m.ratio), fontWeight: 700 }}>{m.ratio.toFixed(3)}{m.ratio > 1 ? ' ✕' : ''}</td>
                 <td>{(() => { const g = memberGrade(m); return <GradeChip g={g.grade} reasons={g.reasons} /> })()}</td>
                 <td className="mono">{m.eq}</td><td className="mono">{m.combo}</td><td className="mono">{m.part >= 0 ? PART[m.part] : '—'}</td>

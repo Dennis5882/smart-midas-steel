@@ -136,7 +136,7 @@ for (const base of [DEFAULT_SPEC, CN_DEFAULT_SPEC]) {
   /* 적용범위·입력 */
   const sc = checkScope({ ...spec, features: { crane: false, mezzanine: false, multiSpan: true, opening: false } })
   ok(!sc.blocked && sc.issues.some((i) => i.key === 'multi') && sc.issues.some((i) => i.key === 'multiTW') === (code === 'TW'), `${code} multi: in scope with multi-span flag, warnings`)
-  ok(checkScope({ ...spec, features: { crane: true, mezzanine: false, multiSpan: false, opening: false } }).issues.some((i) => i.key === 'crane' && i.level === 'block'), `${code} multi + crane: blocked (crane columns cannot be leaning columns)`)
+  ok(checkScope({ ...spec, features: { crane: true, mezzanine: false, multiSpan: false, opening: false } }).issues.some((i) => i.key === 'additionInput' && i.level === 'block'), `${code} multi + crane: blocked until crane inputs are supplied and confirmed`)
   ok(checkScope(normalizeSpans({ ...spec, spanList: [36, 30] })).blocked === false && checkScope(normalizeSpans({ ...spec, spanList: [62, 24] })).blocked, `${code} multi: span limit per span (66 total ok, 62 single blocked)`)
   const vals = { ...initVals(base), frame: 'multi', spanList: '24, 30' }
   const sp2 = toSpec(base, vals, false)

@@ -1,3 +1,4 @@
+import { factoryOnly } from './additions'
 /* 접합부 자동 산정·검토 (M4) — 모든 프레임·조합 중 지배값으로 유형별 1개 상세를 정한다.
    - base : 기둥 주각 베이스플레이트 + 앵커볼트 (고정 주각 = 모멘트 전달, 핀 = 축력·전단만). 지압 10.9, 앵커 표10.3-2, 판 두께 AISC DG1
    - knee : 기둥-지붕보 단부판 모멘트 접합 (4E 확장형, 양 플랜지 대칭 8본) — F10T 표10.3-2/3, 판 두께 AISC DG4 항복선, 패널존 7.3
@@ -229,6 +230,7 @@ function endPlateFor(spec: FactorySpec, forces: EndForce[], boltD: number, beamN
 
 export function runConnections(spec: FactorySpec, model: FactoryModel, info: LoadInfo, res: Results): ConnResult[] {
   validateDesignResults(spec, model, info, res, ROLES)
+  model = factoryOnly(model, false)
   if (spec.code === 'CN') return runCnConnections(spec, model, res)
   if (spec.code === 'KR') return runKrConnections(spec, model, info, res)
   const kind = (c: string) => info.comboKind?.[c] ?? 'basic'

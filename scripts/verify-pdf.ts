@@ -14,6 +14,8 @@ import { buildLoadPayloads } from '../src/domain/loads'
 import { runConnections } from '../src/domain/connections'
 import { runDesign } from '../src/domain/design'
 import { FIXTURE, decodeResults, fixtureFor } from './tw-golden'
+import {additionSpec} from './addition-spec'
+import {addKo,addEn,addTW,addCN} from '../src/i18n/dict/additions'
 import type { ReportInput } from '../src/report/report'
 import { krSynthetic } from './kr-synth'
 import { defaultSpecFor } from '../src/domain/types'
@@ -34,7 +36,9 @@ const krInput: ReportInput = { built: { spec: krSpec, model: kr.model, info: kr.
 const cfx = JSON.parse(gunzipSync(readFileSync(fixtureFor('CN'))).toString())
 const cModel = buildPortal(cfx.spec), cLoads = buildLoadPayloads(cfx.spec, cModel), cRes = decodeResults(cfx.results)
 const cnInput: ReportInput = { built: { spec: cfx.spec, model: cModel, info: cLoads.info, cases: Object.values(cLoads.STLD).map((v: any) => v.NAME), combos: Object.keys(cLoads.info.comboKind).length, comboNames: Object.keys(cLoads.info.comboKind) }, reactions: cfx.reactions, design: runDesign(cfx.spec, cModel, cLoads.info, cRes), connections: runConnections(cfx.spec, cModel, cLoads.info, cRes) }
-for (const [code, inp] of [['TW', input], ['KR', krInput], ['CN', cnInput]] as const) for (const lang of ['ko', 'en', 'zh-TW', 'zh-CN'] as const) {
+const aSpec=additionSpec(defaultSpecFor('TW')),aModel=buildPortal(aSpec),aLoads=buildLoadPayloads(aSpec,aModel)
+const additionInput:ReportInput={built:{spec:aSpec,model:aModel,info:aLoads.info,cases:Object.values(aLoads.STLD).map((v:any)=>v.NAME),combos:Object.keys(aLoads.info.comboKind).length,comboNames:Object.keys(aLoads.info.comboKind)},reactions:null,design:null,connections:null}
+for (const [code, inp] of [['TW', input], ['KR', krInput], ['CN', cnInput], ['ADDITIONS',additionInput]] as const) for (const lang of ['ko', 'en', 'zh-TW', 'zh-CN'] as const) {
   setLang(lang)
   const html = buildReport(inp)
   const doc = new DOMParser().parseFromString(html, 'text/html')
@@ -43,14 +47,14 @@ for (const [code, inp] of [['TW', input], ['KR', krInput], ['CN', cnInput]] as c
   const font = resolve('public/fonts', reportFontFile(htmlLang))
   pdfMake.addFonts({ Report: { normal: font, bold: font, italics: font, bolditalics: font } })
   const face = (fontkit as any).openSync ? (fontkit as any).openSync(font) : (fontkit as any).default.openSync(font)
-  const text = String((doc as any).documentElement.textContent ?? '')
+  const text = String((doc as any).documentElement.textContent ?? '') + Object.values(({ko:addKo,en:addEn,'zh-TW':addTW,'zh-CN':addCN})[lang]).join(' ')
   const missing = [...new Set([...text].filter((ch) => ch.codePointAt(0)! > 0x20 && !face.hasGlyphForCodePoint(ch.codePointAt(0)!)))]
   assert.deepEqual(missing, [], `${lang}: glyphs missing from ${font}`)
   assert.equal(reportFontFile(htmlLang), lang === 'zh-TW' ? 'report-tc.otf' : lang === 'zh-CN' ? 'report-sc.otf' : 'report-kr.otf', `${lang} (${htmlLang}) font`)
   const def = reportPdfDefinition(doc as unknown as Document, (el) => new XMLSerializer().serializeToString(el as any))
   const buffer = await pdfMake.createPdf(def).getBuffer()
   const pdf = await PDFDocument.load(buffer)
-  assert.ok(pdf.getPageCount() >= 8)
+  assert.ok(pdf.getPageCount() >= (code==='ADDITIONS'?2:8))
   const path = `output/pdf/steel-report-${code}-${lang}.pdf`
   writeFileSync(path, buffer)
   console.log(JSON.stringify({ path, font: font.split(/[\\/]/).pop(), pages: pdf.getPageCount(), bytes: buffer.length }))

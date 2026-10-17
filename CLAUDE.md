@@ -4,6 +4,8 @@
 - **한국어**로 소통. 코드 식별자·API 키워드는 영어 유지.
 
 ## 개요
+추가 구조 1~4단계(v2.0.0)는 `docs/factory-additions-phases-1-4.md` 참조. `FactorySpec.additions` → `applyAdditions` → Gen/하중 컴파일 흐름이며 크레인·플랫폼은 출처 확인 후 **예비검토**로 제공한다. 요소 분할 시 `physicalKey`·`designLength`를 보존한다. 추가 부재는 `Element.addition`으로 지붕/벽 하중·기존 접합·주골조 단면 변경에서 분리한다. 지진중량은 정적 등가하중에 한 번만 포함하며 NMAS/모달해석은 아직 추가하지 않았다. 풍·지진+크레인 동시 조합·주행보/브래킷 상세·플랫폼 내진시스템/접합·기초는 별도 검토. 5~6단계는 별도 진행한다. `verify-additions.ts`, `live-additions.ts` 추가; 라이브는 원본 저장·복원 12 DB 해시 일치 확인 필수.
+
 MIDAS Gen 강구조물 자동 모델링 웹앱. 제품 스펙·미정 사항은 README.md.
 참고 프로젝트: `E:/AI Study/story` (Gen NX RC 에이전트 — 같은 스택·MAPI 직접 호출 방식).
 
