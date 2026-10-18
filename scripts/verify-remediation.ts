@@ -48,6 +48,16 @@ for(const base of [DEFAULT_SPEC,CN_DEFAULT_SPEC,KR_DEFAULT_SPEC]) {
   const manual=await createRepairPlan(b,res,linked,cs)
   ok(manual.groups.find((g)=>g.group==='link')?.candidates.length===0,'external gap never becomes a section repair')
   ok(repairMetrics(d,[{...cs[0],ratio:1.4}]).connectionNg===1,'connection NG cannot be hidden by member pass')
+  ok(platform.candidates.every((c)=>Number.isNaN(c.connection)),'added-member candidates carry no unrelated connection ratio')
+  ok(platform.candidates.every((c)=>c.weight>0),'candidate weight is the added tonnage')
+  const rankedW=platform.candidates.filter((c)=>c.ranked).slice(0,3).map((c)=>c.weight)
+  ok(rankedW.every((w,i)=>i===0||w>=rankedW[i-1]),'preferred candidates are ordered by added tonnage')
+  ok(platform.candidates.some((c)=>c.ranked),'added-member candidates can be preferred independent of frame connection ratios')
+  ok(preview.selectedBlocked===0,'only the changed groups gate applying the repair')
+  const ngMember=d.members.find((m)=>m.ratio>1)!
+  const dup=diagnoseRepairs({...d,members:d.members.map((m)=>m===ngMember?{...m,issues:[...m.issues??[],{level:'blocked',code:'test'} as any]}:m)},cs)
+  const dupGroup=dup.flatMap((g)=>g.problems).filter((p)=>p.member?.id===ngMember.id)
+  ok(dupGroup.length===1&&dupGroup[0].kind==='limit','an NG member with a method limit is counted once')
   ok(JSON.stringify(spec)===beforeSpec,'source spec is immutable')
   ok(JSON.stringify(encodeResults(res))===beforeRaw,'candidate evaluation never mutates source forces/deflections')
   if(spec.code==='TW') {
@@ -88,7 +98,7 @@ for(const base of [DEFAULT_SPEC,CN_DEFAULT_SPEC,KR_DEFAULT_SPEC]) {
   const preparing=prepareRepairs()
   S.job!.cancel=true
   await preparing
-  ok(!!S.lastFail?.cancelled&&!!S.lastFail.repair&&!S.busy,'candidate generation is cancellable')
+  ok(!S.lastFail&&!S.busy,'cancelled candidate generation leaves no failed stage or restore prompt (Gen untouched)')
   ok(S.built===b&&S.design===d,'cancelling candidate generation preserves the analyzed model')
   globalThis.fetch=originalFetch;setConfirmHandler(null)
   const next=applySectionChanges(spec,candidate.changes)

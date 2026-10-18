@@ -28,6 +28,7 @@ export async function runOptimize(): Promise<void> {
   if (!S.analyzed) { addMsg('bot', lt('need_anal')); return }
   if (!beginJob('opt')) return
   S.results = null; S.design = null; S.connections = null; S.opt = null; S.ratioView = false
+  S.repairPlan = null; S.repairComparison = null
   notify()
   addMsg('bot', ltc(S.built.spec.code, 'opt_start', MAX_ITER))
   tab('logP')

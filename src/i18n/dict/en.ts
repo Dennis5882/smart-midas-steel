@@ -518,6 +518,9 @@ export const en = {
   g_help_2: 'Release notes',
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_3_1_1: 'Section repair: members unrelated to connections (purlins, girts, added members) no longer show a connection ratio, and preferred candidates are ordered by added steel tonnage.',
+  rn_v2_3_1_2: 'Only limits in the selected groups block applying, so groups can be repaired one at a time. A member that is both NG and over a method limit counts once.',
+  rn_v2_3_1_3: 'A failed or cancelled candidate search no longer offers a restore, and preview errors no longer blank the screen. Crane and multi-span drift estimates now scale with section stiffness.',
   rn_v2_3_0_1: 'Diagnose member, serviceability, connection and method-limit failures, and select country-specific section candidates for the factory frame and added members.',
   rn_v2_3_0_2: 'Review the combined estimate, reanalyze the selected sections in Gen NX, and compare original, estimated and verified results.',
   rn_v2_2_0_1: 'Closed roof hatches replace interior purlins with load transfer to H-section trimmers, with preliminary strength checks and a web estimate of simple-beam deflection.',

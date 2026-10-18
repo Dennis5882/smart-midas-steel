@@ -3,7 +3,7 @@ import { AlertTriangle, ArrowRight, Wrench } from 'lucide-react'
 import { useStore } from '../state/store'
 import { unavailable } from '../state/taskFlow'
 import { currentRepairPlan, prepareRepairs, applyRepairs } from '../actions/remediation'
-import { diagnoseRepairs, previewRepair, repairMetrics, sectionAt, type SectionTarget, type RepairMetrics, type RepairProblem, type RepairDiagnosis, type RepairCandidate } from '../domain/remediation'
+import { diagnoseRepairs, previewRepair, repairMetrics, sectionAt, type SectionTarget, type RepairMetrics, type RepairPreview, type RepairProblem, type RepairDiagnosis, type RepairCandidate, type RepairPlan } from '../domain/remediation'
 import { t, type I18nKey } from '../i18n'
 import { isLengthService } from '../domain/design'
 
@@ -22,7 +22,18 @@ export function RepairPanel() {
   const plan=currentRepairPlan(s.repairPlan)?s.repairPlan:null
   useEffect(()=>setSelection({}),[plan])
   const problems=useMemo(()=>d&&cs?diagnoseRepairs(d,cs):[],[d,cs])
-  const preview=useMemo(()=>plan?previewRepair(plan,selection):null,[plan,selection])
+  // Full re-check is heavy: run it after the select has repainted, and never let a bad selection unmount the stage.
+  const [preview,setPreview]=useState<{plan:RepairPlan;selection:Record<string,string>;value:RepairPreview|null;error?:string}|null>(null)
+  useEffect(()=>{
+    if(!plan||!Object.values(selection).some(Boolean)){setPreview(null);return}
+    const timer=setTimeout(()=>{
+      try {setPreview({plan,selection,value:previewRepair(plan,selection)})}
+      catch(e) {setPreview({plan,selection,value:null,error:t(e instanceof Error&&e.message==='repair_geometry'?'repair_geometry':'repair_invalid')})}
+    },0)
+    return ()=>clearTimeout(timer)
+  },[plan,selection])
+  const current=preview&&preview.plan===plan&&preview.selection===selection?preview:null
+  const previewing=!!plan&&Object.values(selection).some(Boolean)&&!current
   if(!b||!d||!cs)return null
   const reason=unavailable({...s,mapiKey:'offline'},'optimize')||(s.genChanged?'wf_stale_gen':null)
   const applyReason=unavailable(s,'optimize')||(s.genChanged?'wf_stale_gen':null)
@@ -58,8 +69,10 @@ export function RepairPanel() {
       </article>)}</div>
       <div className="repair-actions"><button className="btn btn-ghost" disabled={!!reason} title={reason?t(reason):undefined} onClick={()=>void prepareRepairs()}>{t(plan?'repair_refresh':'repair_generate')}</button>{reason&&<small>{t(reason)}</small>}</div>
       {plan&&<p className="repair-note">{t('repair_estimate_note')}</p>}
-      {preview&&<div className="repair-preview"><h4>{t('repair_selection')}</h4><ul>{preview.changes.map((p)=><li key={p.target}><span>{t(targetKey(p.target))}</span><span className="mono">{sectionAt(b.spec,p.target)} → {p.section}</span></li>)}</ul><Metrics before={repairMetrics(d,cs)} estimated={preview.metrics}/>
-        <p className="repair-note">{t('repair_apply_note')}</p><button className="btn btn-c" disabled={!!applyReason||!!preview.metrics.blocked} title={applyReason?t(applyReason):undefined} onClick={()=>void applyRepairs(selection)}>{t('repair_apply')}<ArrowRight size={14}/></button>
+      {previewing&&<p className="repair-note" role="status">{t('repair_previewing')}</p>}
+      {current?.error&&<p className="repair-manual" role="alert"><AlertTriangle size={14}/>{current.error}</p>}
+      {current?.value&&<div className="repair-preview"><h4>{t('repair_selection')}</h4><ul>{current.value.changes.map((p)=><li key={p.target}><span>{t(targetKey(p.target))}</span><span className="mono">{sectionAt(b.spec,p.target)} → {p.section}</span></li>)}</ul><Metrics before={repairMetrics(d,cs)} estimated={current.value.metrics}/>
+        <p className="repair-note">{t('repair_apply_note')}</p><button className="btn btn-c" disabled={!!applyReason||!!current.value.selectedBlocked} title={applyReason?t(applyReason):undefined} onClick={()=>void applyRepairs(selection)}>{t('repair_apply')}<ArrowRight size={14}/></button>
       </div>}
     </>}
   </section>

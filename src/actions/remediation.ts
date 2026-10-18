@@ -28,7 +28,10 @@ export async function prepareRepairs():Promise<void> {
     if(source!==S.built||res!==S.results)throw new Error(t('repair_stale'))
     S.repairPlan=plan
     tab('resP')
-  } catch(e){addMsg('bot',failMsg(repairError(e),(m)=>t('repair_fail',m)));if(S.lastFail)S.lastFail.repair=true;S.task='optimize'}
+  } catch(e) {
+    // Planning never touches Gen: report it, but leave no failed stage or restore prompt behind.
+    addMsg('bot',failMsg(repairError(e),(m)=>t('repair_fail',m)));S.lastFail=null
+  }
   finally{endJob()}
 }
 
@@ -41,7 +44,7 @@ export async function applyRepairs(selection:Record<string,string>):Promise<void
   let preview
   try {preview=previewRepair(plan,selected)}catch {addMsg('bot',lt('repair_invalid'));return}
   if(!preview)return
-  if(preview.metrics.blocked||checkScope(preview.spec).blocked){addMsg('bot',lt('flow_invalid_design'));return}
+  if(preview.selectedBlocked||checkScope(preview.spec).blocked){addMsg('bot',lt('flow_invalid_design'));return}
   if(!await confirmAction({title:t('repair_apply'),body:t('repair_confirm'),ok:t('repair_apply')}))return
   // The open confirmation may outlive a model/result/draft change.
   if(unavailable(S,'optimize')||!currentRepairPlan(plan)){addMsg('bot',lt('repair_stale'));return}
