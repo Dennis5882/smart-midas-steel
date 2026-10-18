@@ -56,6 +56,8 @@ export const GROUPS: Group[] = [
     ...(['flyBraces', 'sagRods', 'braceCrossing'] as const).map((key): Field => ({ path: `restraints.${key}`, label: `restraint_${key}`, kind: 'select', fallback: 'assumed', options: () => ['assumed', 'confirmed', 'none'].map((v) => ({ value: v, label: t(`restraint_${v}` as I18nKey) })) })),
   ] },
   { title: 'sec_sections', fields: [
+    { path: 'material', label: 'f_material', kind: 'select', options: (sp) =>
+      Object.keys(profileOf(sp.code).materials).map((m) => ({ value: m, label: m })) },
     { path: 'sections.column', label: 'f_column', kind: 'text' },
     { path: 'sections.rafter', label: 'f_rafter', kind: 'text' },
     { path: 'sections.purlin', label: 'f_purlin', kind: 'text' },
@@ -63,8 +65,6 @@ export const GROUPS: Group[] = [
     { path: 'sections.strut', label: 'f_strut', kind: 'text' },
     { path: 'sections.post', label: 'f_post', kind: 'text' },
     { path: 'sections.brace', label: 'f_brace', kind: 'text' },
-    { path: 'material', label: 'f_material', kind: 'select', options: (sp) =>
-      Object.keys(profileOf(sp.code).materials).map((m) => ({ value: m, label: m })) },
   ] },
   { title: 'sec_dead', fields: [
     { path: 'roofDead', label: 'f_roofDead', unit: 'kN/m²', kind: 'num' },

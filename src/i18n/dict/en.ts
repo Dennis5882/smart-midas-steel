@@ -1,10 +1,12 @@
 import { addEn } from './additions'
 import { repairEn } from './repair'
+import { sectionEn } from './sectionPicker'
 /* 영어 사전 — 키의 기준(폴백). 다른 언어는 `Dict` 타입으로 키 일치를 컴파일 시점에 검사.
    값이 HTML 인 키(…_html, welcome, 메시지류)는 dangerouslySetInnerHTML 로 렌더 — 사용자 입력을 넣지 말 것. */
 export const en = {
   ...addEn,
   ...repairEn,
+  ...sectionEn,
   bay_mode: 'Spacing mode',
   numeric_wheel_hint: 'Click to focus, then use the wheel or ↑↓ keys to adjust.',
   bay_error: 'Enter a number greater than zero for every bay spacing.',
@@ -518,6 +520,7 @@ export const en = {
   g_help_2: 'Release notes',
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_3_1_4: 'Choose modeling sections from the audited catalog by code, material and member role. Existing values and direct entry are retained, with property differences and cold-formed limits shown.',
   rn_v2_3_1_1: 'Section repair: members unrelated to connections (purlins, girts, added members) no longer show a connection ratio, and preferred candidates are ordered by added steel tonnage.',
   rn_v2_3_1_2: 'Only limits in the selected groups block applying, so groups can be repaired one at a time. A member that is both NG and over a method limit counts once.',
   rn_v2_3_1_3: 'A failed or cancelled candidate search no longer offers a restore, and preview errors no longer blank the screen. Crane and multi-span drift estimates now scale with section stiffness.',

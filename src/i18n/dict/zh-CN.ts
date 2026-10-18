@@ -1,11 +1,13 @@
 import { addCN } from './additions'
 import { repairCN } from './repair'
+import { sectionCn } from './sectionPicker'
 import type { Dict } from './en'
 
 /* 대륙 간체 — 대륙 용어(屋面梁·檩条·墙梁·系杆·跨度·檐口高度). 대만 규범 고유 항목(用途系数·地况)은 규범 표기 유지 */
 export const zhCN: Dict = {
   ...addCN,
   ...repairCN,
+  ...sectionCn,
   bay_mode: '柱距输入方式',
   numeric_wheel_hint: '点击后可用滚轮或 ↑↓ 键调整数值。',
   bay_error: '请为每一跨间距输入大于零的数值。',
@@ -504,6 +506,7 @@ export const zhCN: Dict = {
   g_help_2: '版本说明',
   g_help_2_cmd: '版本说明',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_3_1_4: '建模截面可按设计规范、材料及构件，从已与 Gen 核对的型录选择。保留当前值与直接输入，并提示特性差异及冷弯型钢适用限制。',
   rn_v2_3_1_1: '加强候选：与连接无关的构件（檩条、墙梁、新增构件）不再显示连接比，推荐候选按实际增加钢材量（t）排序。',
   rn_v2_3_1_2: '仅所选分组的适用限制会阻止应用，可逐组加强；强度 NG 且超出限制的构件只计一次。',
   rn_v2_3_1_3: '候选计算失败或取消时不再提示恢复，预览错误不会使界面空白；吊车与多跨位移估算值按截面刚度比换算。',

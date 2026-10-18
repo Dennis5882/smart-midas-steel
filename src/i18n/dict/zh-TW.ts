@@ -1,11 +1,13 @@
 import { addTW } from './additions'
 import { repairTW } from './repair'
+import { sectionTw } from './sectionPicker'
 import type { Dict } from './en'
 
 /* 대만 번체 — 臺灣 規範 용어(屋樑·檁條·牆樑·繫材·用途係數·地況·基本設計風速) */
 export const zhTW: Dict = {
   ...addTW,
   ...repairTW,
+  ...sectionTw,
   bay_mode: '柱距輸入方式',
   numeric_wheel_hint: '點選後可用滾輪或 ↑↓ 鍵調整數值。',
   bay_error: '請為每一跨間距輸入大於零的數值。',
@@ -504,6 +506,7 @@ export const zhTW: Dict = {
   g_help_2: '版本說明',
   g_help_2_cmd: '版本說明',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_3_1_4: '建模斷面可依設計規範、材料及構件，從已與 Gen 核對的型錄選取。保留目前值與直接輸入，並提示性質差異及冷軋型鋼適用限制。',
   rn_v2_3_1_1: '補強候選：與接合無關的桿件（檁條、牆樑、新增桿件）不再顯示接合比，推薦候選依實際增加鋼材量（t）排序。',
   rn_v2_3_1_2: '僅所選群組的適用限制會阻擋套用，可逐群組補強；強度 NG 且超出限制的桿件只計一次。',
   rn_v2_3_1_3: '候選計算失敗或取消時不再提示還原，預覽錯誤不會使畫面空白；吊車與多跨位移估計值依斷面勁度比換算。',

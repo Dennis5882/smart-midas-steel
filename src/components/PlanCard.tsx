@@ -16,11 +16,12 @@ import { ModelWizard, WIZARD_STEPS } from './ModelWizard'
 import { BaseFixityPicker, FrameTypePicker } from './FrameControls'
 import { BaySpacingEditor } from './BaySpacingEditor'
 import { NumericInput } from './NumericInput'
+import { SectionPicker } from './SectionPicker'
 import { FigureButton, FigureNote } from './FigureRef'
 import { siteSourceText } from './Status'
 import { ScopeBox } from './ScopeBox'
 import { checkScope, NO_FEATURES, type ScopeFeatures } from '../domain/scope'
-import { lengthText, type FactorySpec } from '../domain/types'
+import { lengthText, type FactorySpec, type ElementRole } from '../domain/types'
 import { t, tc } from '../i18n'
 import { fieldConflicts, fieldStep, groupsFor, initVals, invalidFields, numericStep, toSpec, type Group, type Path } from './planFields'
 import { S, notify, useStore, type ChatMsg } from '../state/store'
@@ -146,6 +147,9 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
       <div className="pe-in">
         {f.path === 'baseFixity'
           ? <BaseFixityPicker id={id} value={vals[f.path]} disabled={!live || s.busy || readonly} onChange={(v) => set(f.path, v)} />
+          : f.path.startsWith('sections.')
+          ? <SectionPicker id={id} spec={spec} role={f.path.slice('sections.'.length) as ElementRole} value={vals[f.path]}
+              disabled={!live || s.busy || readonly} invalid={error} errorId={error ? `${id}-error` : undefined} onChange={(v) => set(f.path, v)} />
           : f.kind === 'select'
           ? <select id={id} value={vals[f.path]} disabled={!live || s.busy || readonly} onChange={(e) => set(f.path, e.target.value)} aria-invalid={error} aria-describedby={error ? `${id}-error` : undefined}>
               {f.options!(spec).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}

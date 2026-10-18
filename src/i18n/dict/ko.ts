@@ -1,10 +1,12 @@
 import { addKo } from './additions'
 import { repairKo } from './repair'
+import { sectionKo } from './sectionPicker'
 import type { Dict } from './en'
 
 export const ko: Dict = {
   ...addKo,
   ...repairKo,
+  ...sectionKo,
   bay_mode: '기둥 간격 입력 방식',
   numeric_wheel_hint: '클릭 후 휠 또는 ↑↓ 키로 값을 조절합니다.',
   bay_error: '모든 베이 간격에 0보다 큰 숫자를 입력하세요.',
@@ -506,6 +508,7 @@ export const ko: Dict = {
   g_help_2: '릴리즈 노트',
   g_help_2_cmd: '릴리즈 노트',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_3_1_4: '모델링 단면을 설계기준·재료·부재별 Gen 대조 카탈로그에서 선택합니다. 기존값과 직접 입력을 유지하며 성질 차이·냉간성형 적용 한계를 안내합니다.',
   rn_v2_3_1_1: 'NG 보완 후보: 접합과 무관한 부재(퍼린·거트·추가 부재)는 접합비를 표시하지 않고, 권장 후보는 실제 추가 강재량(t) 순으로 정렬합니다.',
   rn_v2_3_1_2: '선택한 그룹의 한계 초과만 적용을 막아 그룹별로 하나씩 보완할 수 있습니다. 강도 NG와 한계 초과가 겹친 부재는 한 건으로 셉니다.',
   rn_v2_3_1_3: '후보 계산 실패·취소 시 복원 안내를 띄우지 않고, 미리보기 오류가 화면을 비우지 않습니다. 크레인·다경간 변위 예상값도 단면 강성 비로 환산합니다.',

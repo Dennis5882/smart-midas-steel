@@ -768,6 +768,14 @@ td.pos{color:var(--green)} td.neg{color:var(--red)}
 .addition-editor input[type="checkbox"] { accent-color: var(--blue); margin-right: 6px; }
 
 /* NG diagnosis and explicit section selection. */
+.section-picker{width:100%;min-width:0}
+.section-picker-note{display:grid;gap:4px;margin-top:6px;line-height:1.6}
+.section-picker-note small,.section-picker-manual small{color:var(--muted);font-size:.73rem}
+.section-picker-note .section-picker-warning{color:var(--amber)}
+.section-picker-manual{margin-top:8px;font-size:.73rem;color:var(--muted)}
+.section-picker-manual summary{cursor:pointer;width:fit-content}
+.section-picker-manual label{display:block;margin:8px 0 4px}
+.section-picker-manual small{display:block;margin-top:5px;line-height:1.6}
 .repair-panel{margin-top:24px;padding:20px;border:1px solid var(--border);border-radius:12px;background:var(--panel)}
 .repair-heading,.repair-group-title,.repair-actions{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 .repair-heading h3{display:flex;align-items:center;gap:8px;margin:6px 0;color:var(--txt-hi);font-size:1rem}
