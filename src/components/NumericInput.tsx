@@ -1,5 +1,10 @@
 import { useEffect, useRef, type InputHTMLAttributes } from 'react'
 
+/** Clean arithmetic noise in computed values; typed input stays in its own raw string. */
+export function inputNumberText(value: number): string {
+  return Number.isNaN(value) ? '' : Number.isFinite(value) ? String(Number(value.toPrecision(12))) : String(value)
+}
+
 export function steppedValue(raw: string, direction: 1 | -1, step: number, min?: number): string | null {
   const value = Number(raw)
   if (!raw.trim() || !Number.isFinite(value) || !Number.isFinite(step) || step <= 0) return null

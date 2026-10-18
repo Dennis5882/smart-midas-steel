@@ -181,7 +181,11 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
         /* 오류 칸으로 포커스 — 스크롤 아래·접힌 고급 칸이어도 문구가 보이게 (단계 전환·펼침 렌더 뒤) */
         const focusId = first.path.startsWith('additions.') ? `${formId}-additions.${first.path.slice('additions.'.length)}`
           : `${formId}-${first.path === 'bayList' && !free ? 'bayList-0' : first.path}`
-        setTimeout(() => document.getElementById(focusId)?.focus(), 60)
+        setTimeout(() => {
+          const group=document.getElementById(focusId)
+          const field=group?.querySelector<HTMLElement>('[aria-invalid="true"]:not(:disabled)')??group?.querySelector<HTMLElement>('[data-error-target]:not(:disabled)')??group
+          field?.focus()
+        }, 60)
         return
       }
       const issue = checkScope(spec).issues.find((i)=>i.level==='block' && scopeIssueStep(i.key)<target)
@@ -238,7 +242,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
         {g.title === 'sec_seismic' && site && (site.fault || site.basin || site.note) && <div className="pe-tip">{site.fault ? t('site_fault', site.fault) : site.basin ? t('site_basin') : site.note}</div>}
       </section>
     })}
-    {step === ADDITIONS_STEP && <StructureEditor idPrefix={`${formId}-additions`} spec={spec} onFeaturesChange={setFeat} onChange={(v)=>{dirty.current=true;setAdditions(v)}} disabled={!live || s.busy} attempted={attempted}/>}
+    {step === ADDITIONS_STEP && <StructureEditor idPrefix={`${formId}-additions`} spec={spec} onFeaturesChange={setFeat} onChange={(v)=>{dirty.current=true;setAdditions(v)}} disabled={!live || s.busy} attempted={attempted} onEditBays={()=>navigate(2)}/>}
     {step === LOADS_STEP && <p className="mw-note">{tc(spec.code, 'plan_tip')}</p>}
     {step === LOADS_STEP && spec.code === 'KR' && <p className="mw-note">{t('kr_scope_note')}</p>}
     {step > 0 && step < REVIEW_STEP && checkScope(spec).issues.some((i)=>scopeIssueStep(i.key)===step) && <ScopeBox spec={spec} />}

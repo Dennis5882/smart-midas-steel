@@ -5,17 +5,18 @@ import type { ScopeFeatures } from '../domain/scope'
 import { additionErrors } from '../domain/additions'
 import { t, type I18nKey } from '../i18n'
 import { AdditionEditor } from './AdditionEditor'
+import { inputNumberText } from './NumericInput'
 import { ADDITION_PARTS, additionPartActive, additionPartForPath, type AdditionPart } from './modelingFlow'
 
 const titles:Record<AdditionPart,I18nKey>={crane:'ms_crane',platform:'ms_platform',opening:'ms_openings',link:'ms_link',equipment:'ms_equipment',factors:'add_factors'}
 const icons={crane:Construction,platform:Layers,opening:PanelTop,link:Link2,equipment:Package}
 const stateKey=(active:boolean,bad:boolean)=>!active?'ms_none':bad?'ms_needs':'ms_checked'
 
-export function StructureEditor({spec,onFeaturesChange,onChange,disabled,attempted=false,idPrefix}:{
-  spec:FactorySpec;onFeaturesChange(v:ScopeFeatures):void;onChange(v:FactoryAdditions):void;disabled:boolean;attempted?:boolean;idPrefix:string
+export function StructureEditor({spec,onFeaturesChange,onChange,disabled,attempted=false,idPrefix,onEditBays}:{
+  spec:FactorySpec;onFeaturesChange(v:ScopeFeatures):void;onChange(v:FactoryAdditions):void;disabled:boolean;attempted?:boolean;idPrefix:string;onEditBays?:()=>void
 }) {
   const errors=additionErrors(spec)
-  const editor=(part:AdditionPart)=><AdditionEditor spec={spec} value={spec.additions} onChange={onChange} disabled={disabled} attempted={attempted} idPrefix={idPrefix} part={part}/>
+  const editor=(part:AdditionPart)=><AdditionEditor spec={spec} value={spec.additions} onChange={onChange} disabled={disabled} attempted={attempted} idPrefix={idPrefix} part={part} onEditBays={onEditBays}/>
   const enable=(key:'crane'|'mezzanine'|'opening',label:I18nKey)=><label className="structure-enable">
     <input type="checkbox" checked={!!spec.features?.[key]} disabled={disabled} onChange={(e)=>onFeaturesChange({...spec.features!,[key]:e.target.checked})}/>{t(label)}
   </label>
@@ -23,7 +24,7 @@ export function StructureEditor({spec,onFeaturesChange,onChange,disabled,attempt
     <p className="mw-note">{t('ms_optional_note')}</p>
     <div className="structure-cards">{ADDITION_PARTS.map((part)=>{
       const active=additionPartActive(spec,part),bad=errors.some((e)=>additionPartForPath(e.path)===part),Icon=icons[part]
-      return <details key={part} className="structure-card" id={`${idPrefix}-${part}`} open={attempted&&bad || undefined}>
+      return <details key={part} className={`structure-card structure-card-${part}`} id={`${idPrefix}-${part}`} open={attempted&&bad || undefined}>
         <summary><Icon size={19}/><span><strong>{t(titles[part])}</strong><small>{t(`ms_${part}_hint`)}</small></span><span className="structure-status" data-state={!active?'none':bad?'needs':'checked'}>{t(stateKey(active,bad))}</span><ChevronDown className="structure-chevron" size={15}/></summary>
         <div className="structure-card-body">
           {part==='crane'&&enable('crane','ms_enable_crane')}
@@ -42,7 +43,7 @@ export function StructureEditor({spec,onFeaturesChange,onChange,disabled,attempt
 export function StructureSummary({spec,onEdit,disabled=false}:{spec:FactorySpec;onEdit?:()=>void;disabled?:boolean}) {
   const errors=additionErrors(spec),a=spec.additions
   const parts=ADDITION_PARTS.filter((p)=>additionPartActive(spec,p))
-  const n=(x:number|undefined)=>Number.isFinite(x)?String(x):'—'
+  const n=(x:number|undefined)=>x!==undefined&&Number.isFinite(x)?inputNumberText(x):'—'
   const detail=(part:AdditionPart)=>{
     switch(part) {
       case 'crane':return `${t('add_elevation')} ${n(a?.crane?.elevation)} m · ${t('add_maxWheel')} ${n(a?.crane?.maxWheel)} kN${a?.crane?.runway?` · ${a.crane.runway.section}`:''}`

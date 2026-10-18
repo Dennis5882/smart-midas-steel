@@ -8,6 +8,7 @@ const { MODEL_STEPS, ADDITIONS_STEP, LOADS_STEP, REVIEW_STEP, additionPartForPat
 const { ModelWizard }=await import('../src/components/ModelWizard')
 const { StructureEditor, StructureSummary }=await import('../src/components/StructureEditor')
 const { initializeAdditions }=await import('../src/components/AdditionEditor')
+const {craneInputIssues}=await import('../src/domain/craneInput')
 const { fieldStep }=await import('../src/components/planFields')
 const { defaultSpecFor }=await import('../src/domain/types')
 const { defaultLink,defaultRoofOpening,defaultFloorOpening }=await import('../src/domain/phase6')
@@ -28,7 +29,7 @@ for(const lang of ['ko','en','zh-TW','zh-CN'] as const) {
     assert.equal(checkScope(spec).blocked,false)
     const props={spec,onFeaturesChange:()=>{},onChange:()=>{},disabled:false,idPrefix:'flow-test'}
     const initial=renderToStaticMarkup(createElement(StructureEditor,props))
-    assert.equal((initial.match(/class="structure-card"/g)??[]).length,5)
+    assert.equal((initial.match(/class="structure-card /g)??[]).length,5)
     assert.ok(!initial.includes('name="multiSpan"'))
     const missing=initializeAdditions({...spec,features:{...spec.features,crane:true}},spec.additions)
     const crane={...spec,features:{...spec.features,crane:true},additions:missing}
@@ -36,6 +37,16 @@ for(const lang of ['ko','en','zh-TW','zh-CN'] as const) {
     assert.equal(additionPartActive(crane,'platform'),false)
     assert.equal(additionPartActive(crane,'link'),false)
     assert.ok(checkScope(crane).blocked,'Unconfirmed enabled structures still block generation')
+    const runway=structuredClone(crane)
+    runway.bays=6;runway.bayList=undefined
+    runway.additions.crane!.runway={section:spec.sections.rafter,deflectionDivisor:600,source:'',confirmed:false}
+    const issues=craneInputIssues(runway)
+    assert.ok(issues.some(e=>e.field==='bays'&&e.max===4),'A runway must report its actual four-bay limit')
+    for(const field of ['maxWheel','source','confirmed','runway.source','runway.confirmed'])assert.ok(issues.some(e=>e.field===field),`Actionable missing field ${field}`)
+    assert.ok(!craneInputIssues(runway,false).some(e=>e.kind==='source'||e.kind==='confirm'),'Geometry preview does not require source confirmation')
+    const invalidRunway=renderToStaticMarkup(createElement(StructureEditor,{...props,spec:runway,attempted:true,onEditBays:()=>{}}))
+    assert.ok(invalidRunway.includes(t('ms_crane_bays',4,6)))
+    assert.ok(!invalidRunway.includes(t('add_invalid_crane')),'Specific crane errors replace the ambiguous generic warning')
     const withLink={...spec,additions:{...spec.additions,link:defaultLink(spec)}}
     assert.equal(additionPartActive(withLink,'link'),true)
     assert.equal(withLink.frame,spec.frame,'Building interfaces never change frame topology')

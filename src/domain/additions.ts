@@ -6,6 +6,7 @@ import { isPartialKR } from '../codes/krLateral'
 import { baySpans, type Element, type FactoryModel, type FactorySpec } from './types'
 import type { AdditionModel, AdditionUsage, FactoryAdditions, PlatformOptions, WallOpeningOptions } from './additionTypes'
 import {activeFloorOpening,hasPhase6,phase6Errors,platformGridXs} from './phase6'
+import {craneInputIssues} from './craneInput'
 
 export const activeCrane = (s: FactorySpec) => s.features?.crane ? s.additions?.crane : undefined
 export const activePlatform = (s: FactorySpec) => s.features?.mezzanine ? s.additions?.platform : undefined
@@ -52,14 +53,7 @@ export function additionErrors(s: FactorySpec, requireConfirmation = true): Addi
   const c = activeCrane(s)
   if (c && (!c.id || ids.has(c.id))) out.push({path:'crane',key:'add_invalid_crane',name:c.id})
   if (c) ids.add(c.id)
-  if (s.features?.crane && (!c || !finite(c.elevation, c.eccentricity, c.wheelSpacing, c.maxWheel, c.minWheel, c.impactFactor, c.lateral, c.braking, c.seismicWeight)
-    || !(c.elevation > 0 && c.elevation < Math.min(...G.eaveXs.map(G.zAt)) && c.eccentricity >= 0 && c.eccentricity < s.span / 4 && c.wheelSpacing > 0 && c.wheelSpacing < length && c.maxWheel > 0 && c.minWheel >= 0 && c.maxWheel >= c.minWheel && c.impactFactor >= 1 && c.impactFactor <= 3 && c.lateral >= 0 && c.braking >= 0 && c.seismicWeight >= 0)
-    || !(c.driftLimitMm > 0 && Number.isFinite(c.driftLimitMm)) || !confirmed(c) || s.bays > 8)) out.push({ path: 'crane', key: 'add_invalid_crane', name: c?.id ?? 'crane' })
-  if(c?.runway) {
-    const r=c.runway
-    if(!sectionCatalogOptions(s.code,'rafter',s.material).some((v)=>v.name===r.section && v.shape==='H') || !(r.deflectionDivisor>=100 && Number.isFinite(r.deflectionDivisor)) || !confirmed(r) || s.bays>4 || [0,s.span].some((x)=>G.girtZsAt(x).some((z)=>Math.abs(z-c.elevation)<1e-7)))
-      out.push({path:'crane',key:'add_invalid_crane',name:c.id})
-  }
+  if(craneInputIssues(s,requireConfirmation).length)out.push({path:'crane',key:'add_invalid_crane',name:c?.id??'crane'})
   const p = activePlatform(s)
   if (p && (!p.id || ids.has(p.id))) out.push({path:'platform',key:'add_invalid_platform',name:p.id})
   let sectionsOK = false

@@ -94,7 +94,7 @@ export const en = {
   mw_secondary: 'Secondary members', mw_coefficients: 'Seismic coefficients', mw_advanced: 'Review defaults · expand to edit',
   /* ── 헤더·공통 ── */
   app_name: 'Steel Factory Agent',
-  subtitle: 'MIDAS Gen NX · steel factory automation',
+  subtitle: 'MIDAS Gen NX · API Automation',
   code_label: 'Design code',
   results_invalid: (detail: string) => `Design check unavailable: analysis results are missing or invalid (${detail}). Run analysis and fetch results again.`,
   rv_missing: 'missing', rv_duplicate: 'duplicate', rv_unexpected: 'unexpected entry', rv_invalid: 'invalid value',
@@ -522,6 +522,8 @@ export const en = {
   g_help_2: 'Release notes',
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_3_3_1: 'Crane settings now lead Additional structures, grouped into loads, placement, runway and confirmation. Specific missing inputs and actual bay limits explain blocked progress, with links to the fields that need attention.',
+  rn_v2_3_3_2: 'Computed numbers display without floating-point tails, with clearer source and confirmation guidance for shared load factors. Chinese product titles now use Agent, and all four language subtitles identify API automation.',
   rn_v2_3_2_1: 'Choose modeling sections by code, material and member role. Standard sections now share Gen NX DB properties across checks, self-weight, quantities and section proposals. Dimension-based entries and cold-formed preliminary limits are identified separately; a live property mismatch blocks model completion.',
   rn_v2_3_2_2: 'Modeling now follows seven stages. Configure additional structures and their individual loads together before site loads; multi-span geometry and building interfaces are separate. Site-load edits preserve confirmed additional-structure inputs.',
   rn_v2_3_1_4: 'Choose modeling sections from the audited catalog by code, material and member role. Existing values and direct entry are retained, with property differences and cold-formed limits shown.',

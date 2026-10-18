@@ -82,8 +82,8 @@ export const zhTW: Dict = {
   mw_cf_girt: (h, max) => `相對簷高 ${h} m 間距過大，牆面無法配置牆樑 — 請輸入 ${max} m 以下。`,
   mw_cf_post: (span, max) => `相對跨度 ${span} m 間距過大，山牆無法配置山牆柱 — 請輸入 ${max} m 以下。`,
   mw_secondary: '次構件設定', mw_coefficients: '地震係數詳情', mw_advanced: '確認預設值，展開可修改',
-  app_name: '鋼構廠房代理',
-  subtitle: 'MIDAS Gen NX · 鋼構廠房自動化',
+  app_name: '鋼構廠房 Agent',
+  subtitle: 'MIDAS Gen NX · API自動化',
   code_label: '設計規範',
   results_invalid: (detail: string) => `無法檢核：分析結果缺漏或無效（${detail}）。請重新分析並取得結果。`,
   rv_missing: '缺漏', rv_duplicate: '重複', rv_unexpected: '非預期項目', rv_invalid: '無效數值',
@@ -508,6 +508,8 @@ export const zhTW: Dict = {
   g_help_2: '版本說明',
   g_help_2_cmd: '版本說明',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_3_3_1: '天車設定位於附加結構首要卡片，依載重、位置、軌道梁及確認分區。阻擋繼續的缺漏輸入與實際跨數限制分別顯示，並可點選移至修改位置。',
+  rn_v2_3_3_2: '清除自動計算數值的浮點尾數，改善共用載重係數的來源與確認提示。簡繁體產品標題改用 Agent，四種語言副標題統一為 API 自動化。',
   rn_v2_3_2_1: '依規範、材料及構件選取斷面。標準斷面在構件檢核、自重、數量及斷面建議中共用 Gen NX 資料庫性質；尺寸計算與冷軋初步檢核另行標示。實際 Gen 性質與基準資料不同時，阻擋模型建立完成。',
   rn_v2_3_2_2: '建模調整為七階段，附加結構的位置、斷面及個別載重集中設定，工址與載重階段顯示摘要。多跨構架與建築連接部分開設定；修改共用載重時保留附加結構的輸入確認。',
   rn_v2_3_1_4: '建模斷面可依設計規範、材料及構件，從已與 Gen 核對的型錄選取。保留目前值與直接輸入，並提示性質差異及冷軋型鋼適用限制。',
@@ -647,7 +649,7 @@ export const zhTW: Dict = {
   rn_v0_2_0_3: '自動存檔至 C:/temp，避免 Gen 跳出確認視窗。',
   rn_v0_1_0_1: '輸入單跨門型剛構廠房即建立 3D 模型並送至 MIDAS Gen NX。',
   rn_v0_1_0_2: '支援臺灣鋼構造 LRFD 規範與四種語言。',
-  meta_title: '鋼構廠房代理',
+  meta_title: '鋼構廠房 Agent',
   meta_desc: "以 MIDAS Gen NX 建立及分析廠房，依臺灣 LRFD 或中國 GB 檢核並產出計算書與圖說。",
   g_misc_4: '複製連結（目前語言）',
   g_misc_4_cmd: '複製連結',
@@ -718,7 +720,7 @@ export const zhTW: Dict = {
   g_help_1_cmd: '說明',
 
   who_user: '使用者',
-  who_agent: '代理',
+  who_agent: 'Agent',
   input_ph: '輸入指令 — 例：建立廠房 跨距 30 簷高 9',
   mode: 'MODE',
   mode_local: '本機指令',
@@ -726,7 +728,7 @@ export const zhTW: Dict = {
   clearchat_tip: '清除對話',
   split_tip: '拖曳調整寬度 · 雙擊還原',
   welcome:
-    '<b>Smart MIDAS Steel</b> — MIDAS Gen NX 鋼構廠房（單跨門型剛架）代理。<br>' +
+    '<b>Smart MIDAS Steel</b> — MIDAS Gen NX 鋼構廠房（單跨門型剛架）Agent。<br>' +
     '請從左側 <b>GUIDE</b> 選擇或直接輸入。以 <code>建立廠房</code> 開始。<br>' +
     '傳送模型到 Gen NX 前，請先在 ⚙ 設定 MAPI-Key。',
   help_html:
