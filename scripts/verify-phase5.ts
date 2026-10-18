@@ -34,8 +34,8 @@ for(const base of [DEFAULT_SPEC,CN_DEFAULT_SPEC,KR_DEFAULT_SPEC]) {
   ok(!m.elements.some((e)=>e.loadOnly),'no virtual steel in physical model')
   near(steelWeight(s,m),memberSchedule(s,m).total,'optimization/takeoff consistency')
   const length=(e:typeof header)=>{const a=m.nodes[e.n1-1],b=m.nodes[e.n2-1];return Math.hypot(b.x-a.x,b.y-a.y,b.z-a.z)}
-  const removedSteel=sum(m.additions!.removedGirts!.map((e)=>sectionProps(e.section).A*1e-6*length(e)))*profileOf(s.code).materials[s.material].gamma/9.80665
-  const headerSteel=sectionProps(header.section).A*1e-6*length(header)*profileOf(s.code).materials[s.material].gamma/9.80665
+  const removedSteel=sum(m.additions!.removedGirts!.map((e)=>sectionProps(e.section,s.code).A*1e-6*length(e)))*profileOf(s.code).materials[s.material].gamma/9.80665
+  const headerSteel=sectionProps(header.section,s.code).A*1e-6*length(header)*profileOf(s.code).materials[s.material].gamma/9.80665
   near(memberSchedule(s,m).total,memberSchedule(plain,m0).total-removedSteel+headerSteel,'removed girts not in takeoff')
   // Compare independent global force and moment sums, with D self-weight excluded from BODF.
   const resultants=(model:typeof m,load:typeof l)=>{

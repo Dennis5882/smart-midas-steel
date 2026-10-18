@@ -8,6 +8,7 @@ import { buildPortal } from '../domain/portal'
 import type { FactorySpec } from '../domain/types'
 import { checkScope } from '../domain/scope'
 import { dbDifferences, diffText, isRecord } from '../domain/genSync'
+import { sectionSourceDifferences } from '../domain/genSectionSync'
 import { scopeMsg } from '../components/ScopeBox'
 import { t, lt } from '../i18n'
 import { mapi } from '../mapi/client'
@@ -89,6 +90,11 @@ export async function sendModel(spec: FactorySpec, onReplaced?: (backup: string)
   for (const [name, assign] of steps) await mapi('PUT', name, { Assign: assign }, String(Object.keys(assign).length))
   if (designCode) await mapi('PUT', 'DSTL', { Assign: { 1: { DGNCODE: designCode } } })
   await verifyCounts(Object.fromEntries(steps))
+  const sectionTable = await mapi<any>('POST', '/post/TABLE', { Argument: {
+    TABLE_NAME: 'SectionSource', TABLE_TYPE: 'SECTIONALL', UNIT: { FORCE:'KN', DIST:'MM', HEAT:'KJ', TEMP:'C' },
+  } }, 'Gen section source')
+  const sourceDifferences = sectionSourceDifferences(spec.code, p.SECT, sectionTable?.SectionSource)
+  if (sourceDifferences.length) throw new Error(t('section_source_mismatch', sourceDifferences.slice(0,4).join(', ')))
   /* Gen 화면을 ISO 전체 보기로 — 전송 직후엔 일부만 보이거나 비어 보임 (story 와 같은 값, 라이브 확정 H 30·V 15).
      화면 조작이라 실패해도 모델 생성은 성공으로 둔다 */
   try { await mapi('POST', '/view/ANGLE', { Argument: { HORIZONTAL: 30, VERTICAL: 15 } }, 'ISO') } catch { /* 화면만 */ }
@@ -126,7 +132,7 @@ function clearBuilt(): void {
 const VERIFY = ['MATL', 'SECT', 'NODE', 'ELEM', 'FRLS', 'CONS', 'STLD', 'LCOM-GEN', 'BODF', 'BMLD', 'CNLD'] as const
 
 async function verifyCounts(sent: Record<string, Record<string, unknown>>): Promise<void> {
-  stage('st_verify', VERIFY.length)
+  stage('st_verify', VERIFY.length + 1) // DB readback plus the Gen property source table.
   const bad: string[] = []
   for (const name of VERIFY) {
     const want = Object.keys(sent[name] ?? {}).length

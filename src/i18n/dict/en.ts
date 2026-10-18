@@ -1,12 +1,14 @@
 import { addEn } from './additions'
 import { repairEn } from './repair'
 import { sectionEn } from './sectionPicker'
+import { flowEn } from './modelingFlow'
 /* 영어 사전 — 키의 기준(폴백). 다른 언어는 `Dict` 타입으로 키 일치를 컴파일 시점에 검사.
    값이 HTML 인 키(…_html, welcome, 메시지류)는 dangerouslySetInnerHTML 로 렌더 — 사용자 입력을 넣지 말 것. */
 export const en = {
   ...addEn,
   ...repairEn,
   ...sectionEn,
+  ...flowEn,
   bay_mode: 'Spacing mode',
   numeric_wheel_hint: 'Click to focus, then use the wheel or ↑↓ keys to adjust.',
   bay_error: 'Enter a number greater than zero for every bay spacing.',
@@ -69,7 +71,7 @@ export const en = {
   mw_process: 'Modeling workflow',
   mw_step: (n: number) => `STEP ${String(n).padStart(2, '0')}`,
   mw_scope: 'Project', mw_frame: 'Cross section', mw_bays: 'Bays', mw_sections: 'Members', mw_loads: 'Loads', mw_review: 'Review',
-  mw_scope_hint: 'Choose a starting shape and check whether this building is supported.',
+  mw_scope_hint: 'Choose a starting building template. Configure the shape and additional structures in the next stages.',
   mw_frame_hint: 'Define one representative portal frame. Dimensions update the 3D preview.',
   mw_bays_hint: 'Repeat the frame along the building and set secondary member spacing.',
   mw_sections_hint: 'Choose steel and member sections, then review connection material assumptions.',
@@ -266,7 +268,7 @@ export const en = {
   g_model_4_cmd: 'build logistics warehouse',
   g_model_5: 'Free frame',
   g_model_5_cmd: 'build free-frame factory',
-  g_model_note: 'Basic modeling follows Project → Cross section → Bays → Members → Loads → Review. Selecting the same type resumes editing. Free frame lets you edit per-bay spacing directly.',
+  g_model_note: 'Basic modeling follows Project → Cross section → Bays → Members → Additional structures → Loads → Review. Configure placement, sections and individual loads together in Additional structures. Selecting the same type resumes editing.',
   plan_intro_tpl: 'I will build the model below. Press <b>Run</b> to confirm or <b>Edit</b> to change it.',
   plan_intro_free: '<b>Free frame</b>. Edit the per-bay spacing and other values directly, then press <b>Run</b>.',
   edit_btn: 'Edit',
@@ -350,10 +352,10 @@ export const en = {
   q_cjp: 'CJP',
   q_fillet: 'fillet',
   sec_scope: 'Scope',
-  sc_q: 'Select applicable features. Crane and platform inputs appear in Region / loads.',
+  sc_q: 'Configure additional structures in their own stage; choose multi-span geometry in Cross section.',
   feat_crane: 'Overhead crane',
   feat_mezzanine: 'Mezzanine / platform',
-  feat_multiSpan: 'Multi-span / linked bays',
+  feat_multiSpan: 'Multi-span frame',
   feat_opening: 'Large openings (big doors)',
   sc_crane: 'Overhead crane — runway girders and crane loads are not modeled.',
   sc_mezzanine: 'Mezzanine / platform — floor loads and connections are not modeled.',
@@ -520,6 +522,8 @@ export const en = {
   g_help_2: 'Release notes',
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_3_2_1: 'Choose modeling sections by code, material and member role. Standard sections now share Gen NX DB properties across checks, self-weight, quantities and section proposals. Dimension-based entries and cold-formed preliminary limits are identified separately; a live property mismatch blocks model completion.',
+  rn_v2_3_2_2: 'Modeling now follows seven stages. Configure additional structures and their individual loads together before site loads; multi-span geometry and building interfaces are separate. Site-load edits preserve confirmed additional-structure inputs.',
   rn_v2_3_1_4: 'Choose modeling sections from the audited catalog by code, material and member role. Existing values and direct entry are retained, with property differences and cold-formed limits shown.',
   rn_v2_3_1_1: 'Section repair: members unrelated to connections (purlins, girts, added members) no longer show a connection ratio, and preferred candidates are ordered by added steel tonnage.',
   rn_v2_3_1_2: 'Only limits in the selected groups block applying, so groups can be repaired one at a time. A member that is both NG and over a method limit counts once.',

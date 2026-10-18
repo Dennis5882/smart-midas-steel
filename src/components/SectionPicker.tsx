@@ -7,7 +7,7 @@ export function SectionPicker({ id, spec, role, value, disabled, invalid, errorI
   id: string; spec: FactorySpec; role: ElementRole; value: string; disabled: boolean
   invalid: boolean; errorId?: string; onChange: (value: string) => void
 }) {
-  const { material, options, selected, propertyReview, preliminary } = modelingSectionChoices(spec, role, value)
+  const { material, options, selected, source, excluded, propertyReview, preliminary } = modelingSectionChoices(spec, role, value)
   const shapes = [...new Set(options.map((o) => o.shape))]
   const noteId = `${id}-catalog-note`
   return <div className="section-picker">
@@ -22,6 +22,7 @@ export function SectionPicker({ id, spec, role, value, disabled, invalid, errorI
     </select>
     <div id={noteId} className="section-picker-note">
       <small>{t('section_options_note', material, options.length)}</small>
+      <small className={excluded ? 'section-picker-warning' : undefined}>{excluded ? t('section_excluded_source') : source ? t('section_gen_source', source.db) : t('section_dimension_source')}</small>
       {!selected && <small className="section-picker-warning">{t(options.length ? 'section_outside' : 'section_no_options')}</small>}
       {propertyReview && <small className="section-picker-warning">{t('section_property_review', (selected!.maxRelativeDifference * 100).toFixed(1))}</small>}
       {preliminary && <small className="section-picker-warning">{t('section_preliminary_note')}</small>}

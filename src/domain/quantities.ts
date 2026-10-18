@@ -6,7 +6,7 @@
    용접 = 단부판 접합 1 곳당 플랜지 CJP 2·bf + 웨브 필렛 2·h. 풍주 주각·퍼린/거트 클립·새그로드·마감재는 제외. */
 import type { ConnResult, ConnectionParts, PlatePart } from './connections'
 import { memberSchedule, type ScheduleRow } from './schedule'
-import { sectionProps } from './sections'
+import { genSectionRecord, sectionProps } from './sections'
 import { portalGeometry } from './portal'
 import { ROLES, type ElementRole, type FactoryModel, type FactorySpec } from './types'
 
@@ -70,8 +70,10 @@ function legacyParts(c: ConnResult, colH: number, rafD: number): ConnectionParts
 }
 
 /** 단면 둘레(mm) — 도장 면적용. H: 외곽 2d + 4bf − 2tw, CC: 판 양면(중심선 전개 × 2), P: 외면 πD */
-function perimeter(section: string): number {
-  const p = sectionProps(section)
+function perimeter(section: string, spec: FactorySpec): number {
+  const p = sectionProps(section, spec.code)
+  const record = genSectionRecord(section, spec.code)
+  if (record && !record.excluded) return record.perimeter
   if (p.kind === 'H') return 2 * p.d + 4 * p.bf - 2 * p.tw
   if (p.kind === 'P') return Math.PI * p.d
   return 2 * (p.A / p.tw) // CC: A = t × 전개 길이
@@ -87,7 +89,7 @@ export function quantities(spec: FactorySpec, model: FactoryModel, conns: ConnRe
     base: model.elements.filter((e) => e.role === 'column' && nodes.get(e.n1)!.z === 0).length, knee: 2 * frames, apex: model.nodes.filter(G.isRidgeNode).length,
     brace: 2 * model.elements.filter((e) => e.role === 'brace').length,
   }
-  const col = sectionProps(spec.sections.column), raf = sectionProps(spec.sections.rafter)
+  const col = sectionProps(spec.sections.column, spec.code), raf = sectionProps(spec.sections.rafter, spec.code)
   const plates: PlateRow[] = [], bolts: BoltRow[] = [], welds: WeldRow[] = []
   const fmt = (n: number) => +n.toFixed(3)
   const addPlate = (type: ConnType, part: PlateRow['part'], b: number, l: number, t: number, perConn: number, est: boolean) => {
@@ -115,7 +117,7 @@ export function quantities(spec: FactorySpec, model: FactoryModel, conns: ConnRe
     }
   }
 
-  const paint: PaintRow[] = sch.rows.map((r) => ({ addition:r.addition, role: r.role, section: r.section, area: (perimeter(r.section) / 1000) * r.length }))
+  const paint: PaintRow[] = sch.rows.map((r) => ({ addition:r.addition, role: r.role, section: r.section, area: (perimeter(r.section, spec) / 1000) * r.length }))
   plates.sort((a, b) => ['base', 'knee', 'apex', 'brace'].indexOf(a.type) - ['base', 'knee', 'apex', 'brace'].indexOf(b.type) || ['plate', 'shearKey', 'stiffener', 'doubler', 'gusset'].indexOf(a.part) - ['plate', 'shearKey', 'stiffener', 'doubler', 'gusset'].indexOf(b.part))
   const plateT = plates.reduce((s, p) => s + p.kg, 0) / 1000
   const netT = sch.total + plateT

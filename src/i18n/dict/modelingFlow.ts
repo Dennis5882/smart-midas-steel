@@ -1,0 +1,48 @@
+export const flowEn={
+  mw_additions:'Additional structures',mw_additions_hint:'Add the structures you need. Set their placement, sections and individual loads here.',
+  ms_optional_note:'All items are optional. Open a card to configure it; leave unused items off.',
+  ms_crane:'Overhead crane',ms_platform:'Mezzanine / platform',ms_openings:'Openings',ms_link:'Building interface',ms_equipment:'Roof equipment',
+  ms_crane_hint:'Supports, runway beams and wheel loads',ms_platform_hint:'Floor layout, members and floor loads',ms_opening_hint:'Closed wall, roof and floor openings',ms_link_hint:'Movement, separation and external reactions',ms_equipment_hint:'Position and concentrated equipment weight',
+  ms_none:'None',ms_needs:'Input needed',ms_checked:'Inputs checked',
+  ms_enable_crane:'Use an overhead crane',ms_enable_platform:'Add a mezzanine / platform',ms_enable_wall:'Add a side-wall opening (closed door)',
+  ms_floor_dependency:'Add a platform before configuring a floor opening.',
+  ms_factors_hint:'Confirm the combination factors and their source for crane, platform and interface loads.',
+  ms_none_summary:'No additional structures selected.',ms_summary_note:'Edit placement, sections and individual loads in Additional structures.',
+  ms_equipment_count:(n:number)=>`${n} equipment item(s)`,
+}
+export const flowKo={
+  mw_additions:'추가 구조',mw_additions_hint:'필요한 구조를 추가하고 위치·단면·개별 하중을 이 단계에서 설정하세요.',
+  ms_optional_note:'모두 선택 사항입니다. 필요한 카드를 펼쳐 설정하고, 사용하지 않는 항목은 꺼두세요.',
+  ms_crane:'천장 크레인',ms_platform:'메자닌·플랫폼',ms_openings:'개구부',ms_link:'건물 연결부',ms_equipment:'지붕 설비',
+  ms_crane_hint:'지지 위치·주행보·차륜 하중',ms_platform_hint:'바닥 배치·부재·사용하중',ms_opening_hint:'닫힌 측벽 문·지붕·바닥 개구부',ms_link_hint:'이동·이격·외부 반력 연계',ms_equipment_hint:'설비 위치·집중 중량',
+  ms_none:'없음',ms_needs:'입력 필요',ms_checked:'입력 확인',
+  ms_enable_crane:'천장 크레인 사용',ms_enable_platform:'메자닌·플랫폼 추가',ms_enable_wall:'측벽 개구부 추가 (닫힌 출입문)',
+  ms_floor_dependency:'바닥 개구부는 플랫폼을 추가한 뒤 설정할 수 있습니다.',
+  ms_factors_hint:'크레인·플랫폼·연결부 하중의 조합계수와 출처를 확인하세요.',
+  ms_none_summary:'추가 구조를 선택하지 않았습니다.',ms_summary_note:'위치·단면·개별 하중은 추가 구조 단계에서 수정합니다.',
+  ms_equipment_count:(n:number)=>`설비 ${n}개`,
+}
+export const flowTW={
+  mw_additions:'附加結構',mw_additions_hint:'依需求新增結構，在此設定位置、斷面及個別載重。',
+  ms_optional_note:'所有項目皆可選。展開需要的卡片設定，不使用的項目保持關閉。',
+  ms_crane:'天車',ms_platform:'夾層·平台',ms_openings:'開口',ms_link:'建築連接部',ms_equipment:'屋頂設備',
+  ms_crane_hint:'支承位置·軌道梁·輪壓',ms_platform_hint:'樓面配置·構件·使用載重',ms_opening_hint:'關閉側牆門·屋頂·樓板開口',ms_link_hint:'位移·間距·外部反力介面',ms_equipment_hint:'設備位置·集中重量',
+  ms_none:'無',ms_needs:'待輸入',ms_checked:'輸入已確認',
+  ms_enable_crane:'使用天車',ms_enable_platform:'新增夾層·平台',ms_enable_wall:'新增側牆開口（關閉門扇）',
+  ms_floor_dependency:'請先新增平台，再設定樓板開口。',
+  ms_factors_hint:'請確認天車、平台及連接部載重的組合係數與來源。',
+  ms_none_summary:'尚未選用附加結構。',ms_summary_note:'位置、斷面及個別載重請於附加結構階段修改。',
+  ms_equipment_count:(n:number)=>`${n} 項設備`,
+}
+export const flowCN={
+  mw_additions:'附加结构',mw_additions_hint:'按需添加结构，在此设置位置、截面及单项荷载。',
+  ms_optional_note:'所有项目均为可选。展开需要的卡片设置，未使用的项目保持关闭。',
+  ms_crane:'桥式吊车',ms_platform:'夹层·平台',ms_openings:'洞口',ms_link:'建筑连接部',ms_equipment:'屋面设备',
+  ms_crane_hint:'支承位置·吊车梁·轮压',ms_platform_hint:'楼面布置·构件·使用荷载',ms_opening_hint:'关闭侧墙门·屋面·楼板洞口',ms_link_hint:'位移·间距·外部反力接口',ms_equipment_hint:'设备位置·集中重量',
+  ms_none:'无',ms_needs:'待输入',ms_checked:'输入已确认',
+  ms_enable_crane:'使用桥式吊车',ms_enable_platform:'添加夹层·平台',ms_enable_wall:'添加侧墙洞口（关闭门扇）',
+  ms_floor_dependency:'请先添加平台，再设置楼板洞口。',
+  ms_factors_hint:'请确认吊车、平台及连接部荷载的组合系数与来源。',
+  ms_none_summary:'尚未选用附加结构。',ms_summary_note:'位置、截面及单项荷载请在附加结构阶段修改。',
+  ms_equipment_count:(n:number)=>`${n} 项设备`,
+}

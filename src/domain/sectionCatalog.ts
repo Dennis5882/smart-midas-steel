@@ -3,6 +3,7 @@ import audit from '../data/section-catalog-audit.json'
 import type { CodeId } from '../codes/types'
 import type { ElementRole } from './types'
 import type { FactorySpec } from './types'
+import { genSectionRecord } from './sections'
 
 export interface AuditedSection {
   code: string; name: string; db: string; shape: string; roles: string[]; registered: boolean
@@ -16,8 +17,11 @@ export interface AuditedSection {
 export function sectionCatalogOptions(code: CodeId, role: ElementRole, material: string, includeReview = true): AuditedSection[] {
   return (audit.entries as AuditedSection[]).filter((r) => r.code === code && r.roles.includes(role)
     && r.registered && r.selectionStatus !== 'quarantine'
-    && (includeReview || r.selectionStatus === 'normal')
     && !!r.materialSupport[material] && r.materialSupport[material]?.status !== 'blocked')
+    .map((r) => {
+      const source = genSectionRecord(r.name, code)
+      return source && !source.excluded ? { ...r, propertyStatus: 'gen-db', selectionStatus: 'normal' } : r
+    }).filter((r) => includeReview || r.selectionStatus === 'normal')
 }
 
 export const sectionCatalogAuditDate = audit.auditedAt
@@ -28,7 +32,8 @@ export function modelingSectionChoices(spec: FactorySpec, role: ElementRole, cur
   const material = secondary ? spec.secondaryMaterial ?? (spec.code === 'KR' ? 'SS275' : 'Q235B') : spec.material
   const options = sectionCatalogOptions(spec.code, role, material)
   const selected = options.find((o) => o.name === current)
-  return { material, options, selected,
+  const source = genSectionRecord(current, spec.code)
+  return { material, options, selected, excluded: !!source?.excluded, source: source?.excluded ? undefined : source,
     propertyReview: selected?.selectionStatus === 'review',
     preliminary: selected?.materialSupport[material]?.status === 'preliminary' }
 }

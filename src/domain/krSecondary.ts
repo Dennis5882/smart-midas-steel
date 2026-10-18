@@ -51,7 +51,7 @@ export function krCCLoads(spec: FactorySpec, model: FactoryModel, info: LoadInfo
     if (e.role !== 'purlin' && e.role !== 'girt') continue
     const p1 = nodes.get(e.n1)!, p2 = nodes.get(e.n2)!
     const L = Math.hypot(p2.x - p1.x, p2.y - p1.y, p2.z - p1.z)
-    const self = gamma * sectionProps(e.section).A * 1e-6 // kN/m
+    const self = gamma * sectionProps(e.section, spec.code).A * 1e-6 // kN/m
     const yLo = Math.min(p1.y, p2.y), yHi = Math.max(p1.y, p2.y)
     let zone: CCZoneKR, trib: number, wD: number, wS: number, wt: number
     if (e.role === 'purlin') {

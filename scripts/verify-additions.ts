@@ -66,7 +66,7 @@ for (const base of [DEFAULT_SPEC,CN_DEFAULT_SPEC,KR_DEFAULT_SPEC]) {
   near(sum(a.beam.filter((v)=>v.case==='PL').map((v)=>v.q*len(m.elements[v.element-1]))),area*p.live,'floor area live load')
   near(sum(a.beam.filter((v)=>v.case==='D').map((v)=>v.q*len(m.elements[v.element-1]))),area*p.dead,'floor area dead load')
   const gamma=profileOf(s.code).materials[s.material].gamma
-  const structural=sum(m.elements.filter((e)=>e.addition).map((e)=>gamma*sectionProps(e.section).A*1e-6*len(e)))
+  const structural=sum(m.elements.filter((e)=>e.addition).map((e)=>gamma*sectionProps(e.section,s.code).A*1e-6*len(e)))
   near(a.sources.find((v)=>v.id===p.id)!.dead,area*p.dead+structural,'floor ownweight counted once')
   const baseModel=factoryOnly(m);delete baseModel.additions
   const baseWeight=sum([...nodeWeights(s,baseModel,()=>0).values()])
@@ -91,7 +91,7 @@ for (const base of [DEFAULT_SPEC,CN_DEFAULT_SPEC,KR_DEFAULT_SPEC]) {
   const defl=runDesign(s,m,l.info,res)
   ok(defl.service.find((v)=>v.key==='platformDefl')!.ratio>0,'platform support-relative displacement actually evaluated')
   near(defl.service.find((v)=>v.key==='craneDefl')!.ratio,2,'project crane drift limit actually evaluated')
-  const pc=m.elements.find((e)=>e.addition==='platform-column')!,pcSection=sectionProps(pc.section),pcLength=a.members.find((v)=>v.key===pc.physicalKey)!.length
+  const pc=m.elements.find((e)=>e.addition==='platform-column')!,pcSection=sectionProps(pc.section,s.code),pcLength=a.members.find((v)=>v.key===pc.physicalKey)!.length
   const baseCombo=combos.find((c)=>l.info.comboKind[c]==='basic')!
   res.beam.get(pc.id)!.set(baseCombo,Array.from({length:5},()=>({...force,P:-100,Mz:10})))
   const compressed=runDesign(s,m,l.info,res).members.find((v)=>v.id===pc.id)!

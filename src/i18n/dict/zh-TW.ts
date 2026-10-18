@@ -1,6 +1,7 @@
 import { addTW } from './additions'
 import { repairTW } from './repair'
 import { sectionTw } from './sectionPicker'
+import { flowTW } from './modelingFlow'
 import type { Dict } from './en'
 
 /* 대만 번체 — 臺灣 規範 용어(屋樑·檁條·牆樑·繫材·用途係數·地況·基本設計風速) */
@@ -8,6 +9,7 @@ export const zhTW: Dict = {
   ...addTW,
   ...repairTW,
   ...sectionTw,
+  ...flowTW,
   bay_mode: '柱距輸入方式',
   numeric_wheel_hint: '點選後可用滾輪或 ↑↓ 鍵調整數值。',
   bay_error: '請為每一跨間距輸入大於零的數值。',
@@ -58,8 +60,8 @@ export const zhTW: Dict = {
   ws_help: '選擇建物類型並設定幾何、材料與載重。最終確認後建立模型，再依下方流程進行分析、設計檢核及輸出。返回開始畫面會保留輸入及目前步驟。',
   mw_title: '建模工作室', mw_process: '建模流程',
   mw_step: (n: number) => `STEP ${String(n).padStart(2, '0')}`,
-  mw_scope: '開始與範圍', mw_frame: '橫斷面', mw_bays: '長度與跨間', mw_sections: '材料與斷面', mw_loads: '工址與載重', mw_review: '最終確認',
-  mw_scope_hint: '選擇起始建物形式，並確認自動建模適用範圍。',
+  mw_scope: '開始', mw_frame: '橫斷面', mw_bays: '長度與跨間', mw_sections: '材料與斷面', mw_loads: '工址與載重', mw_review: '最終確認',
+  mw_scope_hint: '選擇起始建築範本，於後續階段設定形狀與附加結構。',
   mw_frame_hint: '設定一組代表性門型構架，尺寸變更會同步更新 3D 預覽。',
   mw_bays_hint: '沿建物長度方向配置構架，並設定次構件間距。',
   mw_sections_hint: '選擇鋼材與構件斷面，並確認接合材料假設。',
@@ -252,7 +254,7 @@ export const zhTW: Dict = {
   g_model_4_cmd: '建立物流倉庫',
   g_model_5: '自由構架',
   g_model_5_cmd: '建立自由構架廠房',
-  g_model_note: '基本建模依開始與範圍 → 橫斷面 → 長度與跨間 → 材料與斷面 → 工址與載重 → 最終確認進行。再次選擇相同類型可繼續編輯。自由構架可直接編輯逐跨柱距。',
+  g_model_note: '基本建模依開始 → 橫斷面 → 長度與跨間 → 材料與斷面 → 附加結構 → 工址與載重 → 最終確認進行。附加結構的位置、斷面與個別載重集中設定，再次選擇相同類型可繼續編輯。',
   plan_intro_tpl: '將以下列規格建立模型。確認請按<b>執行</b>，要調整請按<b>修改</b>。',
   plan_intro_free: '<b>自由構架</b>。直接修改逐跨柱距及各項數值後按<b>執行</b>。',
   edit_btn: '修改',
@@ -336,10 +338,10 @@ export const zhTW: Dict = {
   q_cjp: '全滲透銲 (CJP)',
   q_fillet: '填角銲',
   sec_scope: '適用範圍',
-  sc_q: '請選擇適用項目。天車與夾層詳細輸入顯示於地區／載重步驟。',
+  sc_q: '附加結構於獨立階段設定；多跨形狀請於橫斷面選擇。',
   feat_crane: '天車',
   feat_mezzanine: '夾層、設備層',
-  feat_multiSpan: '多跨、連棟',
+  feat_multiSpan: '多跨構架',
   feat_opening: '大型開口（大門等）',
   sc_crane: '天車 — 未模擬軌道梁與吊車載重。',
   sc_mezzanine: '夾層、設備層 — 未模擬樓層載重與接合。',
@@ -506,6 +508,8 @@ export const zhTW: Dict = {
   g_help_2: '版本說明',
   g_help_2_cmd: '版本說明',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_3_2_1: '依規範、材料及構件選取斷面。標準斷面在構件檢核、自重、數量及斷面建議中共用 Gen NX 資料庫性質；尺寸計算與冷軋初步檢核另行標示。實際 Gen 性質與基準資料不同時，阻擋模型建立完成。',
+  rn_v2_3_2_2: '建模調整為七階段，附加結構的位置、斷面及個別載重集中設定，工址與載重階段顯示摘要。多跨構架與建築連接部分開設定；修改共用載重時保留附加結構的輸入確認。',
   rn_v2_3_1_4: '建模斷面可依設計規範、材料及構件，從已與 Gen 核對的型錄選取。保留目前值與直接輸入，並提示性質差異及冷軋型鋼適用限制。',
   rn_v2_3_1_1: '補強候選：與接合無關的桿件（檁條、牆樑、新增桿件）不再顯示接合比，推薦候選依實際增加鋼材量（t）排序。',
   rn_v2_3_1_2: '僅所選群組的適用限制會阻擋套用，可逐群組補強；強度 NG 且超出限制的桿件只計一次。',

@@ -14,11 +14,11 @@ for (const code of ['TW', 'CN', 'KR'] as const) {
   for (const role of ['column', 'rafter', 'purlin', 'girt', 'brace'] as const) {
     const options = sectionCatalogOptions(code, role, material)
     assert.ok(options.every((r) => r.code === code && r.roles.includes(role) && !excluded.includes(r.name)))
-    assert.ok(sectionCatalogOptions(code, role, material, false).every((r) => r.propertyStatus === 'close'))
+    assert.ok(sectionCatalogOptions(code, role, material, false).every((r) => r.propertyStatus === 'gen-db'))
     assert.equal(sectionCatalogOptions(code, role, 'UNKNOWN').length, 0)
   }
 }
-assert.ok(sectionCatalogOptions('TW', 'column', 'SN400B').some((r) => r.name === 'RH 600x200x11x17' && r.selectionStatus === 'review'))
+assert.ok(sectionCatalogOptions('TW', 'column', 'SN400B').some((r) => r.name === 'RH 600x200x11x17' && r.selectionStatus === 'normal'))
 assert.ok(sectionCatalogOptions('TW', 'brace', 'SN400B', false).length > 0)
 assert.ok(sectionCatalogOptions('CN', 'purlin', 'Q345B').every((r) => r.shape !== 'CC'))
 assert.ok(sectionCatalogOptions('KR', 'purlin', 'SSC275').some((r) => r.shape === 'CC' && r.materialSupport.SSC275.status === 'preliminary'))
@@ -64,4 +64,7 @@ const kr = defaultSpecFor('KR')
 assert.equal(modelingSectionChoices(kr, 'purlin', kr.sections.purlin).material, 'SSC275')
 assert.equal(modelingSectionChoices(kr, 'purlin', kr.sections.purlin).preliminary, true)
 assert.equal(modelingSectionChoices({ ...kr, material: 'UNKNOWN' }, 'column', kr.sections.column).options.length, 0)
+assert.equal(modelingSectionChoices(kr, 'purlin', 'LH 125x125x3.2/4.5').excluded, true)
+const quarantinedVals={...initVals(kr),'sections.purlin':'LH 125x125x3.2/4.5'}
+assert.ok(invalidFields(toSpec(kr,quarantinedVals,false),quarantinedVals,false).some((f)=>f.path==='sections.purlin'))
 console.log('Catalog audit + modeling selection passed: 808 registrations, 8 quarantines, TW/CN/KR × 7 roles × 2 modes → model/Gen payload, material fallbacks and retained values.')

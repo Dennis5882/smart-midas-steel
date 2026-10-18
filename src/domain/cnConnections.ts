@@ -27,7 +27,7 @@ interface Force { elem: number; combo: string; P: number; M: number; V: number }
 const endpoints = (res: Results, id: number, part: number): Force[] => [...res.beam.get(id) ?? []].map(([combo, p]) => ({ elem: id, combo, P: p[part].P, M: Math.abs(p[part].My), V: Math.hypot(p[part].Vy, p[part].Vz) }))
 export function runCnConnections(spec: FactorySpec, model: FactoryModel, res: Results): ConnResult[] {
   const out: ConnResult[] = [], c = spec.china!, nodes = new Map(model.nodes.map((n) => [n.id, n])), G = portalGeometry(spec)
-  const col = sectionProps(spec.sections.column), raf = sectionProps(spec.sections.rafter)
+  const col = sectionProps(spec.sections.column, spec.code), raf = sectionProps(spec.sections.rafter, spec.code)
   const plateF = (t: number) => cnStrength(spec.material, t).f
   const weldF = spec.material === 'Q235B' ? 160 : 200 // E43 / E50, GB table 4.4.5
   const baseForces = model.elements.filter((e) => e.role === 'column' && nodes.get(e.n1)!.z === 0).flatMap((e) => endpoints(res, e.id, 0))
@@ -101,7 +101,7 @@ export function runCnConnections(spec: FactorySpec, model: FactoryModel, res: Re
 
 /** Pure sizing for the governing analysis brace force. */
 export function sizeCnBrace(spec: FactorySpec, force: number, elem: number, combo: string): ConnResult {
-  const brace = sectionProps(spec.sections.brace)
+  const brace = sectionProps(spec.sections.brace, spec.code)
   const yieldForce = brace.A * cnStrength(spec.material, brace.tw, true).fy / 1000
   const weldF = spec.material === 'Q235B' ? 160 : 200
   const N = Math.max(force, 1.1 * yieldForce), d = 24, b = frictionBolt(d), n = 2 * Math.max(1, Math.ceil(N / (2 * b.shear)))

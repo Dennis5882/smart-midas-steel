@@ -84,12 +84,12 @@ const roleFor=(target:SectionTarget):ElementRole=>target==='platformColumn'?'col
 function choices(s:FactorySpec,target:SectionTarget):string[] {
   const current=sectionAt(s,target)
   if(!current)return []
-  const p=sectionProps(current),role=roleFor(target)
+  const p=sectionProps(current,s.code),role=roleFor(target)
   const mat=(role==='purlin'||role==='girt')?(s.secondaryMaterial??s.material):s.material
   const options=sectionCatalogOptions(s.code,role,mat).map((o)=>o.name).filter((name)=>{
-    const q=sectionProps(name)
+    const q=sectionProps(name,s.code)
     return q.kind===p.kind&&q.A>p.A&&q.Ix>=p.Ix&&q.Iy>=p.Iy
-  }).sort((a,b)=>sectionProps(a).A-sectionProps(b).A)
+  }).sort((a,b)=>sectionProps(a,s.code).A-sectionProps(b,s.code).A)
   // Sample the full eligible range as well as close sizes; long unsupported members may need a wider section.
   const indices=[0,1,2,3,Math.floor(options.length*.25),Math.floor(options.length*.5),Math.floor(options.length*.75),options.length-1]
   return [current,...new Set(indices.filter((i)=>i>=0&&i<options.length).map((i)=>options[i]))]
@@ -118,7 +118,7 @@ function remapModel(b:Built,spec:FactorySpec):FactoryModel {
 const sameSections=(a:FactoryModel,z:FactoryModel)=>a.elements.length===z.elements.length&&a.elements.every((e,i)=>e.section===z.elements[i].section)
 /** Scaling is an estimate, including when the old displacement happened to be zero. It never replaces analysis. */
 function estimateServices(b:Built,s:FactorySpec,service:ServiceCheck[]):ServiceCheck[] {
-  const ix=(t:SectionTarget)=>sectionProps(sectionAt(b.spec,t)!).Ix/sectionProps(sectionAt(s,t)!).Ix
+  const ix=(t:SectionTarget)=>sectionProps(sectionAt(b.spec,t)!,b.spec.code).Ix/sectionProps(sectionAt(s,t)!,s.code).Ix
   // Multi-span frames have no closed-form portal stiffness here; drift follows the outer columns, deflection the rafter.
   const frame=(key:'drift'|'defl')=>{
     if(s.frame==='multi')return key==='defl'?ix('rafter'):ix('column')
@@ -134,7 +134,7 @@ function estimateServices(b:Built,s:FactorySpec,service:ServiceCheck[]):ServiceC
       case 'platformDefl':if(s.additions?.platform)scale=ix('platformBeam');break
       case 'runwayDefl':if(s.additions?.crane?.runway)scale=ix('runway');break
       case 'roofOpeningDefl':if(s.additions?.roofOpening)scale=ix('roofTrimmer');break
-      case 'windDriftY':case 'seisDriftY':scale=sectionProps(b.spec.sections.brace).A/sectionProps(s.sections.brace).A;break
+      case 'windDriftY':case 'seisDriftY':scale=sectionProps(b.spec.sections.brace,b.spec.code).A/sectionProps(s.sections.brace,s.code).A;break
       case 'windDriftX':case 'seisDriftX':case 'craneDefl':scale=frame('drift');break
       case 'rafterDefl':scale=frame('defl');break
       // External gap/seating cannot be inferred from one member's stiffness.

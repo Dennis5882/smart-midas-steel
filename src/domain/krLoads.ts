@@ -53,7 +53,7 @@ export function validateKrSpec(spec: FactorySpec): void {
   const G = portalGeometry(spec), deg = G.theta * 180 / Math.PI
   if (G.hMean >= 20) throw new Error('KDS 41 12 00 5.4.1: cladding wind for H ≥ 20 m (table 5.8-1) is not implemented')
   if (!ccRangeKR(spec.frame === 'mono' ? 'mono' : spec.frame === 'multi' ? 'multi' : 'gable', deg)) throw new Error('KDS 41 12 00 table 5.8-3: mono-slope cladding coefficients only up to 30°')
-  for (const name of Object.values(spec.sections)) { const p = sectionProps(name); if (![p.A, p.Ix, p.Iy, p.rx, p.ry].every((x) => Number.isFinite(x) && x > 0)) throw new Error(`KDS: invalid section ${name}`) }
+  for (const name of Object.values(spec.sections)) { const p = sectionProps(name, spec.code); if (![p.A, p.Ix, p.Iy, p.rx, p.ry].every((x) => Number.isFinite(x) && x > 0)) throw new Error(`KDS: invalid section ${name}`) }
 }
 
 type Dir = 'GX' | 'GY' | 'GZ'
@@ -181,7 +181,7 @@ export function buildKrLoads(spec: FactorySpec, model: FactoryModel): LoadPayloa
   /* 지붕보 1차 고유진동수 — 단순보 근사 f = (π/2L²)√(EI/m) (양단 강접 골조보다 낮음 → G_pe 보수적).
      m = 지붕 마감 + 지붕보 + 퍼린(분담) 질량 / 길이 */
   const wSpan = Math.max(...frameSpans(spec)), bay = spec.baySpacing, mat = KR.materials[spec.material]
-  const raf = sectionProps(spec.sections.rafter), pur = sectionProps(spec.sections.purlin)
+  const raf = sectionProps(spec.sections.rafter, spec.code), pur = sectionProps(spec.sections.purlin, spec.code)
   const mLine = (spec.roofDead * bay + mat.gamma * (raf.A + pur.A * bay / spec.purlinSpacing) * 1e-6) * 1000 / 9.80665 // kg/m
   const nR0 = Math.PI / (2 * wSpan ** 2) * Math.sqrt(mat.E * 1e6 * raf.Ix * 1e-12 / mLine)
   const gpe = (parallel: boolean, l: number) => roofGustKR({ H, VH, cat: k.exposure, l, b: bay, parallel, nR0, zeta: k.roofZeta })
@@ -271,7 +271,7 @@ export function buildKrLoads(spec: FactorySpec, model: FactoryModel): LoadPayloa
       const name = `N${d}${tag}`
       for (const e of model.elements) {
         let w = vertical[lc]?.get(e.id) ?? 0
-        if (tag === 'D' && !e.loadOnly) w += mat.gamma * sectionProps(e.section).A * 1e-6
+        if (tag === 'D' && !e.loadOnly) w += mat.gamma * sectionProps(e.section, spec.code).A * 1e-6
         if (e.role !== 'brace') { add(e.id, name, d === 'X' ? 'GX' : 'GY', 0.002 * w); continue }
         /* 가새 = Gen TRUSS — 보 하중 불가("Beam Loads cannot be entered", 라이브 2026-10-16) → 양 끝 절점에 반씩 */
         const F = 0.002 * w * elLen(e.id) / 2

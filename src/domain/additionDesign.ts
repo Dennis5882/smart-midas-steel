@@ -17,7 +17,7 @@ export function additionDesign(s: FactorySpec, m: FactoryModel, info: LoadInfo, 
   const prof = profileOf(s.code), mat = prof.materials[s.material]
   const nodes = new Map(m.nodes.map((n)=>[n.id,n]))
   for (const e of m.elements.filter((e)=>e.addition && (!roles || roles.includes(e.role)))) {
-    const sp = sectionProps(e.section), member = m.additions.members.find((p)=>p.key===e.physicalKey)!
+    const sp = sectionProps(e.section, s.code), member = m.additions.members.find((p)=>p.key===e.physicalKey)!
     const L = member.length * 1000, K = e.addition === 'platform-column' ? 2 : 1
     const lens = {KLx:K*L,KLy:K*L,Lb:L}, fy = prof.fyAt?.(s.material,Math.max(sp.tf,sp.tw)) ?? mat.fy
     let best: MemberCheck | undefined
@@ -49,7 +49,7 @@ export function additionDesign(s: FactorySpec, m: FactoryModel, info: LoadInfo, 
     const loads=buildLoadPayloads(s,m),cases=['LR',...(Object.values(loads.STLD) as {NAME:string}[]).map((v)=>v.NAME).filter((n)=>/^(SN|SH)/.test(n))]
     let best={value:0,limit:1,ratio:0},lc='LR'
     for(const e of m.elements.filter((v)=>v.addition==='roof-trimmer')) {
-      const a=nodes.get(e.n1)!,b=nodes.get(e.n2)!,L=Math.hypot(b.x-a.x,b.y-a.y,b.z-a.z),sp=sectionProps(e.section)
+      const a=nodes.get(e.n1)!,b=nodes.get(e.n2)!,L=Math.hypot(b.x-a.x,b.y-a.y,b.z-a.z),sp=sectionProps(e.section, s.code)
       const items=(loads.BMLD[e.id] as {ITEMS:any[]}).ITEMS
       const q=(name:string)=>items.filter((v)=>v.LCNAME===name&&v.DIRECTION==='GZ').reduce((sum,v)=>sum+v.P[0],0)
       for(const name of cases) {

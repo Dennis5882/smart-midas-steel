@@ -89,7 +89,7 @@ function platePick(spec: FactorySpec, tReqAtFy: number) {
 /* ── 베이스플레이트 ── */
 function baseFor(spec: FactorySpec, forces: EndForce[], anchorD: number, nSide: number) {
   const mat = profileOf(spec.code).materials[spec.material]
-  const col = sectionProps(spec.sections.column)
+  const col = sectionProps(spec.sections.column, spec.code)
   const fixed = spec.baseFixity === 'fixed'
   const edge = 50 // 앵커 연단 (mm)
   const N = col.d + 2 * 100
@@ -159,7 +159,7 @@ function baseFor(spec: FactorySpec, forces: EndForce[], anchorD: number, nSide: 
 /* ── 4E 단부판 (기둥-보 / 마루 이음) ── */
 function endPlateFor(spec: FactorySpec, forces: EndForce[], boltD: number, beamName: string, colName: string | null) {
   const mat = profileOf(spec.code).materials[spec.material]
-  const bm = sectionProps(beamName)
+  const bm = sectionProps(beamName, spec.code)
   const bp = bm.bf + 50, g = Math.min(100, bm.bf - 50)
   let pf = Math.max(50, boltD + 25) // 볼트 중심 ~ 플랜지면
   const s = 0.5 * Math.sqrt(bp * g)
@@ -167,7 +167,7 @@ function endPlateFor(spec: FactorySpec, forces: EndForce[], boltD: number, beamN
   const h0 = bm.d - bm.tf / 2 + pf, h1 = bm.d - 1.5 * bm.tf - pf
   /* DG4 4E 항복선 계수 Y (확장형, 무보강) */
   const Y = (bp / 2) * (h1 * (1 / pf + 1 / s) + h0 * (1 / pf) - 0.5) + (2 / g) * (h1 * (pf + s))
-  const col = colName ? sectionProps(colName) : null
+  const col = colName ? sectionProps(colName, spec.code) : null
   let best: { r: number; checks: ConnCheck[]; F: EndForce } | null = null
   let tMax = 0
   for (const F of forces) {
@@ -253,7 +253,7 @@ export function runConnections(spec: FactorySpec, model: FactoryModel, info: Loa
   const kneeDims: Record<string, string> = {}
   if (seis13 && kneeEls.length) {
     const mat = profileOf(spec.code).materials[spec.material]
-    const raf = sectionProps(spec.sections.rafter), col = sectionProps(spec.sections.column)
+    const raf = sectionProps(spec.sections.rafter, spec.code), col = sectionProps(spec.sections.column, spec.code)
     const Mp = (raf.Zx * (profileOf(spec.code).fyAt?.(spec.material, Math.max(raf.tf, raf.tw)) ?? mat.fy)) / 1e6 // kN·m
     const Lh = G.rafterLen - col.d / 1000 // 처마~처마 기둥면 사이 지붕보 길이 (m)
     const grav = kneeEls.flatMap((e) => endForces(res, e.id, kneePart(e), (c) => kind(c) === 'gravity'))

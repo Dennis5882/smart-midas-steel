@@ -7,6 +7,7 @@ import type { FactoryAdditions } from '../domain/additionTypes'
 import type { FactorySpec } from '../domain/types'
 import { NumericInput } from './NumericInput'
 import { sectionCatalogOptions } from '../domain/sectionCatalog'
+import { additionPartForPath, type AdditionPart } from './modelingFlow'
 
 export function AdditionNumber({value,onValueChange,...props}: Omit<Parameters<typeof NumericInput>[0],'value'|'onValueChange'> & {value:number;onValueChange(v:number):void}) {
   const [raw,setRaw]=useState(Number.isNaN(value)?'':String(value))
@@ -14,8 +15,8 @@ export function AdditionNumber({value,onValueChange,...props}: Omit<Parameters<t
   return <NumericInput {...props} value={raw} onValueChange={(v)=>{setRaw(v);onValueChange(v.trim()===''?NaN:Number(v))}}/>
 }
 
-export function AdditionEditor({spec, value, onChange, disabled, attempted = false, idPrefix}: {
-  spec: FactorySpec; value?: FactoryAdditions; onChange(v: FactoryAdditions): void; disabled: boolean; attempted?: boolean; idPrefix?:string
+export function AdditionEditor({spec, value, onChange, disabled, attempted = false, idPrefix, part}: {
+  spec: FactorySpec; value?: FactoryAdditions; onChange(v: FactoryAdditions): void; disabled: boolean; attempted?: boolean; idPrefix?:string; part?:AdditionPart
 }) {
   const id = useId(), a = value ?? defaultAdditions(spec)
   const update = (v: FactoryAdditions) => {
@@ -40,16 +41,17 @@ export function AdditionEditor({spec, value, onChange, disabled, attempted = fal
     <label className="pe-f pe-full"><span><input type="checkbox" checked={o.confirmed} disabled={disabled || !o.source.trim()} onChange={(e)=>change({confirmed:e.target.checked})}/> {t('add_confirm')}</span></label>
   </>
   const c = a.crane, p = a.platform, f = a.factors
-  return <section className="mw-group addition-editor"><h4>{t('add_title')}</h4><p className="mw-note">{t('add_note')}</p>
-    <div id={`${idPrefix??id}.equipment`} tabIndex={-1}>{a.equipment.map((e, i) => {
+  const show = (name: AdditionPart) => !part || part === name
+  return <section className="mw-group addition-editor">{!part && <><h4>{t('add_title')}</h4><p className="mw-note">{t('add_note')}</p></>}
+    {show('equipment') && <div id={`${idPrefix??id}.equipment`} tabIndex={-1}>{a.equipment.map((e, i) => {
       const change = (patch: object) => update({...a,equipment:a.equipment.map((v,j)=>j===i?{...v,...patch}:v)})
       return <fieldset key={e.id} disabled={disabled}><legend>{t('add_equipment')} {i+1}</legend><div className="pe-grid">
         {(['name','x','y','weight','seismicFraction'] as const).map((k)=>input(e,k,(v)=>change({[k]:v,confirmed:false}),k==='x'||k==='y'?'m':k==='weight'?'kN':'',k==='seismicFraction'?'add_mass':`add_${k}`))}
         {confirm(e,change)}
-      </div><button type="button" className="btn btn-s" onClick={()=>update({...a,equipment:a.equipment.filter((_,j)=>j!==i)})}>{t('add_remove')}</button></fieldset>
+      </div><button type="button" className="btn btn-s" disabled={disabled} onClick={()=>update({...a,equipment:a.equipment.filter((_,j)=>j!==i)})}>{t('add_remove')}</button></fieldset>
     })}
-    <button type="button" className="btn btn-s" disabled={disabled} onClick={()=>update({...a,equipment:[...a.equipment,{id:crypto.randomUUID(),name:`${t('add_equipment')} ${a.equipment.length+1}`,x:spec.span/2,y:0,weight:0,seismicFraction:1,source:'',confirmed:false}]})}>{t('add_add')}</button></div>
-    {spec.features?.crane && c && <fieldset id={`${idPrefix??id}.crane`} tabIndex={-1} disabled={disabled}><legend>{t('add_crane')}</legend><p className="mw-note">{t('add_crane_note')}</p><div className="pe-grid">
+    <button type="button" className="btn btn-s" disabled={disabled} onClick={()=>update({...a,equipment:[...a.equipment,{id:crypto.randomUUID(),name:`${t('add_equipment')} ${a.equipment.length+1}`,x:spec.span/2,y:0,weight:0,seismicFraction:1,source:'',confirmed:false}]})}>{t('add_add')}</button></div>}
+    {show('crane') && spec.features?.crane && c && <fieldset id={`${idPrefix??id}.crane`} tabIndex={-1} disabled={disabled}><legend>{t('add_crane')}</legend><p className="mw-note">{t('add_crane_note')}</p><div className="pe-grid">
       {(['elevation','eccentricity','wheelSpacing','maxWheel','minWheel','impactFactor','lateral','braking','seismicWeight','driftLimitMm'] as const).map((k)=>input(c,k,(v)=>update({...a,crane:{...c,[k]:v,confirmed:false}}),k==='driftLimitMm'?'mm':['elevation','eccentricity','wheelSpacing'].includes(k)?'m':k==='impactFactor'?'':'kN'))}
       {confirm(c,(patch)=>update({...a,crane:{...c,...patch}}))}
     </div><label className="pe-f"><span><input type="checkbox" disabled={disabled} checked={!!c.runway} onChange={(e)=>update({...a,crane:{...c,confirmed:false,runway:e.target.checked?{section:spec.sections.rafter,deflectionDivisor:600,source:'',confirmed:false}:undefined}})}/> {t('add_runway')}</span></label>
@@ -59,7 +61,7 @@ export function AdditionEditor({spec, value, onChange, disabled, attempted = fal
         {confirm({...c.runway,id:c.id+'-runway'},(patch)=>update({...a,crane:{...c,runway:{...c.runway!,...patch}}}))}
       </div></>}
     </fieldset>}
-    {spec.features?.opening && a.wallOpening && (()=>{
+    {show('opening') && spec.features?.opening && a.wallOpening && (()=>{
       const o=a.wallOpening!, change=(patch:object)=>update({...a,wallOpening:{...o,...patch,confirmed:false}})
       return <fieldset id={`${idPrefix??id}.wallOpening`} tabIndex={-1} disabled={disabled}><legend>{t('add_wallOpening')}</legend><p className="mw-note">{t('add_opening_note')}</p><div className="pe-grid">
         <div className="pe-f"><label htmlFor={`${id}-face`}>{t('add_face')}</label><select id={`${id}-face`} value={o.face} onChange={(e)=>change({face:e.target.value})}><option value="x0">X = 0</option><option value="xL">X = {spec.span} m</option></select></div>
@@ -69,16 +71,16 @@ export function AdditionEditor({spec, value, onChange, disabled, attempted = fal
         {confirm(o,(patch)=>update({...a,wallOpening:{...o,...patch}}))}
       </div></fieldset>
     })()}
-    {spec.features?.mezzanine && p && <fieldset id={`${idPrefix??id}.platform`} tabIndex={-1} disabled={disabled}><legend>{t('add_platform')}</legend><p className="mw-note">{t('add_platform_note')}</p><div className="pe-grid">
+    {show('platform') && spec.features?.mezzanine && p && <fieldset id={`${idPrefix??id}.platform`} tabIndex={-1} disabled={disabled}><legend>{t('add_platform')}</legend><p className="mw-note">{t('add_platform_note')}</p><div className="pe-grid">
       {(['elevation','x0','x1','firstBay','lastBay','beamSpacing','beamSection','columnSection','dead','live','liveMassFraction','deflectionDivisor'] as const).map((k)=>input(/Bay$/.test(k)?{...p,[k]:p[k as 'firstBay'|'lastBay']+1}:p,k,(v)=>update({...a,platform:{...p,[k]:/Bay$/.test(k)?v-1:v,confirmed:false}}),['elevation','x0','x1','beamSpacing'].includes(k)?'m':['dead','live'].includes(k)?'kN/m²':''))}
       {confirm(p,(patch)=>update({...a,platform:{...p,...patch}}))}
     </div></fieldset>}
-    <Phase6Editor spec={spec} value={a} onChange={update} disabled={disabled} idPrefix={idPrefix??id}/>
-    {(spec.features?.crane || spec.features?.mezzanine || a.link?.mode==='sliding') && <fieldset id={`${idPrefix??id}.factors`} tabIndex={-1} disabled={disabled}><legend>{t('add_factors')}</legend><div className="pe-grid">
+    {(!part || part === 'opening' || part === 'link') && <Phase6Editor spec={spec} value={a} onChange={update} disabled={disabled} idPrefix={idPrefix??id} part={part === 'opening' ? 'openings' : part}/>}
+    {show('factors') && (spec.features?.crane || spec.features?.mezzanine || a.link?.mode==='sliding') && <fieldset id={`${idPrefix??id}.factors`} tabIndex={-1} disabled={disabled}><legend>{t('add_factors')}</legend><div className="pe-grid">
       {(['dead','live','crane','accompanyingLive'] as const).map((k)=>input(f,k,(v)=>update({...a,factors:{...f,[k]:v,confirmed:false}}),'',`add_${k}`))}
       {confirm(f,(patch)=>update({...a,factors:{...f,...patch}}))}
     </div></fieldset>}
-    {(attempted || disabled) && additionErrors(spec).map((e,i)=><p className="mw-error" role="alert" key={i}>{t(e.key)} {e.name}</p>)}
+    {(attempted || disabled) && additionErrors(spec).filter((e)=>!part || additionPartForPath(e.path)===part).map((e,i)=><p className="mw-error" role="alert" key={i}>{t(e.key)} {e.name}</p>)}
   </section>
 }
 

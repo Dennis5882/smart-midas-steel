@@ -49,7 +49,7 @@ export function cnCCLoads(spec: FactorySpec, model: FactoryModel, info: LoadInfo
   }
   for (const e of model.elements) {
     if (e.role !== 'purlin' && e.role !== 'girt') continue
-    const n1 = nodes.get(e.n1)!, n2 = nodes.get(e.n2)!, sp = sectionProps(e.section)
+    const n1 = nodes.get(e.n1)!, n2 = nodes.get(e.n2)!, sp = sectionProps(e.section, spec.code)
     const L = Math.hypot(n2.x - n1.x, n2.y - n1.y, n2.z - n1.z)
     const y0 = Math.min(n1.y, n2.y), y1 = Math.max(n1.y, n2.y), x0 = Math.min(n1.x, n2.x), x1 = Math.max(n1.x, n2.x)
     const gableWall = e.face === 'y0' || e.face === 'yL'

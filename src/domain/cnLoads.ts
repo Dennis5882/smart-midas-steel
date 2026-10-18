@@ -27,7 +27,7 @@ export function validateCnSpec(spec: FactorySpec): void {
   if (!(hMean < spec.span)) throw new Error('GB 51022 1.0.2: height/width must be < 1')
   if (spec.frame === 'mono' && Math.atan(spec.roofSlope) * 180 / Math.PI >= 30) throw new Error('GB 51022 figure 4.2.2-1(b): mono-slope roof angle must be < 30°')
   if (baySpans(spec).reduce((a, b) => a + b, 0) > 90) throw new Error('GB: the current single temperature unit is limited to 90 m')
-  for (const name of Object.values(spec.sections)) { const p = sectionProps(name); if (![p.A, p.Ix, p.Iy, p.rx, p.ry].every((x) => Number.isFinite(x) && x > 0)) throw new Error(`GB: invalid section ${name}`) }
+  for (const name of Object.values(spec.sections)) { const p = sectionProps(name, spec.code); if (![p.A, p.Ix, p.Iy, p.rx, p.ry].every((x) => Number.isFinite(x) && x > 0)) throw new Error(`GB: invalid section ${name}`) }
   if (spec.secondaryMaterial && spec.secondaryMaterial !== 'Q235B') throw new Error('GB/T 50018: the current cold-formed catalogue is configured for Q235B')
 }
 

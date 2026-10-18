@@ -7,7 +7,7 @@ import {portalGeometry} from '../domain/portal'
 import {sectionCatalogOptions} from '../domain/sectionCatalog'
 import {AdditionNumber} from './AdditionEditor'
 
-export function Phase6Editor({spec,value:a,onChange,disabled,idPrefix}:{spec:FactorySpec;value:FactoryAdditions;onChange(v:FactoryAdditions):void;disabled:boolean;idPrefix:string}) {
+export function Phase6Editor({spec,value:a,onChange,disabled,idPrefix,part}:{spec:FactorySpec;value:FactoryAdditions;onChange(v:FactoryAdditions):void;disabled:boolean;idPrefix:string;part?:'openings'|'link'}) {
   const id=useId(),g=portalGeometry(spec)
   const change=(kind:'roofOpening'|'floorOpening'|'link',patch:object)=>onChange({...a,[kind]:{...a[kind],...patch,confirmed:false}})
   const num=(key:string,value:number,update:(v:number)=>void,unit='mm',label:I18nKey=`p6_${key}` as I18nKey)=><div className="pe-f" key={key}><label htmlFor={`${id}-${key}`}>{t(label)}</label><div className="pe-in"><AdditionNumber id={`${id}-${key}`} value={value} disabled={disabled} min={0} step={1} onValueChange={update}/><span className="pe-u">{unit}</span></div></div>
@@ -19,7 +19,8 @@ export function Phase6Editor({spec,value:a,onChange,disabled,idPrefix}:{spec:Fac
   const toggle=(kind:'roofOpening'|'floorOpening'|'link',label:I18nKey,make:()=>unknown)=><label className="pe-f"><span><input type="checkbox" disabled={disabled} checked={!!a[kind]} onChange={(e)=>onChange({...a,[kind]:e.target.checked?make():undefined})}/> {t(label)}</span></label>
   const coords=(xs:number[])=>xs.map((x)=>({value:x,label:`${+x.toFixed(4)} m`}))
   const r=a.roofOpening,f=spec.features?.mezzanine?a.floorOpening:undefined,l=a.link
-  return <section className="phase6-editor"><h4>{t('p6_title')}</h4>
+  return <section className="phase6-editor">{!part && <h4>{t('p6_title')}</h4>}
+    {part !== 'link' && <>
     {toggle('roofOpening','p6_roof',()=>defaultRoofOpening(spec))}
     {r&&<fieldset id={`${idPrefix}.roofOpening`} tabIndex={-1} disabled={disabled}><legend>{t('p6_roof')}</legend><p className="mw-note">{t('p6_roofNote')}</p><div className="pe-grid">
       {select('roofBay',r.bay,roofBayOptions(spec).map((v)=>({value:v.bay,label:`${v.bay+1} · ${v.width} m${v.braced?` · ${t('role_brace')}`:''}`,disabled:v.braced})),(v)=>change('roofOpening',{bay:Number(v)}),'add_bay')}
@@ -34,7 +35,8 @@ export function Phase6Editor({spec,value:a,onChange,disabled,idPrefix}:{spec:Fac
       {(['x0','x1'] as const).map((k)=>select(`floor-${k}`,f[k],coords(platformGridXs(spec).filter((x)=>x>a.platform!.x0&&x<a.platform!.x1)),(v)=>change('floorOpening',{[k]:Number(v)}),`add_${k}`))}
       {confirm('floorOpening')}
     </div></fieldset>}
-    {toggle('link','p6_link',()=>defaultLink(spec))}
+    </>}
+    {part !== 'openings' && <>{toggle('link','p6_link',()=>defaultLink(spec))}
     {l&&<fieldset id={`${idPrefix}.link`} tabIndex={-1} disabled={disabled}><legend>{t('p6_link')}</legend><p className="mw-note">{t('p6_linkNote')}</p><div className="pe-grid">
       {select('mode',l.mode,(['sliding','separate','integral'] as const).map((v)=>({value:v,label:t(`p6_${v}`)})),(v)=>change('link',{mode:v}))}
       {select('linkFace',l.face,[{value:'x0',label:'X = 0'},{value:'xL',label:`X = ${spec.span} m`}],(v)=>change('link',{face:v}),'add_face')}
@@ -46,6 +48,6 @@ export function Phase6Editor({spec,value:a,onChange,disabled,idPrefix}:{spec:Fac
     <p className="mw-note">{t('p6_required',linkReview(l).required.toFixed(2),linkReview(l).gapReserve.toFixed(2),linkReview(l).seatReserve.toFixed(2))}</p>
     {l.mode==='integral'&&<p className="mw-error" role="alert">{t('p6_integralNote')}</p>}
     {l.mode==='sliding'&&<><p className="mw-note">{t('p6_reactionNote')}</p>{l.cases.map((v,i)=><fieldset key={i}><legend>{t('p6_case')} {i+1}</legend><div className="pe-grid"><div className="pe-f"><label htmlFor={`${id}-case-${i}`}>{t('add_name')}</label><input id={`${id}-case-${i}`} value={v.name} onChange={(e)=>change('link',{cases:l.cases.map((c,j)=>j===i?{...c,name:e.target.value}:c)})}/></div>{(['fx','fy','fz','mx','my','mz'] as const).map((k)=><div className="pe-f" key={k}><label htmlFor={`${id}-${i}-${k}`}>{k.toUpperCase()} ({k.startsWith('m')?'kN·m':'kN'})</label><AdditionNumber id={`${id}-${i}-${k}`} value={v[k]} disabled={disabled} step={1} onValueChange={(n)=>change('link',{cases:l.cases.map((c,j)=>j===i?{...c,[k]:n}:c)})}/></div>)}</div><button type="button" className="btn btn-s" disabled={disabled||l.cases.length<=1} onClick={()=>change('link',{cases:l.cases.filter((_,j)=>j!==i)})}>{t('add_remove')}</button></fieldset>)}<button type="button" className="btn btn-s" disabled={disabled||l.cases.length>=8} onClick={()=>change('link',{cases:[...l.cases,{name:`CASE ${l.cases.length+1}`,fx:0,fy:0,fz:0,mx:0,my:0,mz:0}]})}>{t('p6_addCase')}</button></>}
-    <div className="pe-grid">{confirm('link')}</div></fieldset>}
+    <div className="pe-grid">{confirm('link')}</div></fieldset>}</>}
   </section>
 }

@@ -20,7 +20,7 @@ import { purlinDefl, purlinLimitDiv, runDesign, type DesignResult, type ServiceC
 import { cnGirtDeflRatio, cnPostDeflRatio } from './cnDesign'
 import type { LoadInfo } from './loads'
 import { portalGeometry } from './portal'
-import { sectionProps } from './sections'
+import { genSectionRecord, sectionProps } from './sections'
 import { blockedMembers } from './validity'
 import { runConnections } from './connections'
 import { ROLES, type ElementRole, type FactoryModel, type FactorySpec } from './types'
@@ -94,11 +94,11 @@ function roleLengths(model: FactoryModel): Record<ElementRole, number> {
 export function roleTons(spec: FactorySpec, model: FactoryModel, sections: Sections = spec.sections): Record<ElementRole, number> {
   const L = roleLengths(model)
   const gamma = profileOf(spec.code).materials[spec.material].gamma
-  const out = Object.fromEntries(ROLES.map((r) => [r, (gamma * sectionProps(sections[r]).A * 1e-6 * L[r]) / 9.80665])) as Record<ElementRole, number>
+  const out = Object.fromEntries(ROLES.map((r) => [r, (gamma * sectionProps(sections[r], spec.code).A * 1e-6 * L[r]) / 9.80665])) as Record<ElementRole, number>
   const nodes = new Map(model.nodes.map((n) => [n.id,n]))
   for (const e of model.elements.filter((e) => e.addition)) {
     const a = nodes.get(e.n1)!, b = nodes.get(e.n2)!
-    out[e.role] += gamma * sectionProps(e.section).A * 1e-6 * Math.hypot(b.x-a.x,b.y-a.y,b.z-a.z) / 9.80665
+    out[e.role] += gamma * sectionProps(e.section, spec.code).A * 1e-6 * Math.hypot(b.x-a.x,b.y-a.y,b.z-a.z) / 9.80665
   }
   return out
 }
@@ -110,7 +110,7 @@ export const steelWeight = (spec: FactorySpec, model: FactoryModel, sections: Se
 export function frameStiff(spec: FactorySpec, col: string, raf: string) {
   const G = portalGeometry(spec)
   const h = spec.eaveHeight, Lr = G.rafterLen
-  const Ic = sectionProps(col).Ix, Ir = sectionProps(raf).Ix
+  const Ic = sectionProps(col, spec.code).Ix, Ir = sectionProps(raf, spec.code).Ix
   const fixed = spec.baseFixity === 'fixed'
   let k: number
   if (fixed) { const rho = Ir / Lr / ((4 * Ic) / h); k = ((24 * Ic) / h ** 3) * ((12 * rho + 1) / (12 * rho + 4)) }
@@ -137,11 +137,12 @@ export function proposeSections(spec: FactorySpec, model: FactoryModel, info: Lo
   const present = ROLES.filter((r) => model.elements.some((e) => e.role === r))
   const L = roleLengths(model)
   const gamma = profileOf(spec.code).materials[spec.material].gamma
-  const tons = (r: ElementRole, sec: string) => (gamma * sectionProps(sec).A * 1e-6 * L[r]) / 9.80665
+  const tons = (r: ElementRole, sec: string) => (gamma * sectionProps(sec, spec.code).A * 1e-6 * L[r]) / 9.80665
   const byArea = (r: ElementRole) => [...(spec.code === 'CN' ? CN_CATALOG : spec.code === 'KR' ? KR_CATALOG : CATALOG)[r]]
-    .filter((s) => sectionProps(s).A > (ctl.floors?.[r] ?? 0) + 1e-6)
-    .sort((a, b) => sectionProps(a).A - sectionProps(b).A)
-  const A = (s: string) => sectionProps(s).A
+    .filter((s) => !genSectionRecord(s, spec.code)?.excluded)
+    .filter((s) => sectionProps(s, spec.code).A > (ctl.floors?.[r] ?? 0) + 1e-6)
+    .sort((a, b) => sectionProps(a, spec.code).A - sectionProps(b, spec.code).A)
+  const A = (s: string) => sectionProps(s, spec.code).A
   /* 증폭은 현재(해석된) 단면보다 가벼운 후보에만 — 무거운 후보는 부재력이 줄어드는 쪽이고, 현재 부재력에 이미 재분배가 들어 있다 */
   const tgt = (r: ElementRole, sec: string) => (A(sec) < A(cur[r]) - 1e-6 ? target / Math.max(1, ctl.amp?.[r] ?? 1) : target)
   const banned = (c: string, r: string) => (ctl.bans ?? []).some((b) => A(c) <= A(b.column) + 1e-6 && A(r) <= A(b.rafter) + 1e-6)
@@ -152,7 +153,7 @@ export function proposeSections(spec: FactorySpec, model: FactoryModel, info: Lo
     const m: FactoryModel = { ...model, elements: model.elements.map((e) => (!e.addition && e.role === r ? { ...e, section: sec } : e)) }
     const d = runDesign({ ...spec, sections }, m, info, res, [r])
     if (blockedMembers(d)) return Infinity
-    if (sectionProps(sec).kind === 'H' && d.members.some((x) => x.cap.compact === 'slender')) return Infinity
+    if (sectionProps(sec, spec.code).kind === 'H' && d.members.some((x) => x.cap.compact === 'slender')) return Infinity
     /* 기둥: 13.4.1 축력(면제 아닐 때) 포함 */
     return r === 'column' && d.col13 && !d.col13.exempt ? Math.max(d.maxRatio, d.col13.ratio) : d.maxRatio
   }
@@ -167,14 +168,14 @@ export function proposeSections(spec: FactorySpec, model: FactoryModel, info: Lo
   /* ── 2차부재: 강도(+ 퍼린 처짐, 가새 종방향 변위) 통과 최경량 ── */
   const sv = design.service
   const driftY = Math.max(svcRatio(sv, 'windDriftY'), svcRatio(sv, 'seisDriftY'))
-  const braceA0 = sectionProps(cur.brace).A
+  const braceA0 = sectionProps(cur.brace, spec.code).A
   for (const r of present.filter((x) => x !== 'column' && x !== 'rafter')) {
     let pick: string | null = null, ratio = 0, governs: OptRow['governs'] = 'strength'
     for (const sec of byArea(r)) {
       const s = strength(r, sec)
       if (s > tgt(r, sec)) continue
       if (r === 'purlin' && purlinDefl(spec, info, sec) / (spec.baySpacing / purlinLimitDiv(spec.code)) > target) { governs = 'service'; continue }
-      if (r === 'brace' && (driftY * braceA0) / sectionProps(sec).A > target) { governs = 'service'; continue }
+      if (r === 'brace' && (driftY * braceA0) / sectionProps(sec, spec.code).A > target) { governs = 'service'; continue }
       if (spec.code === 'CN' && ((r === 'girt' && cnGirtDeflRatio(spec, info, sec) > target) || (r === 'post' && cnPostDeflRatio(spec, info, sec) > target))) { governs = 'service'; continue }
       pick = sec; ratio = s
       break

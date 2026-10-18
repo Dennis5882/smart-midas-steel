@@ -1,6 +1,7 @@
 import { addCN } from './additions'
 import { repairCN } from './repair'
 import { sectionCn } from './sectionPicker'
+import { flowCN } from './modelingFlow'
 import type { Dict } from './en'
 
 /* 대륙 간체 — 대륙 용어(屋面梁·檩条·墙梁·系杆·跨度·檐口高度). 대만 규범 고유 항목(用途系数·地况)은 규범 표기 유지 */
@@ -8,6 +9,7 @@ export const zhCN: Dict = {
   ...addCN,
   ...repairCN,
   ...sectionCn,
+  ...flowCN,
   bay_mode: '柱距输入方式',
   numeric_wheel_hint: '点击后可用滚轮或 ↑↓ 键调整数值。',
   bay_error: '请为每一跨间距输入大于零的数值。',
@@ -58,8 +60,8 @@ export const zhCN: Dict = {
   ws_help: '选择建筑类型并设置几何、材料与荷载。最终确认后创建模型，再按下方流程进行分析、设计校核和输出。返回开始页面会保留输入和当前步骤。',
   mw_title: '建模工作室', mw_process: '建模流程',
   mw_step: (n: number) => `STEP ${String(n).padStart(2, '0')}`,
-  mw_scope: '开始与范围', mw_frame: '横截面', mw_bays: '长度与柱距', mw_sections: '材料与截面', mw_loads: '场地与荷载', mw_review: '最终确认',
-  mw_scope_hint: '选择初始建筑形式，确认自动建模的适用范围。',
+  mw_scope: '开始', mw_frame: '横截面', mw_bays: '长度与柱距', mw_sections: '材料与截面', mw_loads: '场地与荷载', mw_review: '最终确认',
+  mw_scope_hint: '选择初始建筑模板，在后续阶段设置形状与附加结构。',
   mw_frame_hint: '设置一组典型门式刚架，尺寸变化会同步更新 3D 预览。',
   mw_bays_hint: '沿建筑长度方向布置刚架，并设置次构件间距。',
   mw_sections_hint: '选择钢材和构件截面，确认连接材料假定。',
@@ -252,7 +254,7 @@ export const zhCN: Dict = {
   g_model_4_cmd: '建立物流仓库',
   g_model_5: '自由框架',
   g_model_5_cmd: '建立自由框架厂房',
-  g_model_note: '基本建模按开始与范围 → 横截面 → 长度与柱距 → 材料与截面 → 场地与荷载 → 最终确认进行。再次选择相同类型可继续编辑。自由框架可直接编辑逐跨柱距。',
+  g_model_note: '基本建模按开始 → 横截面 → 长度与柱距 → 材料与截面 → 附加结构 → 场地与荷载 → 最终确认进行。附加结构的位置、截面与单项荷载集中设置，再次选择相同类型可继续编辑。',
   plan_intro_tpl: '将按下列规格建立模型。确认请点<b>执行</b>，要调整请点<b>修改</b>。',
   plan_intro_free: '<b>自由框架</b>。直接修改逐跨柱距及各项数值后点<b>执行</b>。',
   edit_btn: '修改',
@@ -336,10 +338,10 @@ export const zhCN: Dict = {
   q_cjp: '全熔透焊 (CJP)',
   q_fillet: '角焊缝',
   sec_scope: '适用范围',
-  sc_q: '请选择适用项。吊车与夹层详细输入显示于地区／荷载步骤。',
+  sc_q: '附加结构在独立阶段设置；多跨形状请在横截面选择。',
   feat_crane: '桥式吊车',
   feat_mezzanine: '夹层、设备层',
-  feat_multiSpan: '多跨、连跨',
+  feat_multiSpan: '多跨刚架',
   feat_opening: '大型洞口（大门等）',
   sc_crane: '桥式吊车 — 未模拟吊车梁与吊车荷载。',
   sc_mezzanine: '夹层、设备层 — 未模拟楼层荷载与节点。',
@@ -506,6 +508,8 @@ export const zhCN: Dict = {
   g_help_2: '版本说明',
   g_help_2_cmd: '版本说明',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_3_2_1: '按规范、材料及构件选择截面。标准截面在构件验算、自重、工程量及截面建议中共用 Gen NX 数据库特性；尺寸计算与冷弯初步验算另行标示。实际 Gen 特性与基准数据不同时，阻止模型创建完成。',
+  rn_v2_3_2_2: '建模调整为七阶段，附加结构的位置、截面及单项荷载集中设置，场地与荷载阶段显示摘要。多跨刚架与建筑连接部分开设置；修改共用荷载时保留附加结构的输入确认。',
   rn_v2_3_1_4: '建模截面可按设计规范、材料及构件，从已与 Gen 核对的型录选择。保留当前值与直接输入，并提示特性差异及冷弯型钢适用限制。',
   rn_v2_3_1_1: '加强候选：与连接无关的构件（檩条、墙梁、新增构件）不再显示连接比，推荐候选按实际增加钢材量（t）排序。',
   rn_v2_3_1_2: '仅所选分组的适用限制会阻止应用，可逐组加强；强度 NG 且超出限制的构件只计一次。',

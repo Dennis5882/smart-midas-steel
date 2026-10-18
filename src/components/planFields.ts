@@ -9,6 +9,7 @@ import { portalGeometry } from '../domain/portal'
 import { LIMITS } from '../domain/scope'
 import { baySpans, FRAME_TYPES, frameSpans, normalizeBays, normalizeSpans, type FactorySpec, type FrameType } from '../domain/types'
 import { t, type I18nKey } from '../i18n'
+import { ADDITIONS_STEP, LOADS_STEP } from './modelingFlow'
 
 /** 스펙 경로 ('span', 'sections.column', 'seismic.SDS' …) */
 export type Path = string
@@ -212,16 +213,16 @@ export function invalidField(f: Field, raw: string, spec: FactorySpec, individua
   }
   if (f.path.startsWith('sections.')) {
     try {
-      const p = sectionProps(raw)
+      const p = sectionProps(raw, spec.code)
       return ![p.A, p.Ix, p.Iy, p.d, p.bf, p.tw, p.tf, p.h].every((v) => Number.isFinite(v) && v > 0)
     } catch { return true }
   }
   return false
 }
 
-export const fieldStep = (f: Field) => f.path.startsWith('restraints.') ? 2 : ['frame', 'span', 'spanList', 'eaveHeight', 'roofSlope', 'baseFixity'].includes(f.path) ? 1
+export const fieldStep = (f: Pick<Field,'path'>) => f.path.startsWith('additions.') ? ADDITIONS_STEP : f.path.startsWith('restraints.') ? 2 : ['frame', 'span', 'spanList', 'eaveHeight', 'roofSlope', 'baseFixity'].includes(f.path) ? 1
   : ['bayList', 'bays', 'baySpacing', 'purlinSpacing', 'girtSpacing', 'postSpacing', 'sagRods'].includes(f.path) ? 2
-  : f.path.startsWith('sections.') || f.path === 'material' || ['fc', 'anchorFu', 'china.concreteBearing', 'china.anchorFt'].includes(f.path) ? 3 : 4
+  : f.path.startsWith('sections.') || f.path === 'material' || ['fc', 'anchorFu', 'china.concreteBearing', 'china.anchorFt'].includes(f.path) ? 3 : LOADS_STEP
 
 /** 잘못된 입력 칸 — 기본 모델링·자유골조 공통 (자유골조는 베이 수·간격 대신 베이 목록) */
 export const invalidFields = (spec: FactorySpec, vals: Record<Path, string>, free: boolean, individual = free): Field[] =>

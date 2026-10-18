@@ -1,8 +1,7 @@
-import { AdditionEditor, initializeAdditions } from './AdditionEditor'
-import { additionErrors, hasAdditions } from '../domain/additions'
+import { initializeAdditions } from './AdditionEditor'
+import { additionErrors } from '../domain/additions'
 import type { FactoryAdditions } from '../domain/additionTypes'
-/* 공장 스펙 카드 — 기본 모델링은 6단계 업무 흐름, 자유골조는 직접 편집.
-   기본 모델링(mode 'template'): 범위 → 횡단면 → 베이 → 재료 → 하중 → 확인·생성.
+/* 기본 모델링: 시작 → 횡단면 → 베이 → 재료 → 추가 구조 → 지역·하중 → 확인.
    자유골조(mode 'free'): 처음부터 편집 카드, 베이 수·간격 대신 베이별 간격 목록.
    편집 카드(story PlanEditor 형식): 입력 변경 → 디바운스 3D 미리보기.
    [실행] = Gen 전송, [취소] = 미리보기 해제. 실행되면(buildEpoch 증가) 모든 카드 버튼 제거 + 입력 잠금. */
@@ -13,6 +12,8 @@ import { regionZoneKR, ZONE_Z } from '../codes/krLateral'
 import type { TemplateKey } from '../domain/templates'
 import { TEMPLATES, TEMPLATE_KEYS } from '../domain/templates'
 import { ModelWizard, WIZARD_STEPS } from './ModelWizard'
+import { StructureEditor, StructureSummary } from './StructureEditor'
+import { ADDITIONS_STEP, LOADS_STEP, REVIEW_STEP, scopeIssueStep } from './modelingFlow'
 import { BaseFixityPicker, FrameTypePicker } from './FrameControls'
 import { BaySpacingEditor } from './BaySpacingEditor'
 import { NumericInput } from './NumericInput'
@@ -115,7 +116,8 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
   const invalidateAdditions = () => setAdditions((a)=>a ? {...a,equipment:a.equipment.map((e)=>({...e,confirmed:false})),crane:a.crane && {...a.crane,confirmed:false,runway:a.crane.runway && {...a.crane.runway,confirmed:false}},wallOpening:a.wallOpening && {...a.wallOpening,confirmed:false},roofOpening:a.roofOpening && {...a.roofOpening,confirmed:false},floorOpening:a.floorOpening && {...a.floorOpening,confirmed:false},link:a.link && {...a.link,confirmed:false},platform:a.platform && {...a.platform,confirmed:false},factors:{...a.factors,confirmed:false}} : a)
   const set = (p: Path, v: string) => {
     dirty.current = true
-    invalidateAdditions()
+    if (fieldStep({path:p}) < ADDITIONS_STEP) invalidateAdditions()
+    if (p === 'frame') updateFeat((old)=>({...old,multiSpan:v==='multi'}))
     setVals((o) => {
       const n = { ...o, [p]: v }
       if (!individual && (p === 'bays' || p === 'baySpacing') && Number.isInteger(+n.bays) && +n.bays > 0 && +n.bays <= 1000 && Number.isFinite(+n.baySpacing) && +n.baySpacing > 0) {
@@ -173,14 +175,17 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
   function navigate(target: number) {
     if (!live || s.busy) return
     if (target > step) {
-      const first = errors.find((f) => fieldStep(f) < target)
+      const first = errors.filter((f) => fieldStep(f) < target).sort((a,b)=>fieldStep(a)-fieldStep(b))[0]
       if (first) {
         setAttempted(true); setStep(fieldStep(first))
         /* 오류 칸으로 포커스 — 스크롤 아래·접힌 고급 칸이어도 문구가 보이게 (단계 전환·펼침 렌더 뒤) */
-        setTimeout(() => document.getElementById(`${formId}-${first.path === 'bayList' && !free ? 'bayList-0' : first.path}`)?.focus(), 60)
+        const focusId = first.path.startsWith('additions.') ? `${formId}-additions.${first.path.slice('additions.'.length)}`
+          : `${formId}-${first.path === 'bayList' && !free ? 'bayList-0' : first.path}`
+        setTimeout(() => document.getElementById(focusId)?.focus(), 60)
         return
       }
-      if (checkScope(spec).issues.some((i)=>i.level==='block' && i.key!=='additionInput')) { setAttempted(true); return }
+      const issue = checkScope(spec).issues.find((i)=>i.level==='block' && scopeIssueStep(i.key)<target)
+      if (issue) { setAttempted(true); setStep(scopeIssueStep(issue.key)); return }
     }
     setAttempted(false)
     setStep(target)
@@ -197,7 +202,6 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
         <strong>{t(`tpl_${key}`)}</strong><span>{TEMPLATES[key].span} m · {TEMPLATES[key].bays * TEMPLATES[key].baySpacing} m</span>
       </button>)}</div>
       <p className="mw-note">{t('mw_template_note')}</p>
-      <ScopeBox spec={spec} feat={feat} setFeat={setFeat} disabled={!live || s.busy} />
     </>}
     {step === 2 && <section className="mw-group">
       <h4>{t('bay_spacing_title')}</h4>
@@ -206,19 +210,21 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
         onMode={(mode) => {
           if (mode === individual) return
           dirty.current = true
+          invalidateAdditions()
           if (!mode) setVals((old) => ({ ...old, bays: String(spec.bays), baySpacing: String(spec.baySpacing) }))
           setIndividual(mode); setAttempted(false)
         }} onChange={(raw) => set('bayList', raw)} />
       {!individual && fields({ title: 'sec_geometry', fields: groups.flatMap((g) => g.fields).filter((f) => ['bays', 'baySpacing'].includes(f.path)) })}
     </section>}
-    {step > 0 && step < 5 && groups.map((g) => {
+    {step === LOADS_STEP && <StructureSummary spec={spec} onEdit={()=>navigate(ADDITIONS_STEP)} disabled={!live || s.busy}/>}
+    {step > 0 && step < REVIEW_STEP && groups.map((g) => {
       const filtered = { ...g, fields: g.fields.filter((f) => fieldStep(f) === step && !['frame', 'bays', 'baySpacing', 'bayList'].includes(f.path)) }
       if (!filtered.fields.length) return null
       const advanced = g.title === 'sec_conn' ? filtered.fields
         : step === 2 ? filtered.fields.filter((f) => !['bays', 'baySpacing'].includes(f.path))
         : step === 3 ? filtered.fields.filter((f) => !['sections.column', 'sections.rafter', 'material'].includes(f.path))
-        : step === 4 && spec.code === 'TW' && g.title === 'sec_seismic' ? filtered.fields.filter((f) => !['seismic.county', 'seismic.town', 'seismic.soil'].includes(f.path))
-        : step === 4 && spec.code === 'KR' ? filtered.fields.filter((f) => ['korea.Kzt', 'korea.KD', 'korea.roofZeta', 'korea.S'].includes(f.path)) : []
+        : step === LOADS_STEP && spec.code === 'TW' && g.title === 'sec_seismic' ? filtered.fields.filter((f) => !['seismic.county', 'seismic.town', 'seismic.soil'].includes(f.path))
+        : step === LOADS_STEP && spec.code === 'KR' ? filtered.fields.filter((f) => ['korea.Kzt', 'korea.KD', 'korea.roofZeta', 'korea.S'].includes(f.path)) : []
       const basic = filtered.fields.filter((f) => !advanced.includes(f))
       return <section className="mw-group" key={g.title}>
         {basic.length > 0 && <><h4>{t(g.title)}</h4>
@@ -232,15 +238,15 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
         {g.title === 'sec_seismic' && site && (site.fault || site.basin || site.note) && <div className="pe-tip">{site.fault ? t('site_fault', site.fault) : site.basin ? t('site_basin') : site.note}</div>}
       </section>
     })}
-    {step === 4 && <AdditionEditor idPrefix={`${formId}-additions`} spec={spec} value={additions} onChange={(v)=>{dirty.current=true;setAdditions(v)}} disabled={!live || s.busy} attempted={attempted}/> }
-    {step === 4 && <p className="mw-note">{tc(spec.code, 'plan_tip')}</p>}
-    {step === 4 && spec.code === 'KR' && <p className="mw-note">{t('kr_scope_note')}</p>}
-    {step > 0 && step < 5 && checkScope(spec).issues.some((i)=>i.level==='block' && i.key!=='additionInput') && <ScopeBox spec={spec} feat={feat} setFeat={setFeat} disabled={!live || s.busy} />}
-    {step === 5 && <>
-      {hasAdditions(spec) && <AdditionEditor spec={spec} value={additions} onChange={setAdditions} disabled/>}
+    {step === ADDITIONS_STEP && <StructureEditor idPrefix={`${formId}-additions`} spec={spec} onFeaturesChange={setFeat} onChange={(v)=>{dirty.current=true;setAdditions(v)}} disabled={!live || s.busy} attempted={attempted}/>}
+    {step === LOADS_STEP && <p className="mw-note">{tc(spec.code, 'plan_tip')}</p>}
+    {step === LOADS_STEP && spec.code === 'KR' && <p className="mw-note">{t('kr_scope_note')}</p>}
+    {step > 0 && step < REVIEW_STEP && checkScope(spec).issues.some((i)=>scopeIssueStep(i.key)===step) && <ScopeBox spec={spec} />}
+    {step === REVIEW_STEP && <>
       <Summary spec={spec} tpl={selectedTpl} />
-      <ScopeBox spec={spec} feat={feat} setFeat={setFeat} disabled={!live || s.busy} />
-      {WIZARD_STEPS.slice(1, 5).map((key, index) => <details className="mw-review" key={key}>
+      <StructureSummary spec={spec} onEdit={()=>navigate(ADDITIONS_STEP)} disabled={!live || s.busy}/>
+      <ScopeBox spec={spec} />
+      {WIZARD_STEPS.slice(1, REVIEW_STEP).map((key, index) => index+1===ADDITIONS_STEP?null:<details className="mw-review" key={key}>
         <summary>{t(key)}<span>{t('mw_details')}</span></summary>
         <button className="btn btn-ghost" disabled={!live || s.busy} onClick={() => navigate(index + 1)}>{t('edit_btn')}</button>
         {groups.map((g) => { const subset = { ...g, fields: g.fields.filter((f) => fieldStep(f) === index + 1) }; return subset.fields.length ? <section className="mw-group" key={g.title}><h4>{t(g.title)}</h4>{fields(subset, true)}</section> : null })}
@@ -252,7 +258,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
   return (
     <>
       <span dangerouslySetInnerHTML={{ __html: t('plan_intro_free') }} />
-      <ScopeBox spec={spec} feat={feat} setFeat={setFeat} disabled={!live} />
+      <ScopeBox spec={spec} />
       <div className="plan-editor">
         {spec.code === 'CN' && <div className="pe-tip">{t('cn_scope_note')}</div>}
         {spec.code === 'KR' && <div className="pe-tip">{t('kr_scope_note')}</div>}
@@ -273,7 +279,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
         {free && <div className="pe-tip">{t('free_tip', spec.bays, lengthText(spec))}</div>}
         <div className="pe-tip">{tc(spec.code, 'plan_tip')}</div>
       </div>
-      <AdditionEditor idPrefix={`${formId}-additions`} spec={spec} value={additions} onChange={(v)=>{dirty.current=true;setAdditions(v)}} disabled={!live || s.busy} attempted={showErrors}/>
+      <StructureEditor idPrefix={`${formId}-additions`} spec={spec} onFeaturesChange={setFeat} onChange={(v)=>{dirty.current=true;setAdditions(v)}} disabled={!live || s.busy} attempted={showErrors}/>
       {live && errors.length > 0 && <p className="mw-error mw-alert" role="alert">{t('mw_invalid')}</p>}
       {live && (
         <div className="confirm-row">

@@ -55,7 +55,7 @@ export async function runOptimize(): Promise<void> {
       /* 재해석 NG 를 하한·금지로 기록 — 다음 제안이 같은(또는 더 가벼운) 단면으로 되돌아가지 않게 */
       for (const r of ROLES) {
         const m = d.byRole[r]
-        if (m && m.ratio > 1) ctl.floors[r] = Math.max(ctl.floors[r] ?? 0, sectionProps(m.section).A)
+        if (m && m.ratio > 1) ctl.floors[r] = Math.max(ctl.floors[r] ?? 0, sectionProps(m.section, b.spec.code).A)
         /* 직전 제안 추정비 대비 실제비 → 증폭 학습 (골조 재분배) */
         const prev = lastRows.find((x) => x.role === r && x.after === m?.section && x.before !== x.after)
         if (m && prev && prev.ratio > 0) ctl.amp[r] = Math.max(ctl.amp[r] ?? 1, m.ratio / prev.ratio)
@@ -63,10 +63,10 @@ export async function runOptimize(): Promise<void> {
       if (d.service.some((s) => s.ratio > 1 && (s.key === 'windDriftX' || s.key === 'seisDriftX' || s.key === 'rafterDefl')))
         ctl.bans.push({ column: b.spec.sections.column, rafter: b.spec.sections.rafter })
       const svcNg = (k: string) => d.service.some((s) => s.key === k && s.ratio > 1)
-      if (svcNg('windDriftY') || svcNg('seisDriftY')) ctl.floors.brace = Math.max(ctl.floors.brace ?? 0, sectionProps(b.spec.sections.brace).A)
-      if (svcNg('purlinDefl')) ctl.floors.purlin = Math.max(ctl.floors.purlin ?? 0, sectionProps(b.spec.sections.purlin).A)
-      if (svcNg('girtDefl')) ctl.floors.girt = Math.max(ctl.floors.girt ?? 0, sectionProps(b.spec.sections.girt).A)
-      if (svcNg('postDefl')) ctl.floors.post = Math.max(ctl.floors.post ?? 0, sectionProps(b.spec.sections.post).A)
+      if (svcNg('windDriftY') || svcNg('seisDriftY')) ctl.floors.brace = Math.max(ctl.floors.brace ?? 0, sectionProps(b.spec.sections.brace, b.spec.code).A)
+      if (svcNg('purlinDefl')) ctl.floors.purlin = Math.max(ctl.floors.purlin ?? 0, sectionProps(b.spec.sections.purlin, b.spec.code).A)
+      if (svcNg('girtDefl')) ctl.floors.girt = Math.max(ctl.floors.girt ?? 0, sectionProps(b.spec.sections.girt, b.spec.code).A)
+      if (svcNg('postDefl')) ctl.floors.post = Math.max(ctl.floors.post ?? 0, sectionProps(b.spec.sections.post, b.spec.code).A)
       if (it === MAX_ITER) break
       const p = proposeSections(b.spec, b.model, b.info, S.results, d, ctl)
       lastRows = p.rows

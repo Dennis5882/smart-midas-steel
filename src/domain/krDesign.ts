@@ -30,7 +30,7 @@ const comboDir = (c: string): 'X' | 'Y' | null => (c.match(/(?:W|E|N)([XY])/)?.[
     14 31 15 4.3.4(5)① 기초 G — 핀 10, 고정 1. 기둥 상단 G = (Ic/Lc)/(Ir/Lr) */
 export function krLengths(spec: FactorySpec, model: FactoryModel): Map<number, { KLx: number; KLy: number; Lb: number; K: number; L: number }> {
   const G = portalGeometry(spec), nodes = new Map(model.nodes.map((n) => [n.id, n]))
-  const col = sectionProps(spec.sections.column), raf = sectionProps(spec.sections.rafter)
+  const col = sectionProps(spec.sections.column, spec.code), raf = sectionProps(spec.sections.rafter, spec.code)
   const Kat = new Map(G.eaveXs.map((x) => [x, krKSway((col.Ix / G.zAt(x)) / (raf.Ix / G.rafterLen), spec.baseFixity === 'fixed' ? 1 : 10)]))
   const Lsec = spec.baySpacing / (sagCount(spec) + 1)
   const mm = (m: number) => m * 1000
@@ -67,7 +67,7 @@ export function runKrDesign(spec: FactorySpec, model: FactoryModel, info: LoadIn
   let b2Max = 1
   for (const e of model.elements) {
     if (roles && !roles.includes(e.role)) continue
-    const a = nodes.get(e.n1)!, b = nodes.get(e.n2)!, sp = sectionProps(e.section)
+    const a = nodes.get(e.n1)!, b = nodes.get(e.n2)!, sp = sectionProps(e.section, spec.code)
     const Lel = e.designLength ?? Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z)
     const lens = lengths.get(e.id)!
     const material = e.role === 'purlin' || e.role === 'girt' ? spec.secondaryMaterial ?? spec.material : spec.material
@@ -226,7 +226,7 @@ export function runKrDesign(spec: FactorySpec, model: FactoryModel, info: LoadIn
 export function krPurlinDefl(spec: FactorySpec, info: LoadInfo, section: string): number {
   const G = portalGeometry(spec)
   const w = Math.max(info.roofLive, info.snow ?? 0) * G.sRoof * Math.cos(G.theta)
-  const sp = sectionProps(section)
+  const sp = sectionProps(section, spec.code)
   /* 냉간성형: 4.10.1 유효 단면2차모멘트 — 응력 Fy 유효폭으로 (사용성 응력보다 낮은 I → 보수적) */
   const I = sp.kind === 'CC' ? effSx(ccDims(section), 275, 210000).Ie : sp.Ix
   return 5 * w * spec.baySpacing ** 4 / (384 * 210000e3 * I * 1e-12)

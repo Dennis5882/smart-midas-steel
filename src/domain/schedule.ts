@@ -16,7 +16,7 @@ export function memberSchedule(spec: FactorySpec, model: FactoryModel): { rows: 
     const key = `${e.role}|${e.section}|${e.addition ?? ''}`
     let r = map.get(key)
     if (!r) {
-      const kgPerM = (gamma * sectionProps(e.section).A * 1e-6 * 1000) / 9.80665 // kN/m → kg/m
+      const kgPerM = (gamma * sectionProps(e.section, spec.code).A * 1e-6 * 1000) / 9.80665 // kN/m → kg/m
       r = { addition:e.addition, role: e.role, section: e.section, count: 0, length: 0, kgPerM, weight: 0 }
       map.set(key, r)
     }

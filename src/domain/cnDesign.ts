@@ -22,14 +22,14 @@ const RE = { strength: .85, stability: .9 } // GB 51022 표 3.1.5
 export function cnGirtDeflRatio(spec: FactorySpec, info: LoadInfo, section: string): number {
   const G = portalGeometry(spec), L = Math.max(...G.spans), trib = Math.max(...G.eaveXs.map((x) => G.gWallAt(x)))
   const mu = ccWallCN('5', effAreaCN(L, trib)), w = ccQCN(spec, info.wind.hRef) * Math.max(-mu.neg, mu.pos) * trib
-  return 5 * w * L ** 4 / (384 * E_CN * sectionProps(section).Ix * 1e-12) / (L * GIRT_DEFL_CN)
+  return 5 * w * L ** 4 / (384 * E_CN * sectionProps(section, spec.code).Ix * 1e-12) / (L * GIRT_DEFL_CN)
 }
 /** 풍주 수평 처짐비 (처짐 / (h/250)) — 표 3.3.2, 주골조 박공벽 μw 최대(표 4.2.2-2 1E·1·4E·4·5, β 1.1) × 풍주 간격, 단순보(보수적) */
 export function cnPostDeflRatio(spec: FactorySpec, info: LoadInfo, section: string): number {
   const G = portalGeometry(spec)
   if (!G.postXs.length) return 0
   const endW = info.cn?.endZone ?? 2 * edgeACN(Math.min(spec.span, G.length), info.wind.hRef)
-  const I = sectionProps(section).Ix * 1e-12, q = BETA_FRAME_CN * info.wind.qh
+  const I = sectionProps(section, spec.code).Ix * 1e-12, q = BETA_FRAME_CN * info.wind.qh
   return Math.max(...G.postXs.map((x) => {
     const end = x <= endW || x >= spec.span - endW
     const mu = Math.max(...(['+i', '-i'] as const).flatMap((i) => (end ? ['1E', '4E', '5'] as const : ['1', '4', '5'] as const).map((z) => Math.abs(mwLongCN(i, z)))))
@@ -41,7 +41,7 @@ export function cnPostDeflRatio(spec: FactorySpec, info: LoadInfo, section: stri
 export function runCnDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo, res: Results, roles?: readonly ElementRole[]): DesignResult {
   validateDesignResults(spec, model, info, res, roles)
   const G = portalGeometry(spec), nodes = new Map(model.nodes.map((n) => [n.id, n]))
-  const col = sectionProps(spec.sections.column), raf = sectionProps(spec.sections.rafter)
+  const col = sectionProps(spec.sections.column, spec.code), raf = sectionProps(spec.sections.rafter, spec.code)
   /* 기둥 열마다 높이 = 그 열 처마 높이 (편경사 좌우 다름) */
   const Kat = new Map(G.eaveXs.map((x) => [x, cnK((col.Ix / G.zAt(x)) / (raf.Ix / G.rafterLen), spec.baseFixity === 'fixed')]))
   /* 부록 A.0.6 — 흔들림 기둥이 있으면 조합별 η = √(1 + Σ(N/h)흔들림 / (1.1·Σ(P/H)강접)), 기초 쪽 기둥 요소 축력 */
@@ -63,7 +63,7 @@ export function runCnDesign(spec: FactorySpec, model: FactoryModel, info: LoadIn
   const cc = cnCCLoads(spec, model, info), members: MemberCheck[] = [], service: ServiceCheck[] = []
   for (const e of model.elements) {
     if (roles && !roles.includes(e.role)) continue
-    const a = nodes.get(e.n1)!, b = nodes.get(e.n2)!, sp = sectionProps(e.section)
+    const a = nodes.get(e.n1)!, b = nodes.get(e.n2)!, sp = sectionProps(e.section, spec.code)
     const L = 1000 * (e.designLength ?? Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z))
     const secL = Math.min(L, 1000 * spec.baySpacing / (sagCount(spec) + 1))
     const flyL = support(spec, 'flyBraces') === 'none' ? 1000 * (e.role === 'rafter' ? G.slopeLen : G.zAt(a.x)) : L
@@ -136,7 +136,7 @@ export function runCnDesign(spec: FactorySpec, model: FactoryModel, info: LoadIn
   const sums = new Map<string, CCSummary>()
   if (!roles) for (const [id, c] of cc) { const role = model.elements.find((e) => e.id === id)!.role, key = `${role}-${c.zone}`, old = sums.get(key); if (old) old.count++; else sums.set(key, { role, zone: c.zone, A: c.A, pPos: c.pPos, pNeg: c.pNeg, count: 1 }) }
   /* 8.4.2 隅撑 축력 N = A·f/(60·cosθ) — 피지지 플랜지 단면적, θ = 隅撑과 퍼린 축 사이 45° 가정, 쌍이면 각 N/2 */
-  const knee = (name: string) => { const p = sectionProps(name), Af = p.bf * p.tf; return Af * cnStrength(spec.material, p.tf).f / (60 * Math.cos(Math.PI / 4)) / 1000 }
+  const knee = (name: string) => { const p = sectionProps(name, spec.code), Af = p.bf * p.tf; return Af * cnStrength(spec.material, p.tf).f / (60 * Math.cos(Math.PI / 4)) / 1000 }
   const kneeBrace = { column: knee(spec.sections.column), rafter: knee(spec.sections.rafter) }
   return { kneeBrace, members, byRole, service, maxRatio: Math.max(0, ...members.map((m) => m.ratio)), ng: members.filter((m) => m.ratio > 1).length + service.filter((s) => s.ratio > 1).length, cc: [...sums.values()] }
 }

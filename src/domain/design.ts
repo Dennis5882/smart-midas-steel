@@ -91,9 +91,9 @@ export function purlinDefl(spec: FactorySpec, info: LoadInfo, section: string): 
   const mat = profileOf(spec.code).materials[spec.material]
   const G = portalGeometry(spec)
   const wLR = spec.code === 'CN'
-    ? (spec.roofDead + Math.max(info.roofLive * Math.cos(G.theta), (info.snowPeak ?? info.snow ?? 0) * Math.cos(G.theta))) * G.sRoof + mat.gamma * sectionProps(section).A * 1e-6
+    ? (spec.roofDead + Math.max(info.roofLive * Math.cos(G.theta), (info.snowPeak ?? info.snow ?? 0) * Math.cos(G.theta))) * G.sRoof + mat.gamma * sectionProps(section, spec.code).A * 1e-6
     : info.roofLive * G.sRoof * Math.cos(G.theta) // kN/m
-  return (5 * wLR * spec.baySpacing ** 4) / (384 * mat.E * 1e3 * (sectionProps(section).Ix * 1e-12)) // m (E kPa, I m⁴)
+  return (5 * wLR * spec.baySpacing ** 4) / (384 * mat.E * 1e3 * (sectionProps(section, spec.code).Ix * 1e-12)) // m (E kPa, I m⁴)
 }
 
 /** 퍼린 처짐 한계 = 베이 / 이 값 — TW LRFD 11.5.3 L/360, CN GB 51022 표 3.3.2 L/150, KR 프로젝트 기준 L/240 */
@@ -116,7 +116,7 @@ function runFactoryDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
   const mm = (m: number) => m * 1000
 
   /* 기둥 면내 K — G_top = (Ic/Lc) / (Ir/Lr), 지붕보 길이 = 처마~처마 경사길이(대칭 횡이동 = 역대칭 곡률), G_bottom = 핀 10 / 고정 1 */
-  const col = sectionProps(spec.sections.column), raf = sectionProps(spec.sections.rafter)
+  const col = sectionProps(spec.sections.column, spec.code), raf = sectionProps(spec.sections.rafter, spec.code)
   /* 기둥 열마다 높이 h = 그 열 처마 높이 (편경사는 좌우 다름, 박공은 같음) */
   const Kcol = (h: number) => kSway((col.Ix / h) / (raf.Ix / G.rafterLen), spec.baseFixity === 'fixed' ? 1 : 10)
   const KcolAt = new Map(G.eaveXs.map((x) => [x, Kcol(G.zAt(x))]))
@@ -146,7 +146,7 @@ function runFactoryDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
   const fyOf = (sp: { tf: number; tw: number }) => prof.fyAt?.(spec.material, Math.max(sp.tf, sp.tw)) ?? mat.fy
   /** 냉간성형 퍼린·거트 — 해석 부재력(일반 조합) + 국부 풍압 */
   const coldFormedMember = (e: FactoryModel['elements'][number], Lel: number): MemberCheck | null => {
-    const sp = sectionProps(e.section)
+    const sp = sectionProps(e.section, spec.code)
     const { KLx, KLy, Lb } = lengthsOf(e.role, Lel, e)
     const cf = cfCapacity(e.section, sp, mat.fy, mat.E, { Lx: KLx, Ly: KLy, Lt: Lb, Lb }, 1)
     const myScale = 1 / (sagCount(spec) + 1) ** 2
@@ -188,12 +188,12 @@ function runFactoryDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
   const members: MemberCheck[] = []
   for (const e of model.elements) {
     if (roles && !roles.includes(e.role)) continue
-    if ((e.role === 'purlin' || e.role === 'girt') && sectionProps(e.section).kind === 'CC') {
+    if ((e.role === 'purlin' || e.role === 'girt') && sectionProps(e.section, spec.code).kind === 'CC') {
       const m = coldFormedMember(e, dist(nodes.get(e.n1)!, nodes.get(e.n2)!))
       if (m) members.push(m)
       continue
     }
-    const sp = sectionProps(e.section)
+    const sp = sectionProps(e.section, spec.code)
     const Lel = e.designLength ?? dist(nodes.get(e.n1)!, nodes.get(e.n2)!)
     const { KLx, KLy, Lb } = lengthsOf(e.role, Lel, e)
     const frame = e.role === 'column' || e.role === 'rafter'

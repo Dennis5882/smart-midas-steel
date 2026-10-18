@@ -3,9 +3,10 @@ import { ArrowLeft, ArrowRight, Check, CheckCircle2, Building2, Send } from 'luc
 import { baySpans, frameSpans, type FactorySpec } from '../domain/types'
 import { t } from '../i18n'
 import { BaseSymbol } from './FrameControls'
+import { MODEL_STEPS, REVIEW_STEP } from './modelingFlow'
 
-export const WIZARD_STEPS = ['mw_scope', 'mw_frame', 'mw_bays', 'mw_sections', 'mw_loads', 'mw_review'] as const
-const HINTS = ['mw_scope_hint', 'mw_frame_hint', 'mw_bays_hint', 'mw_sections_hint', 'mw_loads_hint', 'mw_review_hint'] as const
+export const WIZARD_STEPS = MODEL_STEPS
+const HINTS = ['mw_scope_hint', 'mw_frame_hint', 'mw_bays_hint', 'mw_sections_hint', 'mw_additions_hint', 'mw_loads_hint', 'mw_review_hint'] as const
 
 /** Small explanatory elevation/plan, independent of the interactive 3D viewport. */
 function GeometrySketch({ spec, plan }: { spec: FactorySpec; plan: boolean }) {
@@ -68,8 +69,8 @@ export function ModelWizard({ spec, step, visited, disabled, blocked, invalid, a
   return <div className="model-wizard">
     <header className="mw-banner">
       <div className="mw-brand"><Building2 size={18} /><span>{t('mw_title')}</span><span className="mw-code">{spec.code}</span></div>
-      <div className="mw-progress-text"><span>{t('mw_process')}</span><strong>{String(step + 1).padStart(2, '0')} / 06</strong></div>
-      <div className="mw-progress" role="progressbar" aria-label={t('mw_process')} aria-valuemin={1} aria-valuemax={6} aria-valuenow={step + 1}><span style={{ width: `${(step + 1) / 6 * 100}%` }} /></div>
+      <div className="mw-progress-text"><span>{t('mw_process')}</span><strong>{String(step + 1).padStart(2, '0')} / {String(WIZARD_STEPS.length).padStart(2, '0')}</strong></div>
+      <div className="mw-progress" role="progressbar" aria-label={t('mw_process')} aria-valuemin={1} aria-valuemax={WIZARD_STEPS.length} aria-valuenow={step + 1}><span style={{ width: `${(step + 1) / WIZARD_STEPS.length * 100}%` }} /></div>
     </header>
     <nav className="mw-steps" aria-label={t('mw_process')}>{WIZARD_STEPS.map((key, i) => <button key={key} type="button" disabled={disabled || i > visited}
       aria-current={i === step ? 'step' : undefined} onClick={() => onStep(i)} title={t(key)}>
@@ -83,14 +84,14 @@ export function ModelWizard({ spec, step, visited, disabled, blocked, invalid, a
       </div>}
       {step === 2 && <GeometrySketch spec={spec} plan />}
       {step > 1 && <div className="mw-metrics"><span>{t('f_span')}<b>{spec.span}<small> m</small></b></span><span>{t('kv_length')}<b>{+length.toFixed(2)}<small> m</small></b></span><span>{t('f_eave')}<b>{spec.eaveHeight}<small> m</small></b></span></div>}
-      {step === 5 && !blocked && !invalid && <div className="mw-ready"><CheckCircle2 size={18} />{t('mw_ready')}</div>}
+      {step === REVIEW_STEP && !blocked && !invalid && <div className="mw-ready"><CheckCircle2 size={18} />{t('mw_ready')}</div>}
       {children}
       {attempted && (blocked || invalid) && <p className="mw-error mw-alert" role="alert">{t(blocked ? 'sc_blocked' : 'mw_invalid')}</p>}
     </div>
     <footer className="mw-footer">
       <div className="mw-footer-actions">
         <button className="btn btn-ghost" disabled={disabled} onClick={step ? () => onStep(step - 1) : onCancel}>{step ? <ArrowLeft size={14} /> : null}{t(step ? 'mw_back' : 'ws_home')}</button>
-        {step < 5 ? <button className="btn btn-c" disabled={disabled} onClick={() => onStep(step + 1)}>{t(step === 4 ? 'mw_to_review' : 'mw_next')}<ArrowRight size={14} /></button>
+        {step < REVIEW_STEP ? <button className="btn btn-c" disabled={disabled} onClick={() => onStep(step + 1)}>{t(step === REVIEW_STEP - 1 ? 'mw_to_review' : 'mw_next')}<ArrowRight size={14} /></button>
           : <button className="btn btn-c" disabled={disabled || blocked || invalid} onClick={onBuild}><Send size={14} />{t('mw_build')}</button>}
       </div>
       <p>{t(disabled ? 'mw_locked' : 'mw_preview_note')}</p>

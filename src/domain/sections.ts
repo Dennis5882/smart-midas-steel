@@ -1,10 +1,13 @@
-/* 단면 성질 (순수 함수, mm 단위) — CNS2020 단면명의 치수로 계산.
-   H형강: 필렛 무시(면적·강성 1~2% 작게, 보수적). 립 C형강(CC): 중심선 근사 + 무립 C형 Cw 근사(냉간성형 유효폭 미고려).
-   강관(P): 정확식. */
+/* Section properties in mm. Production callers supply code for the frozen Gen DB source.
+   Dimension-only formulas remain explicit for noncatalog sections and independent hand checks. */
+import data from '../data/gen-section-properties.json'
+import type { CodeId } from '../codes/types'
 
 export type ShapeKind = 'H' | 'CC' | 'P'
 
 export interface SectionProps {
+  source?: 'gen-db' | 'dimensions'
+  db?: string
   name: string
   kind: ShapeKind
   /** 압연(RH) 여부 — 잔류응력 Fr 구분 (압연 0.7, 용접 1.16 tf/cm²) */
@@ -32,7 +35,7 @@ export interface SectionProps {
 
 const num = (s: string) => s.split('x').map(Number)
 
-export function sectionProps(name: string): SectionProps {
+export function dimensionSectionProps(name: string): SectionProps {
   /* KS21 립 C형강 'LC-150x65x20x3.2' → CC 와 같은 계산 (두께 x 구분) */
   const lc = name.trim().match(/^LC-(\d[\d.x]*)$/)
   const [kind, dims] = lc ? ['CC', lc[1]] : name.trim().split(/\s+/)
@@ -82,5 +85,19 @@ export function sectionProps(name: string): SectionProps {
   throw new Error(`section: unsupported ${name}`)
 }
 
-/** 단위중량 계산용 면적 (mm²) */
-export const sectionArea = (name: string) => sectionProps(name).A
+const records = new Map(data.entries.map((r) => [`${r.code}:${r.name}`, r]))
+export const genSectionRecord = (name: string, code: CodeId) => records.get(`${code}:${name.trim()}`)
+export const genSectionSource = { extractedAt: data.extractedAt, databases: data.sourceDatabases }
+
+export function sectionProps(name: string, code?: CodeId): SectionProps {
+  const geometry = dimensionSectionProps(name)
+  const r = code ? genSectionRecord(name, code) : undefined
+  if (r?.excluded) throw new Error(`Gen section excluded pending review: ${code}/${r.db}/${name}`)
+  if (!r) return { ...geometry, source: 'dimensions' }
+  return { ...geometry, source: 'gen-db', db: r.db,
+    A:r.A,Ix:r.Ix,Iy:r.Iy,J:r.J,Cw:r.Cw,Sx:r.Sx,Sy:r.Sy,Zx:r.Zx,Zy:r.Zy,
+    rx:Math.sqrt(r.Ix/r.A),ry:Math.sqrt(r.Iy/r.A) }
+}
+
+/** Unit-weight area (mm²), from the same source as member checks. */
+export const sectionArea = (name: string, code?: CodeId) => sectionProps(name, code).A

@@ -16,7 +16,7 @@ import { siteSourceText } from '../components/Status'
 import { dimsText } from './dims'
 import { scopeMsg } from '../components/ScopeBox'
 import { checkScope } from '../domain/scope'
-import { sectionProps } from '../domain/sections'
+import { genSectionSource, sectionProps } from '../domain/sections'
 import { lengthText, ROLES } from '../domain/types'
 import { getLang, htmlLang, t, tc, type I18nKey } from '../i18n'
 import type { Built, ReactionSum } from '../state/store'
@@ -120,10 +120,11 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   h2('rep_s2')
   parts.push(`<p>${esc(spec.material)}: Fy = ${mat.fy} MPa, Fu = ${mat.fu} MPa, E = ${mat.E} MPa, γ = ${mat.gamma} kN/m³ (Gen NX ${esc(mat.gen.standard)} ${esc(mat.gen.db)})</p>`)
   const secRows = [...ROLES.map((r) => ({ r, name: spec.sections[r], addition:undefined as import('../domain/additionTypes').AdditionUsage | undefined })), ...model.elements.filter((e)=>e.addition).filter((e,i,es)=>es.findIndex((v)=>v.section===e.section && v.role===e.role)===i).map((e)=>({r:e.role,name:e.section,addition:e.addition}))].map(({ r, name, addition }) => {
-    const p = sectionProps(name)
-    return [L(addition ? additionLabelKey(addition) : `role_${r}`), esc(name), f(p.A / 100, 1), f(p.Ix / 1e4, 0), f(p.Zx / 1e3, 0), f(p.rx / 10, 2), f(p.ry / 10, 2)]
+    const p = sectionProps(name, spec.code)
+    return [L(addition ? additionLabelKey(addition) : `role_${r}`), esc(name), f(p.A / 100, 1), f(p.Ix / 1e4, 0), f(p.Zx / 1e3, 0), f(p.rx / 10, 2), f(p.ry / 10, 2), esc(p.source === 'gen-db' ? t('section_gen_source', p.db!) : t('section_dimension_source'))]
   })
-  parts.push(table([t('rd_role'), t('rd_section'), 'A (cm²)', 'Ix (cm⁴)', 'Zx (cm³)', 'rx (cm)', 'ry (cm)'], secRows))
+  parts.push(table([t('rd_role'), t('rd_section'), 'A (cm²)', 'Ix (cm⁴)', 'Zx / Sx(CC) (cm³)', 'rx (cm)', 'ry (cm)', t('section_report_source')], secRows))
+  parts.push(`<p>${esc(t('section_source_snapshot',genSectionSource.extractedAt))} ${genSectionSource.databases.map((d)=>`${esc(d.db)} ${d.sha256.slice(0,12)}`).join(' · ')}</p>`)
 
   /* 3. 하중 */
   h2('rep_s3')

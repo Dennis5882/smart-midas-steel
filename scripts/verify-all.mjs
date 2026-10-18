@@ -4,6 +4,8 @@
 import { spawnSync } from 'node:child_process'
 
 const SUITES = [
+  ['Modeling structure flow', 'verify-modeling-flow.ts'],
+  ['Gen property source', 'verify-gen-section-source.ts'],
   ['NG diagnosis / repair', 'verify-remediation.ts'],
   ['Openings / interface', 'verify-phase6.ts'],
   ['Runway / closed doors', 'verify-phase5.ts'],

@@ -153,12 +153,12 @@ near(zoneWidthKR(8.6, 24), 2.4); near(zoneWidthKR(3, 60), 2.4, 1e-12, '0.04 × 6
   const g4 = gir.find(([, c]) => c.zone === 4)![1]
   near(g4.pPos, q * (0.9 * (2.0 - 0.6 * lg(Ag / 2) / lg(25)) + 0.8), 1e-9, 'girt p+ = q(0.9·Cpe④⑤ − Cpi−)')
   near(g4.pNeg, q * 0.9 * (-2.2 + 0.6 * lg(Ag) / lg(50)), 1e-9, 'girt p− = q·0.9·Cpe④')
-  const [id1, c1] = z1!, e1 = g.m.elements[id1 - 1], wD = (sp0.roofDead * G0.sRoof + 77 * sectionProps(e1.section).A * 1e-6) * Math.cos(G0.theta)
+  const [id1, c1] = z1!, e1 = g.m.elements[id1 - 1], wD = (sp0.roofDead * G0.sRoof + 77 * sectionProps(e1.section,'KR').A * 1e-6) * Math.cos(G0.theta)
   near(c1.demands.find((x) => x.combo.endsWith('1.7-6'))!.f.Mx, Math.abs(0.9 * wD + c1.pNeg * G0.sRoof) * 36 / 8, 1e-9, '1.7-6 Mx = |0.9D + W−|·L²/8')
   ok(pur.every(([, c]) => c.demands.length === 3) && gir.every(([, c]) => c.demands.length === 2), 'purlin 1.7-3/4/6, girt 1.7-4/6')
   ok(d.cc?.length === 5 && d.cc.reduce((t, c) => t + c.count, 0) === pur.length + gir.length, 'design C&C summary: 3 roof + 2 wall zones, every purlin/girt')
   /* 설계 반영 — 외장재 요구 강도비 ≤ 부재 강도비 */
-  const m1 = d.members.find((m) => m.id === id1)!, sp1 = sectionProps(e1.section), Fy1 = fyKR(sp0.secondaryMaterial ?? sp0.material, Math.max(sp1.tf, sp1.tw))
+  const m1 = d.members.find((m) => m.id === id1)!, sp1 = sectionProps(e1.section,'KR'), Fy1 = fyKR(sp0.secondaryMaterial ?? sp0.material, Math.max(sp1.tf, sp1.tw))
   const L1 = m1.lengths, cf1 = krCfCapacity(e1.section, sp1, Fy1, { Lx: L1.KLx, Ly: L1.KLy, Lt: L1.Lb, Lb: L1.Lb, Lm: L1.Lb }, 1)
   const ccR = Math.max(...c1.demands.map((x) => krCfCheck(cf1, x.f, x.braced).ratio))
   ok(m1.ratio >= ccR - 1e-12, `purlin ratio ${m1.ratio.toFixed(3)} ≥ C&C ${ccR.toFixed(3)}`)

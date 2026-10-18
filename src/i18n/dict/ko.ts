@@ -1,12 +1,14 @@
 import { addKo } from './additions'
 import { repairKo } from './repair'
 import { sectionKo } from './sectionPicker'
+import { flowKo } from './modelingFlow'
 import type { Dict } from './en'
 
 export const ko: Dict = {
   ...addKo,
   ...repairKo,
   ...sectionKo,
+  ...flowKo,
   bay_mode: '기둥 간격 입력 방식',
   numeric_wheel_hint: '클릭 후 휠 또는 ↑↓ 키로 값을 조절합니다.',
   bay_error: '모든 베이 간격에 0보다 큰 숫자를 입력하세요.',
@@ -60,8 +62,8 @@ export const ko: Dict = {
   mw_title: '모델링 스튜디오',
   mw_process: '모델링 진행 단계',
   mw_step: (n: number) => `STEP ${String(n).padStart(2, '0')}`,
-  mw_scope: '시작·범위', mw_frame: '횡단면', mw_bays: '길이·베이', mw_sections: '재료·단면', mw_loads: '지역·하중', mw_review: '최종 확인',
-  mw_scope_hint: '출발할 건물 형상을 선택하고, 자동 모델링 적용범위를 확인하세요.',
+  mw_scope: '시작', mw_frame: '횡단면', mw_bays: '길이·베이', mw_sections: '재료·단면', mw_loads: '지역·하중', mw_review: '최종 확인',
+  mw_scope_hint: '출발할 건물 템플릿을 선택하세요. 형상과 추가 구조는 다음 단계에서 설정합니다.',
   mw_frame_hint: '대표 골조 한 개의 형상을 정합니다. 치수를 바꾸면 3D 미리보기도 함께 바뀝니다.',
   mw_bays_hint: '골조를 길이 방향으로 배치하고, 2차 부재의 간격을 정합니다.',
   mw_sections_hint: '강재와 부재 단면을 정하고, 접합부에 사용할 재료 가정을 확인하세요.',
@@ -254,7 +256,7 @@ export const ko: Dict = {
   g_model_4_cmd: '물류창고 생성',
   g_model_5: '자유 골조',
   g_model_5_cmd: '자유골조 공장 생성',
-  g_model_note: '기본 모델링은 시작·범위 → 횡단면 → 길이·베이 → 재료·단면 → 지역·하중 → 최종 확인 순서로 진행합니다. 같은 유형을 다시 누르면 현재 편집을 이어갑니다. 자유 골조는 베이별 간격을 직접 편집합니다.',
+  g_model_note: '기본 모델링은 시작 → 횡단면 → 길이·베이 → 재료·단면 → 추가 구조 → 지역·하중 → 최종 확인 순서입니다. 추가 구조의 위치·단면·개별 하중은 한 단계에서 설정합니다. 같은 유형을 다시 누르면 현재 편집을 이어갑니다.',
   plan_intro_tpl: '아래 사양으로 모델을 생성합니다. 맞으면 <b>실행</b>, 고치려면 <b>수정</b>을 누르세요.',
   plan_intro_free: '<b>자유 골조</b>입니다. 베이별 간격과 각 값을 <b>직접 수정</b>한 뒤 <b>실행</b>을 누르세요.',
   edit_btn: '수정',
@@ -338,10 +340,10 @@ export const ko: Dict = {
   q_cjp: '완전용입(CJP)',
   q_fillet: '필렛',
   sec_scope: '적용범위',
-  sc_q: '해당하는 항목을 선택하세요. 크레인·메자닌 상세 입력은 지역·하중 단계에 표시됩니다.',
+  sc_q: '추가 구조는 별도 단계에서 설정하고, 다경간 형상은 횡단면에서 선택합니다.',
   feat_crane: '천장 크레인',
   feat_mezzanine: '메자닌·설비층',
-  feat_multiSpan: '다경간·연결동',
+  feat_multiSpan: '다경간',
   feat_opening: '큰 개구부 (대형 출입구 등)',
   sc_crane: '천장 크레인 — 런웨이 보·크레인 하중을 모델링하지 않습니다.',
   sc_mezzanine: '메자닌·설비층 — 층 하중과 접합을 모델링하지 않습니다.',
@@ -508,6 +510,8 @@ export const ko: Dict = {
   g_help_2: '릴리즈 노트',
   g_help_2_cmd: '릴리즈 노트',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_3_2_1: '설계기준·재료·부재별 단면 선택을 제공합니다. 표준단면은 Gen NX DB 성질을 부재 검토·자중·물량·단면 제안에 공통 적용하며, 치수 기반 입력과 냉간 예비검토를 구분합니다. 실제 Gen 성질이 기준 데이터와 다르면 모델 생성 완료를 차단합니다.',
+  rn_v2_3_2_2: '모델링을 7단계로 정리했습니다. 추가 구조의 위치·단면·개별 하중을 한 단계에서 설정하고 지역·하중에는 요약을 표시합니다. 다경간과 건물 연결부를 분리하며 공통 하중 변경 시 추가 구조의 입력 확인을 유지합니다.',
   rn_v2_3_1_4: '모델링 단면을 설계기준·재료·부재별 Gen 대조 카탈로그에서 선택합니다. 기존값과 직접 입력을 유지하며 성질 차이·냉간성형 적용 한계를 안내합니다.',
   rn_v2_3_1_1: 'NG 보완 후보: 접합과 무관한 부재(퍼린·거트·추가 부재)는 접합비를 표시하지 않고, 권장 후보는 실제 추가 강재량(t) 순으로 정렬합니다.',
   rn_v2_3_1_2: '선택한 그룹의 한계 초과만 적용을 막아 그룹별로 하나씩 보완할 수 있습니다. 강도 NG와 한계 초과가 겹친 부재는 한 건으로 셉니다.',

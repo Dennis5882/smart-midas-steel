@@ -52,7 +52,7 @@ function platePick(material: string, tReqAtFy: number, fy0: number) {
 
 /* ── 베이스플레이트 (AISC DG1 — 판 두께·편심 지압 해, KDS 본문 식 없음) ── */
 function baseFor(spec: FactorySpec, forces: EndForce[], anchorD: number, nSide: number) {
-  const mat = KR.materials[spec.material], col = sectionProps(spec.sections.column)
+  const mat = KR.materials[spec.material], col = sectionProps(spec.sections.column, spec.code)
   const fixed = spec.baseFixity === 'fixed'
   const edge = Math.max(50, Math.ceil(1.75 * anchorD)) // 표 4.1-2 수동 가스절단 연단 (> M30 은 1.75d)
   const N = col.d + 2 * 100
@@ -108,7 +108,7 @@ function baseFor(spec: FactorySpec, forces: EndForce[], anchorD: number, nSide: 
 
 /* ── 4E 단부판 (AISC DG4 두꺼운 판 — 볼트 강도 Mnp 로 항복선 판 두께, 지레작용 없음) ── */
 function endPlateFor(spec: FactorySpec, forces: EndForce[], boltD: number, beamName: string, colName: string | null, omf: boolean) {
-  const mat = KR.materials[spec.material], bm = sectionProps(beamName)
+  const mat = KR.materials[spec.material], bm = sectionProps(beamName, spec.code)
   const bp = bm.bf + 50, g = Math.min(100, bm.bf - 50)
   let pf = Math.max(50, boltD + 25)
   const s = 0.5 * Math.sqrt(bp * g)
@@ -118,7 +118,7 @@ function endPlateFor(spec: FactorySpec, forces: EndForce[], boltD: number, beamN
   /* 볼트 공칭 인장 Pt = Fnt·Ab, Mnp = 2Pt(h0 + h1), 두꺼운 판 t ≥ √(1.11·φn·Mnp/(φb·Fy·Y)) — φn 0.75, φb 0.9 */
   const Pt = 750 * areaKR(boltD), Mnp = 2 * Pt * (h0 + h1)
   const tThick = Math.sqrt((1.11 * 0.75 * Mnp) / (0.9 * mat.fy * Y))
-  const col = colName ? sectionProps(colName) : null
+  const col = colName ? sectionProps(colName, spec.code) : null
   const FyC = col ? fyKR(spec.material, Math.max(col.tf, col.tw)) : mat.fy, FyB = fyKR(spec.material, Math.max(bm.tf, bm.tw))
   let best: { r: number; checks: ConnCheck[]; F: EndForce } | null = null
   for (const F of forces) {
@@ -193,7 +193,7 @@ export function runKrConnections(spec: FactorySpec, model: FactoryModel, info: L
   const basic = (c: string) => kind(c) === 'basic', amp = (c: string) => kind(c) === 'amplified'
   const nodes = new Map(model.nodes.map((n) => [n.id, n])), at = (id: number) => nodes.get(id)!
   const G = portalGeometry(spec)
-  const col = sectionProps(spec.sections.column), raf = sectionProps(spec.sections.rafter)
+  const col = sectionProps(spec.sections.column, spec.code), raf = sectionProps(spec.sections.rafter, spec.code)
   const Ry = ryKR(spec.material)
   const out: ConnResult[] = []
 
@@ -249,7 +249,7 @@ export function runKrConnections(spec: FactorySpec, model: FactoryModel, info: L
   let Nb = 0, nE = 0, nC = ''
   for (const [id, m] of res.truss) for (const [c, P] of m) if (basic(c) && Math.abs(P) > Nb) { Nb = Math.abs(P); nE = id; nC = c }
   if (nE) {
-    const br = sectionProps(spec.sections.brace)
+    const br = sectionProps(spec.sections.brace, spec.code)
     let Ns = Nb, sCombo = nC
     if (ocbf) {
       let Na = 0

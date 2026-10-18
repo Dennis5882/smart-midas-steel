@@ -63,7 +63,7 @@ export function additionErrors(s: FactorySpec, requireConfirmation = true): Addi
   const p = activePlatform(s)
   if (p && (!p.id || ids.has(p.id))) out.push({path:'platform',key:'add_invalid_platform',name:p.id})
   let sectionsOK = false
-  if (p) try { sectionsOK = ([['rafter',p.beamSection],['column',p.columnSection]] as const).every(([role,n]) => { const v = sectionProps(n); return sectionCatalogOptions(s.code,role,s.material).some((r)=>r.name===n) && v.kind === 'H' && [v.A, v.Ix, v.Iy, v.d, v.bf, v.tw, v.tf].every((x) => x > 0 && Number.isFinite(x)) }) } catch { /* invalid input */ }
+  if (p) try { sectionsOK = ([['rafter',p.beamSection],['column',p.columnSection]] as const).every(([role,n]) => { const v = sectionProps(n, s.code); return sectionCatalogOptions(s.code,role,s.material).some((r)=>r.name===n) && v.kind === 'H' && [v.A, v.Ix, v.Iy, v.d, v.bf, v.tw, v.tf].every((x) => x > 0 && Number.isFinite(x)) }) } catch { /* invalid input */ }
   if (s.features?.mezzanine && (!p || !finite(p.elevation, p.x0, p.x1, p.firstBay, p.lastBay, p.beamSpacing, p.dead, p.live, p.liveMassFraction)
     || !(p.elevation > 0 && p.elevation < Math.min(...G.eaveXs.map(G.zAt)) && p.x0 >= 0 && p.x1 <= s.span && p.x1 - p.x0 >= .5 && p.beamSpacing >= .5 && (p.x1 - p.x0) / p.beamSpacing <= 40 && Number.isInteger(p.firstBay) && Number.isInteger(p.lastBay) && p.firstBay >= 0 && p.lastBay <= s.bays && p.lastBay > p.firstBay && p.dead >= 0 && p.live > 0 && inRange(p.liveMassFraction, 0, 1))
     || !(p.deflectionDivisor >= 100 && Number.isFinite(p.deflectionDivisor)) || !sectionsOK || !confirmed(p) || (c && Math.abs(p.elevation - c.elevation) < .5))) out.push({ path: 'platform', key: 'add_invalid_platform', name: p?.id ?? 'platform' })
@@ -234,7 +234,7 @@ export function applyAdditions(s: FactorySpec, base: FactoryModel): FactoryModel
     meta.members.push({ key, elementIds: es.map((e) => e.id), length, source: es[0].sourceId ?? 'factory' })
   }
   for (const e of elements.filter((e) => e.addition)) {
-    const a = byId(e.n1), b = byId(e.n2), w = gamma * sectionProps(e.section).A * 1e-6 * Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z)
+    const a = byId(e.n1), b = byId(e.n2), w = gamma * sectionProps(e.section, s.code).A * 1e-6 * Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z)
     weight(e.n1, w / 2, e.sourceId!); weight(e.n2, w / 2, e.sourceId!)
     const source = meta.sources.find((v) => v.id === e.sourceId)!; source.dead += w; source.seismic += w
   }
