@@ -26,3 +26,30 @@ export function phase6Spec(base:FactorySpec):FactorySpec {
   s.additions!.link={...defaultLink(s),frame:2,elevation:4.5,aMovementMm:10,bMovementMm:15,thermalMovementMm:5,toleranceMm:5,availableGapMm:60,cases:[{name:'External simultaneous state 1',fx:20,fy:5,fz:-80,mx:3,my:8,mz:2},{name:'External simultaneous state 2',fx:-20,fy:-5,fz:-60,mx:-3,my:-8,mz:-2}],source:'External bridge analysis and movement envelope',confirmed:true}
   return s
 }
+
+/** Explicit verification specimens, not application defaults or a minimum-weight design. */
+export function strengthenedAdditionSpec(base:FactorySpec):FactorySpec {
+  const s=structuredClone(base)
+  if (!s.additions?.platform) throw new Error('Strengthened specimen requires a platform')
+  s.additions.platform.beamSection=s.code==='TW'?'RH 800x300x14x26':s.code==='CN'?'HN 800x300x14/26':'H 800x300x14/26'
+  // Reanalysis of the heavier floor and stiffer secondaries shifted compression into longitudinal struts.
+  s.sections.strut=s.code==='TW'?'RH 300x300x10x15':s.code==='CN'?'HW 300x300x10/15':'H 300x300x10/15'
+  if(s.code==='TW') {
+    s.sections.purlin='CC 250x75x25/4.5'
+    s.sections.girt='CC 200x75x25/4.5'
+    s.sections.brace='P 165.2x6'
+    if(s.additions.link) {
+      s.sections.column='RH 600x300x14x23'
+      // Keep beam plastic demand within the existing 8-M30 knee detail while increasing beam strength.
+      s.sections.rafter='RH 606x201x12x20'
+    }
+  } else if(s.code==='KR') {
+    s.sections.purlin='LC-250x75x25x4.5'
+    s.sections.girt='LC-200x75x25x4.5'
+    s.sections.brace='P 190.7x6'
+    if(s.additions.link)s.sections.column=s.sections.rafter='H 588x300x12/20'
+  } else {
+    s.sections.brace='P 273x8'
+  }
+  return s
+}

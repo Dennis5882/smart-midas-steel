@@ -107,7 +107,7 @@ export const steelWeight = (spec: FactorySpec, model: FactoryModel, sections: Se
   Object.values(roleTons(spec, model, sections)).reduce((a, b) => a + b, 0)
 
 /** 문형 라멘 횡강성(상대값)·지붕보 처짐 계수(상대값) */
-function frameStiff(spec: FactorySpec, col: string, raf: string) {
+export function frameStiff(spec: FactorySpec, col: string, raf: string) {
   const G = portalGeometry(spec)
   const h = spec.eaveHeight, Lr = G.rafterLen
   const Ic = sectionProps(col).Ix, Ir = sectionProps(raf).Ix

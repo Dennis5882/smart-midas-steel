@@ -1,9 +1,11 @@
 import { addTW } from './additions'
+import { repairTW } from './repair'
 import type { Dict } from './en'
 
 /* 대만 번체 — 臺灣 規範 용어(屋樑·檁條·牆樑·繫材·用途係數·地況·基本設計風速) */
 export const zhTW: Dict = {
   ...addTW,
+  ...repairTW,
   bay_mode: '柱距輸入方式',
   numeric_wheel_hint: '點選後可用滾輪或 ↑↓ 鍵調整數值。',
   bay_error: '請為每一跨間距輸入大於零的數值。',
@@ -502,6 +504,8 @@ export const zhTW: Dict = {
   g_help_2: '版本說明',
   g_help_2_cmd: '版本說明',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_3_0_1: '區分桿件、使用性、接合及檢核方法超限原因，並由各規範型錄選取主構架與新增桿件的補強斷面候選。',
+  rn_v2_3_0_2: '確認所選斷面的組合估計值後，由 Gen NX 重新分析，並比較變更前、估計與確認結果。',
   rn_v2_2_0_1: '封閉屋頂檢修口／天窗移除內部檁條，將載重傳至 H 型補強梁，提供初步強度檢核及簡支梁撓度網頁估算。',
   rn_v2_2_0_2: '新增與平台梁格對齊的樓面開口，扣除開口載重、地震重量與內部次梁，並單獨辨識邊梁。',
   rn_v2_2_0_3: '檢核連接介面位移、間隙與支承長度，將已確認同步反力傳至本廠房 Gen 模型；不含外部建物、連接橋幾何及一體式耦合分析。',

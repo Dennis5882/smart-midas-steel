@@ -116,6 +116,8 @@ function clearBuilt(): void {
   S.design = null
   S.connections = null
   S.opt = null
+  S.repairPlan = null
+  S.repairComparison = null
   notify()
 }
 

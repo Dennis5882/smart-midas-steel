@@ -8,6 +8,8 @@
 
 6단계(v2.2.0)는 `docs/factory-additions-phase-6.md` 참조. `roofCollectors`는 닫힌 지붕 덮개 하중만 보강보로 전달하고 가상 강재를 Gen에 보내지 않는다. `floorOpening`은 플랫폼 내부 작은보와 빈 면적의 하중·질량을 제외한다. 연결부는 웹 이동·이격·받침 검토 및 확인된 6성분 반력 인터페이스만 지원한다. 분리형은 연결하지 않으며 일체형은 생성 차단한다. 외부 건물·연결교 형상이나 ELNK를 자동 생성하지 않는다. 지붕 처짐은 웹 단순보 추정으로 명시하고 연결부 사용성의 값·한계는 mm로 표시한다. `verify-phase6.ts`, `live-additions.ts --phase6`로 검증한다.
 
+v2.3.0 NG 진단·수동 단면 보완은 `domain/remediation.ts` → `actions/remediation.ts` → `RepairPanel.tsx`(설계 검토/최적화 단계)다. 국가·역할·재료별 감사 카탈로그에서 동일 형상/면적·Ix·Iy 증가 후보를 표본 탐색한다. 기둥–지붕보와 스트럿–가새를 쌍으로 검토하고 추가 부재 단면은 독립 경로로 변경한다. 기존 부재력·강성비 예상값과 Gen 재해석 확인값을 구분하며 추가 접합·기초 및 전문가 검토 한계를 유지한다. 계획은 Built/Results/Design/Connections 참조가 모두 같은 경우만 유효; 적용 전 확인 후 재검사·Gen 동일성 GET → 백업·재생성·해석·전체 결과 회수/검토 → 비교 저장. 실패/취소는 `lastFail.repair`로 복원 안내를 표시하며 일반 최적화 재시도로 바꾸지 않는다. `verify-remediation.ts`, `live-additions.ts --phase6 --repair-test`로 검증한다. 상세 기록은 `docs/ng-section-remediation.md`.
+
 MIDAS Gen 강구조물 자동 모델링 웹앱. 제품 스펙·미정 사항은 README.md.
 참고 프로젝트: `E:/AI Study/story` (Gen NX RC 에이전트 — 같은 스택·MAPI 직접 호출 방식).
 

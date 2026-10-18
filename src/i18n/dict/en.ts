@@ -1,8 +1,10 @@
 import { addEn } from './additions'
+import { repairEn } from './repair'
 /* 영어 사전 — 키의 기준(폴백). 다른 언어는 `Dict` 타입으로 키 일치를 컴파일 시점에 검사.
    값이 HTML 인 키(…_html, welcome, 메시지류)는 dangerouslySetInnerHTML 로 렌더 — 사용자 입력을 넣지 말 것. */
 export const en = {
   ...addEn,
+  ...repairEn,
   bay_mode: 'Spacing mode',
   numeric_wheel_hint: 'Click to focus, then use the wheel or ↑↓ keys to adjust.',
   bay_error: 'Enter a number greater than zero for every bay spacing.',
@@ -516,6 +518,8 @@ export const en = {
   g_help_2: 'Release notes',
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_3_0_1: 'Diagnose member, serviceability, connection and method-limit failures, and select country-specific section candidates for the factory frame and added members.',
+  rn_v2_3_0_2: 'Review the combined estimate, reanalyze the selected sections in Gen NX, and compare original, estimated and verified results.',
   rn_v2_2_0_1: 'Closed roof hatches replace interior purlins with load transfer to H-section trimmers, with preliminary strength checks and a web estimate of simple-beam deflection.',
   rn_v2_2_0_2: 'Added platform-grid floor openings. Void loads, seismic weight and internal secondary beams are removed, and edge beams are identified separately.',
   rn_v2_2_0_3: 'Assess building-interface movement, gap and seating length, and transfer confirmed simultaneous reactions into this factory in Gen. External buildings, bridge geometry and integral coupled analysis are excluded.',

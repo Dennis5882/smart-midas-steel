@@ -11,6 +11,7 @@ import type { ConnResult } from '../domain/connections'
 import type { DesignResult } from '../domain/design'
 import type { LoadInfo } from '../domain/loads'
 import type { OptSummary } from '../domain/optimize'
+import type { RepairPlan, RepairComparison } from '../domain/remediation'
 import type { TemplateKey } from '../domain/templates'
 import type { BuildMode } from '../agent/parse'
 import { DEFAULT_SPEC, type ElementRole, type FactoryModel, type FactorySpec } from '../domain/types'
@@ -92,7 +93,7 @@ export const S = {
   /** 진행 중 작업 (진행 표시·취소) — busy 와 함께 beginJob/endJob 이 관리 */
   job: null as Job | null,
   /** 마지막 작업 실패·취소 (작업 흐름 띠의 다시 시도) — beginJob 이 비움 */
-  lastFail: null as { kind: JobKind; cancelled: boolean; msg?: string } | null,
+  lastFail: null as { kind: JobKind; cancelled: boolean; msg?: string; repair?: boolean } | null,
   /** Gen 모델 변경 감지 건수 (0 = 같음) — assertGenSync 가 갱신, sendModel 이 비움 */
   genChanged: 0,
   /** 확인 창 요청 (ConfirmDialog) */
@@ -135,6 +136,8 @@ export const S = {
   rnOpen: false,
   /** 단면 자동 최적화 결과 */
   opt: null as OptSummary | null,
+  repairPlan: null as RepairPlan | null,
+  repairComparison: null as RepairComparison | null,
   /** 마지막으로 쓴 스펙 — 새 계획 카드의 출발점 */
   lastSpec: DEFAULT_SPEC as FactorySpec,
 }

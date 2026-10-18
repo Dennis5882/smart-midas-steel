@@ -34,6 +34,7 @@ export async function analyzeCore(): Promise<void> {
   /* 저장이 성공한 뒤에 이전 결과를 비운다 — 저장 실패(폴더 없음 등)로 해석을 못 했는데 결과만 사라지지 않게 */
   S.analyzed = false
   S.results = null; S.design = null; S.connections = null; S.opt = null; S.reactions = null; S.ratioView = false
+  S.repairPlan = null; S.repairComparison = null
   notify()
   const res = await mapi<{ message?: string }>('POST', '/doc/anal', {})
   if (NOT_ALLOWED.test(String(res?.message ?? ''))) throw new Error(String(res?.message))
