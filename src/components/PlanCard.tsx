@@ -66,8 +66,10 @@ function Summary({ spec, tpl }: { spec: FactorySpec; tpl?: TemplateKey }) {
 export function PlanCard({ msg }: { msg: PlanMsg }) {
   const s = useStore()
   const free = msg.mode === 'free'
-  const [step, setStep] = useState(0)
-  const [visited, setVisited] = useState(0)
+  /* 시작 화면에서 템플릿을 이미 골랐으면 같은 선택을 다시 묻지 않고 횡단면부터 (시작 단계는 되돌아가 바꿀 수 있음) */
+  const opened = msg.mode !== 'free' && msg.tpl ? 1 : 0
+  const [step, setStep] = useState(opened)
+  const [visited, setVisited] = useState(opened)
   const [attempted, setAttempted] = useState(false)
   const [selectedTpl, setSelectedTpl] = useState(msg.tpl ?? 'general')
   const formId = useId()
@@ -199,7 +201,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
   if (!free) return <ModelWizard spec={spec} step={step} visited={visited} disabled={!live || s.busy}
     onStep={navigate} blocked={checkScope(spec).issues.some((i)=>i.level==='block' && i.key!=='additionInput')} invalid={errors.length > 0} attempted={attempted}
     onBuild={() => { if (errors.length || blocked) { setAttempted(true); return }; void buildFactory(spec) }}
-    onCancel={closeEditor}>
+    onCancel={closeEditor} onChangeCode={closeEditor}>
     {step === 0 && <>
       <div className="mw-templates">{TEMPLATE_KEYS.map((key) => <button type="button" key={key} aria-pressed={selectedTpl === key}
         disabled={!live || s.busy} onClick={() => { setSelectedTpl(key); setIndividual(false); invalidateAdditions(); if (S.activePlan?.id === msg.id) S.activePlan = { ...S.activePlan, tpl: key }; dirty.current = true; setVals((old) => ({ ...old, ...Object.fromEntries(Object.entries(TEMPLATES[key]).map(([k, v]) => [k, String(v)])), bayList: Array.from({ length: TEMPLATES[key].bays }, () => TEMPLATES[key].baySpacing).join(', ') })); notify() }}>

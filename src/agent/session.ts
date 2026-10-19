@@ -154,6 +154,23 @@ export async function setCode(id: CodeId, opts: { auto?: boolean } = {}): Promis
   notify()
 }
 
+/** 앱 작업 상태만 처음으로 — 연결·언어·테마·설계기준은 유지, Gen 문서는 건드리지 않는다 */
+export async function resetWorkspace(): Promise<void> {
+  if (S.busy || S.confirm) return
+  if (!await confirmAction({ title: t('flow_reset_title'), body: t('flow_reset_body'), ok: t('flow_reset_ok'), danger: true })) return
+  if (S.busy || S.confirm) return
+  S.buildEpoch++
+  S.activePlan = null; S.draftSpec = null; S.draftInvalid = false; S.preview = null
+  S.workspaceView = 'start'; S.task = 'model'; S.panel = 'logP'; S.ratioView = false
+  S.built = null; S.analyzed = false; S.genChanged = 0; S.reactions = null; S.results = null; S.design = null; S.connections = null
+  S.opt = null; S.repairPlan = null; S.repairComparison = null; S.restorePoint = null; S.lastFail = null
+  S.log = []; S.msgs = []; S.activity = []
+  S.lastSpec = defaultSpecFor(S.code)
+  S.viewNonce++
+  addMsg('bot', lt('flow_reset_done'))
+  notify()
+}
+
 export interface TestOut { cls: '' | 'ok' | 'err'; text: string }
 
 export async function testConn(): Promise<TestOut> {

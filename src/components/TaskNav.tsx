@@ -1,6 +1,6 @@
-import { Building2, ChartNoAxesCombined, ClipboardCheck, Download, History, SlidersHorizontal, Settings, CircleHelp, RotateCcw } from 'lucide-react'
+import { Building2, ChartNoAxesCombined, ClipboardCheck, Download, History, SlidersHorizontal, Settings, CircleHelp, RotateCcw, Eraser } from 'lucide-react'
 import { restoreBackup } from '../actions/build'
-import { executeAction } from '../agent/session'
+import { executeAction, resetWorkspace } from '../agent/session'
 import { t } from '../i18n'
 import { useStore } from '../state/store'
 import { selectTask } from '../state/ui'
@@ -24,6 +24,7 @@ export function TaskNav({ collapsed, onToggle, onOpenMapi }: { collapsed: boolea
         <button className="task-utility" onClick={onOpenMapi}><Settings size={16} />{t('flow_connection')}</button>
         {s.restorePoint && <button className="task-utility" disabled={s.busy} onClick={() => void restoreBackup()}><RotateCcw size={16} />{t('wf_restore')}</button>}
         <button className="task-utility" onClick={() => void executeAction({ intent: 'help' })}><CircleHelp size={16} />{t('g_help_1')}</button>
+        <button className="task-utility" disabled={s.busy} title={t('flow_reset_body')} onClick={() => void resetWorkspace()}><Eraser size={16} />{t('flow_reset')}</button>
       </div>
     </div>
   </aside>

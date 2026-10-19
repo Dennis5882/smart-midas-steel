@@ -60,7 +60,7 @@ export function Workspace({ guideCollapsed, onOpenGuide, onOpenMapi }: { guideCo
       <p className="ws-start-note">{t('ws_local_note')}</p>
     </div>
     {plan && <div className={`ws-editor${plan.mode === 'free' ? ' ws-free-editor' : ''}`} hidden={!editing}>
-      <div className="project-code-summary"><span>{t('code_label')} · <strong>{t(PROFILES[plan.spec.code].labelKey)}</strong></span><button className="btn btn-ghost" disabled={s.busy || !!s.confirm} onClick={home}>{t('project_code_change')}</button></div>
+      {plan.mode === 'free' && <div className="project-code-summary"><span>{t('code_label')} · <strong>{t(PROFILES[plan.spec.code].labelKey)}</strong></span><button className="btn btn-ghost" disabled={s.busy || !!s.confirm} onClick={home}>{t('project_code_change')}</button></div>}
       {locked && <div className="ws-edit-again"><span>{t('ws_model_sent')}</span><button className="btn btn-c" disabled={s.busy} onClick={openCurrentModel}><Pencil size={13} />{t('ws_edit')}</button></div>}
       <PlanCard key={plan.id} msg={plan} />
     </div>}

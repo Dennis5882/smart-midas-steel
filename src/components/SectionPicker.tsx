@@ -1,6 +1,7 @@
 import type { ElementRole, FactorySpec } from '../domain/types'
 import { modelingSectionChoices } from '../domain/sectionCatalog'
 import { t } from '../i18n'
+import { SectionSketch } from './SectionSketch'
 
 /** Current/custom values survive catalog and material changes; they are never silently replaced. */
 export function SectionPicker({ id, spec, role, value, disabled, invalid, errorId, onChange }: {
@@ -20,6 +21,7 @@ export function SectionPicker({ id, spec, role, value, disabled, invalid, errorI
         </option>)}
       </optgroup>)}
     </select>
+    {value.trim() && <SectionSketch name={value} code={spec.code} />}
     <div id={noteId} className="section-picker-note">
       <small>{t('section_options_note', material, options.length)}</small>
       <small className={excluded ? 'section-picker-warning' : undefined}>{excluded ? t('section_excluded_source') : source ? t('section_gen_source', source.db) : t('section_dimension_source')}</small>
