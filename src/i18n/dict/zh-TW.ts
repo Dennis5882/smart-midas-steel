@@ -222,6 +222,7 @@ export const zhTW: Dict = {
   test_http: (status) => `HTTP ${status} — 請確認 Base URL。`,
   test_wrongprod: (program) => `已連線到 ${program}，而非 Gen NX。`,
   test_err: (msg) => `連線錯誤：${msg}`,
+  base_custom: '自訂位址…',
   save_dir: '自動儲存資料夾',
   save_dir_hint: 'Gen NX 所在電腦上的資料夾。建立新模型與分析前會自動儲存到此處，避免 Gen NX 跳出儲存對話框。資料夾須事先存在。',
   save: '儲存',
@@ -510,6 +511,7 @@ export const zhTW: Dict = {
   g_help_2: '版本說明',
   g_help_2_cmd: '版本說明',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_4_2_1: '設定中的 BASE URL 改為下拉選單：簡體中文優先顯示 .cn 伺服器，其他語言優先顯示 .com，也可選擇另一伺服器或自訂位址。',
   rn_v2_4_1_1: '中國設計規範顯示改為 GB 51022，較長的規範名稱不再超出建模工作室標題列（省略顯示，滑鼠移上顯示全名）。',
   rn_v2_4_1_2: '載重步驟收合的進階設定標題改為與群組一致：風載重、地震、積雪係數詳情（修正韓國風載重顯示地震標題的問題）。',
   rn_v2_4_0_1: '成果新增計算書 Word（.docx）：可下載與 PDF 相同的完整計算書並直接編輯。表格為 Word 表格，圖與圖面為影像，不會傳送至伺服器。',

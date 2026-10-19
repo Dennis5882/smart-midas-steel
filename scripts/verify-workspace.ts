@@ -157,6 +157,9 @@ setConfirmHandler(null)
 {
   const { BASE_URLS, defaultBaseUrl, syncBaseUrl } = await import('../src/state/store')
   assert.equal(defaultBaseUrl('zh-CN'), BASE_URLS.cn)
+  const { baseUrlOptions } = await import('../src/state/store')
+  assert.deepEqual(baseUrlOptions('zh-CN'), [BASE_URLS.cn, BASE_URLS.com], 'zh-CN lists .cn first, .com below')
+  assert.deepEqual(baseUrlOptions('ko'), [BASE_URLS.com, BASE_URLS.cn])
   for (const l of ['ko', 'en', 'zh-TW'] as const) assert.equal(defaultBaseUrl(l), BASE_URLS.com)
   const keep = { url: S.baseUrl, connected: S.connected, busy: S.busy }
   S.connected = false; S.busy = false

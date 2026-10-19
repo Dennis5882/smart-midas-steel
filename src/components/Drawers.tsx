@@ -1,12 +1,15 @@
 /* 설정 드로어 — ⚙ MIDAS API. 키는 메모리에만. */
 import { useEffect, useRef, useState } from 'react'
 import { testConn, type TestOut } from '../agent/session'
-import { t } from '../i18n'
-import { BASE_URLS, S, notify, useStore } from '../state/store'
+import { getLang, t } from '../i18n'
+import { S, baseUrlOptions, notify, useStore } from '../state/store'
 
 function MapiDrawer({ open, onClose }: { open: boolean; onClose(): void }) {
   const s = useStore()
   const [out, setOut] = useState<TestOut | null>(null)
+  const [custom, setCustom] = useState(false)
+  const servers = baseUrlOptions(getLang())
+  const isCustom = custom || !servers.includes(s.baseUrl)
   const dialog = useRef<HTMLDialogElement>(null)
   const firstInput = useRef<HTMLInputElement>(null)
 
@@ -43,12 +46,17 @@ function MapiDrawer({ open, onClose }: { open: boolean; onClose(): void }) {
       <div className="body">
         <div className="field">
           <label htmlFor="mapi-base">BASE URL</label>
-          <input id="mapi-base" ref={firstInput} list="mapi-base-options" disabled={s.busy} value={s.baseUrl} onChange={(e) => { S.baseUrl = e.target.value; notify() }} />
-          <datalist id="mapi-base-options">{Object.values(BASE_URLS).map((u) => <option key={u} value={u} />)}</datalist>
+          <select id="mapi-base" disabled={s.busy} value={isCustom ? '' : s.baseUrl}
+            onChange={(e) => { const v = e.target.value; setCustom(!v); if (v) { S.baseUrl = v; notify() } }}>
+            {servers.map((u) => <option key={u} value={u}>{u}</option>)}
+            <option value="">{t('base_custom')}</option>
+          </select>
+          {isCustom && <input aria-label={t('base_custom')} disabled={s.busy} value={s.baseUrl} placeholder="https://…/gen" style={{ marginTop: 6 }}
+            onChange={(e) => { S.baseUrl = e.target.value; notify() }} />}
         </div>
         <div className="field">
           <label htmlFor="mapi-key">MAPI-KEY</label>
-          <input id="mapi-key" type="password" autoComplete="off" disabled={s.busy} value={s.mapiKey} placeholder={t('mapi_key_ph')}
+          <input id="mapi-key" ref={firstInput} type="password" autoComplete="off" disabled={s.busy} value={s.mapiKey} placeholder={t('mapi_key_ph')}
             onChange={(e) => { S.mapiKey = e.target.value; notify() }} />
           <div className="hint" dangerouslySetInnerHTML={{ __html: t('mapi_hint_html') }} />
         </div>

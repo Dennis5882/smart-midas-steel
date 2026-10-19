@@ -224,6 +224,7 @@ export const ko: Dict = {
   test_http: (status) => `HTTP ${status} — Base URL을 확인하세요.`,
   test_wrongprod: (program) => `Gen NX가 아닌 ${program}에 연결되었습니다.`,
   test_err: (msg) => `연결 오류: ${msg}`,
+  base_custom: '직접 입력…',
   save_dir: '자동 저장 폴더',
   save_dir_hint: 'Gen NX가 실행 중인 PC의 폴더입니다. 새 모델 생성·해석 직전에 여기로 자동 저장해 Gen NX 저장 확인 창이 뜨지 않게 합니다. 폴더가 미리 있어야 합니다.',
   save: '저장',
@@ -512,6 +513,7 @@ export const ko: Dict = {
   g_help_2: '릴리즈 노트',
   g_help_2_cmd: '릴리즈 노트',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_4_2_1: '설정의 BASE URL을 드롭다운으로 바꿨습니다. 간체 중국어는 .cn 서버, 그 밖의 언어는 .com 서버가 먼저 나오며 다른 서버와 직접 입력도 고를 수 있습니다.',
   rn_v2_4_1_1: '중국 설계기준 표시를 GB 51022로 바꾸고, 긴 설계기준 이름이 모델링 스튜디오 머리 밖으로 넘치지 않게 했습니다(말줄임, 마우스를 올리면 전체 이름).',
   rn_v2_4_1_2: '하중 단계의 접힌 고급 설정 제목을 그룹에 맞췄습니다: 풍하중 계수 상세·지진 계수 상세·적설 계수 상세 (한국 풍하중에 지진 제목이 붙던 문제 수정).',
   rn_v2_4_0_1: '산출물에 계산서 Word(.docx) 추가: PDF와 같은 전체 계산서를 편집 가능한 Word 문서로 내려받습니다. 표는 Word 표, 그림·도면은 이미지로 들어가며 서버로 전송하지 않습니다.',

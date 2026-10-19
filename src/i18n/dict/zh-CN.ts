@@ -222,6 +222,7 @@ export const zhCN: Dict = {
   test_http: (status) => `HTTP ${status} — 请检查 Base URL。`,
   test_wrongprod: (program) => `已连接到 ${program}，而不是 Gen NX。`,
   test_err: (msg) => `连接错误：${msg}`,
+  base_custom: '自定义地址…',
   save_dir: '自动保存文件夹',
   save_dir_hint: 'Gen NX 所在电脑上的文件夹。创建新模型和分析前会自动保存到此处，避免 Gen NX 弹出保存对话框。文件夹须事先存在。',
   save: '保存',
@@ -510,6 +511,7 @@ export const zhCN: Dict = {
   g_help_2: '版本说明',
   g_help_2_cmd: '版本说明',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_4_2_1: '设置中的 BASE URL 改为下拉菜单：简体中文优先显示 .cn 服务器，其他语言优先显示 .com，也可选择另一服务器或自定义地址。',
   rn_v2_4_1_1: '中国设计规范显示改为 GB 51022，较长的规范名称不再超出建模工作室标题栏（省略显示，鼠标悬停显示全名）。',
   rn_v2_4_1_2: '荷载步骤折叠的高级设置标题改为与分组一致：风荷载、地震、雪荷载系数详情（修正韩国风荷载显示地震标题的问题）。',
   rn_v2_4_0_1: '成果新增计算书 Word（.docx）：可下载与 PDF 相同的完整计算书并直接编辑。表格为 Word 表格，图与图纸为图像，不会发送到服务器。',

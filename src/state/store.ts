@@ -111,6 +111,8 @@ export function freshWorkState() {
 /** MIDAS API 서버 — 간체 중국어는 중국 서버(.cn), 그 밖 언어는 .com (사용자 결정 2026-10-19) */
 export const BASE_URLS = { com: 'https://moa-engineers.midasit.com:443/gen', cn: 'https://moa-engineers.midasit.cn:443/gen' } as const
 export const defaultBaseUrl = (lang: Lang): string => lang === 'zh-CN' ? BASE_URLS.cn : BASE_URLS.com
+/** 드롭다운 순서 — 언어 기본 서버가 먼저 (간체 .cn → .com, 그 외 .com → .cn) */
+export const baseUrlOptions = (lang: Lang): string[] => lang === 'zh-CN' ? [BASE_URLS.cn, BASE_URLS.com] : [BASE_URLS.com, BASE_URLS.cn]
 /** 언어를 바꿀 때 — 주소가 기본값 그대로이고 연결·작업 중이 아니면 새 언어의 기본 서버로. 직접 고친 주소·연결된 세션은 유지 */
 export function syncBaseUrl(lang: Lang): void {
   const cur = S.baseUrl.trim().replace(/\/$/, '')

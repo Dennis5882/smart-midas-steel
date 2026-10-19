@@ -234,6 +234,7 @@ export const en = {
   test_http: (status: number) => `HTTP ${status} — check the Base URL.`,
   test_wrongprod: (program: string) => `Connected to ${program}, not Gen NX.`,
   test_err: (msg: string) => `Connection error: ${msg}`,
+  base_custom: 'Custom address…',
   save_dir: 'AUTO-SAVE FOLDER',
   save_dir_hint: 'Folder on the Gen NX PC. The model is saved here before a new model and before analysis so Gen NX never opens a save dialog. The folder must exist.',
   save: 'Save',
@@ -524,6 +525,7 @@ export const en = {
   g_help_2: 'Release notes',
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_4_2_1: 'BASE URL in Settings is now a dropdown: Simplified Chinese lists the .cn server first, other languages the .com server, with the other server and a custom address below.',
   rn_v2_4_1_1: 'The China design code now reads GB 51022, and long code names no longer overflow the modeling studio header (ellipsis, full name on hover).',
   rn_v2_4_1_2: 'Collapsed advanced-setting titles on the loads step now match their group: wind, seismic and snow coefficients (Korean wind no longer shows the seismic title).',
   rn_v2_4_0_1: 'Added the Word report (.docx) to outputs: download the full report, identical to the PDF, as an editable Word document. Tables are Word tables, figures and drawings are images, and nothing is sent to a server.',
