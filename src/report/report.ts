@@ -89,7 +89,7 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
     const inputs=[...a.equipment, ...(spec.features?.crane && a.crane?[a.crane]:[]), ...(spec.features?.mezzanine && a.platform?[a.platform]:[]), ...(spec.features?.opening && a.wallOpening?[a.wallOpening]:[])]
     const units:Record<string,string>={x:'m',y:'m',x0:'m',x1:'m',height:'m',elevation:'m',eccentricity:'m',wheelSpacing:'m',beamSpacing:'m',weight:'kN',maxWheel:'kN',minWheel:'kN',lateral:'kN',braking:'kN',seismicWeight:'kN',driftLimitMm:'mm',dead:'kN/m²',live:'kN/m²'}
     const inputRows = (value: object, factors=false) => Object.entries(value).filter(([k])=>k!=='confirmed' && k!=='kind' && k!=='runway' && k!=='travel').map(([k,v])=>[
-      k==='id'?'ID':L((k==='seismicFraction'?'add_mass':`add_${k}`) as I18nKey),`${esc((/Bay$/.test(k)||k==='bay')?Number(v)+1:v)}${!factors && units[k] ? ` ${units[k]}` : ''}`,
+      k==='id'?'ID':L((k==='seismicFraction'?'add_mass':`add_${k}`) as I18nKey),`${k==='manufacturer'&&!String(v).trim()?L('add_manufacturer_unset'):esc((/Bay$/.test(k)||k==='bay')?Number(v)+1:v)}${!factors && units[k] ? ` ${units[k]}` : ''}`,
     ])
     for (const value of inputs) parts.push(table([t('sv_item'),t('sv_value')],inputRows(value)))
     if (spec.features?.crane) {

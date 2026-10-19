@@ -518,6 +518,9 @@ export const en = {
   g_help_2: 'Release notes',
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_3_9_1: 'Simpler crane input: the manufacturer defaults to Not decided (the model can be created with assumed loads and the result is flagged for expert review), the basis document is optional, and one confirmation covers the whole crane.',
+  rn_v2_3_9_2: 'Simplified Chinese uses the China API server (moa-engineers.midasit.cn) by default and other languages use the .com server; both can be picked in connection settings.',
+  rn_v2_3_9_3: 'The report crane input table shows the manufacturer (including Not decided).',
   rn_v2_3_8_1: 'After analysis, Gen NX switches to post mode and shows the vertical reactions of the first load combination with values.',
   rn_v2_3_8_2: 'The Reactions button on the analysis step now shows reactions in Gen again and opens the Results tab (previously it did nothing visible).',
   rn_v2_3_7_1: 'After the model is created, the Gen NX view now fits the whole model in ISO view (it previously stayed zoomed in near the origin).',

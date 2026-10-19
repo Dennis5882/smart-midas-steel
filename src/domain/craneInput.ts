@@ -28,16 +28,14 @@ export function craneInputIssues(s:FactorySpec,requireConfirmation=true):CraneIn
   if(!Number.isFinite(c.minWheel)||c.minWheel<0||(Number.isFinite(c.maxWheel)&&c.minWheel>c.maxWheel))out.push({field:'minWheel',kind:'minWheel'})
   if(!Number.isFinite(c.impactFactor)||c.impactFactor<1||c.impactFactor>3)out.push({field:'impactFactor',kind:'range',min:1,max:3})
   for(const field of ['lateral','braking','seismicWeight'] as const)if(!Number.isFinite(c[field])||c[field]<0)out.push({field,kind:'nonnegative'})
-  const confirmation=(prefix:string,o:{source:string;confirmed:boolean})=>{
-    if(requireConfirmation){if(!o.source.trim())out.push({field:prefix+'source',kind:'source'});if(!o.confirmed)out.push({field:prefix+'confirmed',kind:'confirm'})}
-  }
-  confirmation('',c)
+  // One confirmation covers loads, placement and the runway model. The basis text and maker are optional:
+  // an undecided maker is reported as an assumption (scope warning) instead of blocking the model.
+  if(requireConfirmation&&!c.confirmed)out.push({field:'confirmed',kind:'confirm'})
   if(c.runway){
     const r=c.runway
     if(!sectionCatalogOptions(s.code,'rafter',s.material).some(v=>v.name===r.section&&v.shape==='H'))out.push({field:'runway.section',kind:'section'})
     if(!Number.isFinite(r.deflectionDivisor)||r.deflectionDivisor<100)out.push({field:'runway.deflectionDivisor',kind:'minimum',min:100})
     if([0,s.span].some(x=>g.girtZsAt(x).some(z=>Math.abs(z-c.elevation)<1e-7)))out.push({field:'elevation',kind:'elevationConflict'})
-    confirmation('runway.',r)
   }
   return out
 }

@@ -38,13 +38,16 @@ export function AdditionEditor({spec, value, onChange, disabled, attempted = fal
   const update = (v: FactoryAdditions) => {
     const craneBasis=(c:FactoryAdditions['crane'])=>c && Object.fromEntries(Object.entries(c).filter(([k])=>!['runway','confirmed','source'].includes(k)))
     if(v.crane?.runway && JSON.stringify(craneBasis(v.crane))!==JSON.stringify(craneBasis(a.crane))) v={...v,crane:{...v.crane,runway:{...v.crane.runway,confirmed:false}}}
+    // The single crane confirmation also covers the runway model
+    const runwayBasis=(c:FactoryAdditions['crane'])=>JSON.stringify(c?.runway&&{...c.runway,confirmed:undefined,source:undefined})
+    if(v.crane&&a.crane&&runwayBasis(v.crane)!==runwayBasis(a.crane)) v={...v,crane:{...v.crane,confirmed:false}}
     const platformBasis=(p:FactoryAdditions['platform'])=>p&&Object.fromEntries(Object.entries(p).filter(([k])=>!['confirmed','source'].includes(k)))
     if(v.floorOpening&&JSON.stringify(platformBasis(v.platform))!==JSON.stringify(platformBasis(a.platform)))v={...v,floorOpening:{...v.floorOpening,confirmed:false}}
     onChange(v)
   }
   const input = (o: Record<string, any>, k: string, change: (v: any) => void, unit = '', label: I18nKey = `add_${k}` as I18nKey) => {
     const num = typeof o[k] === 'number', fid = `${id}-${o.id ?? 'factors'}-${k}`
-    const craneField=cranePath(o,k),issues=showCraneErrors?craneIssues.filter(e=>e.field===craneField):[],bad=issues.length>0||(attempted&&k==='source'&&!String(o[k]).trim())
+    const craneField=cranePath(o,k),issues=showCraneErrors?craneIssues.filter(e=>e.field===craneField):[],bad=issues.length>0||(attempted&&k==='source'&&!craneField&&!String(o[k]).trim())
     const errorProps={'aria-invalid':bad||undefined,'aria-describedby':bad?`${fid}-error`:undefined}
     return <div className="pe-f" key={k} data-crane-field={craneField}><label htmlFor={fid}>{t(label)}</label><div className="pe-in">
       {['beamSection','columnSection','headerSection','section'].includes(k) ? <select {...errorProps} id={fid} value={o[k]} disabled={disabled} onChange={(e)=>change(e.target.value)}>
@@ -73,7 +76,7 @@ export function AdditionEditor({spec, value, onChange, disabled, attempted = fal
     <button type="button" className="btn btn-s" disabled={disabled} onClick={()=>update({...a,equipment:[...a.equipment,{id:crypto.randomUUID(),name:`${t('add_equipment')} ${a.equipment.length+1}`,x:spec.span/2,y:0,weight:0,seismicFraction:1,source:'',confirmed:false}]})}>{t('add_add')}</button></div>}
     {show('crane') && spec.features?.crane && c && <fieldset id={`${idPrefix??id}.crane`} tabIndex={-1} disabled={disabled}><legend>{t('add_crane')}</legend><p className="mw-note">{t('add_crane_note')}</p>
       {showCraneErrors&&craneIssues.length>0&&<div className="crane-error-summary" role="alert"><strong>{t('ms_crane_errors',craneIssues.length)}</strong><ul>{craneIssues.map((issue,i)=><li key={i}><button type="button" data-error-target disabled={disabled} onClick={e=>{
-        const fieldKey=issue.kind==='confirm'&&!(issue.field.startsWith('runway.')?c.runway?.source:c.source)?.trim()?issue.field.replace('confirmed','source'):issue.field
+        const fieldKey=issue.field
         const field=e.currentTarget.closest('fieldset')?.querySelector<HTMLElement>(`[data-crane-field="${fieldKey}"]`),target=field?.querySelector<HTMLElement>('input:not(:disabled),select:not(:disabled)')??field
         if(target){if(target===field)target.setAttribute('tabindex','-1');target.focus();target.scrollIntoView({block:'center',behavior:'smooth'})}
       }}>{craneIssueText(issue,spec)}</button></li>)}</ul></div>}
@@ -100,11 +103,15 @@ export function AdditionEditor({spec, value, onChange, disabled, attempted = fal
       {c.runway && <><p className="mw-note">{t('add_runway_note')}</p><div className="pe-grid">
         {input({...c.runway,id:c.id+'-runway'},'section',(v)=>update({...a,crane:{...c,runway:{...c.runway!,section:v,confirmed:false}}}))}
         {input({...c.runway,id:c.id+'-runway'},'deflectionDivisor',(v)=>update({...a,crane:{...c,runway:{...c.runway!,deflectionDivisor:v,confirmed:false}}}))}
-        {confirm({...c.runway,id:c.id+'-runway'},(patch)=>update({...a,crane:{...c,runway:{...c.runway!,...patch}}}))}
       </div></>}
       </section>
       <section className="crane-step"><header><span>04</span><h5>{t('ms_crane_confirm')}</h5></header><div className="pe-grid">
-        {confirm(c,(patch)=>update({...a,crane:{...c,...patch}}))}
+        <div className="pe-f"><label htmlFor={`${id}-crane-maker`}>{t('add_manufacturer')}</label><div className="pe-in">
+          <input id={`${id}-crane-maker`} value={c.manufacturer??''} placeholder={t('add_manufacturer_unset')} disabled={disabled} onChange={(e)=>update({...a,crane:{...c,manufacturer:e.target.value,confirmed:false}})}/></div>
+          {!c.manufacturer?.trim()&&<small className="section-picker-warning">{t('add_manufacturer_note')}</small>}</div>
+        <div className="pe-f"><label htmlFor={`${id}-crane-basis`}>{t('add_crane_basis')}</label><div className="pe-in">
+          <input id={`${id}-crane-basis`} value={c.source} placeholder={t('add_crane_basis_ph')} disabled={disabled} onChange={(e)=>update({...a,crane:{...c,source:e.target.value,confirmed:false}})}/></div></div>
+        <label className="pe-f pe-full" data-crane-field="confirmed"><span><input type="checkbox" checked={c.confirmed} disabled={disabled} aria-invalid={showCraneErrors&&!c.confirmed||undefined} onChange={(e)=>update({...a,crane:{...c,confirmed:e.target.checked}})}/> {t('add_crane_confirm')}</span></label>
       </div></section>
     </fieldset>}
     {show('opening') && spec.features?.opening && a.wallOpening && (()=>{

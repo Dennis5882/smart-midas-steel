@@ -7,6 +7,8 @@ export interface CraneOptions {
   id: string; elevation: number; eccentricity: number; wheelSpacing: number
   maxWheel: number; minWheel: number; impactFactor: number; lateral: number; braking: number
   seismicWeight: number; source: string; confirmed: boolean
+  /** Crane maker. Blank/omitted = not decided yet: loads are assumptions (scope warning, expert review). */
+  manufacturer?: string
   driftLimitMm: number
   /** Optional operating bays, zero-based and inclusive. Omitted = entire building. */
   travel?: {firstBay:number;lastBay:number}

@@ -153,4 +153,17 @@ setConfirmHandler(null)
   assert.equal(codeForLang('zh-CN', 'KR', 'KR', false), 'CN', 'zh-CN new work → CN even with saved KR')
   assert.equal(codeForLang('en', 'KR', null, false), 'KR', 'leaving Korean without a saved pick keeps KR (no forced TW)')
 }
+/* API 서버: 간체 .cn 우선, 그 밖 .com — 기본값일 때만 언어 따라 바뀌고 직접 고친 주소·연결 세션은 유지 */
+{
+  const { BASE_URLS, defaultBaseUrl, syncBaseUrl } = await import('../src/state/store')
+  assert.equal(defaultBaseUrl('zh-CN'), BASE_URLS.cn)
+  for (const l of ['ko', 'en', 'zh-TW'] as const) assert.equal(defaultBaseUrl(l), BASE_URLS.com)
+  const keep = { url: S.baseUrl, connected: S.connected, busy: S.busy }
+  S.connected = false; S.busy = false
+  S.baseUrl = BASE_URLS.com; syncBaseUrl('zh-CN'); assert.equal(S.baseUrl, BASE_URLS.cn, 'zh-CN switches a default address to the China server')
+  syncBaseUrl('ko'); assert.equal(S.baseUrl, BASE_URLS.com, 'other languages switch back to .com')
+  S.baseUrl = 'https://my-proxy.local/gen'; syncBaseUrl('zh-CN'); assert.equal(S.baseUrl, 'https://my-proxy.local/gen', 'a custom address is never replaced')
+  S.baseUrl = BASE_URLS.com; S.connected = true; syncBaseUrl('zh-CN'); assert.equal(S.baseUrl, BASE_URLS.com, 'a connected session keeps its server')
+  S.baseUrl = keep.url; S.connected = keep.connected; S.busy = keep.busy
+}
 console.log('Workspace passed: 4 languages × TW/CN × 5 modeling actions; resume, guards, project code migration/cancel/stale results')

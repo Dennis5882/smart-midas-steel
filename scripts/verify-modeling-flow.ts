@@ -42,7 +42,14 @@ for(const lang of ['ko','en','zh-TW','zh-CN'] as const) {
     runway.additions.crane!.runway={section:spec.sections.rafter,deflectionDivisor:600,source:'',confirmed:false}
     const issues=craneInputIssues(runway)
     assert.ok(!issues.some(e=>e.field==='bays'),'Crane setup must not shrink a ten-bay building')
-    for(const field of ['maxWheel','source','confirmed','runway.source','runway.confirmed'])assert.ok(issues.some(e=>e.field===field),`Actionable missing field ${field}`)
+    for(const field of ['maxWheel','confirmed'])assert.ok(issues.some(e=>e.field===field),`Actionable missing field ${field}`)
+    for(const field of ['source','runway.source','runway.confirmed'])assert.ok(!issues.some(e=>e.field===field),`${field} is optional / covered by the single crane confirmation`)
+    // Undecided maker: allowed, but reported as an assumption (expert review)
+    const assumed=structuredClone(runway);assumed.additions.crane!.maxWheel=80;assumed.additions.crane!.confirmed=true
+    assert.ok(!craneInputIssues(assumed).length,'Confirmed crane with undecided maker has no blocking input issue')
+    assert.ok(checkScope(assumed).issues.some(i=>i.key==='craneAssumed'&&i.level==='warn'),'Undecided maker raises an assumption warning')
+    assumed.additions.crane!.manufacturer='Test Crane Co.'
+    assert.ok(!checkScope(assumed).issues.some(i=>i.key==='craneAssumed'),'A named maker clears the assumption warning')
     assert.ok(!craneInputIssues(runway,false).some(e=>e.kind==='source'||e.kind==='confirm'),'Geometry preview does not require source confirmation')
     const invalidRunway=renderToStaticMarkup(createElement(StructureEditor,{...props,spec:runway,attempted:true}))
     assert.ok(invalidRunway.includes(t('crane_travel_summary',1,10,String(10*runway.baySpacing))))

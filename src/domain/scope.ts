@@ -11,7 +11,7 @@ import { portalGeometry } from './portal'
 import { frameSpans, type FactorySpec } from './types'
 
 export type ScopeKey =
-  | 'additionInput' | 'additionReview' | 'crane' | 'mezzanine' | 'multiSpan' | 'opening' | 'openingCN'
+  | 'additionInput' | 'additionReview' | 'craneAssumed' | 'crane' | 'mezzanine' | 'multiSpan' | 'opening' | 'openingCN'
   | 'span' | 'eave' | 'eaveHigh' | 'slope' | 'bayRatio' | 'baySpacing' | 'length' | 'hnR' | 'cn' | 'monoTW' | 'multi' | 'multiTW' | 'kr' | 'multiKR'
 export interface ScopeIssue { key: ScopeKey; level: 'block' | 'warn'; args: (string | number)[] }
 export interface ScopeResult { issues: ScopeIssue[]; blocked: boolean }
@@ -36,6 +36,7 @@ export function checkScope(spec: FactorySpec, f: ScopeFeatures = spec.features ?
   if (f.mezzanine && !spec.additions?.platform) block('additionInput')
   if (additionErrors({...spec, features:f}).length) block('additionInput')
   if (hasAdditions({...spec, features:f})) warn('additionReview')
+  if (f.crane && spec.additions?.crane && !spec.additions.crane.manufacturer?.trim()) warn('craneAssumed')
   if (f.multiSpan && spec.frame !== 'multi') block('multiSpan') // 다경간 형식을 고르면 지원
   /* 큰 개구부: TW 는 부분 밀폐(GCpi ±0.55)로 근사 가능 — 개구부 골조는 별도. CN 은 폐쇄형만 */
   if (f.opening && !activeOpening({...spec,features:f})) {

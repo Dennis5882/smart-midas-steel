@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { testConn, type TestOut } from '../agent/session'
 import { t } from '../i18n'
-import { S, notify, useStore } from '../state/store'
+import { BASE_URLS, S, notify, useStore } from '../state/store'
 
 function MapiDrawer({ open, onClose }: { open: boolean; onClose(): void }) {
   const s = useStore()
@@ -43,7 +43,8 @@ function MapiDrawer({ open, onClose }: { open: boolean; onClose(): void }) {
       <div className="body">
         <div className="field">
           <label htmlFor="mapi-base">BASE URL</label>
-          <input id="mapi-base" ref={firstInput} disabled={s.busy} value={s.baseUrl} onChange={(e) => { S.baseUrl = e.target.value; notify() }} />
+          <input id="mapi-base" ref={firstInput} list="mapi-base-options" disabled={s.busy} value={s.baseUrl} onChange={(e) => { S.baseUrl = e.target.value; notify() }} />
+          <datalist id="mapi-base-options">{Object.values(BASE_URLS).map((u) => <option key={u} value={u} />)}</datalist>
         </div>
         <div className="field">
           <label htmlFor="mapi-key">MAPI-KEY</label>

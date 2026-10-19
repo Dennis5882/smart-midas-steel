@@ -6,6 +6,8 @@
 ## 개요
 문서 시작점은 `docs/README.md`다. 현재 지원 상태는 `docs/current-status.md`, 미완료 작업은 `docs/roadmap.md`의 R01~R10로 관리한다. `docs/reference/`는 기술 참고·현재 기능의 상세 규칙(추가 구조 1~6단계·NG 보완·크레인 구간 포함), `docs/archive/2026-10-19/`는 완료·대체된 계획/구현/시험 기록이다. 아카이브의 미완료 목록이나 과거 수치를 현재 상태로 재사용하지 않는다. 사용자 제공 구조 확장 원안은 `docs/reference/gen_nx_factory_structural_modifier_architecture.md`에 원문 그대로 보존한다.
 
+**v2.3.9 크레인 입력 간소화**: `crane.manufacturer`(빈칸=미정)는 생성을 막지 않고 scope 경고 `craneAssumed`(전문가 검토)로 남긴다. 출처 문구는 선택, 확인 체크는 크레인 전체(하중·위치·주행보) 하나 — 주행보 source/confirmed 는 검증하지 않는다(`craneInput.ts`). **API 서버**: 간체 zh-CN 은 `moa-engineers.midasit.cn`, 그 외 `.com` 기본(`store.BASE_URLS`·`syncBaseUrl` — 기본값일 때만, 연결 중·직접 입력 주소는 유지).
+
 최신 크레인 운행 구간: 아래 초기 구현의 4/8베이 제한은 제거했다. 기본값은 건물 전체이며 `crane.travel`의 시작·끝 베이(0부터, 양끝 포함)로 일부 구간을 지정한다. 건물 형상 및 차륜 샘플은 유지한다. 결과 회수는 표 크기에 따라 분할한다. `verify-crane-travel.ts`, `live-crane-travel.ts` 참조. 공통 오프라인 검증은 현재 27종이다.
 
 추가 구조 1~4단계(v2.0.0)는 `docs/reference/factory-additions-phases-1-4.md`, 5단계(v2.1.0)는 `docs/reference/factory-additions-phase-5.md` 참조. `FactorySpec.additions` → `applyAdditions` → Gen/하중 컴파일 흐름이며 출처 확인 후 **예비검토**로 제공한다. 요소 분할 시 `physicalKey`·`designLength`를 보존한다. 추가 부재는 `Element.addition`으로 지붕/벽 하중·기존 접합·주골조 단면 변경에서 분리한다. `crane.runway`는 기둥 축상 경간별 단순보·실제 차륜 절점 재하·처짐 검토. `wallOpening`은 측벽 한 베이의 닫힌 문만 지원하며 가새 베이를 차단한다. 제거 거트는 `removedGirts`에 남겨 폐쇄 외피 하중만 컴파일하고, `loadOnly`로 강재 자중·물량에서 제외한다. 가상 거트의 하중 ID를 실제 Gen으로 보내지 않는다. 주행보 중간 절점은 실제 지지점·횡지지로 간주하지 않는다. 지진중량은 정적 등가하중에 한 번만 포함하며 NMAS/모달해석은 아직 추가하지 않았다. 풍·지진+크레인 동시 조합·피로·국부지압·횡전단/비틀림·브래킷 상세·문 개방 시 내압·접합·기초는 별도 검토.  `verify-phase5.ts`, `verify-additions.ts`, `live-additions.ts --phase5`로 검증하며 라이브는 원본 저장·복원 12 DB 해시 일치 확인 필수.

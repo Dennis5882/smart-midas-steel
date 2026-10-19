@@ -96,7 +96,8 @@ for(const base of [DEFAULT_SPEC,CN_DEFAULT_SPEC,KR_DEFAULT_SPEC]) {
   near(design.service.find((v)=>v.key==='runwayDefl')!.ratio,1.2,'10 mm relative deflection vs 5m/600')
   near(design.service.find((v)=>v.key==='craneDefl')!.ratio,0,'interior wheel nodes are not crane support drift stations')
   ok(buildDrawingSvgs({spec:both,model:b,connections:null,title:'Phase5'}).some((v)=>v.name.startsWith('S8')),'side elevation sheet')
-  const unconfirmed=structuredClone(both);unconfirmed.additions!.crane!.runway!.confirmed=false
+  // One crane confirmation covers the runway model as well
+  const unconfirmed=structuredClone(both);unconfirmed.additions!.crane!.confirmed=false
   assert.throws(()=>buildLoadPayloads(unconfirmed,b));checks++
 }
 console.log(`phase 5: ${checks} checks passed`)

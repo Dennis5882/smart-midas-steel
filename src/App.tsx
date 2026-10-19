@@ -9,7 +9,7 @@ import { Header } from './components/Header'
 import { LogPanel, ModelPanel, ResultsPanel } from './components/Panels'
 import { View3D } from './components/View3D'
 import { t, useLang, type I18nKey } from './i18n'
-import { useStore, type PanelId } from './state/store'
+import { syncBaseUrl, useStore, type PanelId } from './state/store'
 import { tab } from './state/ui'
 
 const TABS: { id: PanelId; key: I18nKey }[] = [
@@ -56,6 +56,7 @@ export function App() {
 
   useEffect(() => {
     document.title = t('meta_title')
+    syncBaseUrl(lang)
   }, [lang])
 
   return (
