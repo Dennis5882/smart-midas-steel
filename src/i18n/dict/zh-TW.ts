@@ -77,7 +77,7 @@ export const zhTW: Dict = {
   mw_cf_purlin: (len, max) => `相對屋樑斜長 ${len} m 間距過大，簷口與屋脊之間無法配置檁條 — 請輸入 ${max} m 以下。`,
   mw_cf_girt: (h, max) => `相對簷高 ${h} m 間距過大，牆面無法配置牆樑 — 請輸入 ${max} m 以下。`,
   mw_cf_post: (span, max) => `相對跨度 ${span} m 間距過大，山牆無法配置山牆柱 — 請輸入 ${max} m 以下。`,
-  mw_secondary: '次構件設定', mw_coefficients: '地震係數詳情', mw_advanced: '確認預設值，展開可修改',
+  mw_secondary: '次構件設定', mw_wind_coefficients: '風載重係數詳情', mw_snow_coefficients: '積雪係數詳情', mw_more_settings: '詳細設定', mw_coefficients: '地震係數詳情', mw_advanced: '確認預設值，展開可修改',
   app_name: '鋼構廠房 Agent',
   subtitle: 'MIDAS Gen NX · API自動化',
   code_label: '設計規範',
@@ -87,7 +87,7 @@ export const zhTW: Dict = {
   gen_bad_response: '無法確認 Gen 回應',
   check_unavailable: '尚無有效檢核結果，請執行分析與設計檢核。',
   save_failed: (path: string, reason: string) => `自動儲存失敗（${path}）：${reason}。工作已停止，請確認 Gen 儲存資料夾後重試。`,
-  code_CN: 'GB 50017-2017',
+  code_CN: 'GB 51022',
   /* 한국 KDS (2026-10-16) */
   kv_across_KR: '橫風向組合載重（5.13.1）',
   code_KR: 'KDS 41 30 10 · KDS 14 31',
@@ -508,6 +508,8 @@ export const zhTW: Dict = {
   g_help_2: '版本說明',
   g_help_2_cmd: '版本說明',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_4_1_1: '中國設計規範顯示改為 GB 51022，較長的規範名稱不再超出建模工作室標題列（省略顯示，滑鼠移上顯示全名）。',
+  rn_v2_4_1_2: '載重步驟收合的進階設定標題改為與群組一致：風載重、地震、積雪係數詳情（修正韓國風載重顯示地震標題的問題）。',
   rn_v2_4_0_1: '成果新增計算書 Word（.docx）：可下載與 PDF 相同的完整計算書並直接編輯。表格為 Word 表格，圖與圖面為影像，不會傳送至伺服器。',
   rn_v2_4_0_2: 'Word 計算書的標題、內文與圖說採用 Word 內建樣式，可輕鬆套用公司範本（公司標準範本自動套用準備中）。',
   rn_v2_3_9_1: '天車輸入簡化：製造商預設為未定（可用假設載重建立模型，結果標示須專業審查），依據資料為選填，整台天車只需一次確認。',

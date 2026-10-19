@@ -33,6 +33,16 @@ export interface Field {
 export interface Group { title: I18nKey; fields: Field[] }
 
 /** Wheel/arrow increments follow the quantity's unit, never the UI language or design code. */
+/** 접힌 고급 설정 제목 — 그룹 내용과 맞춘다 (KR 풍하중 고급 칸에 '지진 계수 상세'가 붙던 문제) */
+export function advancedTitleKey(groupTitle: string, step: number): I18nKey {
+  if (groupTitle === 'sec_conn') return 'sec_conn'
+  if (step === 2 || step === 3) return 'mw_secondary'
+  if (groupTitle === 'sec_wind') return 'mw_wind_coefficients'
+  if (groupTitle === 'sec_seismic') return 'mw_coefficients'
+  if (/snow/.test(groupTitle)) return 'mw_snow_coefficients'
+  return 'mw_more_settings'
+}
+
 export function numericStep(f: Field): number {
   if (f.kind === 'int' || f.unit === 'MPa' || f.unit === 'm/s') return 1
   if (f.path === 'china.damping' || f.path === 'korea.roofZeta') return 0.001

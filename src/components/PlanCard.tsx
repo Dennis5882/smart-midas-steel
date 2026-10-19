@@ -24,7 +24,7 @@ import { ScopeBox } from './ScopeBox'
 import { checkScope, NO_FEATURES, type ScopeFeatures } from '../domain/scope'
 import { lengthText, type FactorySpec, type ElementRole } from '../domain/types'
 import { t, tc } from '../i18n'
-import { fieldConflicts, fieldStep, groupsFor, initVals, invalidFields, numericStep, toSpec, type Group, type Path } from './planFields'
+import { advancedTitleKey, fieldConflicts, fieldStep, groupsFor, initVals, invalidFields, numericStep, toSpec, type Group, type Path } from './planFields'
 import { S, notify, useStore, type ChatMsg } from '../state/store'
 import { restraintKeys, support } from '../domain/validity'
 import { draw3D, previewSpec, tab } from '../state/ui'
@@ -237,7 +237,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
           {step === 1 && g.title === 'sec_geometry' && <FrameTypePicker value={spec.frame ?? 'gable'} disabled={!live || s.busy} onChange={(frame) => set('frame', frame)} />}
           {fields({ ...g, fields: basic })}</>}
         {advanced.length > 0 && <details className="mw-advanced" open={attempted && advanced.some((f) => errors.includes(f)) || undefined}>
-          <summary>{t(g.title === 'sec_conn' ? 'sec_conn' : step === 2 || step === 3 ? 'mw_secondary' : 'mw_coefficients')}<span>{t('mw_advanced')}</span></summary>
+          <summary>{t(advancedTitleKey(g.title, step))}<span>{t('mw_advanced')}</span></summary>
           {fields({ ...g, fields: advanced })}
         </details>}
         {g.title === 'sec_seismic' && <div className="pe-tip">{t('kv_site_src')}: {siteSourceText(spec)}</div>}

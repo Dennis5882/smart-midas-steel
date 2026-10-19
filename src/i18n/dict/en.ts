@@ -87,7 +87,7 @@ export const en = {
   mw_cf_purlin: (len: number, max: number) => `Too wide for the ${len} m rafter slope length — no purlin fits between eave and ridge. Enter ${max} m or less.`,
   mw_cf_girt: (h: number, max: number) => `Too wide for the ${h} m eave height — no girt fits on the wall. Enter ${max} m or less.`,
   mw_cf_post: (span: number, max: number) => `Too wide for the ${span} m span — no gable post fits on the end wall. Enter ${max} m or less.`,
-  mw_secondary: 'Secondary members', mw_coefficients: 'Seismic coefficients', mw_advanced: 'Review defaults · expand to edit',
+  mw_secondary: 'Secondary members', mw_wind_coefficients: 'Wind coefficients', mw_snow_coefficients: 'Snow coefficients', mw_more_settings: 'Details', mw_coefficients: 'Seismic coefficients', mw_advanced: 'Review defaults · expand to edit',
   /* ── 헤더·공통 ── */
   app_name: 'Steel Factory Agent',
   subtitle: 'MIDAS Gen NX · API Automation',
@@ -98,7 +98,7 @@ export const en = {
   gen_bad_response: 'Gen response could not be confirmed',
   check_unavailable: 'No valid design result — run analysis and design check.',
   save_failed: (path: string, reason: string) => `Automatic save failed (${path}): ${reason}. Work stopped. Check the Gen save folder and try again.`,
-  code_CN: 'GB 50017-2017',
+  code_CN: 'GB 51022',
   /* 한국 KDS (2026-10-16) */
   kv_across_KR: 'Across-wind combination (5.13.1)',
   code_KR: 'KDS 41 30 10 · KDS 14 31',
@@ -522,6 +522,8 @@ export const en = {
   g_help_2: 'Release notes',
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_4_1_1: 'The China design code now reads GB 51022, and long code names no longer overflow the modeling studio header (ellipsis, full name on hover).',
+  rn_v2_4_1_2: 'Collapsed advanced-setting titles on the loads step now match their group: wind, seismic and snow coefficients (Korean wind no longer shows the seismic title).',
   rn_v2_4_0_1: 'Added the Word report (.docx) to outputs: download the full report, identical to the PDF, as an editable Word document. Tables are Word tables, figures and drawings are images, and nothing is sent to a server.',
   rn_v2_4_0_2: 'Headings, body text and captions use Word built-in styles, so a company template can restyle the report (automatic company template support is in progress).',
   rn_v2_3_9_1: 'Simpler crane input: the manufacturer defaults to Not decided (the model can be created with assumed loads and the result is flagged for expert review), the basis document is optional, and one confirmation covers the whole crane.',

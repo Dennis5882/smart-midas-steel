@@ -79,7 +79,7 @@ export const ko: Dict = {
   mw_cf_purlin: (len, max) => `지붕보 경사 길이 ${len} m에 비해 간격이 커서 처마와 마루 사이에 퍼린이 들어가지 않습니다 — ${max} m 이하로 입력하세요.`,
   mw_cf_girt: (h, max) => `처마 높이 ${h} m에 비해 간격이 커서 벽에 거트가 들어가지 않습니다 — ${max} m 이하로 입력하세요.`,
   mw_cf_post: (span, max) => `스팬 ${span} m에 비해 간격이 커서 박공벽에 풍주가 들어가지 않습니다 — ${max} m 이하로 입력하세요.`,
-  mw_secondary: '2차 부재 설정', mw_coefficients: '지진 계수 상세', mw_advanced: '기본값 확인 · 펼쳐서 수정',
+  mw_secondary: '2차 부재 설정', mw_wind_coefficients: '풍하중 계수 상세', mw_snow_coefficients: '적설 계수 상세', mw_more_settings: '세부 설정', mw_coefficients: '지진 계수 상세', mw_advanced: '기본값 확인 · 펼쳐서 수정',
   app_name: '강구조 공장 에이전트',
   subtitle: 'MIDAS Gen NX · API 자동화',
   code_label: '설계기준',
@@ -89,7 +89,7 @@ export const ko: Dict = {
   gen_bad_response: 'Gen 응답을 확인할 수 없습니다',
   check_unavailable: '유효한 검토 결과가 없습니다. 해석과 설계 검토를 실행해 주세요.',
   save_failed: (path: string, reason: string) => `자동 저장 실패 (${path}): ${reason}. 작업을 중단했습니다. Gen 저장 폴더를 확인한 뒤 다시 실행해 주세요.`,
-  code_CN: 'GB 50017-2017',
+  code_CN: 'GB 51022',
   /* 한국 KDS (2026-10-16) */
   kv_across_KR: '풍직각방향 조합하중 (5.13.1)',
   code_KR: 'KDS 41 30 10 · KDS 14 31',
@@ -510,6 +510,8 @@ export const ko: Dict = {
   g_help_2: '릴리즈 노트',
   g_help_2_cmd: '릴리즈 노트',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_4_1_1: '중국 설계기준 표시를 GB 51022로 바꾸고, 긴 설계기준 이름이 모델링 스튜디오 머리 밖으로 넘치지 않게 했습니다(말줄임, 마우스를 올리면 전체 이름).',
+  rn_v2_4_1_2: '하중 단계의 접힌 고급 설정 제목을 그룹에 맞췄습니다: 풍하중 계수 상세·지진 계수 상세·적설 계수 상세 (한국 풍하중에 지진 제목이 붙던 문제 수정).',
   rn_v2_4_0_1: '산출물에 계산서 Word(.docx) 추가: PDF와 같은 전체 계산서를 편집 가능한 Word 문서로 내려받습니다. 표는 Word 표, 그림·도면은 이미지로 들어가며 서버로 전송하지 않습니다.',
   rn_v2_4_0_2: 'Word 계산서의 제목·본문·캡션은 Word 기본 스타일을 사용해 회사 양식으로 쉽게 바꿀 수 있습니다(회사 표준 양식 자동 적용은 준비 중).',
   rn_v2_3_9_1: '크레인 입력 간소화: 제조사는 기본 미정(가정값으로 생성 가능, 결과에 전문가 검토 표시), 근거 자료는 선택 입력, 확인 체크는 크레인 전체에 하나만 둡니다.',

@@ -86,4 +86,13 @@ for(const lang of ['ko','en','zh-TW','zh-CN'] as const) {
   const lc = renderToStaticMarkup(createElement(SectionSketch, { name: 'LC-150x65x20x2.3', code: 'TW', material: 'SN400B' }))
   assert.ok(lc && lc.includes('Sx') && !lc.includes('>Zx<'), 'dimension-only cold-formed shows Sx, not a plastic-looking Zx')
 }
+/* 접힌 고급 설정 제목은 그룹과 일치 — KR 풍하중(Kzt·KD·ζ)에 '지진 계수 상세'가 붙지 않게 */
+{
+  const { advancedTitleKey } = await import('../src/components/planFields')
+  assert.equal(advancedTitleKey('sec_wind', LOADS_STEP), 'mw_wind_coefficients')
+  assert.equal(advancedTitleKey('sec_seismic', LOADS_STEP), 'mw_coefficients')
+  assert.equal(advancedTitleKey('sec_kr_snow', LOADS_STEP), 'mw_snow_coefficients')
+  assert.equal(advancedTitleKey('sec_conn', LOADS_STEP), 'sec_conn')
+  assert.equal(advancedTitleKey('sec_sections', 3), 'mw_secondary')
+}
 console.log('Modeling flow: 7 stages, 4 languages × 3 codes, distinct frame/interfaces, optional parts, error routes, unique targets and read-only summaries passed.')

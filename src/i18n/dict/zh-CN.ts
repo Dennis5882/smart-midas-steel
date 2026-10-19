@@ -77,7 +77,7 @@ export const zhCN: Dict = {
   mw_cf_purlin: (len, max) => `相对屋面梁斜长 ${len} m 间距过大，檐口与屋脊之间无法布置檩条 — 请输入 ${max} m 以下。`,
   mw_cf_girt: (h, max) => `相对檐高 ${h} m 间距过大，墙面无法布置墙梁 — 请输入 ${max} m 以下。`,
   mw_cf_post: (span, max) => `相对跨度 ${span} m 间距过大，山墙无法布置抗风柱 — 请输入 ${max} m 以下。`,
-  mw_secondary: '次构件设置', mw_coefficients: '地震系数详情', mw_advanced: '确认默认值，展开可修改',
+  mw_secondary: '次构件设置', mw_wind_coefficients: '风荷载系数详情', mw_snow_coefficients: '雪荷载系数详情', mw_more_settings: '详细设置', mw_coefficients: '地震系数详情', mw_advanced: '确认默认值，展开可修改',
   app_name: '钢结构厂房 Agent',
   subtitle: 'MIDAS Gen NX · API自动化',
   code_label: '设计规范',
@@ -87,7 +87,7 @@ export const zhCN: Dict = {
   gen_bad_response: '无法确认 Gen 响应',
   check_unavailable: '尚无有效验算结果，请执行分析与设计验算。',
   save_failed: (path: string, reason: string) => `自动保存失败（${path}）：${reason}。工作已停止，请确认 Gen 保存文件夹后重试。`,
-  code_CN: 'GB 50017-2017',
+  code_CN: 'GB 51022',
   /* 한국 KDS (2026-10-16) */
   kv_across_KR: '横风向组合荷载（5.13.1）',
   code_KR: 'KDS 41 30 10 · KDS 14 31',
@@ -508,6 +508,8 @@ export const zhCN: Dict = {
   g_help_2: '版本说明',
   g_help_2_cmd: '版本说明',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_4_1_1: '中国设计规范显示改为 GB 51022，较长的规范名称不再超出建模工作室标题栏（省略显示，鼠标悬停显示全名）。',
+  rn_v2_4_1_2: '荷载步骤折叠的高级设置标题改为与分组一致：风荷载、地震、雪荷载系数详情（修正韩国风荷载显示地震标题的问题）。',
   rn_v2_4_0_1: '成果新增计算书 Word（.docx）：可下载与 PDF 相同的完整计算书并直接编辑。表格为 Word 表格，图与图纸为图像，不会发送到服务器。',
   rn_v2_4_0_2: 'Word 计算书的标题、正文与图注采用 Word 内置样式，可轻松套用公司模板（公司标准模板自动套用准备中）。',
   rn_v2_3_9_1: '吊车输入简化：制造商默认为未定（可用假定荷载创建模型，结果标示须专业审查），依据资料为选填，整台吊车只需一次确认。',
