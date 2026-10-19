@@ -1,4 +1,4 @@
-import { baySpans, frameSpans, type Element, type ElementRole, type Face, type FactoryModel, type FactorySpec, type FrameType, type Node } from './types'
+import { baySpans, columnSpans, frameSpans, type Element, type ElementRole, type Face, type FactoryModel, type FactorySpec, type FrameType, type Node } from './types'
 import { applyAdditions } from './additions'
 
 /** 지붕면 하나 (횡단면, x 증가 방향). rising = x 가 커질수록 높아짐 — 법선 (∓sinθ, 0, cosθ) 방향과 풍상·풍하 판정에 쓴다 */
@@ -23,7 +23,12 @@ export function portalGeometry(spec: FactorySpec): Geometry {
   const nGirt = nGirtOf(eaveHeight)
   const rafterXs = Array.from({ length: nPurlin + 1 }, (_, i) => run * (i / nPurlin))
   /** 지붕보 절점 x (박공: 처마 → 마루 → 처마 / 편경사: 낮은 처마 → 높은 처마) */
-  const xs = mono ? rafterXs : [...rafterXs, ...rafterXs.slice(0, -1).reverse().map((x) => span - x)]
+  const xs0 = mono ? rafterXs : [...rafterXs, ...rafterXs.slice(0, -1).reverse().map((x) => span - x)]
+  /* 한 지붕 다경간: 내부 기둥 x (경간 폭 누적) — 지붕보 절점에 넣어 기둥 상단이 지붕보에 붙게 */
+  const cols = spec.frame === 'gableCols' ? columnSpans(spec) : [span]
+  const colXs = cols.reduce<number[]>((a, w) => [...a, a[a.length - 1] + w], [0])
+  const inner = colXs.slice(1, -1)
+  const xs = inner.length ? [...xs0, ...inner.filter((c) => !xs0.some((x) => Math.abs(x - c) < 1e-6))].sort((a, b) => a - b) : xs0
   const zAt = mono ? (x: number) => eaveHeight + x * roofSlope : (x: number) => eaveHeight + Math.min(x, span - x) * roofSlope
   /** 거트 높이 (기초·처마 제외) — x0 측벽(낮은 쪽). 높이가 다른 벽은 girtZsAt */
   const levels = (h: number) => { const n = nGirtOf(h); return Array.from({ length: n - 1 }, (_, g) => (h * (g + 1)) / n) }
@@ -36,12 +41,17 @@ export function portalGeometry(spec: FactorySpec): Geometry {
   const endGirtZs = Math.abs(hEnd - eaveHeight) < 1e-9 ? girtZs : levels(hEnd)
   const gEnd = hEnd / nGirtOf(hEnd)
   /** 박공벽 풍주 x — 목표 간격으로 등분한 뒤 가장 가까운 지붕보 절점에 맞춤 */
-  const nPost = Math.max(1, Math.round(span / Math.max(spec.postSpacing, 1)))
-  const postXs = [...new Set(Array.from({ length: nPost - 1 }, (_, k) => {
-    const target = (span * (k + 1)) / nPost
-    return xs.reduce((a, b) => (Math.abs(b - target) < Math.abs(a - target) ? b : a))
-  }))].filter((x) => x > 0 && x < span).sort((a, b) => a - b)
-  const sRoof = slopeLen / nPurlin
+  /* 내부 기둥이 있으면 기둥 사이 경간마다 등분 (기둥 위치는 제외) */
+  const postXs = [...new Set(cols.flatMap((w, i) => {
+    const nPost = Math.max(1, Math.round(w / Math.max(spec.postSpacing, 1)))
+    return Array.from({ length: nPost - 1 }, (_, k) => {
+      const target = colXs[i] + (w * (k + 1)) / nPost
+      return xs.reduce((a, b) => (Math.abs(b - target) < Math.abs(a - target) ? b : a))
+    })
+  }))].filter((x) => x > 0 && x < span && !inner.some((c) => Math.abs(c - x) < 1e-6)).sort((a, b) => a - b)
+  /** 지붕 절점 사이 경사 길이 — 내부 기둥 절점이 들어가면 간격이 달라 분담폭을 이웃 절점으로 */
+  const segLen = (a: number, b: number) => Math.abs(b - a) * Math.hypot(1, roofSlope)
+  const sRoof = inner.length ? Math.max(...xs.slice(1).map((x, i) => segLen(xs[i], x))) : slopeLen / nPurlin
   /** 박공 = 마루 높이, 편경사 = 높은 처마 높이 */
   const ridgeZ = eaveHeight + rise
   /* ── 횡단면 기술 ── */
@@ -61,6 +71,13 @@ export function portalGeometry(spec: FactorySpec): Geometry {
   const isRidge = (x: number) => ridges.some((r) => near(x, r))
   /** 지붕 절점 x 의 분담 — 처마: 붙은 면 반 칸 / 마루: 양쪽 면 반 칸씩 / 그 밖: 한 면 한 칸 */
   const roofTrib = (x: number): RoofTrib[] => {
+    if (inner.length) {
+      /* 절점 간격이 고르지 않음 — 양옆 절점까지 반 칸씩 (마루는 면별로) */
+      const k = xs.findIndex((v) => near(v, x)), prev = k > 0 ? segLen(xs[k - 1], x) / 2 : 0, next = k < xs.length - 1 ? segLen(x, xs[k + 1]) / 2 : 0
+      if (isRidge(x)) { const i = planes.findIndex((p) => near(p.xb, x)); return [{ plane: i, trib: prev }, { plane: i + 1, trib: next }] }
+      const e = eaveSide(x)
+      return [{ plane: e === 'x0' ? 0 : e === 'xL' ? planes.length - 1 : planes.findIndex((p) => x > p.xa && x < p.xb), trib: prev + next }]
+    }
     const e = eaveSide(x)
     if (e) return [{ plane: e === 'x0' ? 0 : planes.length - 1, trib: sRoof / 2 }]
     if (isRidge(x)) { const i = planes.findIndex((p) => near(p.xb, x)); return [{ plane: i, trib: sRoof / 2 }, { plane: i + 1, trib: sRoof / 2 }] }
@@ -74,22 +91,25 @@ export function portalGeometry(spec: FactorySpec): Geometry {
   const isEaveNode = (n: { x: number; z: number }) => !!eaveSide(n.x) && Math.abs(n.z - zAt(n.x)) < 1e-9
   const isRidgeNode = (n: { x: number; z: number }) => isRidge(n.x) && Math.abs(n.z - ridgeZ) < 1e-9
   /** 지붕보 처짐 확인 x — 박공 = 마루, 편경사 = 경간 중앙에 가장 가까운 지붕보 절점 */
-  const deflXs = mono ? [xs.reduce((a, b) => (Math.abs(b - span / 2) < Math.abs(a - span / 2) ? b : a))] : ridges
+  const nearestX = (t: number) => xs.reduce((a, b) => (Math.abs(b - t) < Math.abs(a - t) ? b : a))
+  /* 한 지붕 다경간: 기둥 사이 경간마다 중앙에 가장 가까운 지붕보 절점 (지지점 보간 처짐 — roofDeflection) */
+  const deflXs = inner.length ? [...new Set(cols.map((w, i) => nearestX(colXs[i] + w / 2)))] : mono ? [nearestX(span / 2)] : ridges
   const isDeflNode = (n: { x: number; z: number }) => deflXs.some((x) => near(n.x, x)) && Math.abs(n.z - zAt(n.x)) < 1e-9
   return {
     rise, slopeLen, nPurlin, nGirt, xs, zAt, girtZs, postXs,
     sRoof, gWall: eaveHeight / nGirt, length: spans.reduce((a, b) => a + b, 0), spans,
     theta: Math.atan(roofSlope), ridgeZ,
-    frame: (mono ? 'mono' : 'gable') as FrameType,
+    frame: (mono ? 'mono' : inner.length ? 'gableCols' : 'gable') as FrameType,
     /** 흔들림 기둥 열 x (다경간 내부) */
-    leanXs: [] as number[],
+    leanXs: inner,
     valleys: [] as number[],
-    /** 좌우 대칭 — 아니면 X 방향 하중(풍·지진 비틀림)을 양방향으로 */
-    symmetric: !mono,
+    /** 좌우 대칭 — 아니면 X 방향 하중(풍·지진 비틀림)을 양방향으로 (한 지붕 다경간은 기둥 배치도 대칭이어야) */
+    symmetric: !mono && cols.every((w, i) => Math.abs(w - cols[cols.length - 1 - i]) < 1e-9),
     eaveXs, ridges, planes, eaveSide, isRidge, roofTrib, nearEave, nearRidge, isEaveNode, isRidgeNode, deflXs, isDeflNode,
     girtZsAt, gWallAt, endGirtZs, gEnd,
     /** 처마 → 처마 지붕보 전체 길이 (경사 방향) — 기둥 유효길이 G 값·용량 설계 */
-    rafterLen: mono ? slopeLen : 2 * slopeLen,
+    /* 한 지붕 다경간: 처마 ~ 첫 내부 기둥 지붕보 (양 끝 중 긴 쪽 — 보수적 K) */
+    rafterLen: inner.length ? Math.max(cols[0], cols[cols.length - 1]) * Math.hypot(1, roofSlope) : mono ? slopeLen : 2 * slopeLen,
     /** 평균 지붕 높이 (지진 hn·풍 h) */
     hMean: eaveHeight + rise / 2,
   }
@@ -254,7 +274,7 @@ export function buildPortal(spec: FactorySpec): FactoryModel {
   for (let b = 0; b < bays; b++) {
     const y0 = yOf(b), y1 = yOf(b + 1)
     for (const x of G.xs) {
-      const edge = !!G.eaveSide(x) || G.isRidge(x) || G.valleys.some((v) => Math.abs(v - x) < 1e-9) // 처마·마루·골
+      const edge = !!G.eaveSide(x) || G.isRidge(x) || G.leanXs.some((v) => Math.abs(v - x) < 1e-9) // 처마·마루·골·내부 기둥
       elem(node(x, y0, G.zAt(x)), node(x, y1, G.zAt(x)), edge ? 'strut' : 'purlin', edge ? sec.strut : sec.purlin)
     }
     for (const x of G.eaveXs) {
@@ -284,7 +304,10 @@ export function buildPortal(spec: FactorySpec): FactoryModel {
     /* 지붕면마다 낮은 끝(처마) → 높은 끝(마루) X. 편경사는 면이 스팬 전체라 경간 중앙 지붕보 절점에서 두 패널로 (각도 확보) */
     for (const p of G.planes) {
       const lo = p.rising ? p.xa : p.xb, hi = p.rising ? p.xb : p.xa
-      const pts = G.frame === 'mono' ? [lo, G.deflXs[0], hi] : [lo, hi]
+      /* 한 지붕 다경간은 지붕면이 넓어(전체 폭/2) 가새 하나가 너무 길다 — 약 12 m 패널로 나눠 지붕보 절점에서 끊는다 (라이브: 48 m 폭 한 패널 가새 KL/r 지배) */
+      const k = G.frame === 'gableCols' ? Math.max(1, Math.round(Math.abs(hi - lo) / 12)) : 1
+      const mids = [...new Set(Array.from({ length: k - 1 }, (_, i) => { const t = lo + ((hi - lo) * (i + 1)) / k; return G.xs.reduce((a, b) => (Math.abs(b - t) < Math.abs(a - t) ? b : a)) }))]
+      const pts = G.frame === 'mono' ? [lo, G.deflXs[0], hi] : [lo, ...mids, hi]
       for (let i = 0; i < pts.length - 1; i++) {
         const [xa, xb] = [pts[i], pts[i + 1]]
         elem(node(xa, y0, G.zAt(xa)), node(xb, y1, G.zAt(xb)), 'brace', sec.brace, 'roof')

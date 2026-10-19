@@ -121,7 +121,7 @@ function estimateServices(b:Built,s:FactorySpec,service:ServiceCheck[]):ServiceC
   const ix=(t:SectionTarget)=>sectionProps(sectionAt(b.spec,t)!,b.spec.code).Ix/sectionProps(sectionAt(s,t)!,s.code).Ix
   // Multi-span frames have no closed-form portal stiffness here; drift follows the outer columns, deflection the rafter.
   const frame=(key:'drift'|'defl')=>{
-    if(s.frame==='multi')return key==='defl'?ix('rafter'):ix('column')
+    if(s.frame==='multi'||s.frame==='gableCols')return key==='defl'?ix('rafter'):ix('column')
     const a=frameStiff(b.spec,b.spec.sections.column,b.spec.sections.rafter),z=frameStiff(s,s.sections.column,s.sections.rafter)
     return key==='defl'?z.defl/a.defl:a.k/z.k
   }

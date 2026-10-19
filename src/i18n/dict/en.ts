@@ -378,6 +378,7 @@ export const en = {
   f_frame: 'Cross-section type', frame_gable: 'Single-span gable', frame_mono: 'Single-span mono-slope',
   sc_eaveHigh: (v: number) => `High eave ${v} m — only up to 18 m is supported (mono-slope: eave + span × slope).`,
   sc_monoTW: 'Mono-slope wind: table 2.5 coefficients applied to the whole roof as windward or leeward (ASCE 7 monoslope note), cladding zones approximated by gable zones — expert review recommended.',
+  frame_gableCols: 'Single ridge + interior columns', sc_gableCols: 'Single-ridge multi-span: one gable roof over the whole width; interior columns are modelled as leaning columns (pinned top and base) — interior column-top connections and foundations are outside the check scope.', sc_craneInterior: 'Crane with interior columns is not supported — a full-width crane cannot pass interior columns (per-span cranes and rigid crane columns need separate design).',
   frame_multi: 'Multi-span gable', f_spanList: 'Span widths (comma separated)',
   sc_multi: 'Multi-span: interior columns are modelled as leaning columns (pinned top and base) — the interior column top connection and valley gutter details are outside the check.',
   sc_multiTW: 'Multi-span wind: the face-order coefficients of table 2.8 (saw-tooth roofs — first windward face table 2.5 windward, first leeward and second windward faces table 2.5 leeward, then −0.5 → −0.4 → −0.3) are applied to the multi-span gable — expert review recommended.',
@@ -551,6 +552,8 @@ export const en = {
   g_help_2: 'Release notes',
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_4_7_1: 'Added a "single ridge + interior columns" cross-section: one gable roof over the full width with leaning interior columns; wind and snow follow the gable rules.',
+  rn_v2_4_7_2: 'Cranes are now blocked for frames with interior columns (including multi-span), as a full-width crane cannot pass interior columns.',
   rn_v2_4_6_1: 'Taiwan: selecting the county and township fills the basic wind speed V10 from wind code 2.4 and shows its source.',
   rn_v2_4_6_2: 'Taiwan: near-fault townships take the distance to each fault and use seismic code table 2-3 coefficients (required to continue).',
   rn_v2_4_6_3: 'Taiwan: added a site-conditions confirmation (unconfirmed → expert review), clearer Traditional Chinese terms for span/bay direction, and a note that start templates are not code-prescribed sizes.',

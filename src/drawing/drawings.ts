@@ -175,6 +175,7 @@ function drawSheets({ spec, model, connections, title }: DrawingInput): Dxf {
     rowTxt(['Assumed restraints need design verification of stiffness, connections and anchorage.'])
     rowTxt(['EXCLUDED: gable-post bases, cleats, fly braces, sag rods, brace crossing connectors, cladding.'])
     if (spec.frame === 'multi') rowTxt(['MULTI-SPAN: interior column-top / valley connections and gutters require separate design and takeoff.'])
+    if (spec.frame === 'gableCols') rowTxt(['SINGLE-RIDGE MULTI-SPAN: interior (leaning) column-top connections and bases require separate design and takeoff.'])
     if (model.additions) rowTxt(['ADDITIONS: rails/brackets, door hardware, connections and new foundations excluded. Modeled steel included.'])
     /* 표제란 */
     const tbY = -M + 300, tbW = 12000

@@ -122,7 +122,7 @@ export function quantities(spec: FactorySpec, model: FactoryModel, conns: ConnRe
   const plateT = plates.reduce((s, p) => s + p.kg, 0) / 1000
   const netT = sch.total + plateT
   return {
-    excluded: [...(model.additions ? ['crane rails/brackets, door hardware and additional connections/foundations', 'equipment attachments', ...(!spec.additions?.crane?.runway ? ['crane runway beams'] : [])] : []), 'gable-post bases', 'purlin/girt cleats', 'fly braces and their connections', 'sag rods and anchors', 'brace intersection connectors', 'cladding and other hardware', ...(spec.frame === 'multi' ? ['interior column-top / valley connections and gutters'] : [])],
+    excluded: [...(model.additions ? ['crane rails/brackets, door hardware and additional connections/foundations', 'equipment attachments', ...(!spec.additions?.crane?.runway ? ['crane runway beams'] : [])] : []), 'gable-post bases', 'purlin/girt cleats', 'fly braces and their connections', 'sag rods and anchors', 'brace intersection connectors', 'cladding and other hardware', ...(spec.frame === 'multi' ? ['interior column-top / valley connections and gutters'] : spec.frame === 'gableCols' ? ['interior column-top connections and interior column bases'] : [])],
     members: sch.rows, memberT: sch.total,
     plates, plateT,
     bolts,

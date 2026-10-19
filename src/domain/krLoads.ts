@@ -20,7 +20,7 @@ import { portalGeometry } from './portal'
 import { sectionProps } from './sections'
 import { nodeWeights } from './weights'
 import { hasAdditions } from './additions'
-import { baySpans, frameSpans, type Face, type FactoryModel, type FactorySpec, type Node } from './types'
+import { baySpans, columnSpans, frameSpans, type Face, type FactoryModel, type FactorySpec, type Node } from './types'
 
 /** 계산서·결과 탭 표시용 KDS 중간값 */
 export interface KrLoadInfo {
@@ -180,7 +180,7 @@ export function buildKrLoads(spec: FactorySpec, model: FactoryModel): LoadPayloa
   const GD = { X: gustKR(H, length, k.exposure), Y: gustKR(H, span, k.exposure) }
   /* 지붕보 1차 고유진동수 — 단순보 근사 f = (π/2L²)√(EI/m) (양단 강접 골조보다 낮음 → G_pe 보수적).
      m = 지붕 마감 + 지붕보 + 퍼린(분담) 질량 / 길이 */
-  const wSpan = Math.max(...frameSpans(spec)), bay = spec.baySpacing, mat = KR.materials[spec.material]
+  const wSpan = Math.max(...columnSpans(spec)), bay = spec.baySpacing, mat = KR.materials[spec.material]
   const raf = sectionProps(spec.sections.rafter, spec.code), pur = sectionProps(spec.sections.purlin, spec.code)
   const mLine = (spec.roofDead * bay + mat.gamma * (raf.A + pur.A * bay / spec.purlinSpacing) * 1e-6) * 1000 / 9.80665 // kg/m
   const nR0 = Math.PI / (2 * wSpan ** 2) * Math.sqrt(mat.E * 1e6 * raf.Ix * 1e-12 / mLine)

@@ -1,6 +1,6 @@
 /* 대만(TW) 라이브 회귀 — live-cn.ts 와 같은 방식. MAPI-Key 는 표준입력으로 받아 메모리에만 둔다(파일·인자 금지).
    현재 Gen 문서를 자동 저장한 뒤 새 모델을 만든다 → 시험용 Gen 세션에서 실행.
-   실행: node --import tsx scripts/live-tw.ts [--optimize] [--frame mono|multi] [--out <경로 접두사>]
+   실행: node --import tsx scripts/live-tw.ts [--optimize] [--frame mono|multi|gableCols] [--out <경로 접두사>]
    출력: <out>.html (계산서) · .dxf · -summary.json (스펙·반력·검토·접합·최적화 — 계산서 재생성용) */
 import { readMapiKey } from './mapi-key'
 import { blockedMembers } from '../src/domain/validity'
@@ -30,7 +30,7 @@ const t0 = Date.now()
 const sec = () => `${((Date.now() - t0) / 1000).toFixed(0)}s`
 try {
   const fr = arg('--frame')
-  const spec = normalizeSpans({ ...structuredClone(DEFAULT_SPEC), ...(fr === 'mono' ? { frame: 'mono' as const } : fr === 'multi' ? { frame: 'multi' as const, spanList: process.argv.includes('--spans') ? process.argv[process.argv.indexOf('--spans') + 1].split(',').map(Number) : [24, 24] } : {}) })
+  const spec = normalizeSpans({ ...structuredClone(DEFAULT_SPEC), ...(fr === 'mono' ? { frame: 'mono' as const } : fr === 'multi' || fr === 'gableCols' ? { frame: fr as 'multi' | 'gableCols', spanList: process.argv.includes('--spans') ? process.argv[process.argv.indexOf('--spans') + 1].split(',').map(Number) : [24, 24] } : {}) })
   if (checkScope(spec).blocked) throw new Error('sample spec is out of scope')
   await sendModel(spec)
   console.log(`[${sec()}] TW model sent: nodes ${S.built!.model.nodes.length}, elems ${S.built!.model.elements.length}, cases ${S.built!.cases.length}, combos ${S.built!.combos}`)
@@ -62,7 +62,7 @@ try {
   console.log(`[${sec()}] baseline: max ${S.design.maxRatio.toFixed(3)} NG ${S.design.ng} status ${st().overall}; conns ${S.connections.map((c) => `${c.type} ${c.ratio.toFixed(3)}`).join(', ')}`)
   if (process.argv.includes('--optimize')) {
     await runOptimize()
-    if (!S.opt) throw new Error('optimization failed: ' + JSON.stringify(S.msgs.at(-1)))
+    if (!S.opt) { for (const l of S.log.slice(-25)) console.log('  log', JSON.stringify(l).slice(0, 260)); throw new Error('optimization failed: ' + JSON.stringify(S.msgs.at(-1))) }
     console.log(`[${sec()}] optimized: ${S.opt.weightBefore.toFixed(2)} -> ${S.opt.weightAfter.toFixed(2)} t, iters ${S.opt.iters.length}, max ${S.design!.maxRatio.toFixed(3)} NG ${S.design!.ng} status ${st().overall}`)
   }
   const report = buildReport({ built: S.built!, reactions: S.reactions, design: S.design, connections: S.connections, opt: S.opt })

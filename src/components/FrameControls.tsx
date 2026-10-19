@@ -19,6 +19,7 @@ function FrameIcon({ frame }: { frame: FrameType }) {
     <path className="mw-icon-ground" d="M8 54 H80" />
     <path className="mw-icon-frame" d={frame === 'mono' ? 'M14 52 V28 L74 12 V52'
       : frame === 'multi' ? 'M10 52 V30 L27 17 L44 30 L61 17 L78 30 V52 M44 30 V52'
+      : frame === 'gableCols' ? 'M10 52 V32 L44 14 L78 32 V52 M33 52 V20 M55 52 V20'
       : 'M14 52 V30 L44 14 L74 30 V52'} />
   </svg>
 }

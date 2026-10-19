@@ -18,7 +18,7 @@ import { dimsText } from './dims'
 import { scopeMsg } from '../components/ScopeBox'
 import { checkScope } from '../domain/scope'
 import { genSectionSource, sectionProps } from '../domain/sections'
-import { lengthText, ROLES } from '../domain/types'
+import { lengthText, ROLES, hasInteriorColumns } from '../domain/types'
 import { getLang, htmlLang, t, tc, type I18nKey } from '../i18n'
 import type { Built, ReactionSum } from '../state/store'
 import { APP_VERSION } from '../version'
@@ -75,7 +75,7 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   parts.push(table([t('sv_item'), t('sv_value')], [
     [L('kv_code'), `${esc(t(prof.basisLabelKey ?? prof.labelKey))} — ${esc(tc(spec.code, 'rep_code_refs'))}`],
     [L('f_frame'), t(`frame_${spec.frame ?? 'gable'}`)],
-    [L('kv_span'), `${spec.span} m${spec.frame === 'multi' && spec.spanList ? ` (${spec.spanList.join(' + ')} m)` : ''}`], [L('kv_length'), lengthText(spec)],
+    [L('kv_span'), `${spec.span} m${hasInteriorColumns(spec) && spec.spanList ? ` (${spec.spanList.join(' + ')} m)` : ''}`], [L('kv_length'), lengthText(spec)],
     [L('kv_eave'), `${spec.eaveHeight} m`], [L('kv_slope'), `${spec.roofSlope} (${f((G.theta * 180) / Math.PI, 1)}°)`],
     [L('kv_base'), L(spec.baseFixity === 'fixed' ? 'base_fixed' : 'base_pinned')],
     [L('f_purlinSp'), `${f(G.sRoof, 3)} m`], [L('f_girtSp'), `${f(G.gWall, 3)} m`], [L('f_postSp'), `${spec.postSpacing} m`], [L('f_sagRods'), spec.sagRods],

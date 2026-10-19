@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, Building2, Send } from 'lucide-react'
-import { baySpans, frameSpans, type FactorySpec } from '../domain/types'
+import { baySpans, columnSpans, frameSpans, type FactorySpec } from '../domain/types'
 import { t } from '../i18n'
 import { BaseSymbol } from './FrameControls'
 import { MODEL_STEPS, REVIEW_STEP } from './modelingFlow'
@@ -15,6 +15,7 @@ function GeometrySketch({ spec, plan }: { spec: FactorySpec; plan: boolean }) {
   const length = spans.reduce((a, b) => a + b, 0)
   const mono = spec.frame === 'mono'
   const widths = frameSpans(spec)
+  const cols = columnSpans(spec), inner = cols.slice(0, -1).map((_, i) => cols.slice(0, i + 1).reduce((a, b) => a + b, 0))
   const rise = (mono ? spec.span : Math.max(...widths) / 2) * spec.roofSlope
   const width = 220, scale = Math.min(width / spec.span, 112 / (spec.eaveHeight + rise))
   const left = (300 - spec.span * scale) / 2, right = 300 - left
@@ -35,11 +36,11 @@ function GeometrySketch({ spec, plan }: { spec: FactorySpec; plan: boolean }) {
         <path d={mono ? `M${left} 145 V${eave} L${right} ${ridge} V145`
           : `M${left} 145 V${eave} ${widths.reduce((acc, w, i) => { const x0 = left + widths.slice(0, i).reduce((a, b) => a + b, 0) * scale; return `${acc} L${x0 + w * scale / 2} ${eave - (w / 2) * spec.roofSlope * scale} L${x0 + w * scale} ${eave}` }, '')} V145`}
           fill="var(--tile)" stroke="var(--cyan)" strokeWidth="4" strokeLinejoin="round" />
-        {/* 다경간 내부 기둥 (흔들림 기둥) */}
-        {widths.slice(0, -1).map((_, i) => { const x = left + widths.slice(0, i + 1).reduce((a, b) => a + b, 0) * scale; return <path key={i} d={`M${x} 145 V${eave}`} stroke="var(--cyan)" strokeWidth="2" strokeDasharray="4 3" /> })}
+        {/* 내부 기둥 (흔들림 기둥) — 다경간은 골(처마 높이), 한 지붕 다경간은 지붕선까지 */}
+        {inner.map((xm, i) => { const x = left + xm * scale, top = spec.frame === 'gableCols' ? eave - Math.min(xm, spec.span - xm) * spec.roofSlope * scale : eave; return <path key={i} d={`M${x} 145 V${top}`} stroke="var(--cyan)" strokeWidth="2" strokeDasharray="4 3" /> })}
         <BaseSymbol x={left} y={145} fixed={spec.baseFixity === 'fixed'} />
         <BaseSymbol x={right} y={145} fixed={spec.baseFixity === 'fixed'} />
-        {widths.slice(0, -1).map((_, i) => <BaseSymbol key={i} x={left + widths.slice(0, i + 1).reduce((a, b) => a + b, 0) * scale} y={145} fixed={false} />)}
+        {inner.map((xm, i) => <BaseSymbol key={i} x={left + xm * scale} y={145} fixed={false} />)}
         <path d={`M${left} 170 H${right} M${left} 166 V174 M${right} 166 V174`} stroke="var(--muted)" />
         <text x="150" y="183" textAnchor="middle">{spec.span} m</text>
         {/* 편경사: 낮은 처마는 왼쪽, 높은 처마는 오른쪽에 */}

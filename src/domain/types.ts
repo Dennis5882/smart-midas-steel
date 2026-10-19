@@ -4,8 +4,8 @@ import type { ScopeFeatures } from './scope'
 import type { AdditionModel, AdditionUsage, FactoryAdditions } from './additionTypes'
 
 /* 공장형 단경간 포털 프레임 입력 스펙. 단위: m, kN */
-export type FrameType = 'gable' | 'mono' | 'multi'
-export const FRAME_TYPES: FrameType[] = ['gable', 'mono', 'multi']
+export type FrameType = 'gable' | 'mono' | 'multi' | 'gableCols'
+export const FRAME_TYPES: FrameType[] = ['gable', 'gableCols', 'multi', 'mono']
 
 export interface FactorySpec {
   /** 설계기준 (UI 언어와 독립) */
@@ -19,9 +19,10 @@ export interface FactorySpec {
   /** 베이별 간격 (m, y=0 박공부터). 기본 모델링·자유골조 공통. 있으면 bays = 길이, baySpacing = 최댓값 (normalizeBays) */
   bayList?: number[]
   /** 횡단면 형식 — 없으면 'gable'(단경간 박공). 'mono' = 단경간 편경사: x = 0 이 낮은 처마, x = 스팬이 높은 처마.
-      'multi' = 다경간 박공: 경간마다 마루, 내부 기둥 = 흔들림 기둥(상·하단 핀), 골 높이 = 처마 */
+      'multi' = 다경간 박공: 경간마다 마루, 내부 기둥 = 흔들림 기둥(상·하단 핀), 골 높이 = 처마.
+      'gableCols' = 한 지붕(마루 1, 전체 폭 박공) + 내부 기둥(흔들림 기둥) — 지붕 하중·풍·적설은 박공, 경간 폭 목록 = 기둥 위치 */
   frame?: FrameType
-  /** 다경간 경간별 폭 (m, x = 0 부터). frame 'multi' 에서만 — span = 합계 (normalizeSpans) */
+  /** 경간별 폭 (m, x = 0 부터). frame 'multi'·'gableCols' 에서만 — span = 합계 (normalizeSpans) */
   spanList?: number[]
   /** 처마 높이 (m) — 편경사는 낮은 쪽 처마 (높은 쪽 = 처마 + 스팬 × 경사) */
   eaveHeight: number
@@ -80,13 +81,19 @@ export function baySpans(spec: Pick<FactorySpec, 'bays' | 'baySpacing' | 'bayLis
   return spec.bayList?.length ? spec.bayList : Array.from({ length: spec.bays }, () => spec.baySpacing)
 }
 
-/** 다경간 경간 폭 목록 — 'multi' 가 아니면 [span] */
+/** 지붕(박공) 단위 폭 목록 — 'multi' 는 경간마다 지붕, 그 밖(한 지붕 내부 기둥 포함)은 [span]. 지붕 높이·풍·적설용 */
 export function frameSpans(spec: Pick<FactorySpec, 'frame' | 'span' | 'spanList'>): number[] {
   return spec.frame === 'multi' && spec.spanList?.length ? spec.spanList : [spec.span]
 }
-/** 다경간: span = 경간 합계 (전체 폭). 그 밖 형식은 spanList 제거 */
+/** 내부 기둥이 있는 형식 (다경간 박공·한 지붕 다경간) */
+export const hasInteriorColumns = (spec: Pick<FactorySpec, 'frame'>) => spec.frame === 'multi' || spec.frame === 'gableCols'
+/** 기둥 사이 경간 폭 목록 — 내부 기둥 형식이면 spanList, 아니면 [span]. 스팬 한계·풍주·기둥 위치용 */
+export function columnSpans(spec: Pick<FactorySpec, 'frame' | 'span' | 'spanList'>): number[] {
+  return hasInteriorColumns(spec) && spec.spanList?.length ? spec.spanList : [spec.span]
+}
+/** 내부 기둥 형식: span = 경간 합계 (전체 폭). 그 밖 형식은 spanList 제거 */
 export function normalizeSpans(spec: FactorySpec): FactorySpec {
-  if (spec.frame !== 'multi') return spec.spanList ? { ...spec, spanList: undefined } : spec
+  if (!hasInteriorColumns(spec)) return spec.spanList ? { ...spec, spanList: undefined } : spec
   const list = spec.spanList?.filter((v) => Number.isFinite(v) && v > 0)
   return list?.length ? { ...spec, spanList: list, span: list.reduce((a, b) => a + b, 0) } : spec
 }

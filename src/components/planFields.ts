@@ -8,7 +8,7 @@ import { CPI_KEYS, SITES_KR, REGIONS_KR } from '../codes/krLateral'
 import { sectionProps } from '../domain/sections'
 import { portalGeometry } from '../domain/portal'
 import { LIMITS } from '../domain/scope'
-import { baySpans, FRAME_TYPES, frameSpans, normalizeBays, normalizeSpans, type FactorySpec, type FrameType } from '../domain/types'
+import { baySpans, columnSpans, FRAME_TYPES, frameSpans, hasInteriorColumns, normalizeBays, normalizeSpans, type FactorySpec, type FrameType } from '../domain/types'
 import { t, type I18nKey } from '../i18n'
 import { ADDITIONS_STEP, BAYS_STEP, LOADS_STEP, SECTIONS_STEP } from './modelingFlow'
 
@@ -172,7 +172,7 @@ export const groupsFor = (code: FactorySpec['code'], free = false, frame?: Frame
   (code === 'CN' ? [...GROUPS.filter((g) => !['sec_wind', 'sec_seismic', 'sec_conn'].includes(g.title)), ...CN_GROUPS]
     : code === 'KR' ? [...GROUPS.filter((g) => !['sec_wind', 'sec_seismic', 'sec_conn'].includes(g.title)), ...KR_GROUPS] : GROUPS)
     .map((g) => individual ? individualGeometry(g) : g)
-    .map((g) => frame === 'multi' ? multiGeometry(g) : g)
+    .map((g) => frame === 'multi' || frame === 'gableCols' ? multiGeometry(g) : g)
     .map((g) => code === 'CN' ? { ...g, fields: g.fields.filter((f) => f.path !== 'restraints.braceCrossing') } : g)
 export const FIELDS = [...GROUPS, ...CN_GROUPS, ...KR_GROUPS].flatMap((g) => g.fields)
 export const parseList = (raw: string) => raw.split(/[,，、\s]+/).filter(Boolean).map(Number)
@@ -260,8 +260,9 @@ export function fieldConflicts(spec: FactorySpec, vals: Record<Path, string>, fr
   const floor2 = (x: number) => Math.floor(x * 100) / 100
   if (ok('span') && spec.span > LIMITS.span) add('span', t('sc_span', spec.span))
   /* 다경간: 스팬 한계는 경간마다 */
-  const widths = frameSpans(spec), wMax = Math.max(...widths), wMin = Math.min(...widths)
-  if (spec.frame === 'multi' && ok('spanList') && wMax > LIMITS.span) add('spanList', t('sc_span', wMax))
+  const widths = frameSpans(spec), wMin = Math.min(...widths)
+  const cols = columnSpans(spec), cMax = Math.max(...cols), cMin = Math.min(...cols)
+  if (hasInteriorColumns(spec) && ok('spanList') && cMax > LIMITS.span) add('spanList', t('sc_span', cMax))
   if (ok('eaveHeight') && spec.eaveHeight > LIMITS.eave) add('eaveHeight', t('sc_eave', spec.eaveHeight))
   if (ok('roofSlope') && spec.roofSlope > LIMITS.slope) add('roofSlope', t('sc_slope', spec.roofSlope))
   if (out.length) return out
@@ -275,7 +276,7 @@ export function fieldConflicts(spec: FactorySpec, vals: Record<Path, string>, fr
     add('purlinSpacing', t('mw_cf_purlin', r2(slopeLen), floor2(slopeLen / MIN_DIV)))
   if (ok('eaveHeight', 'girtSpacing') && spec.eaveHeight / spec.girtSpacing < MIN_DIV)
     add('girtSpacing', t('mw_cf_girt', spec.eaveHeight, floor2(spec.eaveHeight / MIN_DIV)))
-  const wPost = spec.frame === 'multi' ? wMin : spec.span
+  const wPost = hasInteriorColumns(spec) ? cMin : spec.span
   if (ok('span', 'spanList', 'postSpacing') && wPost / Math.max(spec.postSpacing, 1) < MIN_DIV)
     add('postSpacing', t('mw_cf_post', wPost, floor2(wPost / MIN_DIV)))
   return out

@@ -15,6 +15,9 @@ const {runConnections}=await import('../src/domain/connections')
 const {buildReport}=await import('../src/report/report')
 const {buildDxf}=await import('../src/drawing/drawings')
 const {memberSchedule}=await import('../src/domain/schedule')
+/* --frames gable,mono,multi,gableCols (기본: gable,mono,multi) */
+const fi=process.argv.indexOf('--frames')
+const FRAMES=(fi>0?process.argv[fi+1].split(','):['gable','mono','multi']) as ('gable'|'mono'|'multi'|'gableCols')[]
 const key=await readMapiKey(),client=new MidasClient({mapiKey:key,product:'gen',timeout:120000})
 S.mapiKey=key
 const token=new Date().toISOString().replace(/[-:.TZ]/g,''),folder=`output/country-frames-live-${token}`
@@ -29,8 +32,8 @@ assert.deepEqual(await snapshot(),before,'Document changed during backup')
 const state:any={version:JSON.parse(readFileSync('package.json','utf8')).version,backup,before,restored:false,cases:[]}
 const save=()=>writeFileSync(`${folder}/evidence.json`,JSON.stringify(state,null,2));save()
 try {
-  for(const code of ['TW','CN','KR'] as const)for(const frame of ['gable','mono','multi'] as const){
-    const spec=normalizeSpans({...structuredClone(defaultSpecFor(code)),frame,...(frame==='multi'?{spanList:[24,24]}:{})})
+  for(const code of ['TW','CN','KR'] as const)for(const frame of FRAMES){
+    const spec=normalizeSpans({...structuredClone(defaultSpecFor(code)),frame,...(frame==='multi'||frame==='gableCols'?{spanList:[24,24]}:{})})
     S.code=code
     console.log(`${code}/${frame}: sending, source check and analysis`)
     await sendModel(spec);await analyzeCore()
@@ -58,4 +61,4 @@ finally{
   try{await command('/doc/saveas',`C:/temp/sms_frames_scratch_${token}.mgbx`)}
   finally{await command('/doc/open',backup);state.after=await snapshot();state.restored=canonical(state.after)===canonical(before);save();assert.ok(state.restored,'Original model restoration mismatch')}
 }
-console.log(`All 9 cases completed; original 12 DB hashes restored. Evidence: ${folder}`)
+console.log(`All ${state.cases.length} cases completed; original 12 DB hashes restored. Evidence: ${folder}`)

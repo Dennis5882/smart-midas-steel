@@ -166,4 +166,61 @@ for (const base of [DEFAULT_SPEC, CN_DEFAULT_SPEC]) {
   const sc = Object.values(buildLoadPayloads(steep, buildPortal(steep)).STLD).map((c: any) => c.NAME)
   ok(sc.includes('SN') && sc.includes('SV1') && sc.includes('SV2') && !sc.includes('SN1') && !checkScope(steep).blocked, 'CN multi 26.6°: uniform + valley snow (GB 51022 4.3.2), not blocked')
 }
+/* ── 한 지붕 다경간 (마루 1 + 내부 흔들림 기둥) ── */
+{
+  const { defaultSpecFor, columnSpans } = await import('../src/domain/types')
+  for (const base of [DEFAULT_SPEC, CN_DEFAULT_SPEC, defaultSpecFor('KR')]) {
+    const code = base.code
+    const spec = normalizeSpans({ ...structuredClone(base), frame: 'gableCols' as const, spanList: [16, 16, 16] })
+    const G = portalGeometry(spec), model = buildPortal(spec), loads = buildLoadPayloads(spec, model)
+    ok(spec.span === 48 && columnSpans(spec).join() === '16,16,16', `${code} gableCols: span 48 from 16+16+16`)
+    ok(G.frame === 'gableCols' && G.ridges.join() === '24' && G.planes.length === 2 && G.valleys.length === 0 && G.leanXs.join() === '16,32' && G.symmetric, `${code} gableCols: one ridge, 2 planes, interior columns 16/32`)
+    near(G.ridgeZ, spec.eaveHeight + 24 * spec.roofSlope, 1e-12, `${code} gableCols: ridge height from the full width`)
+    const node = new Map(model.nodes.map((p) => [p.id, p]))
+    const lean = model.elements.filter((e) => e.lean)
+    ok(lean.length > 0 && lean.every((e) => e.role === 'column' && [16, 32].includes(node.get(e.n1)!.x)), `${code} gableCols: leaning columns on lines 16/32`)
+    const leanTops = lean.filter((e) => !lean.some((o) => o.n1 === e.n2))
+    ok(leanTops.every((e) => Math.abs(node.get(e.n2)!.z - G.zAt(node.get(e.n2)!.x)) < 1e-9), `${code} gableCols: interior column tops on the roof line`)
+    const rafterNodes = new Set(model.elements.filter((e) => e.role === 'rafter').flatMap((e) => [e.n1, e.n2]))
+    ok(leanTops.every((e) => rafterNodes.has(e.n2)), `${code} gableCols: interior column tops are rafter nodes`)
+    const gp = buildGenPayloads(spec, model)
+    ok(leanTops.every((e) => (gp.FRLS[e.id] as any)?.ITEMS[0].FLAG_J === '0000110'), `${code} gableCols: leaning column tops pinned`)
+    ok(lean.filter((e) => node.get(e.n1)!.z === 0).every((e) => (gp.CONS[e.n1] as any).ITEMS[0].CONSTRAINT === '1110000'), `${code} gableCols: leaning column bases pinned`)
+    const primary = new Set(model.elements.filter((e) => e.role === 'column' || e.role === 'rafter' || e.role === 'post').flatMap((e) => [e.n1, e.n2]))
+    ok(model.nodes.every((p) => p.z === 0 || primary.has(p.id)), `${code} gableCols: every non-support node on a primary member`)
+    ok([16, 32].every((x) => model.elements.filter((e) => e.role === 'strut' && node.get(e.n1)!.x === x).length === spec.bays), `${code} gableCols: strut line over each interior column`)
+    ok(!G.postXs.some((x) => [16, 32].includes(x)), `${code} gableCols: no gable post on an interior column line`)
+    /* 지붕 분담폭 합 = 지붕 경사 길이 전체 (절점 간격이 고르지 않아도) */
+    near(G.xs.reduce((a, x) => a + G.roofTrib(x).reduce((b, r) => b + r.trib, 0), 0), 2 * G.slopeLen, 1e-9, `${code} gableCols: tributary widths sum to the roof length`)
+    ok(G.deflXs.length === 3 && G.deflXs.every((x, i) => Math.abs(x - (8 + 16 * i)) <= G.sRoof), `${code} gableCols: deflection check near each column-span midpoint`)
+    const tot = totals(spec, model, loads)
+    near(-tot.LR[2], loads.info.roofLive * spec.span * spec.bays * spec.baySpacing, 1e-9, `${code} gableCols: LR total = q·B·L`)
+    for (const lc of ['EX', 'EY'] as const) {
+      const dir = lc === 'EX' ? 'FX' : 'FY'
+      const sm = Object.values(loads.CNLD).reduce((a: number, rec: any) => a + rec.ITEMS.filter((x: any) => x.LCNAME === lc).reduce((b: number, x: any) => b + x[dir], 0), 0)
+      near(sm, loads.info.seismic[lc === 'EX' ? 'X' : 'Y'].V, 1e-9, `${code} gableCols: ${lc} nodal sum = V`)
+    }
+    /* 지붕 풍압·적설 = 같은 폭의 단경간 박공 (지붕 형상이 같음) */
+    const plain = { ...structuredClone(base), span: 48 }
+    const pl = buildLoadPayloads(plain, buildPortal(plain))
+    ok(JSON.stringify(loads.info.wind.cases.map((c: any) => [c.name, c.dir, +c.roofCp.toFixed(9), c.gcpi])) === JSON.stringify(pl.info.wind.cases.map((c: any) => [c.name, c.dir, +c.roofCp.toFixed(9), c.gcpi])), `${code} gableCols: wind cases/roof Cp = 48 m gable`)
+    ok(Object.values(loads.STLD).map((c: any) => c.NAME).join() === Object.values(pl.STLD).map((c: any) => c.NAME).join(), `${code} gableCols: same load cases as the gable (no valley snow / saw-tooth wind)`)
+    near(-tot.D?.[2] || 1, -(totals(plain, buildPortal(plain), pl).D?.[2]) || 1, 0.2, `${code} gableCols: roof dead load close to the plain gable`)
+    /* 물량: 주각 = 기둥 4열 × 프레임, 마루 = 1 × 프레임 */
+    const frames = spec.bays + 1
+    const conn = (type: string, kind: string) => ({ type, ratio: 0.5, checks: [], notes: [], dims: {}, parts: { plates: [{ part: 'plate', width: 400, length: 500, thickness: 30, count: 1, estimated: false }], fasteners: [{ kind, diameter: 24, count: 4 }] } }) as any
+    const q = quantities(spec, model, [conn('base', 'anchor'), conn('apex', 'bolt')])
+    ok(q.plates.filter((r) => r.type === 'base').every((r) => r.conns === 4 * frames) && q.plates.filter((r) => r.type === 'apex').every((r) => r.conns === frames), `${code} gableCols: connection counts base ${4 * frames}, apex ${frames}`)
+    /* 적용범위·입력 */
+    const sc = checkScope({ ...spec, features: { crane: false, mezzanine: false, multiSpan: true, opening: false } })
+    ok(!sc.blocked && sc.issues.some((i) => i.key === 'gableCols') && !sc.issues.some((i) => i.key === 'multi' || i.key === 'multiTW' || i.key === 'multiKR'), `${code} gableCols: in scope, own warning only`)
+    for (const fr of ['gableCols', 'multi'] as const) ok(checkScope({ ...spec, frame: fr, features: { crane: true, mezzanine: false, multiSpan: false, opening: false } }).issues.some((i) => i.key === 'craneInterior' && i.level === 'block'), `${code} ${fr} + crane: blocked (full-width crane cannot pass interior columns)`)
+    ok(!checkScope(normalizeSpans({ ...spec, spanList: [36, 36] })).blocked && checkScope(normalizeSpans({ ...spec, spanList: [62, 24] })).blocked, `${code} gableCols: span limit per column span (72 total ok, 62 blocked)`)
+    const sp2 = toSpec(base, { ...initVals(base), frame: 'gableCols', spanList: '24, 30' }, false)
+    ok(sp2.frame === 'gableCols' && sp2.span === 54 && sp2.spanList?.join() === '24,30', `${code} gableCols: card → span 54 from 24 + 30`)
+    const uneq = normalizeSpans({ ...spec, spanList: [30, 18] })
+    ok(!portalGeometry(uneq).symmetric, `${code} gableCols: unequal column spans → not symmetric (mirrored X loads)`)
+  }
+}
+
 console.log(`Frames: ${n} checks passed (mono-slope + multi-span + TW 表2.8: geometry, releases, loads, wind, snow, scope, quantities, inputs)`)

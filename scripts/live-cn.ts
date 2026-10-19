@@ -39,7 +39,7 @@ try {
   } else {
     const fr = process.argv.indexOf('--frame') > 0 ? process.argv[process.argv.indexOf('--frame') + 1] : 'gable'
     const { normalizeSpans } = await import('../src/domain/types')
-    await sendModel(normalizeSpans({ ...structuredClone(CN_DEFAULT_SPEC), ...(fr === 'mono' ? { frame: 'mono' as const } : fr === 'multi' ? { frame: 'multi' as const, spanList: [24, 24] } : {}) }))
+    await sendModel(normalizeSpans({ ...structuredClone(CN_DEFAULT_SPEC), ...(fr === 'mono' ? { frame: 'mono' as const } : fr === 'multi' || fr === 'gableCols' ? { frame: fr as 'multi' | 'gableCols', spanList: [24, 24] } : {}) }))
     console.log(`CN model transmitted (${fr}): nodes ${S.built!.model.nodes.length}, cases ${S.built!.cases.length}, combos ${S.built!.combos}.`)
     await analyzeCore()
     console.log('CN analysis completed.')

@@ -1,7 +1,7 @@
 /* 한국 KDS 라이브 회귀 (명시적 실행). MAPI-Key 는 stdin → MAPI_KEY 환경변수 → .env(gitignore) 순 — 인자·커밋 금지.
    현재 Gen 문서를 자동 저장한 뒤 시험 모델을 만든다.
    실행: printf '<key>
-' | node --import tsx scripts/live-kr.ts [--frame mono|multi] [--optimize] [--gen-check] [--gen-default] [--systems] [--assert-pass]
+' | node --import tsx scripts/live-kr.ts [--frame mono|multi|gableCols] [--optimize] [--gen-check] [--gen-default] [--systems] [--assert-pass]
    --gen-check: PUT DESIGN/STEEL/DSTL 'KDS 41 30 : 2022' → POST .../CODE-ANAL(180 s 제한) → post/STEELCODECHECK,
    Gen KDS 강도비를 앱 검토와 역할별로 대조. 기본: 앱 유효길이(krLengths)를 LENG(K = 1)·DCTL·MBTP 로 맞춘 뒤 대조, --gen-default 면 Gen 기본 설계 옵션. */
 import { readMapiKey } from './mapi-key'
@@ -46,7 +46,7 @@ try {
     const base = structuredClone(KR_DEFAULT_SPEC)
     /* --systems: X 보통모멘트골조·Y 보통중심가새골조 (KDS 14 31 60 상세, 증폭지진 조합 포함) */
     if (process.argv.includes('--systems')) base.korea = { ...base.korea!, systemX: 'OMF', systemY: 'OCBF' }
-    await sendModel(normalizeSpans({ ...base, ...(fr === 'mono' ? { frame: 'mono' as const } : fr === 'multi' ? { frame: 'multi' as const, spanList: process.argv.includes('--spans') ? process.argv[process.argv.indexOf('--spans') + 1].split(',').map(Number) : [24, 24] } : {}) }))
+    await sendModel(normalizeSpans({ ...base, ...(fr === 'mono' ? { frame: 'mono' as const } : fr === 'multi' || fr === 'gableCols' ? { frame: fr as 'multi' | 'gableCols', spanList: process.argv.includes('--spans') ? process.argv[process.argv.indexOf('--spans') + 1].split(',').map(Number) : [24, 24] } : {}) }))
     console.log(`KR model transmitted (${fr}): nodes ${S.built!.model.nodes.length}, cases ${S.built!.cases.length}, combos ${S.built!.combos}.`)
     await analyzeCore()
     console.log('KR analysis completed.')

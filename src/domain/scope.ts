@@ -8,11 +8,11 @@ import { validateCnSpec } from './cnLoads'
 import { validateKrSpec } from './krLoads'
 import { isPartialKR } from '../codes/krLateral'
 import { portalGeometry } from './portal'
-import { frameSpans, type FactorySpec } from './types'
+import { columnSpans, hasInteriorColumns, type FactorySpec } from './types'
 
 export type ScopeKey =
   | 'additionInput' | 'additionReview' | 'craneAssumed' | 'siteAssumed' | 'crane' | 'mezzanine' | 'multiSpan' | 'opening' | 'openingCN'
-  | 'span' | 'eave' | 'eaveHigh' | 'slope' | 'bayRatio' | 'baySpacing' | 'length' | 'hnR' | 'cn' | 'monoTW' | 'multi' | 'multiTW' | 'kr' | 'multiKR'
+  | 'span' | 'eave' | 'eaveHigh' | 'slope' | 'bayRatio' | 'baySpacing' | 'length' | 'hnR' | 'cn' | 'monoTW' | 'multi' | 'gableCols' | 'craneInterior' | 'multiTW' | 'kr' | 'multiKR'
 export interface ScopeIssue { key: ScopeKey; level: 'block' | 'warn'; args: (string | number)[] }
 export interface ScopeResult { issues: ScopeIssue[]; blocked: boolean }
 
@@ -39,7 +39,9 @@ export function checkScope(spec: FactorySpec, f: ScopeFeatures = spec.features ?
   if (f.crane && spec.additions?.crane && !spec.additions.crane.manufacturer?.trim()) warn('craneAssumed')
   /* TW 工址 조건이 위치 기반 제안값이면 확정된 법규 산정으로 표시하지 않는다 (현지화 검토 P0) */
   if (spec.code === 'TW' && spec.siteBasis !== 'confirmed') warn('siteAssumed')
-  if (f.multiSpan && spec.frame !== 'multi') block('multiSpan') // 다경간 형식을 고르면 지원
+  if (f.multiSpan && !hasInteriorColumns(spec)) block('multiSpan') // 다경간·한 지붕 다경간 형식을 고르면 지원
+  /* 크레인은 바깥 기둥 열(x = 0, 스팬) 레일 — 내부 기둥이 있으면 전체 폭 크레인이 지나갈 수 없다 */
+  if (f.crane && hasInteriorColumns(spec)) block('craneInterior')
   /* 큰 개구부: TW 는 부분 밀폐(GCpi ±0.55)로 근사 가능 — 개구부 골조는 별도. CN 은 폐쇄형만 */
   if (f.opening && !activeOpening({...spec,features:f})) {
     if (spec.code === 'CN') block('openingCN')
@@ -48,7 +50,7 @@ export function checkScope(spec: FactorySpec, f: ScopeFeatures = spec.features ?
 
   /* 치수 한계 */
   /* 스팬 한계는 경간마다 (다경간은 경간 폭 목록) */
-  const wMax = Math.max(...frameSpans(spec))
+  const wMax = Math.max(...columnSpans(spec))
   if (!(spec.span > 0 && wMax <= LIMITS.span)) block('span', wMax)
   if (!(spec.eaveHeight > 0 && spec.eaveHeight <= LIMITS.eave)) block('eave', spec.eaveHeight)
   if (!(spec.roofSlope > 0 && spec.roofSlope <= LIMITS.slope)) block('slope', spec.roofSlope)
@@ -60,6 +62,7 @@ export function checkScope(spec: FactorySpec, f: ScopeFeatures = spec.features ?
     /* KR: 표 5.7-1 에 다경간 표 없음 — θ ≥ 10° 는 첫 풍상면만 풍상 표·나머지 풍하 표, 불균형 적설(4.5.3) 처마 쪽 면 0.5S_f 가정 */
     if (spec.code === 'KR') warn('multiKR')
   }
+  if (spec.frame === 'gableCols') warn('gableCols')
   if (spec.frame === 'mono') {
     if (spec.eaveHeight <= LIMITS.eave && G.ridgeZ > LIMITS.eave) block('eaveHigh', r2(G.ridgeZ))
     if (spec.code === 'TW') warn('monoTW')

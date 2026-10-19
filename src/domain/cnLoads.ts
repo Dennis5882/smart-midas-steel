@@ -10,14 +10,14 @@ import type { LoadCaseType } from '../codes'
 import type { LoadInfo, LoadPayloads } from './loads'
 import { portalGeometry, type Geometry } from './portal'
 import { nodeWeights } from './weights'
-import { baySpans, frameSpans, type FactoryModel, type FactorySpec, type Face, type Node } from './types'
+import { baySpans, columnSpans, frameSpans, type FactoryModel, type FactorySpec, type Face, type Node } from './types'
 import { sectionProps } from './sections'
 
 export function validateCnSpec(spec: FactorySpec): void {
   const c = spec.china
   if (!c) throw new Error('CN project inputs are required')
   if (spec.wind.enclosure !== 'enclosed') throw new Error('GB: this factory model supports closed buildings; dominant openings require a separate pressure model')
-  if (!(spec.eaveHeight > 0 && spec.eaveHeight <= 18 && spec.span > 0 && Math.max(...frameSpans(spec)) <= 60 && spec.bays >= 1 && Number.isInteger(spec.bays) && baySpans(spec).every((s) => s > 0) && spec.roofSlope > 0 && spec.roofSlope <= 1 && (spec.frame !== 'mono' || spec.eaveHeight + spec.span * spec.roofSlope <= 18))) throw new Error('GB scope: regular single-storey factory, eave ≤18 m, span ≤60 m, roof slope ≤1')
+  if (!(spec.eaveHeight > 0 && spec.eaveHeight <= 18 && spec.span > 0 && Math.max(...columnSpans(spec)) <= 60 && spec.bays >= 1 && Number.isInteger(spec.bays) && baySpans(spec).every((s) => s > 0) && spec.roofSlope > 0 && spec.roofSlope <= 1 && (spec.frame !== 'mono' || spec.eaveHeight + spec.span * spec.roofSlope <= 18))) throw new Error('GB scope: regular single-storey factory, eave ≤18 m, span ≤60 m, roof slope ≤1')
   for (const k of ['w0', 'topography', 'alphaMax', 'Tg', 'Tx', 'Ty', 'damping', 'snowMu', 'gamma0', 'concreteBearing', 'anchorFt'] as const)
     if (!(Number.isFinite(c[k]) && c[k] > 0)) throw new Error(`GB: invalid ${k}`)
   if (!(c.w0 >= .3 && c.topography >= .75 && c.snow >= 0 && Number.isFinite(c.snow) && c.snowMu >= .9 && c.gamma0 >= 1 && c.Tx <= 6 && c.Ty <= 6 && c.damping >= .045 && c.damping <= .05)) throw new Error('GB: check w0 ≥0.3, topography ≥0.75, snow multiplier ≥0.9, gamma0 ≥1, periods ≤6 s, damping 0.045–0.05')

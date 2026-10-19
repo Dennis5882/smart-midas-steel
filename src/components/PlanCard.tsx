@@ -25,7 +25,7 @@ import { FigureButton, FigureNote } from './FigureRef'
 import { siteSourceText, windSourceText } from './Status'
 import { ScopeBox } from './ScopeBox'
 import { checkScope, NO_FEATURES, type ScopeFeatures } from '../domain/scope'
-import { lengthText, type FactorySpec, type ElementRole } from '../domain/types'
+import { hasInteriorColumns, lengthText, type FactorySpec, type ElementRole } from '../domain/types'
 import { t, tc } from '../i18n'
 import { advancedTitleKey, fieldConflicts, fieldStep, groupsFor, initVals, invalidFields, numericStep, toSpec, type Group, type Path } from './planFields'
 import { S, notify, useStore, type ChatMsg } from '../state/store'
@@ -52,7 +52,7 @@ function Summary({ spec, tpl }: { spec: FactorySpec; tpl?: TemplateKey }) {
         <div><span className="plan-type">{t(`tpl_${k}`)}</span></div>
       </div>
       {row(t('f_frame'), t(`frame_${spec.frame ?? 'gable'}`))}
-      {row(t('f_span'), spec.frame === 'multi' && spec.spanList ? `${spec.span} m (${spec.spanList.join(' + ')})` : `${spec.span} m`)}
+      {row(t('f_span'), hasInteriorColumns(spec) && spec.spanList ? `${spec.span} m (${spec.spanList.join(' + ')})` : `${spec.span} m`)}
       {row(t('kv_length'), lengthText(spec))}
       {row(t('f_eave'), `${spec.eaveHeight} m · ${t('f_slope')} ${spec.roofSlope} · ${t('f_base')} ${t(spec.baseFixity === 'fixed' ? 'base_fixed' : 'base_pinned')}`)}
       {row(t('f_column'), `${sec.column} · ${t('f_rafter')} ${sec.rafter}`)}
@@ -122,7 +122,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
   const set = (p: Path, v: string) => {
     dirty.current = true
     if (fieldStep({path:p}) < ADDITIONS_STEP) invalidateAdditions()
-    if (p === 'frame') updateFeat((old)=>({...old,multiSpan:v==='multi'}))
+    if (p === 'frame') updateFeat((old)=>({...old,multiSpan:v==='multi'||v==='gableCols'}))
     setVals((o) => {
       const n = { ...o, [p]: v }
       if (!individual && (p === 'bays' || p === 'baySpacing') && Number.isInteger(+n.bays) && +n.bays > 0 && +n.bays <= 1000 && Number.isFinite(+n.baySpacing) && +n.baySpacing > 0) {

@@ -350,7 +350,7 @@ main.splitting .right,main.splitting .chat{pointer-events:none}
 .mw-sketch svg{display:block;width:100%;max-height:130px}.mw-sketch text{font-family:var(--font-mono);font-size:11px;fill:var(--muted)}
 .mw-frame-picker{margin-bottom:16px;max-width:480px}
 .mw-picker-label{display:block;font-size:.75rem;color:var(--muted);margin-bottom:10px}
-.mw-frame-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.mw-frame-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:7px}
 .mw-frame-options button,.mw-base-options button{position:relative;border:1px solid var(--border);border-radius:8px;background:var(--panel);color:var(--muted);font-family:var(--font-ui);cursor:pointer;transition:background .15s,border-color .15s}
 .mw-frame-options button{display:flex;flex-direction:column;align-items:center;gap:5px;padding:9px 5px 8px;font-size:.72rem;line-height:1.4;min-width:0}
 .mw-frame-options button>svg{width:100%;max-width:76px;height:44px}
