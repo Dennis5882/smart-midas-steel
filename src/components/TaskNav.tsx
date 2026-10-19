@@ -1,4 +1,4 @@
-import { Building2, ChartNoAxesCombined, ClipboardCheck, Download, History, SlidersHorizontal, Settings, CircleHelp, RotateCcw, Eraser } from 'lucide-react'
+import { Building2, Calculator, ClipboardCheck, Download, History, SlidersHorizontal, Settings, CircleHelp, RotateCcw, Eraser } from 'lucide-react'
 import { restoreBackup } from '../actions/build'
 import { executeAction, resetWorkspace } from '../agent/session'
 import { t } from '../i18n'
@@ -6,7 +6,7 @@ import { useStore } from '../state/store'
 import { selectTask } from '../state/ui'
 import { TASKS, taskStatus } from '../state/taskFlow'
 
-const ICONS = [Building2, ChartNoAxesCombined, ClipboardCheck, SlidersHorizontal, Download]
+const ICONS = [Building2, Calculator, ClipboardCheck, SlidersHorizontal, Download]
 export function TaskNav({ collapsed, onToggle, onOpenMapi }: { collapsed: boolean; onToggle(): void; onOpenMapi(): void }) {
   const s = useStore()
   const unread = s.activity.filter((a) => a.source === 'notice' && a.level !== 'info' && !a.acknowledged).length

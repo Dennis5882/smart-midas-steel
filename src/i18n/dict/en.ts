@@ -536,6 +536,7 @@ export const en = {
   g_help_2: 'Release notes',
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_4_4_1: 'The Analysis step in the task menu now uses a calculator icon.',
   rn_v2_4_3_1: 'The outputs screen now has Report, Drawings and Quantities cards: pick a format (report PDF/Word/HTML, drawings DXF/PDF, quantities CSV) and export; the chosen format is remembered.',
   rn_v2_4_3_2: 'Drawings can also be downloaded as an A3 landscape PDF (same sheets as the DXF, one per page). Dimension symbols × and · no longer turn into ? in DXF and drawings.',
   rn_v2_4_3_3: 'In Simplified Chinese, the start-screen design-code selector shows the full title GB 51022-2015 门式刚架轻型房屋钢结构技术规范.',
