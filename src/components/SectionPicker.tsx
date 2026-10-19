@@ -21,7 +21,7 @@ export function SectionPicker({ id, spec, role, value, disabled, invalid, errorI
         </option>)}
       </optgroup>)}
     </select>
-    {value.trim() && <SectionSketch name={value} code={spec.code} />}
+    {value.trim() && <SectionSketch name={value} code={spec.code} material={spec.material} />}
     <div id={noteId} className="section-picker-note">
       <small>{t('section_options_note', material, options.length)}</small>
       <small className={excluded ? 'section-picker-warning' : undefined}>{excluded ? t('section_excluded_source') : source ? t('section_gen_source', source.db) : t('section_dimension_source')}</small>

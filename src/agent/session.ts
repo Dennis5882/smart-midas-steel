@@ -9,7 +9,7 @@ import { TEMPLATES } from '../domain/templates'
 import { defaultSpecFor, normalizeBays, type FactorySpec } from '../domain/types'
 import { getLang, langUrl, t, lt, isLText } from '../i18n'
 import { verifyConn } from '../mapi/client'
-import { S, notify, saveCode, type Theme } from '../state/store'
+import { S, freshWorkState, notify, saveCode, type Theme } from '../state/store'
 import { specChanged } from '../state/taskFlow'
 import { addMsg, addPlanMsg, escapeHtml, previewSpec, tab, selectTask } from '../state/ui'
 import { unavailable } from '../state/taskFlow'
@@ -61,7 +61,7 @@ export async function executeAction(c: Intent): Promise<void> {
       const base: FactorySpec = { ...defaultSpecFor(S.code), ...(previous.code === S.code ? previous : {}) }
       const geo = c.mode === 'template' ? { ...TEMPLATES[c.tpl ?? 'general'], bayList: undefined } : {}
       const spec = normalizeBays({ ...base, ...geo, ...c.params, code: S.code })
-      addPlanMsg(spec, c.mode, c.tpl)
+      addPlanMsg(spec, c.mode, c.tpl, c.mode === 'template' && !!c.tpl)
       tab('viewP')
       previewSpec(spec)
       break
@@ -160,11 +160,8 @@ export async function resetWorkspace(): Promise<void> {
   if (!await confirmAction({ title: t('flow_reset_title'), body: t('flow_reset_body'), ok: t('flow_reset_ok'), danger: true })) return
   if (S.busy || S.confirm) return
   S.buildEpoch++
-  S.activePlan = null; S.draftSpec = null; S.draftInvalid = false; S.preview = null
-  S.workspaceView = 'start'; S.task = 'model'; S.panel = 'logP'; S.ratioView = false
-  S.built = null; S.analyzed = false; S.genChanged = 0; S.reactions = null; S.results = null; S.design = null; S.connections = null
-  S.opt = null; S.repairPlan = null; S.repairComparison = null; S.restorePoint = null; S.lastFail = null
-  S.log = []; S.msgs = []; S.activity = []
+  // restorePoint 는 Gen 문서 백업 경로라 남긴다 — 초기화 뒤에도 [이전 모델로 복원] 가능
+  Object.assign(S, freshWorkState())
   S.lastSpec = defaultSpecFor(S.code)
   S.viewNonce++
   addMsg('bot', lt('flow_reset_done'))

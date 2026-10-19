@@ -67,4 +67,16 @@ for(const lang of ['ko','en','zh-TW','zh-CN'] as const) {
     assert.ok(review.includes(t('mw_build')))
   }
 }
+/* 단면도: 입력 중인 불완전한 이름은 그리지 않고, 치수 계산 냉간성형은 Zx(탄성값)를 표시하지 않는다 */
+{
+  const { SectionSketch } = await import('../src/components/SectionSketch')
+  for (const partial of ['RH 400x200', 'P 114.3', 'H 600x', 'CC 150x65'])
+    assert.equal(renderToStaticMarkup(createElement(SectionSketch, { name: partial, code: 'TW', material: 'SN400B' })), '', `partial ${partial} renders nothing`)
+  const h = renderToStaticMarkup(createElement(SectionSketch, { name: 'RH 400x200x8x13', code: 'TW', material: 'SN400B' }))
+  assert.ok(h.includes('<svg') && h.includes('Zx') && !h.includes('NaN'), 'full H section renders outline and plastic Zx')
+  const cc = renderToStaticMarkup(createElement(SectionSketch, { name: 'CC 150x65x20/3.2', code: 'CN', material: 'Q235B' }))
+  assert.ok(cc && !cc.includes('NaN'), 'lipped C renders without NaN')
+  const lc = renderToStaticMarkup(createElement(SectionSketch, { name: 'LC-150x65x20x2.3', code: 'TW', material: 'SN400B' }))
+  assert.ok(lc && lc.includes('Sx') && !lc.includes('>Zx<'), 'dimension-only cold-formed shows Sx, not a plastic-looking Zx')
+}
 console.log('Modeling flow: 7 stages, 4 languages × 3 codes, distinct frame/interfaces, optional parts, error routes, unique targets and read-only summaries passed.')

@@ -51,8 +51,9 @@ export function selectTask(task: TaskId): void {
 }
 
 /** Set the single active editor — template wizard or free-frame form. */
-export function addPlanMsg(spec: FactorySpec, mode: BuildMode = 'free', tpl?: TemplateKey): void {
-  S.activePlan = { id: nextId(), ts: hm(), role: 'bot', kind: 'plan', spec, epoch: S.buildEpoch, mode, tpl, modelRevision: S.modelRevision }
+/** fromStart: 사용자가 템플릿을 직접 고른 새 편집기 — 시작(템플릿) 단계를 건너뛴다 */
+export function addPlanMsg(spec: FactorySpec, mode: BuildMode = 'free', tpl?: TemplateKey, fromStart?: boolean): void {
+  S.activePlan = { id: nextId(), ts: hm(), role: 'bot', kind: 'plan', spec, epoch: S.buildEpoch, mode, tpl, modelRevision: S.modelRevision, ...(fromStart ? { fromStart: true as const } : {}) }
   S.draftSpec = spec
   S.draftInvalid = false
   S.task = 'model'

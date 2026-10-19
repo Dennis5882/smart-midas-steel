@@ -825,19 +825,23 @@ td.pos{color:var(--green)} td.neg{color:var(--red)}
 .addition-editor input[type="checkbox"] { accent-color: var(--blue); margin-right: 6px; }
 
 /* NG diagnosis and explicit section selection. */
-.section-picker{width:100%;min-width:0}
+.section-picker{width:100%;min-width:0;container-type:inline-size}
 .section-picker-note{display:grid;gap:4px;margin-top:6px;line-height:1.6}
-.section-sketch{display:flex;gap:14px;align-items:center;margin-top:8px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--tile)}
-.section-sketch svg{flex:0 0 132px;width:132px;height:132px}
+.section-sketch{display:flex;gap:14px;align-items:flex-start;width:fit-content;max-width:100%;margin-top:8px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--tile)}
+.section-sketch svg{flex:0 0 120px;width:120px;height:120px}
 .section-sketch-shape{fill:color-mix(in srgb,var(--cyan) 22%,transparent);stroke:var(--cyan);stroke-width:1.2}
 .section-sketch-dim{fill:none;stroke:var(--muted);stroke-width:.8}
 .section-sketch svg text{fill:var(--txt);font-size:9px;font-family:var(--font-mono)}
-.section-sketch-info{display:grid;gap:6px;min-width:0;flex:1}
+.section-sketch-info{min-width:0;flex:1;padding-top:4px}
+.section-sketch-info>summary{cursor:pointer;width:fit-content;font-size:.72rem;color:var(--muted)}
+.section-sketch-info[open]>summary{margin-bottom:6px}
+.section-sketch-info[open]{display:grid;gap:6px;align-content:start}
 .section-sketch-info>small{color:var(--muted);font-size:.7rem}
-.section-sketch-info dl{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:3px 14px;margin:0}
+.section-sketch:has(.section-sketch-info[open]){width:100%}
+.section-sketch-info dl{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:3px 14px;margin:0}
 .section-sketch-info dl div{display:flex;justify-content:space-between;gap:8px;font-size:.74rem}
-.section-sketch-info dt{color:var(--muted)}.section-sketch-info dd{margin:0;color:var(--txt-hi)}.section-sketch-info dd small{color:var(--muted);font-size:.66rem}
-@container(max-width:300px){.section-sketch{flex-direction:column;align-items:stretch}.section-sketch svg{margin:0 auto}}
+.section-sketch-info dt{color:var(--muted);white-space:nowrap}.section-sketch-info dd{white-space:nowrap}.section-sketch-info dd{margin:0;color:var(--txt-hi)}.section-sketch-info dd small{color:var(--muted);font-size:.66rem}
+@container(max-width:340px){.section-sketch{flex-direction:column;align-items:stretch}.section-sketch svg{margin:0 auto}}
 .section-picker-note small,.section-picker-manual small{color:var(--muted);font-size:.73rem}
 .section-picker-note .section-picker-warning{color:var(--amber)}
 .section-picker-manual{margin-top:8px;font-size:.73rem;color:var(--muted)}

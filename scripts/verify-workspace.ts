@@ -110,7 +110,8 @@ await resetWorkspace()
 assert.equal(S.built, builtBefore, 'a running job cannot be reset')
 S.busy = false
 await resetWorkspace()
-assert.ok(!S.built && !S.analyzed && !S.design && !S.connections && !S.draftSpec && !S.activePlan && !S.restorePoint, 'reset clears inputs, model and results')
+assert.ok(!S.built && !S.analyzed && !S.design && !S.connections && !S.draftSpec && !S.activePlan, 'reset clears inputs, model and results')
+assert.equal(S.restorePoint, 'C:/temp/sms_backup.mgbx', 'reset keeps the Gen backup so the replaced model can still be restored')
 assert.equal(S.workspaceView, 'start'); assert.equal(S.task, 'model')
 assert.equal(S.log.length, 0, 'reset clears the API log')
 assert.equal(S.activity.length, 1, 'only the reset notice remains in history')
@@ -118,6 +119,12 @@ assert.equal(S.code, 'TW', 'reset keeps the design code')
 assert.equal(S.mapiKey, 'test-only', 'reset keeps the connection key')
 assert.equal(S.baseUrl, 'https://example.invalid/gen', 'reset keeps the connection URL')
 assert.equal(S.lastSpec.material, defaultSpecFor('TW').material, 'new work starts from the code defaults')
+/* 템플릿 단계 건너뛰기: 사용자가 템플릿을 고른 새 편집기만 (설계기준 변경으로 열린 편집기는 아님) */
+await executeAction({ intent: 'new', mode: 'template', tpl: 'small', params: {} })
+assert.equal(S.activePlan?.fromStart, true, 'start-screen template opens past the template step')
+await setCode('CN')
+assert.equal(S.activePlan?.fromStart, undefined, 'a code-change editor starts at the template step')
+await setCode('TW')
 S.mapiKey = ''
 setConfirmHandler(null)
 /* 설계기준·언어 예외 규칙 (간체만): 새 작업은 CN 만 / 작업 중 간체 전환은 TW 유지 / 그 밖 언어는 고른 기준 유지 */

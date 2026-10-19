@@ -53,10 +53,10 @@ function GeometrySketch({ spec, plan }: { spec: FactorySpec; plan: boolean }) {
 
 interface Props {
   spec: FactorySpec; step: number; visited: number; disabled: boolean; blocked: boolean; invalid: boolean; attempted: boolean
-  onStep(step: number): void; onBuild(): void; onCancel(): void; onChangeCode?(): void; children: ReactNode
+  onStep(step: number): void; onBuild(): void; onCancel(): void; onChangeCode?(): void; codeLocked?: boolean; children: ReactNode
 }
 
-export function ModelWizard({ spec, step, visited, disabled, blocked, invalid, attempted, onStep, onBuild, onCancel, onChangeCode, children }: Props) {
+export function ModelWizard({ spec, step, visited, disabled, blocked, invalid, attempted, onStep, onBuild, onCancel, onChangeCode, codeLocked, children }: Props) {
   const heading = useRef<HTMLHeadingElement>(null)
   const content = useRef<HTMLDivElement>(null)
   const mounted = useRef(false)
@@ -70,7 +70,7 @@ export function ModelWizard({ spec, step, visited, disabled, blocked, invalid, a
     <header className="mw-banner">
       <div className="mw-brand"><Building2 size={18} /><span>{t('mw_title')}</span>
         <span className="mw-code-info"><span className="mw-code" title={t('code_label')}>{spec.code}</span><span className="mw-code-label">{t(PROFILES[spec.code].labelKey)}</span>
-          {onChangeCode && <button type="button" className="btn btn-ghost mw-code-change" disabled={disabled} onClick={onChangeCode}>{t('project_code_change')}</button>}</span></div>
+          {onChangeCode && <button type="button" className="btn btn-ghost mw-code-change" disabled={codeLocked} onClick={onChangeCode}>{t('project_code_change')}</button>}</span></div>
       <div className="mw-progress-text"><span>{t('mw_process')}</span><strong>{String(step + 1).padStart(2, '0')} / {String(WIZARD_STEPS.length).padStart(2, '0')}</strong></div>
       <div className="mw-progress" role="progressbar" aria-label={t('mw_process')} aria-valuemin={1} aria-valuemax={WIZARD_STEPS.length} aria-valuenow={step + 1}><span style={{ width: `${(step + 1) / WIZARD_STEPS.length * 100}%` }} /></div>
     </header>

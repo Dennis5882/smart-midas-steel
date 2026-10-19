@@ -37,7 +37,7 @@ export interface LogEntry { id: number; ts: string; type: LogType; html: string 
 export type ChatMsg = { ts?: string } & (
   | { id: number; role: 'user' | 'bot'; kind: 'html'; html: string | LText }
   | { id: number; role: 'bot'; kind: 'thinking' }
-  | { id: number; role: 'bot'; kind: 'plan'; spec: FactorySpec; epoch: number; mode: BuildMode; tpl?: TemplateKey; modelRevision?: number }
+  | { id: number; role: 'bot'; kind: 'plan'; spec: FactorySpec; epoch: number; mode: BuildMode; tpl?: TemplateKey; modelRevision?: number; fromStart?: true }
 )
 
 /** Gen 에 보낸 모델 — 스펙·형상·하중 요약 */
@@ -79,7 +79,37 @@ function readCode(): CodeId {
   return codeForLang(getLang(), 'TW', savedCode(), false)
 }
 
+/** 작업 상태 초기값 — 앱 시작과 [작업 초기화]가 같이 쓴다. 새 작업 상태는 여기에 추가한다
+   (연결·화면 설정·Gen 백업 경로·개정 번호는 작업 상태가 아니라 S 에 직접 둔다) */
+export function freshWorkState() {
+  return {
+    lastFail: null as { kind: JobKind; cancelled: boolean; msg?: string; repair?: boolean } | null,
+    genChanged: 0,
+    panel: 'logP' as PanelId,
+    ratioView: false,
+    log: [] as LogEntry[],
+    msgs: [] as ChatMsg[],
+    activePlan: null as Extract<ChatMsg, { kind: 'plan' }> | null,
+    draftSpec: null as FactorySpec | null,
+    workspaceView: 'start' as 'start' | 'model',
+    task: 'model' as TaskId,
+    draftInvalid: false,
+    activity: [] as Activity[],
+    preview: null as FactorySpec | null,
+    built: null as Built | null,
+    analyzed: false,
+    reactions: null as ReactionSum[] | null,
+    results: null as Results | null,
+    design: null as DesignResult | null,
+    connections: null as ConnResult[] | null,
+    opt: null as OptSummary | null,
+    repairPlan: null as RepairPlan | null,
+    repairComparison: null as RepairComparison | null,
+  }
+}
+
 export const S = {
+  ...freshWorkState(),
   /* MIDAS API — MAPI-Key 는 메모리에만(저장 금지) */
   baseUrl: 'https://moa-engineers.midasit.com:443/gen',
   mapiKey: '',
@@ -93,51 +123,29 @@ export const S = {
   /** 진행 중 작업 (진행 표시·취소) — busy 와 함께 beginJob/endJob 이 관리 */
   job: null as Job | null,
   /** 마지막 작업 실패·취소 (작업 흐름 띠의 다시 시도) — beginJob 이 비움 */
-  lastFail: null as { kind: JobKind; cancelled: boolean; msg?: string; repair?: boolean } | null,
   /** Gen 모델 변경 감지 건수 (0 = 같음) — assertGenSync 가 갱신, sendModel 이 비움 */
-  genChanged: 0,
   /** 확인 창 요청 (ConfirmDialog) */
   confirm: null as (import('../components/ConfirmDialog').ConfirmReq & { resolve(ok: boolean): void }) | null,
   /** 마지막 [공장 생성] 직전 Gen 문서 백업 (Gen PC 경로) — [이전 모델로 복원] 대상 */
   restorePoint: null as string | null,
   theme: readTheme(),
   code: readCode(),
-  panel: 'logP' as PanelId,
   cam: 'iso' as CamId,
   vis3d: { column: true, rafter: true, purlin: true, girt: true, strut: true, post: true, brace: true, support: true, node: false } as Vis3D,
   /** 3D 표시 방식 — 선 / 단면 형상(실제 치수 입체) */
   render3d: 'line' as 'line' | 'solid',
   /** 3D 를 강도비 색상으로 표시 */
-  ratioView: false,
-  log: [] as LogEntry[],
-  msgs: [] as ChatMsg[],
   /** One current modeling editor. Hidden on the start screen, kept mounted to retain raw inputs and step. */
-  activePlan: null as Extract<ChatMsg, { kind: 'plan' }> | null,
-  draftSpec: null as FactorySpec | null,
-  workspaceView: 'start' as 'start' | 'model',
-  task: 'model' as TaskId,
-  draftInvalid: false,
   modelRevision: 0,
   resultRevision: 0,
-  activity: [] as Activity[],
   /** 실행되면 증가 — 이전 계획 카드의 버튼을 모두 잠근다 */
   buildEpoch: 0,
   /** 편집 중인 스펙 미리보기 (아직 Gen 에 보내지 않은 형상) */
-  preview: null as FactorySpec | null,
   viewNonce: 0,
-  built: null as Built | null,
-  analyzed: false,
-  reactions: null as ReactionSum[] | null,
   /** 해석 결과 원자료 (설계 검토 입력) */
-  results: null as Results | null,
-  design: null as DesignResult | null,
-  connections: null as ConnResult[] | null,
   /** 릴리즈 노트 창 열림 */
   rnOpen: false,
   /** 단면 자동 최적화 결과 */
-  opt: null as OptSummary | null,
-  repairPlan: null as RepairPlan | null,
-  repairComparison: null as RepairComparison | null,
   /** 마지막으로 쓴 스펙 — 새 계획 카드의 출발점 */
   lastSpec: DEFAULT_SPEC as FactorySpec,
 }
