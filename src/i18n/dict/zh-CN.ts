@@ -436,6 +436,7 @@ export const zhCN: Dict = {
   g_design_6: '数量 (CSV)',
   g_design_6_cmd: '数量',
   btn_html: '打开计算书 (HTML)',
+  log_xlsx: '已生成数量 Excel（.xlsx）',
   log_csv: '已生成数量 CSV',
   q_members: '构件',
   q_plates: '节点钢板',
@@ -483,6 +484,7 @@ export const zhCN: Dict = {
   q_note: '* = 估算值（加劲肋、补强板与节点板尺寸、焊缝长度）。不含山墙柱柱脚、檩条与墙梁连接件、拉条、围护板及其他五金。涂装面积 = 构件外周长 × 长度（冷弯型钢计两面）。',
   q_loss_v: (m, p) => `构件 ${m}%、钢板 ${p}%`,
   pdf_done: (name, pages, kb, time) => `PDF 已生成并开始下载：<b>${name}</b> · ${pages} 页 · ${kb} KB · ${time}。`,
+  xlsx_done: (net, order) => `已下载数量 Excel（.xlsx）— 净钢材量 <b>${net} t</b>，订货重量 <b>${order} t</b>（含损耗）。`,
   csv_done: (net, order) => `已下载数量 CSV — 净用钢量 <b>${net} t</b>，订货重量 <b>${order} t</b>（含损耗）。`,
   opt_start: (n) => `截面自动优化 — 各构件组选取强度比 ≤ 0.95 的最轻 CNS2020 截面，重复 验算 → 选取 → 重新发送 → 重新分析（最多 ${n} 次，每次约 30 秒）。`,
   opt_done: (wb, wa, pct, max, status, it) => `优化完成 — 用钢量 <b>${wb} t → ${wa} t</b>（节省 ${pct}%），最大强度比 <b>${max}</b>，分析 ${it} 次。状态：${status}。Gen 模型已应用新截面 — 请见结果分页。`,
@@ -522,6 +524,7 @@ export const zhCN: Dict = {
   g_help_2: '版本说明',
   g_help_2_cmd: '版本说明',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_4_5_1: '数量表可选择 CSV 或 Excel（XLSX）下载；XLSX 数值为数字单元格、标题加粗，可直接计算。',
   rn_v2_4_4_1: '任务菜单的“分析”图标改为计算器。',
   rn_v2_4_3_1: '输出界面整理为计算书、图纸、数量三张卡片：选择格式（计算书 PDF/Word/HTML、图纸 DXF/PDF、数量 CSV）后导出，并记住所选格式。',
   rn_v2_4_3_2: '图纸也可下载为 A3 横向 PDF（与 DXF 相同图纸，每页一张）。修正 DXF 与图纸中尺寸符号 ×、· 变成 ? 的问题。',

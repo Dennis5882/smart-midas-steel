@@ -112,7 +112,7 @@ Vite 8 + TypeScript + React 19 + Tailwind v4 + shadcn/ui(new-york) + **Vercel Fu
 
 ### v2.4.3 산출물 카드·도면 PDF
 
-- 산출물 화면 = `TaskStage` `OUTPUTS` 카드 3개(계산서 PDF·Word·HTML / 도면 DXF·PDF / 물량 CSV) — 형식 선택(ARIA radio, 방향키) 후 추출, 카드별 형식은 localStorage `sms_format_<id>`. 작업 종류 `docx`·`dwgpdf` 분리(`FILE_JOBS` — 결과 개정 유지). 도면 PDF `report/pdf.ts drawingsPdfDefinition`: DXF 와 같은 SVG 시트를 A3 가로 한 장씩, vector-effect 대신 선 굵기·점선을 pt 환산, 글꼴은 PDF 표준 Helvetica(도면 글자는 `dxf.toAscii` 로 ASCII — × → x, · → . 등, 예전 '?' 깨짐 수정). 명령 '도면 PDF'(계산서 단어가 있으면 계산서). 시작 화면 설계기준 드롭다운만 프로필 `selectLabelKey`(간체 CN = `GB 51022-2015 门式刚架轻型房屋钢结构技术规范`). BASE URL 은 드롭다운(`baseUrlOptions` — 언어 기본 서버 먼저 + 직접 입력, v2.4.2).
+- 산출물 화면 = `TaskStage` `OUTPUTS` 카드 3개(계산서 PDF·Word·HTML / 도면 DXF·PDF / 물량 CSV) — 형식 선택(ARIA radio, 방향키) 후 추출, 카드별 형식은 localStorage `sms_format_<id>`. 작업 종류 `docx`·`dwgpdf` 분리(`FILE_JOBS` — 결과 개정 유지). 도면 PDF `report/pdf.ts drawingsPdfDefinition`: DXF 와 같은 SVG 시트를 A3 가로 한 장씩, vector-effect 대신 선 굵기·점선을 pt 환산, 글꼴은 PDF 표준 Helvetica(도면 글자는 `dxf.toAscii` 로 ASCII — × → x, · → . 등, 예전 '?' 깨짐 수정). 명령 '도면 PDF'(계산서 단어가 있으면 계산서). 시작 화면 설계기준 드롭다운만 프로필 `selectLabelKey`(간체 CN = `GB 51022-2015 门式刚架轻型房屋钢结构技术规范`). 물량 산출서 CSV·XLSX: 행은 `report/quantitySheet.ts`(순수, 두 형식 공통), XLSX 는 `report/xlsx.ts` 최소 OOXML 작성기(jszip, 외부 엑셀 라이브러리 없음 — 숫자 칸·제목/머리 굵게), 명령 '엑셀/xlsx'. BASE URL 은 드롭다운(`baseUrlOptions` — 언어 기본 서버 먼저 + 직접 입력, v2.4.2).
 
 ### v0.12.0 보완
 

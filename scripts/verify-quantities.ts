@@ -49,4 +49,34 @@ const twModel = buildPortal(fixture.spec), info = buildLoadPayloads(fixture.spec
 const tw = runConnections(fixture.spec, twModel, info, decodeResults(fixture.results))
 assert.ok(tw.every((x) => x.parts))
 assert.deepEqual(quantities(fixture.spec, twModel, tw), quantities(fixture.spec, twModel, tw.map(({ parts: _, ...x }) => x)))
+/* 물량 산출서: CSV·Excel 같은 행. xlsx 파트는 올바른 XML, 숫자는 숫자 칸, 제목·머리 행 굵게, zip 으로 다시 열림 */
+{
+  const { DOMParser } = await import('@xmldom/xmldom')
+  const JSZip = (await import('jszip')).default
+  ;(globalThis as any).document ??= { documentElement: { lang: 'ko', dataset: {} } }
+  const { setLang, t } = await import('../src/i18n')
+  const { quantitySheet, quantityCsv } = await import('../src/report/quantitySheet')
+  const { xlsxParts } = await import('../src/report/xlsx')
+  for (const lang of ['ko', 'en', 'zh-TW', 'zh-CN'] as const) {
+    setLang(lang)
+    const tq = quantities(fixture.spec, twModel, tw), sheet = quantitySheet(fixture.spec, tq)
+    const csv = quantityCsv(sheet)
+    assert.ok(csv.startsWith('\ufeff') && csv.split('\r\n').length === sheet.rows.length, `${lang}: CSV rows`)
+    const parts = xlsxParts(sheet)
+    for (const [path, xml] of Object.entries(parts)) {
+      const errors: string[] = []
+      new DOMParser({ onError: (level: string, msg: string) => { if (level !== 'warning') errors.push(msg) } } as any).parseFromString(xml, 'text/xml')
+      assert.deepEqual(errors, [], `${lang}: ${path} is well-formed XML`)
+    }
+    const ws = parts['xl/worksheets/sheet1.xml']
+    assert.equal((ws.match(/<row /g) ?? []).length, sheet.rows.length, `${lang}: one xlsx row per CSV row`)
+    assert.ok(ws.includes(`<v>${tq.orderT.toFixed(3).replace(/0+$/, '').replace(/\.$/, '')}</v>`), `${lang}: order weight is a numeric cell`)
+    assert.ok(ws.includes(`s="1"><is><t xml:space="preserve">${t('q_members')}</t>`), `${lang}: section title bold`)
+    assert.equal((ws.match(/ s="2"/g) ?? []).length, sheet.rows[1].length + sheet.rows.find((r, i) => i > 0 && sheet.rows[i - 1][0] === t('q_plates'))!.length + sheet.rows.find((r, i) => i > 0 && sheet.rows[i - 1][0] === t('q_bolts'))!.length, `${lang}: three header rows shaded`)
+    const zip = new JSZip(); for (const [path, xml] of Object.entries(parts)) zip.file(path, xml)
+    const back = await JSZip.loadAsync(await zip.generateAsync({ type: 'uint8array' }))
+    assert.ok(back.file('xl/workbook.xml') && back.file('[Content_Types].xml'), `${lang}: xlsx package reopens`)
+  }
+  setLang('ko')
+}
 console.log('Quantity regression passed: shear key, fractional stiffener, totals, structured CN/TW parts, legacy compatibility')

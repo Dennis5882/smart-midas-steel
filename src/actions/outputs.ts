@@ -3,12 +3,11 @@
 import { buildDrawingSvgs, buildDxf } from '../drawing/drawings'
 import { getLang, t, lt } from '../i18n'
 import { buildReport } from '../report/report'
-import { LOSS, QuantityError, quantities } from '../domain/quantities'
-import type { I18nKey } from '../i18n'
+import { QuantityError, quantities } from '../domain/quantities'
+import { quantityCsv, quantitySheet } from '../report/quantitySheet'
 import { S } from '../state/store'
 import { addMsg, log, recordArtifact } from '../state/ui'
 import { unavailable } from '../state/taskFlow'
-import { restraintKeys, support } from '../domain/validity'
 import { beginJob, checkCancel, endJob, failMsg, stage } from './job'
 
 const stamp = () => new Intl.DateTimeFormat('sv-SE').format(new Date()).replaceAll('-', '')
@@ -96,8 +95,8 @@ export async function downloadReportDocx(): Promise<void> {
   }
 }
 
-/** 물량 CSV (UTF-8 BOM — 엑셀에서 바로 열림) */
-export function downloadQuantities(): void {
+/** 물량 산출서 — CSV(UTF-8 BOM, 엑셀에서 바로 열림) 또는 Excel(.xlsx, 제목·머리 굵게·숫자 칸) */
+export async function downloadQuantities(format: 'csv' | 'xlsx' = 'csv'): Promise<void> {
   if (!canOutput()) return
   if (!S.built) { addMsg('bot', lt('no_model')); return }
   const { spec, model } = S.built
@@ -105,26 +104,13 @@ export function downloadQuantities(): void {
   try { q = quantities(spec, model, S.connections) } catch (e) {
     addMsg('bot', e instanceof QuantityError ? t('q_invalid', e.where) : String(e instanceof Error ? e.message : e), 'error'); return
   }
-  const L = (k: string) => t(k as I18nKey)
-  const cell = (v: unknown) => { const s = String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
-  const rows: unknown[][] = [
-    [L('q_members')], [L('rd_role'), L('rd_section'), L('rep_count'), L('rep_len'), 'kg/m', L('rep_wt'), `${L('q_paint')} (m2)`],
-    ...q.members.map((r) => [L(`role_${r.role}`), r.section, r.count, r.length.toFixed(2), r.kgPerM.toFixed(2), r.weight.toFixed(3), (q.paint.find((x) => x.role === r.role && x.section === r.section)?.area ?? 0).toFixed(1)]),
-    [], [L('q_plates')], [L('q_conn'), L('q_part'), L('q_size'), L('q_per'), L('q_conns'), L('q_kg'), L('q_est')],
-    ...q.plates.map((x) => [L(`cn_type_${x.type}`), L(`q_part_${x.part}`), x.size, x.perConn, x.conns, x.kg.toFixed(1), x.est ? '*' : '']),
-    [], [L('q_bolts')], [L('q_conn'), L('q_part'), L('q_size'), L('q_per'), L('q_conns'), L('q_total')],
-    ...q.bolts.map((x) => [L(`cn_type_${x.type}`), L(`q_${x.kind}`), x.size, x.perConn, x.conns, x.total]),
-    [], [L('q_summary')],
-    [L('q_memberT'), q.memberT.toFixed(3), 't'], [L('q_plateT'), q.plateT.toFixed(3), 't'], [L('q_netT'), q.netT.toFixed(3), 't'],
-    [L('q_loss'), t('q_loss_v', LOSS.member * 100, LOSS.plate * 100)], [L('q_orderT'), q.orderT.toFixed(3), 't'],
-    [L('q_paint'), q.paintM2.toFixed(1), 'm2'], [`${L('q_weld')} — ${L('q_cjp')}`, q.cjpM.toFixed(1), 'm'], [`${L('q_weld')} — ${L('q_fillet')}`, q.filletM.toFixed(1), 'm'],
-    [], [L('q_excluded')], [L('q_note')], [L('q_excluded_note')],
-    ...restraintKeys(spec).map((k) => [t(`restraint_${k}`), t(`restraint_${support(spec, k)}`)]),
-    [t('restraint_note')],
-  ]
-  download(`steel_quantities_${stamp()}.csv`, '\ufeff' + rows.map((r) => r.map(cell).join(',')).join('\r\n'), 'text/csv;charset=utf-8')
-  log(t('log_csv'), 'ok')
-  addMsg('bot', lt('csv_done', q.netT.toFixed(2), q.orderT.toFixed(2)))
+  const sheet = quantitySheet(spec, q)
+  if (format === 'xlsx') {
+    const { createXlsx } = await import('../report/xlsx')
+    downloadBlob(`steel_quantities_${spec.code}_${stamp()}.xlsx`, await createXlsx(sheet))
+  } else download(`steel_quantities_${spec.code}_${stamp()}.csv`, quantityCsv(sheet), 'text/csv;charset=utf-8')
+  log(t(format === 'xlsx' ? 'log_xlsx' : 'log_csv'), 'ok')
+  addMsg('bot', lt(format === 'xlsx' ? 'xlsx_done' : 'csv_done', q.netT.toFixed(2), q.orderT.toFixed(2)))
 }
 
 export function downloadDrawings(): void {

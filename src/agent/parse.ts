@@ -16,6 +16,7 @@ export type Intent =
   | { intent: 'pdf' }
   | { intent: 'docx' }
   | { intent: 'quantities' }
+  | { intent: 'quantities_xlsx' }
   | { intent: 'drawings' }
   | { intent: 'drawings_pdf' }
   | { intent: 'status' }
@@ -51,6 +52,7 @@ export function parseCommand(raw: string): Intent {
   if (/(drawing|dxf|도면|圖說|圖紙|图纸)/i.test(txt) && /pdf/i.test(txt) && !/(report|계산서|보고서|計算書|计算书)/i.test(txt)) return { intent: 'drawings_pdf' }
   if (/(docx|word|워드|文書|文档)/i.test(txt)) return { intent: 'docx' }
   if (/pdf/i.test(txt)) return { intent: 'pdf' }
+  if (/(xlsx|excel|엑셀|엑설)/i.test(txt)) return { intent: 'quantities_xlsx' }
   if (/(quantit|csv|물량|數量|材料表)/i.test(txt)) return { intent: 'quantities' }
   if (/(report|계산서|보고서|計算書)/i.test(txt)) return { intent: 'report' }
   if (/(drawing|dxf|도면|圖說|圖紙|圖)/i.test(txt)) return { intent: 'drawings' }

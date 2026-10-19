@@ -438,6 +438,7 @@ export const ko: Dict = {
   g_design_6: '물량 (CSV)',
   g_design_6_cmd: '물량',
   btn_html: '계산서 열기 (HTML)',
+  log_xlsx: '물량 Excel(.xlsx) 생성',
   log_csv: '물량 CSV 생성',
   q_members: '부재',
   q_plates: '접합 판재',
@@ -485,6 +486,7 @@ export const ko: Dict = {
   q_note: '* = 추정값(스티프너·더블러 크기, 거셋 크기, 용접 길이). 풍주 주각, 퍼린·거트 클립, 새그로드, 마감재·볼트 외 철물은 포함하지 않습니다. 도장 면적 = 부재 외곽 둘레 × 길이(냉간성형재는 양면).',
   q_loss_v: (m, p) => `부재 ${m}%, 판재 ${p}%`,
   pdf_done: (name, pages, kb, time) => `PDF 생성 후 다운로드를 시작했습니다: <b>${name}</b> · ${pages}쪽 · ${kb} KB · ${time}.`,
+  xlsx_done: (net, order) => `물량 Excel(.xlsx)을 내려받았습니다 — 순 강재량 <b>${net} t</b>, 발주 중량 <b>${order} t</b> (로스 포함).`,
   csv_done: (net, order) => `물량 CSV를 내려받았습니다 — 순 강재량 <b>${net} t</b>, 발주 중량 <b>${order} t</b> (로스 포함).`,
   opt_start: (n) => `단면 자동 최적화 — 부재 그룹별로 강도비 ≤ 0.95 인 가장 가벼운 CNS2020 단면을 고릅니다. 검토 → 선정 → 재전송 → 재해석을 반복합니다 (최대 ${n}회, 회당 약 30초).`,
   opt_done: (wb, wa, pct, max, status, it) => `최적화 완료 — 강재량 <b>${wb} t → ${wa} t</b> (${pct}% 절감), 최대 강도비 <b>${max}</b>, 해석 ${it}회. 상태: ${status}. Gen 모델에 새 단면이 반영되어 있습니다 — 결과 탭을 보세요.`,
@@ -524,6 +526,7 @@ export const ko: Dict = {
   g_help_2: '릴리즈 노트',
   g_help_2_cmd: '릴리즈 노트',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_4_5_1: '물량 산출서를 CSV 또는 Excel(XLSX)로 골라 내려받을 수 있습니다. XLSX는 숫자 칸·굵은 제목으로 바로 계산할 수 있습니다.',
   rn_v2_4_4_1: '작업 메뉴의 해석 아이콘을 계산기 모양으로 바꿨습니다.',
   rn_v2_4_3_1: '산출물 화면을 계산서·도면·물량 카드로 정리했습니다. 형식(계산서 PDF·Word·HTML, 도면 DXF·PDF, 물량 CSV)을 고른 뒤 추출하며, 고른 형식은 기억합니다.',
   rn_v2_4_3_2: '도면을 A3 가로 PDF로도 내려받을 수 있습니다(DXF와 같은 도면, 한 장씩). DXF·도면의 치수 기호 ×·· 가 ? 로 깨지던 문제를 고쳤습니다.',

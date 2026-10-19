@@ -450,6 +450,7 @@ export const en = {
   g_design_6: 'Quantities (CSV)',
   g_design_6_cmd: 'quantities',
   btn_html: 'Open report (HTML)',
+  log_xlsx: 'Quantities Excel (.xlsx) generated',
   log_csv: 'Quantities CSV generated',
   q_members: 'Members',
   q_plates: 'Connection plates',
@@ -497,6 +498,7 @@ export const en = {
   q_note: '* = estimates (stiffener/doubler and gusset sizes, weld length). Excludes gable post bases, purlin/girt cleats, sag rods, cladding and other hardware. Paint area = member perimeter × length (both faces for cold-formed).',
   q_loss_v: (m: number, p: number) => `members ${m}%, plates ${p}%`,
   pdf_done: (name: string, pages: number, kb: string, time: string) => `PDF generated; download started: <b>${name}</b> · ${pages} pages · ${kb} KB · ${time}.`,
+  xlsx_done: (net: string, order: string) => `Quantities Excel (.xlsx) downloaded — net steel <b>${net} t</b>, order weight <b>${order} t</b> (with loss allowance).`,
   csv_done: (net: string, order: string) => `Quantities CSV downloaded — net steel <b>${net} t</b>, order weight <b>${order} t</b> (with loss allowance).`,
   opt_start: (n: number) => `Section optimization — lightest CNS2020 section per member group with ratio ≤ 0.95. Repeats check → select → resend → reanalyze (up to ${n} rounds, ~30 s each).`,
   opt_done: (wb: string, wa: string, pct: string, max: string, status: string, it: number) => `Optimization done — steel <b>${wb} t → ${wa} t</b> (${pct}% saved), max ratio <b>${max}</b>, ${it} analyses. Status: ${status}. The new sections are in the Gen model — see the Results tab.`,
@@ -536,6 +538,7 @@ export const en = {
   g_help_2: 'Release notes',
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_4_5_1: 'Quantities can be exported as CSV or Excel (XLSX); the XLSX keeps numbers as numeric cells with bold section titles.',
   rn_v2_4_4_1: 'The Analysis step in the task menu now uses a calculator icon.',
   rn_v2_4_3_1: 'The outputs screen now has Report, Drawings and Quantities cards: pick a format (report PDF/Word/HTML, drawings DXF/PDF, quantities CSV) and export; the chosen format is remembered.',
   rn_v2_4_3_2: 'Drawings can also be downloaded as an A3 landscape PDF (same sheets as the DXF, one per page). Dimension symbols × and · no longer turn into ? in DXF and drawings.',

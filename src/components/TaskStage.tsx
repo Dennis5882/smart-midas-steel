@@ -15,11 +15,11 @@ import { StatusCard } from './Status'
 import { RepairPanel } from './RepairPanel'
 
 /* 산출물 카드 — 형식을 고른 뒤 한 번에 추출. 고른 형식은 이 브라우저에 기억 (계산서 PDF·Word·HTML, 도면 DXF·PDF, 물량 CSV) */
-type OutIntent = 'pdf' | 'docx' | 'report' | 'drawings' | 'drawings_pdf' | 'quantities'
+type OutIntent = 'pdf' | 'docx' | 'report' | 'drawings' | 'drawings_pdf' | 'quantities' | 'quantities_xlsx'
 const OUTPUTS: { id: string; title: I18nKey; Icon: typeof FileText; formats: [OutIntent, string][] }[] = [
   { id: 'report', title: 'out_report', Icon: FileText, formats: [['pdf', 'PDF'], ['docx', 'Word'], ['report', 'HTML']] },
   { id: 'drawings', title: 'out_drawings', Icon: Ruler, formats: [['drawings', 'DXF'], ['drawings_pdf', 'PDF']] },
-  { id: 'quantities', title: 'out_quantities', Icon: Table2, formats: [['quantities', 'CSV']] },
+  { id: 'quantities', title: 'out_quantities', Icon: Table2, formats: [['quantities', 'CSV'], ['quantities_xlsx', 'XLSX']] },
 ]
 function ExportCard({ out, reason }: { out: (typeof OUTPUTS)[number]; reason: I18nKey | null }) {
   const key = `sms_format_${out.id}`
