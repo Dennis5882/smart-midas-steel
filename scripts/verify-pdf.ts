@@ -8,6 +8,9 @@ import { DOMParser, XMLSerializer } from '@xmldom/xmldom'
 import pdfMake from 'pdfmake'
 import { PDFDocument } from 'pdf-lib'
 import { reportFontFile, reportPdfDefinition } from '../src/report/pdf'
+import { Packer } from 'docx'
+import JSZip from 'jszip'
+import { reportDocxDocument, reportDocxFont } from '../src/report/docx'
 import * as fontkit from 'fontkit'
 import { buildPortal } from '../src/domain/portal'
 import { buildLoadPayloads } from '../src/domain/loads'
@@ -25,7 +28,9 @@ const { buildReport } = await import('../src/report/report')
 const { setLang } = await import('../src/i18n')
 pdfMake.setLocalAccessPolicy((path) => path.startsWith(resolve('public/fonts')))
 pdfMake.setUrlAccessPolicy(() => false)
-mkdirSync('output/pdf', { recursive: true })
+mkdirSync('output/pdf', { recursive: true }); mkdirSync('output/docx', { recursive: true })
+/* 1×1 PNG — Node 에는 캔버스가 없어 그림 자리만 확인 */
+const PNG = Uint8Array.from(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64'))
 const fx = JSON.parse(gunzipSync(readFileSync(FIXTURE)).toString())
 const model = buildPortal(fx.spec), loads = buildLoadPayloads(fx.spec, model), results = decodeResults(fx.results)
 const input: ReportInput = { built: { spec: fx.spec, model, info: loads.info, cases: Object.values(loads.STLD).map((v: any) => v.NAME), combos: Object.keys(loads.info.comboKind).length, comboNames: Object.keys(loads.info.comboKind) }, reactions: fx.reactions, design: runDesign(fx.spec, model, loads.info, results), connections: runConnections(fx.spec, model, loads.info, results) }
@@ -61,5 +66,27 @@ for (const [code, inp] of [['TW', input], ['KR', krInput], ['CN', cnInput], ['AD
   assert.ok(pdf.getPageCount() >= (code==='ADDITIONS'?2:8))
   const path = `output/pdf/steel-report-${code}-${lang}.pdf`
   writeFileSync(path, buffer)
+  /* Word: 같은 HTML → .docx. 제목 스타일·표·그림 자리·본문 글자가 모두 들어갔는지 */
+  let figures = 0
+  const word = await reportDocxDocument(doc as unknown as Document, (el) => new XMLSerializer().serializeToString(el as any), async (_svg, width, height) => { figures++; return { data: PNG, width, height } })
+  const docxBuf = await Packer.toBuffer(word)
+  const zip = await JSZip.loadAsync(docxBuf), xml = await zip.file('word/document.xml')!.async('string')
+  const tblCount = (xml.match(/<w:tbl>/g) ?? []).length, drawings = (xml.match(/<w:drawing>/g) ?? []).length
+  assert.equal(drawings, figures, `${code}/${lang}: every figure becomes an image`)
+  assert.equal(figures, (doc as any).getElementsByTagName('figure').length, `${code}/${lang}: all figures rasterized`)
+  assert.ok(tblCount >= (doc as any).getElementsByTagName('table').length, `${code}/${lang}: every report table is a Word table`)
+  for (const style of ['Title', 'Heading1']) assert.ok(xml.includes(`w:val="${style}"`), `${code}/${lang}: ${style} style used`)
+  const styles = await zip.file('word/styles.xml')!.async('string')
+  assert.ok(styles.includes(reportDocxFont(htmlLang)), `${code}/${lang}: language font in styles`)
+  const unxml = (x: string) => x.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&')
+  const docText = unxml((xml.match(/<w:t(?: [^>]*)?>[^<]*<\/w:t>/g) ?? []).map((x) => x.replace(/<[^>]+>/g, '')).join(' '))
+  const bodyEl = (doc as any).getElementsByTagName('body')[0]
+  for (const svg of Array.from((doc as any).getElementsByTagName('svg')) as any[]) svg.parentNode.removeChild(svg)
+  // Cell texts touch in textContent ('박공'+'스팬'), so compare with all whitespace removed; split wide tables reorder columns,
+  // so a token may also be satisfied piecewise by the cell texts it is made of
+  const flat = docText.replace(/\s+/g, '')
+  const lost = [...new Set(String(bodyEl.textContent).split(/\s+/).filter((w) => w && !flat.includes(w) && ![...w].every((ch) => flat.includes(ch))))]
+  assert.deepEqual(lost.slice(0, 10), [], `${code}/${lang}: report text missing from Word`)
+  writeFileSync(`output/docx/steel-report-${code}-${lang}.docx`, docxBuf)
   console.log(JSON.stringify({ path, font: font.split(/[\\/]/).pop(), pages: pdf.getPageCount(), bytes: buffer.length }))
 }

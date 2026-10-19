@@ -2,7 +2,7 @@
 import { fetchReactions, runAnalysis, showReactionsInGen } from '../actions/analysis'
 import { runDesignCheck } from '../actions/design'
 import { runOptimize } from '../actions/optimize'
-import { downloadDrawings, downloadQuantities, openReport, downloadReportPdf } from '../actions/outputs'
+import { downloadDrawings, downloadQuantities, openReport, downloadReportPdf, downloadReportDocx } from '../actions/outputs'
 import type { CodeId } from '../codes'
 import { portalGeometry } from '../domain/portal'
 import { TEMPLATES } from '../domain/templates'
@@ -17,7 +17,7 @@ import type { TaskId } from '../state/store'
 import { parseCommand, type Intent } from './parse'
 import { confirmAction } from '../components/ConfirmDialog'
 
-const BUSY_BLOCKED = new Set<string>(['new', 'analyze', 'design', 'optimize', 'report', 'drawings', 'pdf', 'quantities', 'reactions', 'conn'])
+const BUSY_BLOCKED = new Set<string>(['new', 'analyze', 'design', 'optimize', 'report', 'drawings', 'pdf', 'docx', 'quantities', 'reactions', 'conn'])
 
 /** 사용자 입력 1건 처리 (로컬 명령) */
 export async function send(raw: string): Promise<void> {
@@ -72,6 +72,7 @@ export async function executeAction(c: Intent): Promise<void> {
     case 'report': openReport(); break
     case 'drawings': downloadDrawings(); break
     case 'pdf': await downloadReportPdf(); break
+    case 'docx': await downloadReportDocx(); break
     case 'quantities': downloadQuantities(); break
     case 'reactions': {
       if (!S.built) { addMsg('bot', lt('no_model')); break }

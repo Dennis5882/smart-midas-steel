@@ -73,6 +73,29 @@ export async function downloadReportPdf(): Promise<void> {
   }
 }
 
+/** 계산서 Word(.docx) — PDF 와 같은 계산서 HTML 에서 만든다. 편집 가능, 서버 전송 없음 */
+export async function downloadReportDocx(): Promise<void> {
+  if (!canOutput()) return
+  if (!S.built) { addMsg('bot', lt('no_model')); return }
+  if (!beginJob('pdf')) return
+  try {
+    stage('docx_start')
+    const name = `steel_report_${S.built.spec.code}_${getLang()}_${stamp()}.docx`
+    const html = reportHtml()
+    const { createReportDocx } = await import('../report/docx')
+    checkCancel()
+    const { blob, images, tables } = await createReportDocx(html)
+    checkCancel()
+    downloadBlob(name, blob)
+    log(t('log_report'), 'ok')
+    addMsg('bot', lt('docx_done', name, tables, images, (blob.size / 1024).toFixed(0)))
+  } catch (e) {
+    addMsg('bot', failMsg(e, (m) => t('docx_failed', m)))
+  } finally {
+    endJob()
+  }
+}
+
 /** 물량 CSV (UTF-8 BOM — 엑셀에서 바로 열림) */
 export function downloadQuantities(): void {
   if (!canOutput()) return
