@@ -42,16 +42,21 @@ export function Workspace({ guideCollapsed, onOpenGuide, onOpenMapi }: { guideCo
     </div>
     <NoticeCenter />
     <div className="ws-start" hidden={!!editing || s.task !== 'model'}>
-      <div className="ws-hero"><span className="ws-kicker">{t('ws_kicker')}</span><h2 tabIndex={-1}>{t('project_start_title')}</h2><p>{t('project_start_hint')}</p></div>
-      <section className="project-code" aria-labelledby="project-code-heading"><h3 id="project-code-heading" className="ws-section-label">01 · {t('code_label')}</h3><select aria-label={t('code_label')} value={restrictedCode ? '' : s.code} disabled={s.busy || !!s.confirm} onChange={(e) => void setCode(e.target.value as CodeId)}>{restrictedCode && <option value="" disabled>{t('project_code_existing')}</option>}{availableCodes.map((id) => <option key={id} value={id}>{t(PROFILES[id].labelKey)}</option>)}</select>{restrictedCode && <p role="status">{t('project_code_existing_hint')}</p>}</section>
+      <div className="ws-hero"><h2 tabIndex={-1}>{t('project_start_title')}</h2><p>{t('project_start_hint')}</p></div>
+      <section className="project-code" aria-labelledby="project-code-heading"><h3 id="project-code-heading" className="ws-section-label">{t('code_label')}</h3><select aria-label={t('code_label')} value={restrictedCode ? '' : s.code} disabled={s.busy || !!s.confirm} onChange={(e) => void setCode(e.target.value as CodeId)}>{restrictedCode && <option value="" disabled>{t('project_code_existing')}</option>}{availableCodes.map((id) => <option key={id} value={id}>{t(PROFILES[id].labelKey)}</option>)}</select>{restrictedCode && <p role="status">{t('project_code_existing_hint')}</p>}</section>
       {plan?.spec.code === s.code && <button className="ws-resume-card" disabled={s.busy} onClick={openCurrentModel}><FolderOpen size={20} /><span><strong>{t('ws_resume')}</strong><small>{t('ws_resume_hint')}</small></span><ArrowRight size={16} /></button>}
-      <h3 className="ws-section-label">02 · {t('ws_templates')}</h3>
-      <div className="ws-template-grid">{TEMPLATE_KEYS.map((key, i) => <button className="ws-template" key={key} disabled={s.busy || restrictedCode} onClick={() => void executeAction({ intent: 'new', mode: 'template', tpl: key, params: {} })}>
-        <span className="ws-template-icon"><Building2 size={21} /><small>{String(i + 1).padStart(2, '0')}</small></span>
-        <strong>{t(`tpl_${key}`)}</strong><span className="ws-template-dims">{TEMPLATES[key].span} × {TEMPLATES[key].bays * TEMPLATES[key].baySpacing} m</span>
-        <span className="ws-template-desc">{t(`tpl_${key}_desc`)}</span><span className="ws-template-go">{t('ws_begin')}<ArrowRight size={13} /></span>
-      </button>)}</div>
-      <button className="ws-free" disabled={s.busy || restrictedCode} onClick={() => void executeAction({ intent: 'new', mode: 'free', params: {} })}><Frame size={22} /><span><strong>{t('g_model_5')}</strong><small>{t('ws_free_hint')}</small></span><ArrowRight size={15} /></button>
+      <h3 className="ws-section-label">{t('ws_templates')}</h3>
+      <div className="ws-template-grid">{TEMPLATE_KEYS.map((key) => {
+        const geometry=TEMPLATES[key]
+        return <button className="ws-template" key={key} disabled={s.busy || restrictedCode} onClick={() => void executeAction({ intent: 'new', mode: 'template', tpl: key, params: {} })}>
+          <strong>{t(`tpl_${key}`)}</strong>
+          <span className="ws-template-specs">{([
+            ['f_span',geometry.span],['kv_length',geometry.bays*geometry.baySpacing],['f_eave',geometry.eaveHeight],
+          ] as const).map(([label,value])=><span key={label}><small>{t(label)}</small><span>{value}<small>m</small></span></span>)}</span>
+          <span className="ws-template-meta"><span>{t('f_bays')} <b>{geometry.bays}</b></span><span>{t('f_baySpacing')} <b>{geometry.baySpacing} m</b></span></span>
+        </button>
+      })}</div>
+      <button className="ws-free" disabled={s.busy || restrictedCode} onClick={() => void executeAction({ intent: 'new', mode: 'free', params: {} })}><Frame size={19} /><span><strong>{t('g_model_5')}</strong><small>{t('ws_free_hint')}</small></span></button>
       <p className="ws-start-note">{t('ws_local_note')}</p>
     </div>
     {plan && <div className={`ws-editor${plan.mode === 'free' ? ' ws-free-editor' : ''}`} hidden={!editing}>

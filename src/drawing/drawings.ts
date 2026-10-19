@@ -6,6 +6,7 @@ import { profileOf } from '../codes'
 import { restraintKeys, support } from '../domain/validity'
 import { portalGeometry } from '../domain/portal'
 import {linkReview} from '../domain/phase6'
+import {craneTravel} from '../domain/craneTravel'
 import { memberSchedule } from '../domain/schedule'
 import type { ElementRole, FactoryModel, FactorySpec, Node } from '../domain/types'
 import { Dxf, toSvgSheets, type SvgLayerStyle } from './dxf'
@@ -230,6 +231,7 @@ function drawSheets({ spec, model, connections, title }: DrawingInput): Dxf {
       }
       if(o){d.rect('GRID',ox+mm(frameYs[o.bay]),0,mm(frameYs[o.bay+1]-frameYs[o.bay]),mm(o.height));d.text('TEXT',ox,-2200,TXT,`CLOSED DOOR: BAY ${o.bay+1}; H=${o.height.toFixed(3)} m; HEADER ${o.headerSection}`)}
       if(c?.runway)d.text('TEXT',ox,-3400,TXT,`RUNWAY z=${c.elevation} m; ${c.runway.section}; PROJECT LIMIT L/${c.runway.deflectionDivisor}`)
+      if(c){const range=craneTravel(spec);d.text('TEXT',ox,-4000,TXT*.8,`CRANE BAYS ${range.firstBay+1}-${range.lastBay+1}; Y=${range.start.toFixed(3)}-${range.end.toFixed(3)} m`)}
       d.text('TEXT',ox,-4600,TXT*.8,'Column jambs retained. Door pressure area retained. Closed-door wind only; hardware/detail design excluded.')
     }
     if(model.additions.voids?.length || spec.additions?.link) {

@@ -32,7 +32,7 @@ export function ActivityHistory() {
   const [filter, setFilter] = useState<'all' | 'jobs' | 'issues' | 'files'>('all')
   const items = s.activity.filter((a) => filter === 'issues' ? a.source === 'notice' && a.level !== 'info' : filter === 'files' ? a.source === 'artifact' : !a.parent && (filter === 'all' || a.source === 'job')).slice().reverse()
   const body = (a: Activity) => a.html ? <div dangerouslySetInnerHTML={{ __html: render(a.html) }} /> : null
-  return <div className="task-content history-content"><div className="task-heading"><span className="ws-kicker">{t('flow_history')}</span><h2 tabIndex={-1}>{t('flow_history')}</h2><p>{t('flow_history_hint')}</p></div>
+  return <div className="task-content history-content"><div className="task-heading"><h2 tabIndex={-1}>{t('flow_history')}</h2><p>{t('flow_history_hint')}</p></div>
     <div className="history-filters" role="group" aria-label={t('flow_history')}>{(['all', 'jobs', 'issues', 'files'] as const).map((f) => <button key={f} aria-pressed={filter === f} onClick={() => setFilter(f)}>{t(`flow_${f}`)}</button>)}</div>
     {!items.length && <div className="task-empty"><Clock3 size={25} /><p>{t('flow_history_empty')}</p></div>}
     <ol className="history-list">{items.map((a) => <li className={`history-entry ${a.level}`} key={a.id}>

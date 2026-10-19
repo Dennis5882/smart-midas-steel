@@ -2,10 +2,11 @@ import type { FactorySpec } from './types'
 import { baySpans } from './types'
 import { portalGeometry } from './portal'
 import { sectionCatalogOptions } from './sectionCatalog'
+import {craneTravel} from './craneTravel'
 
 export interface CraneInputIssue {
   field:string
-  kind:'positive'|'nonnegative'|'positiveBelow'|'nonnegativeBelow'|'range'|'minimum'|'minWheel'|'source'|'confirm'|'bays'|'section'|'elevationConflict'|'missing'
+  kind:'positive'|'nonnegative'|'positiveBelow'|'nonnegativeBelow'|'range'|'minimum'|'minWheel'|'source'|'confirm'|'travel'|'section'|'elevationConflict'|'missing'
   min?:number; max?:number
 }
 /** Shared by model validation and field-level UI; these are existing model limits. */
@@ -14,16 +15,19 @@ export function craneInputIssues(s:FactorySpec,requireConfirmation=true):CraneIn
   const c=s.additions?.crane
   if(!c)return [{field:'configuration',kind:'missing'}]
   const out:CraneInputIssue[]=[],g=portalGeometry(s),height=Math.min(...g.eaveXs.map(g.zAt)),length=baySpans(s).reduce((a,b)=>a+b,0)
+  const travel=craneTravel(s)
+  if(!travel.valid){
+    if(!Number.isInteger(travel.firstBay)||travel.firstBay<0||travel.firstBay>=s.bays)out.push({field:'travel.firstBay',kind:'travel'})
+    if(!Number.isInteger(travel.lastBay)||travel.lastBay<travel.firstBay||travel.lastBay>=s.bays||travel.lastBay<0)out.push({field:'travel.lastBay',kind:'travel'})
+  }
   const below=(field:'elevation'|'eccentricity'|'wheelSpacing',max:number,positive:boolean)=>{
     if(!Number.isFinite(c[field]) || (positive?c[field]<=0:c[field]<0) || c[field]>=max)out.push({field,kind:positive?'positiveBelow':'nonnegativeBelow',max})
   }
-  below('elevation',height,true);below('eccentricity',s.span/4,false);below('wheelSpacing',length,true)
+  below('elevation',height,true);below('eccentricity',s.span/4,false);below('wheelSpacing',travel.valid?travel.length:length,true)
   for(const field of ['maxWheel','driftLimitMm'] as const)if(!Number.isFinite(c[field])||c[field]<=0)out.push({field,kind:'positive'})
   if(!Number.isFinite(c.minWheel)||c.minWheel<0||(Number.isFinite(c.maxWheel)&&c.minWheel>c.maxWheel))out.push({field:'minWheel',kind:'minWheel'})
   if(!Number.isFinite(c.impactFactor)||c.impactFactor<1||c.impactFactor>3)out.push({field:'impactFactor',kind:'range',min:1,max:3})
   for(const field of ['lateral','braking','seismicWeight'] as const)if(!Number.isFinite(c[field])||c[field]<0)out.push({field,kind:'nonnegative'})
-  const limit=c.runway?4:8
-  if(s.bays>limit)out.push({field:'bays',kind:'bays',max:limit})
   const confirmation=(prefix:string,o:{source:string;confirmed:boolean})=>{
     if(requireConfirmation){if(!o.source.trim())out.push({field:prefix+'source',kind:'source'});if(!o.confirmed)out.push({field:prefix+'confirmed',kind:'confirm'})}
   }

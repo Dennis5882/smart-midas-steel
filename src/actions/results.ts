@@ -39,6 +39,17 @@ async function table(type: string, name: string, keys: number[], loads: string[]
 
 const STATIONS = ['I', '1/4', '2/4', '3/4', 'J']
 
+const caseBatchSize=(keys:number[],stations=1)=>Math.max(1,Math.floor(60000/Math.max(1,keys.length*stations)))
+/** Bound each response without discarding any load cases or keeping raw tables together. */
+async function* tableRows(type:string,name:string,keys:number[],loads:string[],components?:string[]) {
+  const batch=caseBatchSize(keys)
+  for(let offset=0;offset<loads.length;offset+=batch){
+    const data=await table(type,name,keys,loads.slice(offset,offset+batch),{},components)
+    requireResult(Array.isArray(data.DATA),type,'missing')
+    for(const row of data.DATA)yield row
+  }
+}
+
 export async function fetchResults(b: Built): Promise<Results> {
   const { model, spec } = b
   const combos = b.comboNames
@@ -46,13 +57,15 @@ export async function fetchResults(b: Built): Promise<Results> {
   const cb = combos.map((c) => `${c}(CB)`)
   const beamIds = model.elements.filter((e) => e.role !== 'brace').map((e) => e.id)
   const trussIds = model.elements.filter((e) => e.role === 'brace').map((e) => e.id)
+  const { eaves: eaveNodes, tops: columnTops, nodes: svcNodes } = serviceNodes(spec, model)
+  const svcCases = b.cases.filter((c) => spec.code === 'CN' || !!b.info.additions || c !== 'D')
   /* 행 검증은 Set 조회 — 배열 includes 는 11만 행 × 410 요소로 화면 스레드에서 수천만 번 비교 */
   const comboSet = new Set(combos), beamSet = new Set(beamIds), trussSet = new Set(trussIds)
 
   /* 보 부재력 */
   const beam = new Map<number, Map<string, ForcePt[]>>()
-  const batchSize = spec.code === 'CN' ? 4 : model.additions ? Math.max(1,Math.min(16,Math.floor(15000/Math.max(1,beamIds.length*5)))) : cb.length
-  stage('st_results', Math.ceil(cb.length / batchSize) + (trussIds.length ? 1 : 0) + 3)
+  const batchSize = spec.code === 'CN' ? Math.min(4,caseBatchSize(beamIds,5)) : model.additions ? Math.min(16,caseBatchSize(beamIds,5)) : cb.length
+  stage('st_results', Math.ceil(cb.length / batchSize) + (trussIds.length ? Math.ceil(cb.length/caseBatchSize(trussIds)) : 0) + 1 + Math.ceil(cb.length/caseBatchSize(eaveNodes.map(n=>n.id))) + Math.ceil(svcCases.length/caseBatchSize(svcNodes.map(n=>n.id))))
   for (let offset = 0; offset < cb.length; offset += batchSize) {
     const bf = await table('BEAMFORCE', spec.code === 'CN' ? `F${offset}` : 'F', beamIds, cb.slice(offset, offset + batchSize), { PARTS: ['PartI', 'Part1/4', 'Part2/4', 'Part3/4', 'PartJ'] },
       ['Elem', 'Load', 'Part', 'Axial', 'Shear-y', 'Shear-z', 'Moment-y', 'Moment-z'])
@@ -74,8 +87,7 @@ export async function fetchResults(b: Built): Promise<Results> {
   /* 가새 축력 — 인장 +, I·J 중 절댓값 큰 쪽 */
   const truss = new Map<number, Map<string, number>>()
   if (trussIds.length) {
-    const tf = await table('TRUSSFORCE', 'T', trussIds, cb)
-    for (const [, el, lc, fi, fj] of tf?.DATA ?? []) {
+    for await (const [, el, lc, fi, fj] of tableRows('TRUSSFORCE','T',trussIds,cb)) {
       const m = truss.get(+el) ?? new Map<string, number>()
       requireResult(trussSet.has(+el) && comboSet.has(lc) && !m.has(lc), 'TRUSSFORCE', m.has(lc) ? 'duplicate' : 'unexpected', `${el} · ${lc}`)
       truss.set(+el, m)
@@ -84,7 +96,6 @@ export async function fetchResults(b: Built): Promise<Results> {
   }
 
   /* B2 입력 — 조합별 반력 합(ΣPu = ΣFZ, ΣH = |ΣFX|·|ΣFY|), 처마 절점(기둥 상단) 평균 변위 */
-  const { eaves: eaveNodes, tops: columnTops, nodes: svcNodes } = serviceNodes(spec, model)
   const base = model.nodes.find((n) => n.z === 0)!
   const rx = await table('REACTIONG', 'R', [base.id], cb, {}, ['Node', 'Load', 'FX', 'FY', 'FZ'])
   const sums = new Map<string, number[]>()
@@ -94,11 +105,10 @@ export async function fetchResults(b: Built): Promise<Results> {
     requireResult(comboSet.has(lc) && !sums.has(lc), 'REACTIONG', sums.has(lc) ? 'duplicate' : 'unexpected', lc)
     sums.set(lc, [num(fx), num(fy), num(fz)])
   }
-  const ux = await table('DISPLACEMENTG', 'U', eaveNodes.map((n) => n.id), cb, {}, ['Node', 'Load', 'DX', 'DY', 'DZ'])
   const dsum = new Map<string, number[]>()
   const seenU = new Set<string>()
   const eaveSet = new Set(eaveNodes.map((n) => n.id))
-  for (const [, nd, lc, dx, dy, dz] of ux.DATA ?? []) {
+  for await (const [, nd, lc, dx, dy, dz] of tableRows('DISPLACEMENTG','U',eaveNodes.map(n=>n.id),cb,['Node', 'Load', 'DX', 'DY', 'DZ'])) {
     const key = `${lc}:${nd}`
     requireResult(eaveSet.has(+nd) && comboSet.has(lc) && !seenU.has(key), 'DISPLACEMENTG', seenU.has(key) ? 'duplicate' : 'unexpected', `${nd} · ${lc}`)
     seenU.add(key); num(dz)
@@ -117,11 +127,9 @@ export async function fetchResults(b: Built): Promise<Results> {
   }
 
   /* 사용성 — 처마·마루 절점 변위 (사용 하중 케이스) */
-  const svcCases = b.cases.filter((c) => spec.code === 'CN' || !!b.info.additions || c !== 'D')
-  const us = await table('DISPLACEMENTG', 'S', svcNodes.map((n) => n.id), svcCases.map((c) => `${c}(ST)`), {}, ['Node', 'Load', 'DX', 'DY', 'DZ'])
   const disp = new Map<string, Map<number, { dx: number; dy: number; dz: number }>>()
   const svcCaseSet = new Set(svcCases), svcNodeSet = new Set(svcNodes.map((n) => n.id))
-  for (const [, nd, lc, dx, dy, dz] of us?.DATA ?? []) {
+  for await (const [, nd, lc, dx, dy, dz] of tableRows('DISPLACEMENTG','S',svcNodes.map(n=>n.id),svcCases.map(c=>`${c}(ST)`),['Node', 'Load', 'DX', 'DY', 'DZ'])) {
     const m = disp.get(lc) ?? new Map()
     requireResult(svcCaseSet.has(lc) && svcNodeSet.has(+nd) && !m.has(+nd), 'DISPLACEMENTG', m.has(+nd) ? 'duplicate' : 'unexpected', `${nd} · ${lc}`)
     disp.set(lc, m)

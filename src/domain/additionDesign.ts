@@ -1,3 +1,4 @@
+import {craneTravel} from './craneTravel'
 import { profileOf } from '../codes'
 import { capacity, check } from '../codes/twSteel'
 import { cnCapacity, cnCheck } from '../codes/cnSteel'
@@ -7,7 +8,7 @@ import type { DesignResult, MemberCheck } from './design'
 import type { FactoryModel, FactorySpec, ElementRole } from './types'
 import type { LoadInfo } from './loads'
 import { sectionProps } from './sections'
-import { activeCrane, activePlatform, bayStations } from './additions'
+import { activeCrane, activePlatform } from './additions'
 import {linkReview,simpleBeamDeflection} from './phase6'
 import {buildLoadPayloads} from './loads'
 
@@ -102,7 +103,7 @@ export function additionDesign(s: FactorySpec, m: FactoryModel, info: LoadInfo, 
       d.service.push({key:'runwayDefl',...best,case:`D + ${lc}`,clause:`Project L/${crane.runway.deflectionDivisor}; impacted static samples; relative nodal deflection`})
     }
     let value=0, lc=''
-    const stations=bayStations(s)
+    const stations=craneTravel(s).stations
     for (const c of m.additions.craneCases) for (const n of m.nodes.filter((n)=>Math.abs(n.z-crane.elevation)<1e-7 && (n.x===0||n.x===s.span) && stations.some((y)=>Math.abs(n.y-y)<1e-7))) {
       const base=res.disp.get('D')!.get(n.id)!, disp=res.disp.get(c.name)!.get(n.id)!
       const v=Math.hypot(base.dx+disp.dx,base.dy+disp.dy)

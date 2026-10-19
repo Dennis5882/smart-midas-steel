@@ -54,7 +54,7 @@ export function RepairPanel() {
     return null
   }
   return <section className="repair-panel" aria-label={t('repair_title')}>
-    <div className="repair-heading"><div><span className="ws-kicker">{t('repair_kicker')}</span><h3><Wrench size={17}/>{t('repair_title')}</h3></div><span className="repair-count">{t('repair_count',problems.reduce((n,g)=>n+g.count,0))}</span></div>
+    <div className="repair-heading"><h3><Wrench size={17}/>{t('repair_title')}</h3><span className="repair-count">{t('repair_count',problems.reduce((n,g)=>n+g.count,0))}</span></div>
     <p className="repair-note">{t('repair_hint')}</p>
     {comparison&&<div className="repair-comparison"><h4>{t('repair_comparison')}</h4><p>{t('repair_comparison_note')}</p><ul>{comparison.changes.map((c)=><li key={c.target}>{t(targetKey(c.target))}: <span className="mono">{c.section}</span></li>)}</ul><Metrics before={comparison.before} estimated={comparison.estimated} after={comparison.after}/></div>}
     {!problems.length?<p className="repair-clear">✓ {t('repair_clear')}</p>:<>

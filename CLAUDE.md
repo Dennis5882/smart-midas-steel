@@ -4,7 +4,9 @@
 - **한국어**로 소통. 코드 식별자·API 키워드는 영어 유지.
 
 ## 개요
-추가 구조 1~4단계(v2.0.0)는 `docs/factory-additions-phases-1-4.md`, 5단계(v2.1.0)는 `docs/factory-additions-phase-5.md` 참조. `FactorySpec.additions` → `applyAdditions` → Gen/하중 컴파일 흐름이며 출처 확인 후 **예비검토**로 제공한다. 요소 분할 시 `physicalKey`·`designLength`를 보존한다. 추가 부재는 `Element.addition`으로 지붕/벽 하중·기존 접합·주골조 단면 변경에서 분리한다. `crane.runway`는 기둥 축상 경간별 단순보·실제 차륜 절점 재하·처짐 검토(최대 4베이). `wallOpening`은 측벽 한 베이의 닫힌 문만 지원하며 가새 베이를 차단한다. 제거 거트는 `removedGirts`에 남겨 폐쇄 외피 하중만 컴파일하고, `loadOnly`로 강재 자중·물량에서 제외한다. 가상 거트의 하중 ID를 실제 Gen으로 보내지 않는다. 주행보 중간 절점은 실제 지지점·횡지지로 간주하지 않는다. 지진중량은 정적 등가하중에 한 번만 포함하며 NMAS/모달해석은 아직 추가하지 않았다. 풍·지진+크레인 동시 조합·피로·국부지압·횡전단/비틀림·브래킷 상세·문 개방 시 내압·접합·기초는 별도 검토.  `verify-phase5.ts`, `verify-additions.ts`, `live-additions.ts --phase5`로 검증하며 라이브는 원본 저장·복원 12 DB 해시 일치 확인 필수.
+최신 크레인 운행 구간: 아래 초기 구현의 4/8베이 제한은 제거했다. 기본값은 건물 전체이며 `crane.travel`의 시작·끝 베이(0부터, 양끝 포함)로 일부 구간을 지정한다. 건물 형상 및 차륜 샘플은 유지한다. 결과 회수는 표 크기에 따라 분할한다. `verify-crane-travel.ts`, `live-crane-travel.ts` 참조. 공통 오프라인 검증은 현재 27종이다.
+
+추가 구조 1~4단계(v2.0.0)는 `docs/factory-additions-phases-1-4.md`, 5단계(v2.1.0)는 `docs/factory-additions-phase-5.md` 참조. `FactorySpec.additions` → `applyAdditions` → Gen/하중 컴파일 흐름이며 출처 확인 후 **예비검토**로 제공한다. 요소 분할 시 `physicalKey`·`designLength`를 보존한다. 추가 부재는 `Element.addition`으로 지붕/벽 하중·기존 접합·주골조 단면 변경에서 분리한다. `crane.runway`는 기둥 축상 경간별 단순보·실제 차륜 절점 재하·처짐 검토. `wallOpening`은 측벽 한 베이의 닫힌 문만 지원하며 가새 베이를 차단한다. 제거 거트는 `removedGirts`에 남겨 폐쇄 외피 하중만 컴파일하고, `loadOnly`로 강재 자중·물량에서 제외한다. 가상 거트의 하중 ID를 실제 Gen으로 보내지 않는다. 주행보 중간 절점은 실제 지지점·횡지지로 간주하지 않는다. 지진중량은 정적 등가하중에 한 번만 포함하며 NMAS/모달해석은 아직 추가하지 않았다. 풍·지진+크레인 동시 조합·피로·국부지압·횡전단/비틀림·브래킷 상세·문 개방 시 내압·접합·기초는 별도 검토.  `verify-phase5.ts`, `verify-additions.ts`, `live-additions.ts --phase5`로 검증하며 라이브는 원본 저장·복원 12 DB 해시 일치 확인 필수.
 
 6단계(v2.2.0)는 `docs/factory-additions-phase-6.md` 참조. `roofCollectors`는 닫힌 지붕 덮개 하중만 보강보로 전달하고 가상 강재를 Gen에 보내지 않는다. `floorOpening`은 플랫폼 내부 작은보와 빈 면적의 하중·질량을 제외한다. 연결부는 웹 이동·이격·받침 검토 및 확인된 6성분 반력 인터페이스만 지원한다. 분리형은 연결하지 않으며 일체형은 생성 차단한다. 외부 건물·연결교 형상이나 ELNK를 자동 생성하지 않는다. 지붕 처짐은 웹 단순보 추정으로 명시하고 연결부 사용성의 값·한계는 mm로 표시한다. `verify-phase6.ts`, `live-additions.ts --phase6`로 검증한다.
 
@@ -19,7 +21,7 @@ Vite 8 + TypeScript + React 19 + Tailwind v4 + shadcn/ui(new-york) + **Vercel Fu
 - 백엔드(`api/*.ts`)는 단면·재질 라이브러리, 설계 검토 계산, 보고서 생성 등 Gen과 무관한 일을 담당. 핸들러는 Web 표준 `export function GET(req: Request)` 형식.
 
 ## 구조 (2026-10-15 story 셸로 재구성)
-현재 모델링 UX는 `docs/modeling-additional-structures-ux.md`의 7단계가 우선이다. `modelingFlow.ts` 단계 상수·오류 이동, `StructureEditor` 카드별 입력, `StructureSummary` 하중/최종 요약을 사용한다. 최초 `ScopeBox` 기능 체크는 제거했고 판정만 남긴다. 다경간은 횡단면에서, 연결부는 추가 구조에서 설정한다. 공통 지역/하중 변경은 추가 구조의 출처 확인을 해제하지 않는다. 형상/간격/재료/단면 변경은 해제한다. 기본·자유골조 모두 같은 카드 입력을 쓴다. `verify-modeling-flow.ts`를 공통 검증에 추가, 총 26종. v2.3.2 release.
+현재 모델링 UX는 `docs/modeling-additional-structures-ux.md`의 7단계가 우선이다. `modelingFlow.ts` 단계 상수·오류 이동, `StructureEditor` 카드별 입력, `StructureSummary` 하중/최종 요약을 사용한다. 최초 `ScopeBox` 기능 체크는 제거했고 판정만 남긴다. 다경간은 횡단면에서, 연결부는 추가 구조에서 설정한다. 공통 지역/하중 변경은 추가 구조의 출처 확인을 해제하지 않는다. 형상/간격/재료/단면 변경은 해제한다. 기본·자유골조 모두 같은 카드 입력을 쓴다. `verify-modeling-flow.ts`를 공통 검증에 추가, 총 27종. v2.3.2 release.
 화면 = story 와 같은 레이아웃·클래스명: 헤더(언어·기준·연결 pill·⚙) / [GUIDE 사이드바 + 대화형 작업 로그 | 분할선 | 로그·모델·3D·결과 탭] / 하단 바(버전·테마 navy/light/cyber) / MAPI 드로어.
 - `src/styles/app.css` — story `shared/app.css` 사본 + 강구조 3D 토큰(`--p-col/raf/pur/girt/strut`). 색은 전부 테마 토큰. Tailwind(`index.css`)는 유지하되 화면은 app.css 클래스로 그린다.
 - `src/state/store.ts` — story 식 mutable `S` + `notify()`/`useStore()`. `ui.ts` — log·addMsg·addPlanMsg·thinking·tab·previewSpec·draw3D.
@@ -182,6 +184,8 @@ Vite 8 + TypeScript + React 19 + Tailwind v4 + shadcn/ui(new-york) + **Vercel Fu
 **언어별 공유 링크** (story 와 같은 방식): 빌드 시 `vite.config.ts` langPages 가 `dist/{ko,en,zh-TW,zh-CN}/index.html`(+ 소문자 경로) 생성 — `<title>`·og 메타 = 사전 `meta_title`/`meta_desc`(메신저 미리보기는 JS 미실행이라 정적 메타 필수), 루트 `/` = ko. 시작 언어: 링크 경로·`?lang=` > 저장값(`sms_lang`) > 브라우저. 언어를 바꾸면 주소도 `/<lang>/`(루트에서 ko 는 `/` 유지, `?lang=` 은 경로로 옮김, 해시 보존) — `src/i18n/index.ts` `langUrl`·`syncUrl`. GUIDE 기타 `링크 복사` = 현재 언어 링크를 클립보드로.
 
 ## 버전·릴리즈 노트 (사용자 규칙, 2026-10-15 — rebar-repair 와 같은 방식)
+**최신 사용자 선호(2026-10-19)**: 버전을 빠르게 올리지 않는다. 일반 개선·수정은 patch로 올리고, minor 변경은 먼저 사용자와 상의한다. 이번 크레인 구간 및 화면 개선은 v2.3.4로 묶는다. 아래 기존 minor 자동 증가 규칙보다 이 선호가 우선한다.
+
 **사용자에게 보이는 변경을 푸시할 때마다 버전을 올리고, 그 버전의 릴리즈 노트를 같은 커밋에 넣는다 — 묻지 않고 자동으로.** 커밋 전에 `npm run release -- minor`(새 기능) 또는 `patch`(수정·문구·사용자에게 보이는 문서), `major` 는 사용자가 말할 때만. **자릿수 올림(2026-10-16)**: minor·patch 는 0~9, 10 이 되면 스크립트가 자동으로 윗자리로(0.9.x minor → 1.0.0, 1.2.9 patch → 1.3.0). 2026-10-16 v0.19.x → **v1.0.0**(사용자 요청 major). 스크립트(`scripts/release.mjs`)가 `package.json`(+ lock) version 을 올리고 `src/data/releases.json` 맨 앞에 `{version,date,id,items}` 추가(**date = KST 'YYYY-MM-DD HH:mm' 날짜 + 시각**, 사용자 규칙 2026-10-16 — 이전 항목은 git 커밋 시각으로 소급, release-check 가 형식 검사), 네 사전(`src/i18n/dict/*.ts`)의 `@release-notes` 앵커 아래에 빈 키 `rn_<id>_1..N` 을 넣는다 → 노트를 ko 먼저, en·zh-TW·zh-CN 순으로 사용자 언어로 한 줄씩 채운다(항목 수는 `--items N`). `release-check`(= `npm run build` 첫 단계, Vercel 빌드에도 적용)는 package.json version ≠ 최신 항목이거나 노트가 하나라도 비면 실패 — **version·키를 손으로 고치지 말 것**. 내부 변경(테스트·리팩터·CLAUDE.md)만이면 버전업 불필요. 화면: 하단 바 `v{APP_VERSION}`(vite define, package.json 단일 출처) 클릭·GUIDE 도움말·명령 `릴리즈 노트` → `ReleaseNotes.tsx`(`.rn` 모달, `S.rnOpen`). 0.1.0~0.5.0 은 기존 커밋에 소급 번호(모두 2026-10-15).
 
 ## 명령

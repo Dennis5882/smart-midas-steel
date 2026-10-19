@@ -1,4 +1,5 @@
 import { additionLabelKey } from '../domain/additionTypes'
+import {craneTravel} from '../domain/craneTravel'
 import {activeFloorOpening,linkReview} from '../domain/phase6'
 /* 구조 계산서 (M5) — 현재 상태(스펙·하중·해석·설계·접합부)로 인쇄용 단일 HTML 을 만든다.
    화면 언어(t)를 따르며, 기호·조항 번호는 원문 표기 유지. 브라우저 인쇄 → PDF. */
@@ -87,11 +88,13 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
     const a=spec.additions!
     const inputs=[...a.equipment, ...(spec.features?.crane && a.crane?[a.crane]:[]), ...(spec.features?.mezzanine && a.platform?[a.platform]:[]), ...(spec.features?.opening && a.wallOpening?[a.wallOpening]:[])]
     const units:Record<string,string>={x:'m',y:'m',x0:'m',x1:'m',height:'m',elevation:'m',eccentricity:'m',wheelSpacing:'m',beamSpacing:'m',weight:'kN',maxWheel:'kN',minWheel:'kN',lateral:'kN',braking:'kN',seismicWeight:'kN',driftLimitMm:'mm',dead:'kN/m²',live:'kN/m²'}
-    const inputRows = (value: object, factors=false) => Object.entries(value).filter(([k])=>k!=='confirmed' && k!=='kind' && k!=='runway').map(([k,v])=>[
+    const inputRows = (value: object, factors=false) => Object.entries(value).filter(([k])=>k!=='confirmed' && k!=='kind' && k!=='runway' && k!=='travel').map(([k,v])=>[
       k==='id'?'ID':L((k==='seismicFraction'?'add_mass':`add_${k}`) as I18nKey),`${esc((/Bay$/.test(k)||k==='bay')?Number(v)+1:v)}${!factors && units[k] ? ` ${units[k]}` : ''}`,
     ])
     for (const value of inputs) parts.push(table([t('sv_item'),t('sv_value')],inputRows(value)))
     if (spec.features?.crane) {
+      const travel=craneTravel(spec)
+      parts.push(`<p>${esc(t('crane_travel_summary',travel.firstBay+1,travel.lastBay+1,f(travel.length,3)))}</p>`)
       parts.push(`<p>${L('add_crane_note')}</p>`)
       if(a.crane?.runway) parts.push(`<h4>${L('add_runway')}</h4><p>${L('add_runway_note')}</p>`,table([t('sv_item'),t('sv_value')],inputRows(a.crane.runway)))
       parts.push(table([t('rd_combo'),'Y (m)','Pmax rail','FX sign','FY sign'],model.additions.craneCases.map((v)=>[esc(v.name),f(v.position,3),esc(v.maxRail),v.lateralSign,v.brakingSign])))

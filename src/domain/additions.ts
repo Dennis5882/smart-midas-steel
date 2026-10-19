@@ -7,6 +7,7 @@ import { baySpans, type Element, type FactoryModel, type FactorySpec } from './t
 import type { AdditionModel, AdditionUsage, FactoryAdditions, PlatformOptions, WallOpeningOptions } from './additionTypes'
 import {activeFloorOpening,hasPhase6,phase6Errors,platformGridXs} from './phase6'
 import {craneInputIssues} from './craneInput'
+import {craneTravel} from './craneTravel'
 
 export const activeCrane = (s: FactorySpec) => s.features?.crane ? s.additions?.crane : undefined
 export const activePlatform = (s: FactorySpec) => s.features?.mezzanine ? s.additions?.platform : undefined
@@ -23,13 +24,15 @@ export function defaultOpening(s: FactorySpec): WallOpeningOptions {
 }
 /** All wheel/support alignments plus moment-oriented positions within each actual bay. */
 export function cranePositions(stations: number[], spacing: number, detailed: boolean): number[] {
+  if(stations.length<2||!Number.isFinite(spacing)||spacing<=0)return []
+  const start=stations[0]
   const limit=stations.at(-1)!-spacing
-  const candidates=[0,limit,...stations.flatMap((y)=>[y,y-spacing])]
+  const candidates=[start,limit,...stations.flatMap((y)=>[y,y-spacing])]
   if(detailed) for(let i=0;i<stations.length-1;i++) {
     const mid=(stations[i]+stations[i+1])/2
     candidates.push(mid,mid-spacing,mid-spacing/2,mid-spacing/4,mid-3*spacing/4)
   }
-  return [...new Set(candidates.filter((v)=>v>=0 && v<=limit).map((v)=>+v.toFixed(7)))].sort((a,b)=>a-b)
+  return [...new Set(candidates.filter((v)=>v>=start && v<=limit).map((v)=>+v.toFixed(7)))].sort((a,b)=>a-b)
 }
 export function defaultAdditions(s: FactorySpec): FactoryAdditions {
   return { equipment: [], factors: { dead: s.code === 'CN' ? 1.3 : 1.2, live: s.code === 'TW' ? 1.6 : 1.5, accompanyingLive: .5, crane: s.code === 'TW' ? 1.6 : 1.5, source: '', confirmed: false } }
@@ -191,12 +194,13 @@ export function applyAdditions(s: FactorySpec, base: FactoryModel): FactoryModel
   }
   const c = activeCrane(s)
   if (c) {
-    for (const y of ys) for (const x of [0, s.span]) splitColumn(x, y, c.elevation)
-    const positions = cranePositions(ys,c.wheelSpacing,!!c.runway)
+    const travel=craneTravel(s),supports=travel.stations
+    for (const y of supports) for (const x of [0, s.span]) splitColumn(x, y, c.elevation)
+    const positions = cranePositions(supports,c.wheelSpacing,!!c.runway)
     if(c.runway) {
       // Every sampled wheel position and midspan is a result station, not a lateral restraint.
-      const cuts=[...new Set([...ys,...positions.flatMap((v)=>[v,v+c.wheelSpacing]),...ys.slice(0,-1).map((y,i)=>(y+ys[i+1])/2)])].sort((a,b)=>a-b)
-      for(const x of [0,s.span]) for(let bay=0;bay<s.bays;bay++) {
+      const cuts=[...new Set([...supports,...positions.flatMap((v)=>[v,v+c.wheelSpacing]),...supports.slice(0,-1).map((y,i)=>(y+supports[i+1])/2)])].sort((a,b)=>a-b)
+      for(const x of [0,s.span]) for(let bay=travel.firstBay;bay<=travel.lastBay;bay++) {
         const local=cuts.filter((y)=>y>=ys[bay]-1e-7 && y<=ys[bay+1]+1e-7)
         for(let i=0;i<local.length-1;i++) if(local[i+1]-local[i]>1e-7)
           addMember(node(x,local[i],c.elevation),node(x,local[i+1],c.elevation),c.runway.section,'runway-beam',`${c.id}:runway:${x}:${bay}`,c.id)
@@ -205,16 +209,16 @@ export function applyAdditions(s: FactorySpec, base: FactoryModel): FactoryModel
     for (const position of positions) for (const maxRail of ['left', 'right'] as const) for (const lateralSign of c.lateral ? [-1, 1] : [0]) for (const brakingSign of c.braking ? [-1, 1] : [0]) {
       const name = `CR${String(meta.craneCases.length + 1).padStart(3, '0')}`
       meta.craneCases.push({ name, position, maxRail, lateralSign, brakingSign })
-      for (const rail of ['left', 'right'] as const) for (const wheel of [position, position + c.wheelSpacing]) for (const [y, share] of (c.runway?[[wheel,1]]:bracket(ys, wheel))) {
+      for (const rail of ['left', 'right'] as const) for (const wheel of [position, position + c.wheelSpacing]) for (const [y, share] of (c.runway?[[wheel,1]]:bracket(supports, wheel))) {
         const x = rail === 'left' ? 0 : s.span, rx = rail === 'left' ? c.eccentricity : -c.eccentricity
         const fz = -(rail === maxRail ? c.maxWheel : c.minWheel) * c.impactFactor * share
         const fx = lateralSign * c.lateral / 4 * share, fy = brakingSign * c.braking / 4 * share
         nodal(node(x, y, c.elevation), name, c.id, fz, fx, fy, c.runway?0:-rx*fz, c.runway?0:rx*fy)
-        if(c.runway) for(const [support, fraction] of bracket(ys,wheel))
+        if(c.runway) for(const [support, fraction] of bracket(supports,wheel))
           nodal(node(x,support,c.elevation),name,c.id,0,0,0,-rx*fz*fraction,rx*fy*fraction)
       }
     }
-    for (const x of [0, s.span]) for (const y of ys) weight(node(x, y, c.elevation), c.seismicWeight / (2 * ys.length), c.id)
+    for (const x of [0, s.span]) for (const y of supports) weight(node(x, y, c.elevation), c.seismicWeight / (2 * supports.length), c.id)
     meta.sources.push({ id: c.id, kind: 'crane', dead: 0, live: 0, seismic: c.seismicWeight })
   }
   // Base elements stay first so existing load generators can index ID-1 safely.

@@ -242,7 +242,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
         {g.title === 'sec_seismic' && site && (site.fault || site.basin || site.note) && <div className="pe-tip">{site.fault ? t('site_fault', site.fault) : site.basin ? t('site_basin') : site.note}</div>}
       </section>
     })}
-    {step === ADDITIONS_STEP && <StructureEditor idPrefix={`${formId}-additions`} spec={spec} onFeaturesChange={setFeat} onChange={(v)=>{dirty.current=true;setAdditions(v)}} disabled={!live || s.busy} attempted={attempted} onEditBays={()=>navigate(2)}/>}
+    {step === ADDITIONS_STEP && <StructureEditor idPrefix={`${formId}-additions`} spec={spec} onFeaturesChange={setFeat} onChange={(v)=>{dirty.current=true;setAdditions(v)}} disabled={!live || s.busy} attempted={attempted}/>}
     {step === LOADS_STEP && <p className="mw-note">{tc(spec.code, 'plan_tip')}</p>}
     {step === LOADS_STEP && spec.code === 'KR' && <p className="mw-note">{t('kr_scope_note')}</p>}
     {step > 0 && step < REVIEW_STEP && checkScope(spec).issues.some((i)=>scopeIssueStep(i.key)===step) && <ScopeBox spec={spec} />}

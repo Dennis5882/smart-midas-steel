@@ -8,6 +8,8 @@ export interface CraneOptions {
   maxWheel: number; minWheel: number; impactFactor: number; lateral: number; braking: number
   seismicWeight: number; source: string; confirmed: boolean
   driftLimitMm: number
+  /** Optional operating bays, zero-based and inclusive. Omitted = entire building. */
+  travel?: {firstBay:number;lastBay:number}
   runway?: { section: string; deflectionDivisor: number; source: string; confirmed: boolean }
 }
 /** Full-bay, closed side-wall door. Pressure remains on the closed door envelope. */

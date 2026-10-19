@@ -38,14 +38,14 @@ for(const lang of ['ko','en','zh-TW','zh-CN'] as const) {
     assert.equal(additionPartActive(crane,'link'),false)
     assert.ok(checkScope(crane).blocked,'Unconfirmed enabled structures still block generation')
     const runway=structuredClone(crane)
-    runway.bays=6;runway.bayList=undefined
+    runway.bays=10;runway.bayList=undefined
     runway.additions.crane!.runway={section:spec.sections.rafter,deflectionDivisor:600,source:'',confirmed:false}
     const issues=craneInputIssues(runway)
-    assert.ok(issues.some(e=>e.field==='bays'&&e.max===4),'A runway must report its actual four-bay limit')
+    assert.ok(!issues.some(e=>e.field==='bays'),'Crane setup must not shrink a ten-bay building')
     for(const field of ['maxWheel','source','confirmed','runway.source','runway.confirmed'])assert.ok(issues.some(e=>e.field===field),`Actionable missing field ${field}`)
     assert.ok(!craneInputIssues(runway,false).some(e=>e.kind==='source'||e.kind==='confirm'),'Geometry preview does not require source confirmation')
-    const invalidRunway=renderToStaticMarkup(createElement(StructureEditor,{...props,spec:runway,attempted:true,onEditBays:()=>{}}))
-    assert.ok(invalidRunway.includes(t('ms_crane_bays',4,6)))
+    const invalidRunway=renderToStaticMarkup(createElement(StructureEditor,{...props,spec:runway,attempted:true}))
+    assert.ok(invalidRunway.includes(t('crane_travel_summary',1,10,String(10*runway.baySpacing))))
     assert.ok(!invalidRunway.includes(t('add_invalid_crane')),'Specific crane errors replace the ambiguous generic warning')
     const withLink={...spec,additions:{...spec.additions,link:defaultLink(spec)}}
     assert.equal(additionPartActive(withLink,'link'),true)

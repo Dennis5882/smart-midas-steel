@@ -522,6 +522,9 @@ export const en = {
   g_help_2: 'Release notes',
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_3_4_1: 'Choose crane operation across the entire building or selected start/end bays. Runway members, wheel loads and seismic weight follow that range while building geometry stays intact.',
+  rn_v2_3_4_2: 'Simplified repeated numbers and decoration in task navigation and project selection, with clearer building dimensions. Large result tables are retrieved in batches with completeness and duplicate checks.',
+  rn_v2_3_4_3: 'Verified six Gen NX live cases across three codes and full/partial ranges, plus 27 regression suites. Added evidence including sample section NGs and recovery after a network runtime failure.',
   rn_v2_3_3_1: 'Crane settings now lead Additional structures, grouped into loads, placement, runway and confirmation. Specific missing inputs and actual bay limits explain blocked progress, with links to the fields that need attention.',
   rn_v2_3_3_2: 'Computed numbers display without floating-point tails, with clearer source and confirmation guidance for shared load factors. Chinese product titles now use Agent, and all four language subtitles identify API automation.',
   rn_v2_3_2_1: 'Choose modeling sections by code, material and member role. Standard sections now share Gen NX DB properties across checks, self-weight, quantities and section proposals. Dimension-based entries and cold-formed preliminary limits are identified separately; a live property mismatch blocks model completion.',

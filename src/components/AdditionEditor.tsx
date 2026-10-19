@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from 'react'
 import { t, type I18nKey } from '../i18n'
-import { additionErrors, defaultAdditions, defaultOpening, defaultPlatform, openingBayOptions } from '../domain/additions'
+import { additionErrors, cranePositions, defaultAdditions, defaultOpening, defaultPlatform, openingBayOptions } from '../domain/additions'
 import { portalGeometry } from '../domain/portal'
 import {Phase6Editor} from './Phase6Editor'
 import type { FactoryAdditions } from '../domain/additionTypes'
@@ -9,11 +9,12 @@ import { inputNumberText, NumericInput } from './NumericInput'
 import { sectionCatalogOptions } from '../domain/sectionCatalog'
 import { additionPartForPath, type AdditionPart } from './modelingFlow'
 import {craneInputIssues,type CraneInputIssue} from '../domain/craneInput'
+import {craneTravel} from '../domain/craneTravel'
 
 function craneIssueText(issue:CraneInputIssue,spec:FactorySpec):string {
-  const key=issue.field.replace('runway.',''),label=key==='confirmed'?t(issue.field.startsWith('runway.')?'add_runway':'ms_crane'):(issue.field.startsWith('runway.')?t('add_runway')+' · ':'')+t((key==='section'?'add_beamSection':key==='bays'?'f_bays':key==='configuration'?'add_crane':`add_${key}`) as I18nKey)
+  const key=issue.field.replace(/^(runway|travel)\./,''),label=key==='confirmed'?t(issue.field.startsWith('runway.')?'add_runway':'ms_crane'):(issue.field.startsWith('runway.')?t('add_runway')+' · ':'')+t((key==='section'?'add_beamSection':key==='configuration'?'add_crane':`add_${key}`) as I18nKey)
   switch(issue.kind){
-    case 'bays':return t('ms_crane_bays',issue.max!,spec.bays)
+    case 'travel':return t('crane_travel_error',spec.bays)
     case 'positiveBelow':case 'nonnegativeBelow':return t(`ms_crane_${issue.kind}`,label,inputNumberText(issue.max!))
     case 'range':return t('ms_crane_range',label,issue.min!,issue.max!)
     case 'minimum':return t('ms_crane_minimum',label,issue.min!)
@@ -28,12 +29,12 @@ export function AdditionNumber({value,onValueChange,...props}: Omit<Parameters<t
   return <NumericInput {...props} value={raw} onValueChange={(v)=>{setRaw(v);onValueChange(v.trim()===''?NaN:Number(v))}}/>
 }
 
-export function AdditionEditor({spec, value, onChange, disabled, attempted = false, idPrefix, part,onEditBays}: {
-  spec: FactorySpec; value?: FactoryAdditions; onChange(v: FactoryAdditions): void; disabled: boolean; attempted?: boolean; idPrefix?:string; part?:AdditionPart;onEditBays?:()=>void
+export function AdditionEditor({spec, value, onChange, disabled, attempted = false, idPrefix, part}: {
+  spec: FactorySpec; value?: FactoryAdditions; onChange(v: FactoryAdditions): void; disabled: boolean; attempted?: boolean; idPrefix?:string; part?:AdditionPart
 }) {
   const id = useId(), a = value ?? defaultAdditions(spec)
   const craneIssues=craneInputIssues(spec),showCraneErrors=attempted||disabled
-  const cranePath=(o:{id?:string},key:string)=>a.crane&&o.id===a.crane.id?key:a.crane&&o.id===a.crane.id+'-runway'?'runway.'+key:undefined
+  const cranePath=(o:{id?:string},key:string)=>a.crane&&o.id===a.crane.id?key:a.crane&&o.id===a.crane.id+'-runway'?'runway.'+key:a.crane&&o.id===a.crane.id+'-travel'?'travel.'+key:undefined
   const update = (v: FactoryAdditions) => {
     const craneBasis=(c:FactoryAdditions['crane'])=>c && Object.fromEntries(Object.entries(c).filter(([k])=>!['runway','confirmed','source'].includes(k)))
     if(v.crane?.runway && JSON.stringify(craneBasis(v.crane))!==JSON.stringify(craneBasis(a.crane))) v={...v,crane:{...v.crane,runway:{...v.crane.runway,confirmed:false}}}
@@ -58,6 +59,8 @@ export function AdditionEditor({spec, value, onChange, disabled, attempted = fal
     <label className="pe-f pe-full" data-crane-field={cranePath(o,'confirmed')}><span><input type="checkbox" checked={o.confirmed} disabled={disabled || !o.source.trim()} aria-invalid={attempted&&!o.confirmed||undefined} onChange={(e)=>change({confirmed:e.target.checked})}/> {t('add_confirm')}</span>{attempted&&!o.confirmed&&<small className="mw-error">{!o.source.trim()?t('ms_crane_source',t('add_source')):t('ms_confirm_needed')}</small>}</label>
   </>
   const c = a.crane, p = a.platform, f = a.factors
+  const travel=craneTravel(spec)
+  const craneCases=c&&travel.valid&&c.wheelSpacing>0&&c.wheelSpacing<travel.length?cranePositions(travel.stations,c.wheelSpacing,!!c.runway).length*2*(c.lateral?2:1)*(c.braking?2:1):0
   const show = (name: AdditionPart) => !part || part === name
   return <section className="mw-group addition-editor">{!part && <><h4>{t('add_title')}</h4><p className="mw-note">{t('add_note')}</p></>}
     {show('equipment') && <div id={`${idPrefix??id}.equipment`} tabIndex={-1}>{a.equipment.map((e, i) => {
@@ -69,16 +72,22 @@ export function AdditionEditor({spec, value, onChange, disabled, attempted = fal
     })}
     <button type="button" className="btn btn-s" disabled={disabled} onClick={()=>update({...a,equipment:[...a.equipment,{id:crypto.randomUUID(),name:`${t('add_equipment')} ${a.equipment.length+1}`,x:spec.span/2,y:0,weight:0,seismicFraction:1,source:'',confirmed:false}]})}>{t('add_add')}</button></div>}
     {show('crane') && spec.features?.crane && c && <fieldset id={`${idPrefix??id}.crane`} tabIndex={-1} disabled={disabled}><legend>{t('add_crane')}</legend><p className="mw-note">{t('add_crane_note')}</p>
-      {showCraneErrors&&craneIssues.length>0&&<div className="crane-error-summary" role="alert"><strong>{t('ms_crane_errors',craneIssues.length)}</strong><ul>{craneIssues.map((issue,i)=><li key={i}>{issue.field==='bays'&&!onEditBays?craneIssueText(issue,spec):<button type="button" data-error-target disabled={disabled} onClick={e=>{
-        if(issue.field==='bays'){onEditBays?.();return}
+      {showCraneErrors&&craneIssues.length>0&&<div className="crane-error-summary" role="alert"><strong>{t('ms_crane_errors',craneIssues.length)}</strong><ul>{craneIssues.map((issue,i)=><li key={i}><button type="button" data-error-target disabled={disabled} onClick={e=>{
         const fieldKey=issue.kind==='confirm'&&!(issue.field.startsWith('runway.')?c.runway?.source:c.source)?.trim()?issue.field.replace('confirmed','source'):issue.field
         const field=e.currentTarget.closest('fieldset')?.querySelector<HTMLElement>(`[data-crane-field="${fieldKey}"]`),target=field?.querySelector<HTMLElement>('input:not(:disabled),select:not(:disabled)')??field
         if(target){if(target===field)target.setAttribute('tabindex','-1');target.focus();target.scrollIntoView({block:'center',behavior:'smooth'})}
-      }}>{craneIssueText(issue,spec)}</button>}</li>)}</ul></div>}
+      }}>{craneIssueText(issue,spec)}</button></li>)}</ul></div>}
+      {craneCases>0&&<p className="mw-note">{t('crane_case_count',craneCases)}</p>}
       <section className="crane-step"><header><span>01</span><h5>{t('ms_crane_loads')}</h5></header><div className="pe-grid">
         {(['maxWheel','minWheel','impactFactor','lateral','braking','seismicWeight'] as const).map((k)=>input(c,k,(v)=>update({...a,crane:{...c,[k]:v,confirmed:false}}),k==='impactFactor'?'':'kN'))}
       </div></section>
-      <section className="crane-step"><header><span>02</span><h5>{t('ms_crane_placement')}</h5></header><div className="pe-grid">
+      <section className="crane-step"><header><span>02</span><h5>{t('ms_crane_placement')}</h5></header>
+        <div className="crane-model-options" role="group" aria-label={t('crane_travel_title')}>
+          {[false,true].map(partial=><label key={String(partial)} className="crane-model-option" data-selected={!!c.travel===partial}><input type="radio" name={`${id}-travel-mode`} disabled={disabled} checked={!!c.travel===partial} onChange={()=>update({...a,crane:{...c,travel:partial?{firstBay:0,lastBay:spec.bays-1}:undefined,confirmed:false}})}/><span>{t(partial?'crane_travel_partial':'crane_travel_all')}</span></label>)}
+        </div>
+        {c.travel&&<div className="pe-grid">{(['firstBay','lastBay'] as const).map(k=>input({id:c.id+'-travel',...c.travel,[k]:c.travel![k]+1},k,v=>update({...a,crane:{...c,travel:{...c.travel!,[k]:v-1},confirmed:false}}),'',k==='firstBay'?'crane_travel_first':'crane_travel_last'))}</div>}
+        {travel.valid&&<p className="mw-note">{t('crane_travel_summary',travel.firstBay+1,travel.lastBay+1,inputNumberText(travel.length))}</p>}
+        <div className="pe-grid">
         {(['elevation','eccentricity','wheelSpacing','driftLimitMm'] as const).map((k)=>input(c,k,(v)=>update({...a,crane:{...c,[k]:v,confirmed:false}}),k==='driftLimitMm'?'mm':'m'))}
       </div></section>
       <section className="crane-step"><header><span>03</span><h5>{t('ms_crane_runway')}</h5></header>
