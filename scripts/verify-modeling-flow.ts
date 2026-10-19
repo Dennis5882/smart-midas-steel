@@ -54,13 +54,16 @@ for(const lang of ['ko','en','zh-TW','zh-CN'] as const) {
     // TW 工址: location-suggested site values stay an assumption until the engineer confirms them
     {
       const { DEFAULT_SPEC, defaultSpecFor } = await import('../src/domain/types')
-      const { toSpec, initVals } = await import('../src/components/planFields')
+      const { toSpec, initVals, fieldConflicts } = await import('../src/components/planFields')
       const tw = structuredClone(DEFAULT_SPEC)
       assert.ok(checkScope(tw).issues.some(i=>i.key==='siteAssumed'&&i.level==='warn'),'TW site values default to an assumption')
       assert.equal(toSpec(tw,initVals(tw),false).siteBasis,undefined,'Untouched site basis does not change the spec')
       const confirmed = toSpec(tw,{...initVals(tw),siteBasis:'confirmed'},false)
       assert.equal(confirmed.siteBasis,'confirmed')
-      assert.ok(!checkScope(confirmed).issues.some(i=>i.key==='siteAssumed'),'Confirmed site clears the warning')
+      assert.ok(checkScope(confirmed).issues.some(i=>i.key==='siteAssumed'),'Confirmed without a basis document keeps the warning')
+      assert.ok(fieldConflicts(confirmed,{...initVals(tw),siteBasis:'confirmed'},false).some(c=>c.field.path==='siteEvidence'),'Confirmed site requires the basis document')
+      const documented = toSpec(tw,{...initVals(tw),siteBasis:'confirmed',siteEvidence:'地質調查報告 GI-2026-031'},false)
+      assert.ok(documented.siteEvidence==='地質調查報告 GI-2026-031' && !checkScope(documented).issues.some(i=>i.key==='siteAssumed'),'Confirmed site with a basis document clears the warning')
       for (const code of ['CN','KR'] as const) assert.ok(!checkScope(defaultSpecFor(code)).issues.some(i=>i.key==='siteAssumed'),`${code} has no TW site warning`)
       // Near-fault township: one distance input per table 2-3 fault row; required before the field is valid
       const { NearFaultInput } = await import('../src/components/NearFaultInput')

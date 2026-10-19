@@ -28,8 +28,8 @@ export function buildGenPayloads(spec: FactorySpec, model: FactoryModel): GenPay
   if (!mat) throw new Error(`unknown material: ${spec.material}`)
 
   /* 퍼린·거트 재료를 따로 (CN Q235B · KR SS275) */
-  const twoMat = spec.code === 'CN' || spec.code === 'KR'
-  const secondary = spec.secondaryMaterial ?? (spec.code === 'KR' ? 'SS275' : 'Q235B')
+  const twoMat = spec.code === 'CN' || spec.code === 'KR' || (spec.code === 'TW' && !!spec.secondaryMaterial && spec.secondaryMaterial !== spec.material)
+  const secondary = spec.secondaryMaterial ?? (spec.code === 'KR' ? 'SS275' : spec.code === 'CN' ? 'Q235B' : spec.material)
 
   /* 단면: 사용된 이름을 등장 순서대로 번호 부여 */
   const sectId = new Map<string, number>()

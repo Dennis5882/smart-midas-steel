@@ -80,7 +80,7 @@ export function footingGroups(model: FactoryModel): Map<number, FootingGroup> {
   for (const e of model.elements) {
     if (!base.has(e.n1) || out.has(e.n1)) continue
     if (e.role === 'post') out.set(e.n1, 'post')
-    else if (e.role === 'column') out.set(e.n1, e.lean ? 'lean' : 'column')
+    else if (e.role === 'column') out.set(e.n1, e.lean || e.interior ? 'lean' : 'column')
   }
   return out
 }

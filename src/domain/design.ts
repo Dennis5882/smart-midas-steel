@@ -1,3 +1,4 @@
+import { columnSpans } from './types'
 import { additionDesign } from './additionDesign'
 import { factoryOnly } from './additions'
 /* 부재 설계 검토 (M3) — 해석 결과 + 기준 프로필 강도식 → 부재별 강도비, 사용성.
@@ -15,11 +16,12 @@ import { profileOf } from '../codes'
 import { runCnDesign } from './cnDesign'
 import { KR_DEFL, krPurlinDefl, runKrDesign } from './krDesign'
 import { asdCb, asdCheck, cfAsdScale } from '../codes/twAsd'
+import { boltBearing, boltShearA307, sagRodTension, webCrippling } from '../codes/twCfDetails'
 import { b1Of, b2Of, capacity, cbOf, check, kSway, SLENDER_LIMIT, type Capacity, type CheckResult } from '../codes/twSteel'
 import type { Results } from '../actions/results'
 import type { LoadInfo } from './loads'
 import { portalGeometry } from './portal'
-import { cfCapacity, cfCheck } from '../codes/twColdFormed'
+import { ccDims, cfCapacity, cfCheck } from '../codes/twColdFormed'
 import { ccLoads } from './secondary'
 import { validateDesignResults } from './resultValidation'
 import { roofDeflection } from './roofDeflection'
@@ -81,7 +83,10 @@ export interface DesignResult {
   byRole: Partial<Record<ElementRole, MemberCheck>>
   maxRatio: number
   ng: number
+  /** TW 퍼린·거트 부속 접합 (클리트 볼트·새그로드, codes/twCfDetails) — 예비, 등급에 넣지 않음 */
+  cfDetails?: CfDetailRow[]
 }
+export interface CfDetailRow { role: 'purlin' | 'girt'; item: 'clipBearing' | 'clipShear' | 'sagRod' | 'sagBearing'; demand: number; capacity: number; ratio: number; clause: string }
 
 const dist = (a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }) => Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z)
 
@@ -125,6 +130,11 @@ function runFactoryDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
   const Kcol = (h: number) => kSway(G.truss ? 0.1 : (col.Ix / h) / (raf.Ix / G.rafterLen), spec.baseFixity === 'fixed' ? 1 : 10)
   const colH = (x: number) => (G.truss ? G.truss.zb : G.zAt(x))
   const KcolAt = new Map(G.eaveXs.map((x) => [x, Kcol(colH(x))]))
+  /* 강접 내부 기둥 (TW interiorColumns 'rigid'): 양쪽 지붕보 — G_top = (Ic/h) / (2 Ir/L), L = 평균 기둥 경간 경사 길이 */
+  if (spec.interiorColumns === 'rigid') {
+    const cs = columnSpans(spec), Lavg = cs.reduce((a, b) => a + b, 0) / cs.length * Math.sqrt(1 + spec.roofSlope ** 2)
+    for (const x of G.leanXs) KcolAt.set(x, kSway((col.Ix / G.zAt(x)) / (2 * raf.Ix / Lavg), spec.baseFixity === 'fixed' ? 1 : 10))
+  }
   const Lsec = (spec.baySpacing / (sagCount(spec) + 1))
 
   /* 트러스 프레임(하현재가 있는 y) — 박공 프레임 지붕보는 일반 지붕보 */
@@ -161,13 +171,20 @@ function runFactoryDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
   }
 
   const cc = ccLoads(spec, model, info)
+  /** 퍼린·거트 최대 끝 반력 (kN) — 클리트 볼트 검토 */
+  const endV: Partial<Record<'purlin' | 'girt', number>> = {}
+  /** 역할 재료 — TW 퍼린·거트는 2차 재료(spec.secondaryMaterial, 예: SSC400)가 있으면 그것 */
+  const matName = (r: ElementRole) => (r === 'purlin' || r === 'girt') && spec.secondaryMaterial && prof.materials[spec.secondaryMaterial] ? spec.secondaryMaterial : spec.material
+  const matOf = (r: ElementRole) => prof.materials[matName(r)]
   /** 두께별 Fy — 판 두께 max(tf, tw) (프로필 fyAt, 없으면 재료 fy) */
-  const fyOf = (sp: { tf: number; tw: number }) => prof.fyAt?.(spec.material, Math.max(sp.tf, sp.tw)) ?? mat.fy
+  const fyOf = (sp: { tf: number; tw: number }, r: ElementRole = 'column') => prof.fyAt?.(matName(r), Math.max(sp.tf, sp.tw)) ?? matOf(r).fy
   /** 냉간성형 퍼린·거트 — 해석 부재력(일반 조합) + 국부 풍압 */
   const coldFormedMember = (e: FactoryModel['elements'][number], Lel: number): MemberCheck | null => {
     const sp = sectionProps(e.section, spec.code)
     const { KLx, KLy, Lb } = lengthsOf(e.role, Lel, e)
-    const cf = cfCapacity(e.section, sp, mat.fy, mat.E, { Lx: KLx, Ly: KLy, Lt: Lb, Lb }, 1)
+    const cf = cfCapacity(e.section, sp, matOf(e.role).fy, matOf(e.role).E, { Lx: KLx, Ly: KLy, Lt: Lb, Lb }, 1, spec.code === 'TW' ? mm(Lel) : undefined)
+    /* 6.5 腹板皺曲 — 단순보 양 끝 반력, 받침 = 지붕보(퍼린)·기둥(거트) 플랜지 폭 */
+    const crip = spec.code === 'TW' ? webCrippling(ccDims(e.section), matOf(e.role).fy, sectionProps(e.role === 'purlin' ? spec.sections.rafter : spec.sections.column, spec.code).bf) : null
     const myScale = 1 / (sagCount(spec) + 1) ** 2
     let best: MemberCheck | null = null
     const consider = (combo: string, part: number, f: MemberCheck['forces'], braced: boolean) => {
@@ -197,6 +214,16 @@ function runFactoryDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
     for (const d of cc.get(e.id)?.demands ?? []) if (!d.asd) consider(d.combo, 2, d.f, d.braced)
     if (!best) return null
     const b = best as MemberCheck
+    if (crip) {
+      /* 반력 = 끝 전단 최대 (일반 조합 + 국부 풍압) */
+      let V = 0, vc = ''
+      for (const [combo, pts] of beam ?? []) if (usable(e.role, combo)) for (const p of [pts[0], pts[pts.length - 1]]) if (Math.abs(p.Vz) > V) { V = Math.abs(p.Vz); vc = combo }
+      for (const d of cc.get(e.id)?.demands ?? []) if (!d.asd && d.f.V > V) { V = d.f.V; vc = d.combo }
+      const r = V / (crip.phi * crip.Pn)
+      endV[e.role as 'purlin' | 'girt'] = Math.max(endV[e.role as 'purlin' | 'girt'] ?? 0, V)
+      b.notes = [...b.notes, `CF-6.5 ${r.toFixed(3)}`]
+      if (r > b.ratio) { b.ratio = r; b.eq = 'TW CF 6.5-1'; b.combo = vc; b.part = 0 }
+    }
     if (asdOn) {
       /* ASD — 冷軋型鋼 1.3.1 허용강도 (LRFD 설계강도 ÷ φΩ), 같은 조합식 */
       const ca = cfAsdScale(cf)
@@ -211,6 +238,13 @@ function runFactoryDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
         pts.forEach((p, i) => take(combo, i, { P: p.P, Mx: Math.abs(p.My), My: Math.abs(p.Mz) * myScale, V: Math.abs(p.Vz) }, braced))
       }
       for (const d of cc.get(e.id)?.demands ?? []) if (d.asd) take(d.combo, 2, d.f, d.braced)
+      if (crip) {
+        let V = 0, vc = ''
+        for (const [combo, pts] of beam ?? []) if (kindOf(combo) === 'asd') for (const p of [pts[0], pts[pts.length - 1]]) if (Math.abs(p.Vz) > V) { V = Math.abs(p.Vz); vc = combo }
+        for (const d of cc.get(e.id)?.demands ?? []) if (d.asd && d.f.V > V) { V = d.f.V; vc = d.combo }
+        const r = V * crip.omega / crip.Pn
+        if (!top || r > top.ratio) top = { ratio: r, combo: vc, eq: 'ASD CF 6.5-1', part: 0 }
+      }
       if (top) mergeAsd(b, top)
     }
     const slender = maxComp > 1e-3
@@ -251,7 +285,7 @@ function runFactoryDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
       for (const [combo, P] of res.truss.get(e.id) ?? []) {
         if (!usable(e.role, combo)) continue
         if (P < 0) maxComp = Math.max(maxComp, -P)
-        const cap = capacity(sp, fyOf(sp), mat.E, { KLx, KLy, Lb }, 1, Math.max(0, -P))
+        const cap = capacity(sp, fyOf(sp, e.role), matOf(e.role).E, { KLx, KLy, Lb }, 1, Math.max(0, -P))
         consider(combo, -1, { P, Mx: 0, My: 0, V: 0 }, cap, 1, 1)
       }
     } else {
@@ -260,7 +294,7 @@ function runFactoryDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
         if (e.role === 'column' && kindOf(combo) === 'amplified') {
           /* 13.4.1: 휨 무시 축력만 — 압축 φcPn, 인장 φtPn */
           const Pmin = Math.min(...pts.map((p) => p.P)), Pmax = Math.max(...pts.map((p) => p.P))
-          const capA = capacity(sp, fyOf(sp), mat.E, { KLx, KLy, Lb }, 1, Math.max(0, -Pmin))
+          const capA = capacity(sp, fyOf(sp, e.role), matOf(e.role).E, { KLx, KLy, Lb }, 1, Math.max(0, -Pmin))
           for (const [P, cap] of [[Pmin, capA.phiPnc], [Pmax, capA.phiPnt]] as const) {
             const r = (P < 0 ? -P : P) / cap
             if (r > ampMax) { ampMax = r; ampCombo = combo; ampP = P; ampCap = cap }
@@ -271,7 +305,7 @@ function runFactoryDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
         const Cb = cbOf(pts.map((p) => p.My))
         const Pc = Math.max(0, ...pts.map((p) => -p.P))
         maxComp = Math.max(maxComp, Pc)
-        const cap = capacity(sp, fyOf(sp), mat.E, { KLx, KLy, Lb }, Cb, Pc)
+        const cap = capacity(sp, fyOf(sp, e.role), matOf(e.role).E, { KLx, KLy, Lb }, Cb, Pc)
         puMax = Math.max(puMax, Pc / cap.phiPnc)
         const B1 = b1Of(Pc, sp, mat.E, KLx > 0 ? Math.min(KLx, mm(Lel)) : mm(Lel))
         let B = B1
@@ -297,10 +331,10 @@ function runFactoryDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
     const b = best as MemberCheck
     if (asdOn) {
       /* ASD 5~8장 — Cm: 골조 기둥·지붕보 0.85(횡이동), 그 밖 양단 핀 + 횡하중 1.0 */
-      const Cm = frame || e.role === 'chord' ? 0.85 : 1, Fy = fyOf(sp)
+      const Cm = frame || e.role === 'chord' ? 0.85 : 1, Fy = fyOf(sp, e.role)
       let top: (Omit<NonNullable<MemberCheck['asd']>, 'lrfd'> & { f?: MemberCheck['forces'] }) | undefined
       const take = (combo: string, part: number, f: MemberCheck['forces'], Cb: number) => {
-        const r = asdCheck(sp, Fy, mat.E, { KLx, KLy, Lb }, Cb, f, Cm)
+        const r = asdCheck(sp, Fy, matOf(e.role).E, { KLx, KLy, Lb }, Cb, f, Cm)
         if (!top || r.ratio > top.ratio) top = { ratio: r.ratio, combo, eq: r.eq, part, f }
       }
       if (e.role === 'brace' || e.role === 'web') for (const [combo, P] of res.truss.get(e.id) ?? []) { if (kindOf(combo) === 'asd') take(combo, -1, { P, Mx: 0, My: 0, V: 0 }, 1) }
@@ -366,6 +400,33 @@ function runFactoryDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
     const s = ccSum.get(k)
     if (s) { s.count++; s.pNeg = Math.min(s.pNeg, c.pNeg); s.pPos = Math.max(s.pPos, c.pPos) }
     else ccSum.set(k, { role, zone: c.zone, A: c.A, pPos: c.pPos, pNeg: c.pNeg, count: 1 })
+  }
+  /* TW 부속 접합 (예비): 클리트 2-M12 A307 — 웨브 지압·볼트 전단, 새그로드 M12 — 경사 방향(퍼린)·연직(거트) 자중 성분 누적 */
+  if (spec.code === 'TW' && !roles) {
+    const rows: CfDetailRow[] = []
+    const lenOf = (role: 'purlin' | 'girt') => { const e = model.elements.find((x) => x.role === role); return e ? sectionProps(e.section, spec.code) : null }
+    const push = (role: CfDetailRow['role'], item: CfDetailRow['item'], demand: number, capacity: number, clause: string) => rows.push({ role, item, demand, capacity, ratio: demand / capacity, clause })
+    const nRod = sagCount(spec), Lsec = spec.baySpacing / (nRod + 1)
+    for (const role of ['purlin', 'girt'] as const) {
+      const sp = lenOf(role), V = endV[role]
+      if (!sp || !['CC', 'Z'].includes(sp.kind)) continue
+      const m = matOf(role), brg = boltBearing(12, sp.tw, m.fu), sh = boltShearA307(12)
+      if (V) {
+        push(role, 'clipBearing', V / 2, brg.phi * brg.Pn, 'TW CF 11.3-9')
+        push(role, 'clipShear', V / 2, sh.phi * sh.Pn, 'TW CF 11.3-11 (A307)')
+      }
+      if (nRod > 0) {
+        const self = m.gamma * sp.A * 1e-6 // kN/m
+        const wPar = role === 'purlin'
+          ? (1.2 * (spec.roofDead * G.sRoof + self) + 1.6 * info.roofLive * G.sRoof * Math.cos(G.theta)) * Math.sin(G.theta)
+          : 1.2 * (spec.wallDead * G.gWall + self)
+        const per = wPar * Lsec, n = role === 'purlin' ? G.nPurlin : G.girtZs.length
+        const rod = sagRodTension(12)
+        push(role, 'sagRod', per * n, rod.phi * rod.Pn, 'LRFD 表10.3-2')
+        push(role, 'sagBearing', per, brg.phi * brg.Pn, 'TW CF 11.3-9')
+      }
+    }
+    out.cfDetails = rows
   }
   out.cc = [...ccSum.values()].sort((x, y) => (x.role === y.role ? String(x.zone).localeCompare(String(y.zone)) : x.role === 'purlin' ? -1 : 1))
   const c13 = col13 as ColumnAxial13 | null

@@ -1,3 +1,5 @@
+import type { ReviewItem, ReviewKey } from '../domain/twReview'
+import { weldSchedule } from '../domain/twWelding'
 import type { FootingInput, FootingResult } from '../domain/twFoundation'
 import { isTwUse, twUseSource } from '../codes/twOccupancy'
 import { additionLabelKey } from '../domain/additionTypes'
@@ -15,7 +17,7 @@ import { LOSS, quantities } from '../domain/quantities'
 import { buildDrawingSvgs } from '../drawing/drawings'
 import { isoSvg, RATIO_BANDS, ratioColor, ROLE_COLOR } from '../drawing/iso'
 import { connGrade, GRADES, roleGrade, summarizeStatus, type Grade, type Graded } from '../domain/status'
-import { siteSourceText, windSourceText } from '../components/Status'
+import { siteSourceText, windSourceText, rSourceText } from '../components/Status'
 import { dimsText } from './dims'
 import { scopeMsg } from '../components/ScopeBox'
 import { checkScope } from '../domain/scope'
@@ -50,9 +52,11 @@ export interface ReportInput {
   opt?: OptSummary | null
   /** TW 기초 예비검토 (state/footing) */
   footing?: { result: FootingResult; input: FootingInput } | null
+  /** TW 簽證 심사 대응표 (state/review) + 사용자 사유 */
+  review?: { items: ReviewItem[]; reasons: Partial<Record<ReviewKey, string>> } | null
 }
 
-export function buildReport({ built, reactions, design, connections, opt, footing }: ReportInput): string {
+export function buildReport({ built, reactions, design, connections, opt, footing, review }: ReportInput): string {
   const { spec, model, info } = built
   const prof = profileOf(spec.code)
   const mat = prof.materials[spec.material]
@@ -74,6 +78,12 @@ export function buildReport({ built, reactions, design, connections, opt, footin
     <ul>${used.map((g) => `<li>${grade({ grade: g, reasons: [] })} ${L(`gr_${g}_d`)}</li>`).join('')}</ul>
     <div class="note">${L('src_anal')}<br>${esc(t('src_design', t(prof.checkLabelKey ?? prof.labelKey)))} ${esc(tc(spec.code, 'src_design_why'))}</div></div>`)
 
+  /* TW 簽證 심사 항목 대응표 — 1장 앞 */
+  if (review?.items.length) {
+    parts.push(`<h3>${L('rv_title')}</h3><p class="note">${L('rv_note')}</p>`)
+    parts.push(table([t('rv_col_item'), t('rv_col_section'), t('rv_col_status'), t('rv_col_reason')], review.items.map((i) => [
+      L(`rv_item_${i.key}`), esc(tc(spec.code, i.section)), L(`rv_status_${i.status}`), esc(review.reasons[i.key]?.trim() || (i.reason ? t(`rv_reason_${i.reason}`) : ''))])))
+  }
   /* 1. 설계 개요 */
   h2('rep_s1')
   parts.push(table([t('sv_item'), t('sv_value')], [
@@ -128,6 +138,8 @@ export function buildReport({ built, reactions, design, connections, opt, footin
   /* 2. 재료·단면 */
   h2('rep_s2')
   parts.push(`<p>${esc(spec.material)}: Fy = ${mat.fy} MPa, Fu = ${mat.fu} MPa, E = ${mat.E} MPa, γ = ${mat.gamma} kN/m³ (Gen NX ${esc(mat.gen.standard)} ${esc(mat.gen.db)})</p>`)
+  const mat2 = spec.code === 'TW' && spec.secondaryMaterial ? prof.materials[spec.secondaryMaterial] : undefined
+  if (mat2) parts.push(`<p>${L('f_secondaryMaterial')} — ${esc(spec.secondaryMaterial!)}: Fy = ${mat2.fy} MPa, Fu = ${mat2.fu} MPa (Gen NX ${esc(mat2.gen.standard)} ${esc(mat2.gen.db)})</p>`)
   const secRows = [...ROLES.filter((r) => spec.sections[r]).map((r) => ({ r, name: spec.sections[r]!, addition:undefined as import('../domain/additionTypes').AdditionUsage | undefined })), ...model.elements.filter((e)=>e.addition).filter((e,i,es)=>es.findIndex((v)=>v.section===e.section && v.role===e.role)===i).map((e)=>({r:e.role,name:e.section,addition:e.addition}))].map(({ r, name, addition }) => {
     const p = sectionProps(name, spec.code)
     return [L(addition ? additionLabelKey(addition) : `role_${r}`), esc(name), f(p.A / 100, 1), f(p.Ix / 1e4, 0), f(p.Zx / 1e3, 0), f(p.rx / 10, 2), f(p.ry / 10, 2), esc(p.source === 'gen-db' ? t('section_gen_source', p.db!) : t('section_dimension_source'))]
@@ -147,6 +159,8 @@ export function buildReport({ built, reactions, design, connections, opt, footin
   if (spec.code === 'TW') parts.push(table(['', 'X', 'Y'], [
     [L('kv_site'), `${esc(si.county ?? '')} ${esc(si.town ?? '')} · ${si.soil ? L(`soil_${si.soil}`) : '-'}`, ''],
     [L('kv_site_src'), esc(siteSourceText(spec)), ''],
+    ...(spec.siteEvidence ? [[L('kv_site_evidence'), esc(spec.siteEvidence), '']] : []),
+    [L('kv_r_src'), esc(rSourceText(spec)), ''],
     ['SDS / SD1 / SMS / SM1 / I', `${si.SDS} / ${si.SD1} / ${si.SMS ?? '-'} / ${si.SM1 ?? '-'} / ${si.I}`, ''],
     ['R', si.Rx, si.Ry],
     ['T (s)', f(info.seismic.X.T, 3), f(info.seismic.Y.T, 3)],
@@ -269,6 +283,18 @@ export function buildReport({ built, reactions, design, connections, opt, footin
         c.dims.stiffener && k.item === 'flangeBend' ? `${f(k.ratio, 3)} → ${L('cn_stiffener')}` : ok(k.ratio), esc(k.clause)])))
   }
   if (!connections?.length) parts.push(`<p>${L('need_design')}</p>`)
+  /* TW 퍼린·거트 부속 접합 (예비) */
+  if (design?.cfDetails?.length) {
+    parts.push(`<h3>${L('cfd_title')}</h3><p class="note">${L('cfd_note')}</p>`)
+    parts.push(table([t('cfd_member'), t('sv_item'), t('cn_demand'), t('cn_capacity'), t('rd_ratio'), t('sv_clause')], design.cfDetails.map((r) => [L(`role_${r.role}`), L(`cfd_${r.item}`), `${f(r.demand)} kN`, `${f(r.capacity)} kN`, ok(r.ratio), esc(r.clause)])))
+  }
+  /* TW 용접 근거 (twWelding) */
+  const welds = weldSchedule(spec, connections)
+  if (welds.length) {
+    parts.push(`<h3>${L('weld_title')}</h3><p class="note">${L('weld_note')}</p>`)
+    parts.push(table([t('weld_conn'), t('weld_joint'), t('weld_std'), t('weld_dc')], welds.map((w) => [L(`cn_type_${w.type}`),
+      `${L(`weld_${w.joint}`)}${w.size ? ` ${w.size} mm` : ''}`, esc(w.standard), w.demandCritical ? L('weld_dc_yes') : '—'])))
+  }
   if (footing) {
     const fi = footing.input
     parts.push(`<h3>${L('ft_title')} — ${footing.result.ok ? 'OK' : 'NG'}</h3><p class="note">${L('ft_note')}</p>`)

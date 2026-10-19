@@ -69,8 +69,10 @@ export const GROUPS: Group[] = [
   ] },
   { title: 'sec_sections', fields: [
     { path: 'material', label: 'f_material', kind: 'select', options: (sp) =>
-      Object.keys(profileOf(sp.code).materials).map((m) => ({ value: m, label: m })) },
+      Object.keys(profileOf(sp.code).materials).filter((m) => !(sp.code === 'TW' && m === 'SSC400')).map((m) => ({ value: m, label: m })) },
     /* TW 容許應力 ASD 검토 추가 (LRFD 와 둘 다) — codes/twAsd */
+    /* TW 퍼린·거트 재료 (빈칸 = 주재료와 같음) — 냉간형강 SSC400 등 */
+    { path: 'secondaryMaterial', label: 'f_secondaryMaterial', kind: 'select', fallback: '', options: (sp) => [{ value: '', label: t('secmat_same') }, ...Object.keys(profileOf(sp.code).materials).map((m) => ({ value: m, label: m }))] },
     { path: 'asd', label: 'f_asd', kind: 'select', fallback: 'false', options: () => [{ value: 'false', label: t('asd_off') }, { value: 'true', label: t('asd_on') }] },
     { path: 'sections.column', label: 'f_column', kind: 'text' },
     { path: 'sections.rafter', label: 'f_rafter', kind: 'text' },
@@ -90,6 +92,7 @@ export const GROUPS: Group[] = [
   ] },
   { title: 'sec_seismic', fields: [
     { path: 'siteBasis', label: 'f_siteBasis', kind: 'select', fallback: 'assumed', options: () => (['assumed', 'confirmed'] as const).map((v) => ({ value: v, label: t(`site_basis_${v}`) })) },
+    { path: 'siteEvidence', label: 'f_siteEvidence', kind: 'text', fallback: '', full: true },
     { path: 'seismic.county', label: 'f_county', kind: 'select', options: () => counties().map((c) => ({ value: c, label: c })) },
     { path: 'seismic.town', label: 'f_town', kind: 'select', options: (sp) => townsOf(sp.seismic.county).map((c) => ({ value: c, label: c })) },
     { path: 'seismic.nearFault', label: 'f_nearFault', kind: 'text', fallback: '', full: true },
@@ -99,6 +102,8 @@ export const GROUPS: Group[] = [
     { path: 'seismic.SMS', label: 'f_SMS', unit: 'g', kind: 'num' },
     { path: 'seismic.SM1', label: 'f_SM1', unit: 'g', kind: 'num' },
     { path: 'seismic.I', label: 'f_I', kind: 'num' },
+    { path: 'seismic.systemX', label: 'f_systemX', kind: 'select', fallback: 'IMF', options: () => (['IMF', 'SMF'] as const).map((v) => ({ value: v, label: t(`sys_tw_${v}`) })) },
+    { path: 'seismic.systemY', label: 'f_systemY', kind: 'select', fallback: 'OCBF', options: () => (['OCBF', 'SCBF'] as const).map((v) => ({ value: v, label: t(`sys_tw_${v}`) })) },
     { path: 'seismic.Rx', label: 'f_Rx', kind: 'num' },
     { path: 'seismic.Ry', label: 'f_Ry', kind: 'num' },
   ] },
@@ -168,8 +173,9 @@ const SPAN_LIST: Field = { path: 'spanList', label: 'f_spanList', unit: 'm', kin
 /** 트러스 지붕: 처마 춤 + 하현재·웨브 단면 */
 const trussGroups = (g: Group): Group => g.title === 'sec_geometry' ? { ...g, fields: g.fields.flatMap((f) => (f.path === 'roofSlope' ? [f, { path: 'trussDepth', label: 'f_trussDepth', unit: 'm', kind: 'num' } as Field] : [f])) }
   : g.title === 'sec_sections' ? { ...g, fields: g.fields.flatMap((f) => (f.path === 'sections.rafter' ? [f, { path: 'sections.chord', label: 'f_chord', kind: 'text', fallback: TRUSS_DEFAULTS.chord } as Field, { path: 'sections.web', label: 'f_web', kind: 'text', fallback: TRUSS_DEFAULTS.web } as Field] : [f])) } : g
+const INTERIOR: Field = { path: 'interiorColumns', label: 'f_interiorColumns', kind: 'select', fallback: 'lean', options: () => (['lean', 'rigid'] as const).map((v) => ({ value: v, label: t(`interior_${v}`) })) }
 const multiGeometry = (g: Group): Group => g.title !== 'sec_geometry' ? g
-  : { ...g, fields: g.fields.flatMap((f) => (f.path === 'span' ? [SPAN_LIST] : [f])) }
+  : { ...g, fields: g.fields.flatMap((f) => (f.path === 'span' ? [SPAN_LIST, INTERIOR] : [f])) }
 /** 개별 간격: 베이 수·공통 간격 대신 베이별 목록 (자유골조와 위저드 공통). */
 const individualGeometry = (g: Group): Group => g.title !== 'sec_geometry' ? g
   : { ...g, fields: [BAY_LIST, ...g.fields.filter((f) => f.path !== 'bays' && f.path !== 'baySpacing')] }
@@ -180,7 +186,8 @@ export const groupsFor = (code: FactorySpec['code'], free = false, frame?: Frame
     .map((g) => frame === 'multi' || frame === 'gableCols' ? multiGeometry(g) : g)
     .map((g) => frame === 'truss' ? trussGroups(g) : g)
     .map((g) => code === 'CN' ? { ...g, fields: g.fields.filter((f) => f.path !== 'restraints.braceCrossing') } : g)
-export const FIELDS = [...GROUPS.map(trussGroups), ...CN_GROUPS, ...KR_GROUPS].flatMap((g) => g.fields)
+    .map((g) => code !== 'TW' ? { ...g, fields: g.fields.filter((f) => !['secondaryMaterial', 'asd', 'interiorColumns'].includes(f.path)) } : g)
+export const FIELDS = [...GROUPS.map(trussGroups), ...CN_GROUPS, ...KR_GROUPS].flatMap((g) => g.fields).concat([INTERIOR])
 export const parseList = (raw: string) => raw.split(/[,，、\s]+/).filter(Boolean).map(Number)
 
 export const getPath = (o: any, p: Path): unknown => p.split('.').reduce((a, k) => a?.[k], o)
@@ -197,6 +204,9 @@ export function toSpec(base: FactorySpec, vals: Record<Path, string>, free: bool
   for (const f of groupsFor(base.code, free, frame, individual).flatMap((g) => g.fields)) {
     const raw = vals[f.path]
     if ((f.path.startsWith('restraints.') || f.path === 'siteBasis') && raw === 'assumed' && getPath(base, f.path) === undefined) continue
+    /* 기본값(표시만)은 스펙에 쓰지 않는다 — 기존 스펙·정답 세트와 같게 */
+    if (((f.path === 'seismic.systemX' && raw === 'IMF') || (f.path === 'seismic.systemY' && raw === 'OCBF') || (f.path === 'interiorColumns' && raw === 'lean')) && getPath(base, f.path) === undefined) continue
+    if (f.path === 'secondaryMaterial' || f.path === 'siteEvidence' || f.path === 'interiorColumns') { sp = setPath(sp, f.path, raw?.trim() ? raw.trim() : undefined); continue }
     /* 근단층 거리는 鄉鎮이 바뀌면 비워진다 — 빈 값도 그대로 반영해 이전 鄉鎮 거리가 남지 않게 */
     if (f.path === 'seismic.nearFault') { sp = setPath(sp, f.path, raw?.trim() ? raw.trim() : undefined); continue }
     if (f.path === 'asd') { sp = setPath(sp, f.path, raw === 'true' ? true : undefined); continue }
@@ -229,6 +239,8 @@ export const listError = (raw: string, cells = false) => {
 export function invalidField(f: Field, raw: string, spec: FactorySpec, individualCells = false): boolean {
   /* 근단층 鄉鎮이면 표2-3 단층 행마다 거리(km ≥ 0) 필수, 아니면 칸 없음 */
   if (f.path === 'seismic.nearFault') return nearFaultEntries(spec.seismic.county, spec.seismic.town, raw) === null
+  /* 선택 입력 — 빈칸 허용 (퍼린·거트 재료 = 주재료, 工址 근거는 확인 시 충돌 검사) */
+  if (f.path === 'secondaryMaterial' || f.path === 'siteEvidence') return !!raw?.trim() && f.kind === 'select' && !f.options!(spec).some((o) => o.value === raw)
   if (!raw?.trim()) return true
   if (f.kind === 'list') return listError(raw, f.path === 'bayList' && individualCells)
   if (f.kind === 'select') return !f.options!(spec).some((o) => o.value === raw)
@@ -245,9 +257,9 @@ export function invalidField(f: Field, raw: string, spec: FactorySpec, individua
   return false
 }
 
-export const fieldStep = (f: Pick<Field,'path'>) => f.path.startsWith('additions.') ? ADDITIONS_STEP : f.path.startsWith('restraints.') ? 2 : ['frame', 'span', 'spanList', 'eaveHeight', 'roofSlope', 'baseFixity'].includes(f.path) ? 1
+export const fieldStep = (f: Pick<Field,'path'>) => f.path.startsWith('additions.') ? ADDITIONS_STEP : f.path.startsWith('restraints.') ? 2 : ['frame', 'span', 'spanList', 'interiorColumns', 'trussDepth', 'eaveHeight', 'roofSlope', 'baseFixity'].includes(f.path) ? 1
   : ['bayList', 'bays', 'baySpacing', 'purlinSpacing', 'girtSpacing', 'postSpacing', 'sagRods'].includes(f.path) ? 2
-  : f.path.startsWith('sections.') || f.path === 'material' || ['fc', 'anchorFu', 'china.concreteBearing', 'china.anchorFt'].includes(f.path) ? 3 : LOADS_STEP
+  : f.path.startsWith('sections.') || ['material', 'secondaryMaterial', 'asd'].includes(f.path) || ['fc', 'anchorFu', 'china.concreteBearing', 'china.anchorFt'].includes(f.path) ? 3 : LOADS_STEP
 
 /** 잘못된 입력 칸 — 기본 모델링·자유골조 공통 (자유골조는 베이 수·간격 대신 베이 목록) */
 export const invalidFields = (spec: FactorySpec, vals: Record<Path, string>, free: boolean, individual = free): Field[] =>
@@ -267,6 +279,8 @@ export function fieldConflicts(spec: FactorySpec, vals: Record<Path, string>, fr
   const add = (path: Path, text: string) => { const field = fields.find((f) => f.path === path); if (field) out.push({ field, text }) }
   const floor2 = (x: number) => Math.floor(x * 100) / 100
   if (ok('span') && spec.span > LIMITS.span) add('span', t('sc_span', spec.span))
+  /* 工址 확인이면 근거 문서 필수 (TW) */
+  if (spec.code === 'TW' && vals.siteBasis === 'confirmed' && !(vals.siteEvidence ?? '').trim()) add('siteEvidence', t('site_evidence_required'))
   /* 다경간: 스팬 한계는 경간마다 */
   const widths = frameSpans(spec), wMin = Math.min(...widths)
   const cols = columnSpans(spec), cMax = Math.max(...cols), cMin = Math.min(...cols)

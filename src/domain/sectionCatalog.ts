@@ -40,8 +40,8 @@ export const sectionCatalogAuditDate = audit.auditedAt
 
 /** Match the material actually assigned by buildGenPayloads, including legacy specs. */
 export function modelingSectionChoices(spec: FactorySpec, role: ElementRole, current: string) {
-  const secondary = (spec.code === 'CN' || spec.code === 'KR') && (role === 'purlin' || role === 'girt')
-  const material = secondary ? spec.secondaryMaterial ?? (spec.code === 'KR' ? 'SS275' : 'Q235B') : spec.material
+  const secondary = (spec.code === 'CN' || spec.code === 'KR' || (spec.code === 'TW' && !!spec.secondaryMaterial)) && (role === 'purlin' || role === 'girt')
+  const material = secondary ? spec.secondaryMaterial ?? (spec.code === 'KR' ? 'SS275' : spec.code === 'CN' ? 'Q235B' : spec.material) : spec.material
   const options = sectionCatalogOptions(spec.code, role, material)
   const selected = options.find((o) => o.name === current)
   const source = current ? genSectionRecord(current, spec.code) : undefined

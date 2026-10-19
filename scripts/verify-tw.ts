@@ -214,6 +214,7 @@ eq(now.conns, G.conns, 'connection dims and per-item ratios')
     SN400B: ['CNS(S)', 'SN400', 235, 400], SN490B: ['CNS(S)', 'SN490', 325, 490], SM490A: ['CNS(S)', 'SM490', 325, 490],
     SM400A: ['CNS(S)', 'SM400', 235, 400], SM490YA: ['CNS(S)', 'SM490Y', 355, 490], SM520B: ['CNS(S)', 'SM520', 355, 520], SS400: ['CNS(S)', 'SS400', 235, 400],
     A36: ['ASTM(S)', 'A36', 250, 400], A572Gr50: ['ASTM(S)', 'A572-50', 345, 450], A992: ['ASTM(S)', 'A992', 345, 450],
+    SSC400: ['CNS(S)', 'SSC400', 245, 400],
   }
   assert.deepEqual(Object.keys(TW.materials).sort(), Object.keys(want).sort())
   for (const [m, [std, db, fy, fu]] of Object.entries(want)) {

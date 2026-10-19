@@ -27,6 +27,8 @@ export const TW: CodeProfile = {
     A36: { fy: 250, fu: 400, E: 200000, nu: 0.3, gamma: 77, gen: { standard: 'ASTM(S)', db: 'A36' } },
     A572Gr50: { fy: 345, fu: 450, E: 200000, nu: 0.3, gamma: 77, gen: { standard: 'ASTM(S)', db: 'A572-50' } },
     A992: { fy: 345, fu: 450, E: 200000, nu: 0.3, gamma: 77, gen: { standard: 'ASTM(S)', db: 'A992' } },
+    /* CNS 6183 一般結構用輕型鋼 SSC400 (LRFD 3.2) — 냉간 퍼린·거트용 2차 재료(spec.secondaryMaterial). Gen CNS(S) SSC400 (DLL 문자열) */
+    SSC400: { fy: 245, fu: 400, E: 200000, nu: 0.3, gamma: 77, gen: { standard: 'CNS(S)', db: 'SSC400' } },
   },
   defaultMaterial: 'SN400B',
   /* ⚠ 두께별 Fy — CNS 13812(SN)·2947(SM) = JIS G3136·G3106 통상값 (KB 에 표 없음, 원문 대조 전): SN 은 40 mm 초과 −20 MPa(400)·−30 MPa(490),
@@ -37,7 +39,7 @@ export const TW: CodeProfile = {
       /* JIS G3106·G3101 (= CNS 2947·2473) 두께 구분 통상값, ASTM A6/A36·A572·A992 최소 항복 (원문 대조 전) */
       SM400A: [[16, 245], [40, 235], [100, 215]], SS400: [[16, 245], [40, 235], [100, 215]],
       SM490YA: [[16, 365], [40, 355], [75, 335], [100, 325]], SM520B: [[16, 365], [40, 355], [75, 335], [100, 325]],
-      A36: [[200, 250]], A572Gr50: [[100, 345]], A992: [[100, 345]],
+      A36: [[200, 250]], A572Gr50: [[100, 345]], A992: [[100, 345]], SSC400: [[100, 245]],
     }
     const row = T[m]?.find(([tm]) => t <= tm)
     return row ? row[1] : T[m]?.at(-1)?.[1] ?? 235

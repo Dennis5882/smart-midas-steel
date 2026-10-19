@@ -7,7 +7,7 @@ import type { ConnResult } from '../domain/connections'
 import {isLengthService,type DesignResult} from '../domain/design'
 import type { OptSummary } from '../domain/optimize'
 import { connGrade, roleGrade } from '../domain/status'
-import { GradeChip, siteSourceText, StatusCard, windSourceText } from './Status'
+import { GradeChip, siteSourceText, StatusCard, windSourceText, rSourceText } from './Status'
 import { dimValue } from '../report/dims'
 import { StaleBanner } from './StaleBanner'
 import { selectTask } from '../state/ui'
@@ -89,7 +89,7 @@ export function ModelPanel() {
         ))}
       </div>
       <div className="scard"><h3>{t('sec_prop')}</h3>
-        <KV k={t('kv_mat')} v={sp.material} />
+        <KV k={t('kv_mat')} v={sp.code === 'TW' && sp.secondaryMaterial ? `${sp.material} · ${t('f_secondaryMaterial')} ${sp.secondaryMaterial}` : sp.material} />
         <KV k={t('f_column')} v={sp.sections.column} />
         <KV k={t('f_rafter')} v={sp.sections.rafter} />
         <KV k={t('f_purlin')} v={sp.sections.purlin} />
@@ -101,6 +101,8 @@ export function ModelPanel() {
       <div className="scard"><h3>{t('sec_load')}</h3>
         <KV k={t('kv_roofLive')} v={`${f3(info.roofLive)} kN/m²`} />
         <KV k={t('kv_site_src')} v={siteSourceText(sp)} />
+        {sp.code === 'TW' && sp.siteEvidence && <KV k={t('kv_site_evidence')} v={sp.siteEvidence} />}
+        {sp.code === 'TW' && <KV k={t('kv_r_src')} v={rSourceText(sp)} />}
         {sp.code === 'TW' && <KV k={t('kv_wind_src')} v={windSourceText(sp)} />}
         <KV k={t('kv_W')} v={`${f1(info.seismic.W)} kN`} />
         <KV k={t('kv_EX')} v={seis('X')} hi />
@@ -275,6 +277,13 @@ function ConnTables({ cs }: { cs: ConnResult[] }) {
   )
 }
 
+function CfDetailCard({ rows }: { rows: NonNullable<DesignResult['cfDetails']> }) {
+  return <div className="scard"><h3>{t('cfd_title')}</h3><p className="mw-note">{t('cfd_note')}</p>
+    <table><thead><tr><th>{t('cfd_member')}</th><th>{t('sv_item')}</th><th>{t('cn_demand')}</th><th>{t('cn_capacity')}</th><th>{t('rd_ratio')}</th><th>{t('sv_clause')}</th></tr></thead>
+      <tbody>{rows.map((r, i) => <tr key={i}><td>{t(`role_${r.role}`)}</td><td>{t(`cfd_${r.item}`)}</td><td className="mono">{r.demand.toFixed(2)} kN</td><td className="mono">{r.capacity.toFixed(2)} kN</td>
+        <td className="mono" style={{ color: ratioColor(r.ratio), fontWeight: 700 }}>{r.ratio.toFixed(3)}</td><td style={{ color: 'var(--muted)' }}>{r.clause}</td></tr>)}</tbody></table></div>
+}
+
 export function ResultsPanel() {
   const s = useStore()
   if (!s.reactions?.length && !s.design) return <div className="res-empty">{t('res_empty')}</div>
@@ -293,6 +302,7 @@ export function ResultsPanel() {
       {s.design && <MemberTable d={s.design} />}
       {!!s.connections?.length && <ConnTables cs={s.connections} />}
       <FootingCard />
+      {!!s.design?.cfDetails?.length && <CfDetailCard rows={s.design.cfDetails} />}
       {!!s.reactions?.length && (
         <div className="scard"><h3>{t('res_react')}</h3>
           <table>

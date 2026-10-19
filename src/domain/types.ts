@@ -53,11 +53,16 @@ export interface FactorySpec {
    * none removes the length reduction; confirmed records project verification. */
   /** TW 工址 조건(지반 분류·지표조도·用途係數) 근거 — 없음/'assumed' = 위치 기반 제안값(엔지니어 확인 필요, 결과 등급 전문가 검토) */
   siteBasis?: 'assumed' | 'confirmed'
+  /** 工址 확인 근거 (지반조사 보고서 번호 등) — siteBasis confirmed 이면 필수 */
+  siteEvidence?: string
+  /** 다경간·한 지붕 다경간 내부 기둥 — 흔들림(핀, 기본) / 강접 (TW) */
+  interiorColumns?: 'lean' | 'rigid'
   restraints?: { flyBraces?: 'assumed' | 'confirmed' | 'none'; sagRods?: 'assumed' | 'confirmed' | 'none'; braceCrossing?: 'assumed' | 'confirmed' | 'none' }
   /** 지진 입력 — county·town·soil 로 표2-1/2-4 조회해 SDS·SD1·SMS·SM1 을 채움(직접 수정 가능). I: 용도계수, Rx/Ry: 구조계 R (표1-3).
       county '臺北盆地' = 微分區 (地盤 放大 없음, Ra·V* 대북분지 식) */
   /** nearFault: 근단층 鄉鎮의 표2-3 단층 행별 거리 'NF01:5;NF03:14' (km) */
-  seismic: { county: string; town: string; soil: 1 | 2 | 3; SDS: number; SD1: number; SMS: number; SM1: number; I: number; Rx: number; Ry: number; nearFault?: string }
+  seismic: { county: string; town: string; soil: 1 | 2 | 3; SDS: number; SD1: number; SMS: number; SM1: number; I: number; Rx: number; Ry: number; nearFault?: string
+    /** 표1-3 횡력저항시스템 (codes/twSystems) — 없으면 IMF·OCBF */ systemX?: import('../codes/twSystems').TwSystemX; systemY?: import('../codes/twSystems').TwSystemY }
   /** 풍 입력 — V10: 기본설계풍속(m/s), I: 풍 용도계수, exposure: 지표조도 A/B/C, enclosure: 封閉/部分封閉 */
   wind: { V10: number; I: number; exposure: 'A' | 'B' | 'C'; enclosure: 'enclosed' | 'partial' }
   /** 지붕 마감 고정하중 — 경사면 면적 기준 (kN/m²) */
@@ -138,7 +143,7 @@ export const isAxialRole = (r: ElementRole) => r === 'brace' || r === 'web'
 export const roleSection = (s: FactorySpec['sections'], r: ElementRole): string | undefined => s[r]
 /** wall: 벽 부재가 붙은 면 — 'x0'·'xL' = 측벽(x=0, x=스팬), 'y0'·'yL' = 박공벽(y=0, y=길이), 'roof' = 지붕 가새 */
 export type Face = 'x0' | 'xL' | 'y0' | 'yL' | 'roof'
-export interface Element { id: number; n1: number; n2: number; role: ElementRole; section: string; face?: Face; /** 흔들림 기둥(다경간 내부): 상단 핀·기초 핀, 면내 K = 1 */ lean?: true
+export interface Element { id: number; n1: number; n2: number; role: ElementRole; section: string; face?: Face; /** 내부 기둥 열 (흔들림·강접 공통) */ interior?: true; /** 흔들림 기둥(다경간 내부): 상단 핀·기초 핀, 면내 K = 1 */ lean?: true
   designLength?: number; physicalKey?: string; addition?: AdditionUsage; sourceId?: string
   /** Virtual wall load collector: never sent to Gen or counted as structural steel. */
   loadOnly?: true

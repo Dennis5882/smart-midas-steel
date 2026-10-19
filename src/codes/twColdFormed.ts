@@ -14,6 +14,7 @@
    단순화: 모서리 R = 0 (평판 폭 = 외곽 − 2t), 약축 휨 φMny = 0.90·Sy·Fy (유효폭 미적용, 참고), 립 각도 90°. */
 import type { SectionProps } from '../domain/sections'
 import { distortionalTW } from './twDistortional'
+import { rFactor } from './twCfDetails'
 
 const rho = (lam: number) => (lam <= 0.673 ? 1 : Math.max(0, (1 - 0.22 / lam) / lam))
 const lamOf = (k: number, w: number, t: number, f: number, E: number) => (1.052 / Math.sqrt(k)) * (w / t) * Math.sqrt(Math.max(f, 1e-9) / E)
@@ -139,7 +140,8 @@ export interface CFCapacity {
   FdB: number; FdC: number
 }
 
-export function cfCapacity(name: string, sp: SectionProps, Fy: number, E: number, L: CFLengths, Cb: number): CFCapacity {
+/** span (mm) 를 주면 10.6.1 R 계수법(관통 체결 외장재, 압축 플랜지 자유) 형상 조건을 확인해 횡비틀림 대신 적용 — codes/twCfDetails */
+export function cfCapacity(name: string, sp: SectionProps, Fy: number, E: number, L: CFLengths, Cb: number, span?: number): CFCapacity {
   const g = ccDims(name)
   const G = E / 2.6
   /* 립 Z (점대칭): 도심 = 전단중심 → x0 = 0, 압축 휨좌굴은 약한 주축 rmin, 횡비틀림은 6.2-21 (Iyc = Iy/2).
@@ -178,9 +180,11 @@ export function cfCapacity(name: string, sp: SectionProps, Fy: number, E: number
   const Mnd = ld <= 0.673 ? My : (1 - 0.22 * Math.sqrt(Mcrd / My)) * Math.sqrt(Mcrd / My) * My
   const phiMd = 0.9 * Mnd / 1e6
   const phiMnxBraced = Math.min((0.95 * se.Se * Fy) / 1e6, phiMd)
-  const phiMnxLTB = Math.min(phiMnxBraced, (0.9 * Sc * Fc) / 1e6)
+  const Rf = span ? rFactor(g, isZ ? 'Z' : 'CC', span) : null
+  const phiMnxLTB = Rf ? Math.min(phiMnxBraced, (0.9 * Rf * se.Se * Fy) / 1e6) : Math.min(phiMnxBraced, (0.9 * Sc * Fc) / 1e6)
+  if (Rf) notes.push(`CF-R10.6.1 R=${Rf}`)
   if (phiMd <= phiMnxBraced) notes.push('CF-distortional')
-  if (Fc < Fy) notes.push('CF-LTB')
+  if (!Rf && Fc < Fy) notes.push('CF-LTB')
 
   /* 압축 C4: 휨좌굴(y) · 휨비틀림(x–θ) */
   const sEx = sigEx(L.Lx), sEy = sigEy(L.Ly), sT = sigT(L.Lt)

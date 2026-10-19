@@ -1,3 +1,4 @@
+import { TW_SYSTEMS_X, TW_SYSTEMS_Y, type TwSystemX, type TwSystemY } from '../codes/twSystems'
 import { initializeAdditions } from './AdditionEditor'
 import { additionErrors } from '../domain/additions'
 import type { FactoryAdditions } from '../domain/additionTypes'
@@ -22,7 +23,7 @@ import { BaySpacingEditor } from './BaySpacingEditor'
 import { NumericInput } from './NumericInput'
 import { SectionPicker } from './SectionPicker'
 import { FigureButton, FigureNote } from './FigureRef'
-import { siteSourceText, windSourceText } from './Status'
+import { siteSourceText, windSourceText, rSourceText } from './Status'
 import { ScopeBox } from './ScopeBox'
 import { checkScope, NO_FEATURES, type ScopeFeatures } from '../domain/scope'
 import { hasInteriorColumns, lengthText, type FactorySpec, type ElementRole } from '../domain/types'
@@ -139,6 +140,9 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
         const c = siteCoef(n['seismic.county'], n['seismic.town'], (+n['seismic.soil'] || 1) as 1 | 2 | 3, n['seismic.nearFault'])
         if (c) for (const k of ['SDS', 'SD1', 'SMS', 'SM1'] as const) n[`seismic.${k}`] = String(c[k])
       }
+      /* TW 표1-3 시스템 → R */
+      if (msg.spec.code === 'TW' && p === 'seismic.systemX') n['seismic.Rx'] = String(TW_SYSTEMS_X[v as TwSystemX]?.R ?? n['seismic.Rx'])
+      if (msg.spec.code === 'TW' && p === 'seismic.systemY') n['seismic.Ry'] = String(TW_SYSTEMS_Y[v as TwSystemY]?.R ?? n['seismic.Ry'])
       /* KR 지진구역 → S = Z × 2.0 (KDS 41 17 00 3.2, Z 는 KDS 17 10 00 표 4.2-2 통상값) */
       if (msg.spec.code === 'KR' && p === 'korea.zone') { n['korea.S'] = String(+(ZONE_Z[v as '1' | '2'] * 2).toFixed(3)); n['korea.region'] = 'manual' }
       /* 행정구역 → 지진구역(KDS 17 10 00 표 4.2-1) → S = Z × 2.0 */
@@ -239,7 +243,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
       const advanced = g.title === 'sec_conn' ? filtered.fields
         : step === 2 ? filtered.fields.filter((f) => !['bays', 'baySpacing'].includes(f.path))
         : step === 3 ? filtered.fields.filter((f) => !['sections.column', 'sections.rafter', 'material'].includes(f.path))
-        : step === LOADS_STEP && spec.code === 'TW' && g.title === 'sec_seismic' ? filtered.fields.filter((f) => !['siteBasis', 'seismic.county', 'seismic.town', 'seismic.nearFault', 'seismic.soil'].includes(f.path))
+        : step === LOADS_STEP && spec.code === 'TW' && g.title === 'sec_seismic' ? filtered.fields.filter((f) => !['siteBasis', 'siteEvidence', 'seismic.county', 'seismic.town', 'seismic.nearFault', 'seismic.soil', 'seismic.systemX', 'seismic.systemY'].includes(f.path))
         : step === LOADS_STEP && spec.code === 'KR' ? filtered.fields.filter((f) => ['korea.Kzt', 'korea.KD', 'korea.roofZeta', 'korea.S'].includes(f.path)) : []
       const basic = filtered.fields.filter((f) => !advanced.includes(f))
       return <section className="mw-group" key={g.title}>
@@ -251,6 +255,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
           {fields({ ...g, fields: advanced })}
         </details>}
         {g.title === 'sec_seismic' && <div className="pe-tip">{t('kv_site_src')}: {siteSourceText(spec)}</div>}
+        {g.title === 'sec_seismic' && spec.code === 'TW' && <div className="pe-tip">{t('kv_r_src')}: {rSourceText(spec)}</div>}
         {g.title === 'sec_wind' && spec.code === 'TW' && <div className="pe-tip">{t('kv_wind_src')}: {windSourceText(spec)}</div>}
         {g.title === 'sec_seismic' && site && (site.fault || site.basin || site.note) && <div className="pe-tip">{site.fault ? t('site_fault', site.fault) : site.basin ? t('site_basin') : site.note}</div>}
       </section>

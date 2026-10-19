@@ -1,3 +1,4 @@
+import { systemSource } from '../codes/twSystems'
 /* 검토 상태 표시 — 등급 칩, 결과 탭 상단 요약 카드, 채팅 한 줄 요약. 등급 판정은 domain/status.ts (순수). */
 import { profileOf, type CodeId } from '../codes'
 import { siteCoef, siteSource } from '../codes/twSites'
@@ -57,6 +58,13 @@ export function siteSourceText(spec: FactorySpec): string {
   const nf = s.kind === 'table' ? siteCoef(spec.seismic.county, spec.seismic.town, spec.seismic.soil, spec.seismic.nearFault)?.nearFault : undefined
   if (nf?.length) return t('site_src_nf', nf.map((e) => `${e.faults} r = ${e.r} km`).join('; '))
   return s.kind === 'table' ? t('site_src_table') : s.kind === 'user' ? t('site_src_user', s.SDS, s.SD1) : t('site_src_none')
+}
+
+/** TW R 출처 — 표1-3 시스템 행과 같으면 행 이름, 다르면 사용자 입력 */
+export function rSourceText(spec: FactorySpec): string {
+  const s = systemSource(spec.seismic)
+  const one = (row: string | null, table: number) => row ? `${t('r_src_table')} ${row}` : t('r_src_user', table)
+  return `Rx ${spec.seismic.Rx}: ${one(s.x, s.X.R)} · Ry ${spec.seismic.Ry}: ${one(s.y, s.Y.R)}`
 }
 
 /** TW 기본설계풍속 출처 — 耐風規範(2014) 2.4 鄉鎮 구역 */

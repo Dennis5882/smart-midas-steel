@@ -106,6 +106,8 @@ export function freshWorkState() {
     baseReactions: null as import('../domain/twFoundation').BaseReactions | null,
     /** 기초 예비검토 입력 — Gen 재해석 없이 결과 탭에서 바로 재계산 */
     footingInput: defaultFootingInput(),
+    /** 簽證 심사 대응표 사유 (TW, 항목 키 → 사용자 문구) */
+    reviewReasons: {} as Partial<Record<import('../domain/twReview').ReviewKey, string>>,
     results: null as Results | null,
     design: null as DesignResult | null,
     connections: null as ConnResult[] | null,

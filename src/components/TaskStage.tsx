@@ -1,3 +1,4 @@
+import { ReviewEditor } from './ReviewEditor'
 import { useState } from 'react'
 import { ArrowRight, Play, FileText, Download, Ruler, Table2, RotateCcw } from 'lucide-react'
 import { executeAction, openCurrentModel } from '../agent/session'
@@ -75,7 +76,7 @@ export function TaskStage({ onOpenMapi }: { onOpenMapi(): void }) {
     {(s.task==='design'||s.task==='optimize')&&<RepairPanel/>}
     {s.task === 'design' && <>{s.design && b ? <><StatusCard d={s.design} cs={s.connections} spec={b.spec} /><button className="btn btn-ghost" onClick={() => tab('resP')}>{t('flow_view_results')}</button></> : <div className="task-empty"><FileText size={26} /><p>{t('flow_design_hint')}</p></div>}{ng && <p className="task-warning">{t('flow_ng_note')}</p>}</>}
     {s.task === 'optimize' && <>{s.opt ? <><div className="task-stat-grid"><div><span>{t('op_before')} · {t('op_tons')}</span><strong>{s.opt.weightBefore.toFixed(2)}</strong></div><div><span>{t('op_after')} · {t('op_tons')}</span><strong>{s.opt.weightAfter.toFixed(2)}</strong></div></div>{b && s.design && <StatusCard d={s.design} cs={s.connections} spec={b.spec} />}<button className="btn btn-ghost" onClick={() => tab('resP')}>{t('flow_view_results')}</button></> : <div className="task-empty"><Ruler size={26} /><p>{t('flow_opt_empty')}</p></div>}</>}
-    {s.task === 'outputs' && <>{ng && <p className="task-warning">{t('flow_ng_note')}</p>}<div className="export-list">{OUTPUTS.map((o) => <ExportCard key={o.id} out={o} reason={reason} />)}</div><p className="ws-start-note">{t('flow_output_note')}</p><ArtifactList /></>}
+    {s.task === 'outputs' && <>{ng && <p className="task-warning">{t('flow_ng_note')}</p>}<div className="export-list">{OUTPUTS.map((o) => <ExportCard key={o.id} out={o} reason={reason} />)}</div><p className="ws-start-note">{t('flow_output_note')}</p><ReviewEditor /><ArtifactList /></>}
   </div>
     {s.task !== 'outputs' && !repairFailed && <div className="task-primary-row"><button className="btn btn-c" disabled={done && !stale ? s.busy || !!s.confirm : !!reason} onClick={done && !stale ? next : run}>{done && !stale ? <ArrowRight size={16} /> : <Play size={16} />}{t(done && !stale ? s.task === 'analysis' ? 'flow_next_design' : 'flow_next_outputs' : failed ? 'flow_retry' : s.task === 'analysis' ? 'flow_run_analysis' : s.task === 'design' ? 'flow_run_design' : 'flow_run_opt')}</button>{done && <button className="btn btn-ghost" disabled={!!reason} onClick={run}>{t(s.task === 'analysis' ? 'flow_run_analysis' : s.task === 'design' ? 'flow_run_design' : 'flow_run_opt')}</button>}{s.task === 'design' && s.design && <button className="btn btn-ghost" onClick={() => selectTask('optimize')}>{t('flow_optimize')}</button>}</div>}
   </div>

@@ -244,7 +244,8 @@ export function buildPortal(spec0: FactorySpec): FactoryModel {
       let prev = node(x, y, 0)
       for (const z of [...(gable ? G.endGirtZs.filter((z) => z < G.zAt(x) - 1e-6) : []), G.zAt(x)]) {
         const cur = node(x, y, z)
-        elem(prev, cur, 'column', sec.column, undefined, true)
+        elem(prev, cur, 'column', sec.column, undefined, spec.interiorColumns === 'rigid' ? undefined : true)
+        elements[elements.length - 1].interior = true
         prev = cur
       }
     }

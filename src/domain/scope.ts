@@ -1,3 +1,4 @@
+import { TW_SYSTEMS_X, TW_SYSTEMS_Y, systemXOf, systemYOf } from '../codes/twSystems'
 import { profileOf } from '../codes'
 import { activeOpening, additionErrors, hasAdditions } from './additions'
 /* 적용범위 게이트 (평가 보고서 P0-4, 기획서 14장) — 자동설계가 맞는 건물인지 Gen 전송 전에 판정한다.
@@ -13,7 +14,7 @@ import { columnSpans, defaultTrussDepth, hasInteriorColumns, type FactorySpec } 
 
 export type ScopeKey =
   | 'additionInput' | 'additionReview' | 'craneAssumed' | 'siteAssumed' | 'crane' | 'mezzanine' | 'multiSpan' | 'opening' | 'openingCN'
-  | 'span' | 'eave' | 'eaveHigh' | 'slope' | 'bayRatio' | 'baySpacing' | 'length' | 'hnR' | 'cn' | 'monoTW' | 'multi' | 'gableCols' | 'craneInterior' | 'multiTW' | 'kr' | 'multiKR' | 'twMatSS' | 'twMatImported' | 'twZPurlin' | 'twAsd' | 'twAsdAdditions' | 'truss' | 'trussCode' | 'trussDepth'
+  | 'span' | 'eave' | 'eaveHigh' | 'slope' | 'bayRatio' | 'baySpacing' | 'length' | 'hnR' | 'cn' | 'monoTW' | 'multi' | 'gableCols' | 'craneInterior' | 'multiTW' | 'kr' | 'multiKR' | 'twMatSS' | 'twMatImported' | 'twZPurlin' | 'twAsd' | 'twAsdAdditions' | 'truss' | 'trussCode' | 'trussDepth' | 'twSystemSpecial' | 'interiorRigid' | 'interiorRigidCode' | 'siteEvidence'
 export interface ScopeIssue { key: ScopeKey; level: 'block' | 'warn'; args: (string | number)[] }
 export interface ScopeResult { issues: ScopeIssue[]; blocked: boolean }
 
@@ -39,7 +40,7 @@ export function checkScope(spec: FactorySpec, f: ScopeFeatures = spec.features ?
   if (hasAdditions({...spec, features:f})) warn('additionReview')
   if (f.crane && spec.additions?.crane && !spec.additions.crane.manufacturer?.trim()) warn('craneAssumed')
   /* TW 工址 조건이 위치 기반 제안값이면 확정된 법규 산정으로 표시하지 않는다 (현지화 검토 P0) */
-  if (spec.code === 'TW' && spec.siteBasis !== 'confirmed') warn('siteAssumed')
+  if (spec.code === 'TW' && (spec.siteBasis !== 'confirmed' || !spec.siteEvidence?.trim())) warn('siteAssumed')
   /* 13.2.1 내진 부재 강재 목록 밖 — SS(용접 주구조 부적합, 3.2 해설), ASTM(3.1.2 검사·동등성) */
   if (spec.code === 'TW' && spec.material === 'SS400') warn('twMatSS')
   if (spec.code === 'TW' && spec.asd) { warn('twAsd'); if (hasAdditions({ ...spec, features: f })) block('twAsdAdditions') }
@@ -69,6 +70,7 @@ export function checkScope(spec: FactorySpec, f: ScopeFeatures = spec.features ?
     if (spec.code === 'KR') warn('multiKR')
   }
   if (spec.frame === 'gableCols') warn('gableCols')
+  if (hasInteriorColumns(spec) && spec.interiorColumns === 'rigid') { if (spec.code !== 'TW') block('interiorRigidCode'); else warn('interiorRigid') }
   if (spec.frame === 'truss') {
     if (spec.code !== 'TW') block('trussCode')
     else warn('truss')
@@ -87,7 +89,9 @@ export function checkScope(spec: FactorySpec, f: ScopeFeatures = spec.features ?
   if (spec.code === 'TW' && G.length > 90) warn('length', r2(G.length))
   /* TW 표1-3 R(Rx 3.2·Ry 2.0)은 h ≤ 12 m 조건 — 넘으면 구조계 R 재확인 */
   const hn = G.hMean
-  if (spec.code === 'TW' && hn > 12) warn('hnR', r2(hn))
+  const sysH = spec.code === 'TW' ? Math.min(TW_SYSTEMS_X[systemXOf(spec.seismic)].hMax, TW_SYSTEMS_Y[systemYOf(spec.seismic)].hMax) : 12
+  if (spec.code === 'TW' && hn > sysH) warn('hnR', r2(hn))
+  if (spec.code === 'TW' && (systemXOf(spec.seismic) === 'SMF' || systemYOf(spec.seismic) === 'SCBF')) warn('twSystemSpecial')
 
   /* KR: 접합부·외장재 풍하중·냉간성형·내진상세(OMF·OCBF) 구현 — 남은 범위 밖(콘크리트 정착 등)은 결과별 메모로 */
   if (spec.code === 'KR') {

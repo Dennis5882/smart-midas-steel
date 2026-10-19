@@ -1,3 +1,4 @@
+import { currentReview } from '../state/review'
 import { footingState } from '../state/footing'
 /* 산출물 (M5·M6) — 계산서(PDF 직접 다운로드 / HTML 새 창)·도면(DXF)·물량(CSV).
    브라우저 안에서 생성하며 PDF는 파일 생성·페이지 수 확인 후 다운로드한다. */
@@ -48,7 +49,7 @@ export function openReport(): void {
   addMsg('bot', S.design ? t('report_done') : t('report_partial'))
 }
 
-const reportHtml = () => { const ft = footingState(); return buildReport({ built: S.built!, reactions: S.reactions, design: S.design, connections: S.connections, opt: S.opt, footing: ft.kind === 'result' ? { result: ft.result, input: S.footingInput } : null }) }
+const reportHtml = () => { const ft = footingState(); return buildReport({ built: S.built!, reactions: S.reactions, design: S.design, connections: S.connections, opt: S.opt, footing: ft.kind === 'result' ? { result: ft.result, input: S.footingInput } : null, review: { items: currentReview(), reasons: S.reviewReasons } }) }
 
 /** Generate and validate the PDF locally before starting the file download. */
 export async function downloadReportPdf(): Promise<void> {

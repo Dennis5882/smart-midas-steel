@@ -16,6 +16,7 @@ const SUITES = [
   ['TW cold-formed + Q', 'verify-tw-coldformed.ts'],
   ['TW foundation footing', 'verify-tw-foundation.ts'],
   ['TW ASD member check', 'verify-tw-asd.ts'],
+  ['TW localization options', 'verify-tw-localization.ts'],
   ['CN code anchors', 'verify-cn.ts'],
   ['CN golden', 'verify-golden.ts'],
   ['KR code anchors', 'verify-kr.ts'],

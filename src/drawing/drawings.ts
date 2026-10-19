@@ -178,6 +178,13 @@ function drawSheets({ spec, model, connections, title }: DrawingInput): Dxf {
     rowTxt(['EXCLUDED: gable-post bases, cleats, fly braces, sag rods, brace crossing connectors, cladding.'])
     if (spec.frame === 'multi') rowTxt(['MULTI-SPAN: interior column-top / valley connections and gutters require separate design and takeoff.'])
     if (spec.frame === 'gableCols') rowTxt(['SINGLE-RIDGE MULTI-SPAN: interior (leaning) column-top connections and bases require separate design and takeoff.'])
+    if (spec.frame === 'truss') rowTxt(['ROOF TRUSS: truss joints / gusset plates are not designed - separate design and takeoff.'])
+    if (spec.interiorColumns === 'rigid') rowTxt(['RIGID INTERIOR COLUMNS: interior column-top moment connections and fixed bases require separate design.'])
+    /* TW 용접 근거 (twWelding) — ASCII 만 */
+    if (spec.code === 'TW' && conns.length) {
+      rowTxt(['WELDING: AWS D1.1. Knee flange CJP' + (spec.baseFixity === 'fixed' ? ' and fixed-base column CJP' : '') + ': AWS D1.8 demand-critical candidates,'])
+      rowTxt(['  matching filler CVN >= 27 J at -29 C (TW steel code 13.2.1). WPS, preheat and NDT by fabricator; designer to confirm.'])
+    }
     if (model.additions) rowTxt(['ADDITIONS: rails/brackets, door hardware, connections and new foundations excluded. Modeled steel included.'])
     /* 표제란 */
     const tbY = -M + 300, tbW = 12000
