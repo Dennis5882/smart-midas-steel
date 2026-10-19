@@ -12,9 +12,9 @@ import { sectionSourceDifferences } from '../domain/genSectionSync'
 import { scopeMsg } from '../components/ScopeBox'
 import { t, lt } from '../i18n'
 import { mapi } from '../mapi/client'
-import { autoSave } from './save'
+import { autoSave, autoSavePath } from './save'
 import { confirmAction } from '../components/ConfirmDialog'
-import { beginJob, endJob, failMsg, stage } from './job'
+import { beginJob, Cancelled, endJob, failMsg, stage } from './job'
 import { S, notify } from '../state/store'
 import { addMsg, draw3D, escapeHtml, log, tab } from '../state/ui'
 
@@ -36,8 +36,10 @@ export async function buildFactory(spec: FactorySpec): Promise<void> {
     const b = S.built!
     addMsg('bot', lt('build_done', model.nodes.length, model.elements.length, b.cases.length, b.combos))
     S.task = 'analysis'
+    /* 생성 직후 3D 탭에서 ISO 전체 보기 — 미리보기에서 돌리거나 다른 시점이었어도 다시 맞춘다 (Gen 화면도 위에서 ISO) */
+    S.cam = 'iso'; S.camReset++
     draw3D()
-    tab('modelP')
+    tab('viewP')
   } catch (e) {
     addMsg('bot', failMsg(e, (m) => t('build_fail', m)))
   } finally {
@@ -95,9 +97,14 @@ export async function sendModel(spec: FactorySpec, onReplaced?: (backup: string)
   } }, 'Gen section source')
   const sourceDifferences = sectionSourceDifferences(spec.code, p.SECT, sectionTable?.SectionSource)
   if (sourceDifferences.length) throw new Error(t('section_source_mismatch', sourceDifferences.slice(0,4).join(', ')))
-  /* Gen 화면을 ISO 전체 보기로 — 전송 직후엔 일부만 보이거나 비어 보임 (story 와 같은 값, 라이브 확정 H 30·V 15).
-     화면 조작이라 실패해도 모델 생성은 성공으로 둔다 */
-  try { await mapi('POST', '/view/ANGLE', { Argument: { HORIZONTAL: 30, VERTICAL: 15 } }, 'ISO') } catch { /* 화면만 */ }
+  /* Gen 화면을 ISO 전체 보기로 (story 와 같은 각도, H 30·V 15). view/ANGLE 은 각도만 바꾸고 확대는 그대로라
+     doc/new 직후 원점 근처가 크게 확대된 채 남는다. 맞춤(fit) 전용 API 는 없고, view/CAPTURE 의 ZOOM_LEVEL 100(Zoom Fit)이
+     캡처 뒤에도 화면에 남는다 — 라이브 2026-10-19 확인 (view/ACTIVE All·doc/open 재열기는 효과 없음). 작은 PNG 하나가 저장 폴더에 남는다.
+     화면 조작이라 실패해도 모델 생성은 성공으로 둔다 (취소는 그대로 전달) */
+  try {
+    await mapi('POST', '/view/ANGLE', { Argument: { HORIZONTAL: 30, VERTICAL: 15 } }, 'ISO')
+    await mapi('POST', '/view/CAPTURE', { Argument: { EXPORT_PATH: autoSavePath('view').replace(/\.mgbx$/, '.png'), WIDTH: 400, HEIGHT: 300, ZOOM_LEVEL: 100 } }, 'zoom fit')
+  } catch (e) { if (e instanceof Cancelled) throw e }
 
   const cases = Object.values(l.STLD).map((c) => (c as { NAME: string }).NAME)
   const comboNames = Object.values(l['LCOM-GEN']).map((c) => (c as { NAME: string }).NAME)

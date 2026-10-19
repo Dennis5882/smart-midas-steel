@@ -1,7 +1,7 @@
 /** Explicit live matrix. Run sequentially, with no other Gen automation active. */
 import assert from 'node:assert/strict'
 import {createHash} from 'node:crypto'
-import {mkdirSync,writeFileSync} from 'node:fs'
+import {mkdirSync,readFileSync,writeFileSync} from 'node:fs'
 import {MidasClient} from 'midas-nx'
 import {readMapiKey} from './mapi-key'
 ;(globalThis as any).document={documentElement:{lang:'ko',dataset:{}}}
@@ -26,7 +26,7 @@ const command=async(path:string,arg:string)=>{const r:any=await client.request('
 const before=await snapshot(),backup=`C:/temp/sms_frames_backup_${token}.mgbx`
 await command('/doc/saveas',backup)
 assert.deepEqual(await snapshot(),before,'Document changed during backup')
-const state:any={version:'2.3.2',backup,before,restored:false,cases:[]}
+const state:any={version:JSON.parse(readFileSync('package.json','utf8')).version,backup,before,restored:false,cases:[]}
 const save=()=>writeFileSync(`${folder}/evidence.json`,JSON.stringify(state,null,2));save()
 try {
   for(const code of ['TW','CN','KR'] as const)for(const frame of ['gable','mono','multi'] as const){

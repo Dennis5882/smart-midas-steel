@@ -518,6 +518,8 @@ export const en = {
   g_help_2: 'Release notes',
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_3_7_1: 'After the model is created, the Gen NX view now fits the whole model in ISO view (it previously stayed zoomed in near the origin).',
+  rn_v2_3_7_2: 'Right after creation the web view also opens the 3D preview tab and resets the camera to the full ISO view.',
   rn_v2_3_6_1: 'Section cards show only the outline; Details expands plate thickness, A, Ix, Iy, Sx, Zx, radii of gyration and unit weight. Partially typed section names are not drawn.',
   rn_v2_3_6_2: 'The previous Gen model can still be restored after Reset work, and the design-code change button stays available after the model is created.',
   rn_v2_3_6_3: 'Unit weight now matches the quantity table, and dimension-based cold-formed sections show Sx instead of a plastic-looking Zx.',

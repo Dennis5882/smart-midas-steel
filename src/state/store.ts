@@ -131,6 +131,8 @@ export const S = {
   theme: readTheme(),
   code: readCode(),
   cam: 'iso' as CamId,
+  /** 증가하면 3D 카메라를 현재 시점의 전체 보기로 다시 맞춘다 (사용자가 돌린 시점 무시) — 모델 생성 직후 */
+  camReset: 0,
   vis3d: { column: true, rafter: true, purlin: true, girt: true, strut: true, post: true, brace: true, support: true, node: false } as Vis3D,
   /** 3D 표시 방식 — 선 / 단면 형상(실제 치수 입체) */
   render3d: 'line' as 'line' | 'solid',

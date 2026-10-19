@@ -164,7 +164,7 @@ export function View3D() {
         paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', margin: { l: 0, r: 0, t: ratio ? 28 : 0, b: 0 },
         font: { family: font, color: P.txt }, showlegend: !!ratio,
         /* 시점 버튼·맞춤을 누를 때만 카메라를 다시 적용 — 토글·표시 방식 변경은 사용자 시점 유지 */
-        uirevision: c,
+        uirevision: `${c}:${S.camReset}`,
         modebar: { orientation: 'h', bgcolor: 'rgba(0,0,0,0)', color: P.axis, activecolor: P.txt },
         /* 범례: 위쪽 가로 한 줄 (story) — 모델을 가리지 않음 */
         /* 강도비 보기에만 색 구간 범례 (부재 종류는 위 토글 줄이 범례) */
@@ -181,7 +181,7 @@ export function View3D() {
       } as any)
     })
     return () => { alive = false }
-  }, [model, spec, ratio, invalid, s.cam, s.theme, lang, s.vis3d, solid])
+  }, [model, spec, ratio, invalid, s.cam, s.camReset, s.theme, lang, s.vis3d, solid])
 
   /** 확대·축소 — 지금 시점 기준 (원근: 카메라 거리, 정투영: 축 비율) */
   const zoom = (f: number) => void loadPlotly().then((Plotly) => {
