@@ -3,6 +3,7 @@ import type { FactorySpec } from '../domain/types'
 
 export const MODEL_STEPS = ['mw_scope','mw_frame','mw_bays','mw_sections','mw_additions','mw_loads','mw_review'] as const
 export const ADDITIONS_STEP = 4, LOADS_STEP = 5, REVIEW_STEP = MODEL_STEPS.length - 1
+export const BAYS_STEP = MODEL_STEPS.indexOf('mw_bays'), SECTIONS_STEP = MODEL_STEPS.indexOf('mw_sections')
 export const ADDITION_PARTS = ['crane','platform','opening','link','equipment'] as const
 export type AdditionPart = typeof ADDITION_PARTS[number] | 'factors'
 export function additionPartActive(s: FactorySpec, part: AdditionPart): boolean {

@@ -23,7 +23,7 @@ export function cnStrength(material: string, t: number, pipe = false): CnStrengt
 }
 
 export const CN: CodeProfile = {
-  id: 'CN', labelKey: 'code_CN', method: 'LSD',
+  id: 'CN', labelKey: 'code_CN', checkLabelKey: 'code_CN_check', basisLabelKey: 'code_CN_basis', method: 'LSD',
   materials: {
     Q235B: { fy: 235, fu: 370, E: 206000, nu: 0.3, gamma: 78.5, gen: { standard: 'GB03(S)', db: 'Q235' } },
     Q345B: { fy: 345, fu: 470, E: 206000, nu: 0.3, gamma: 78.5, gen: { standard: 'GB03(S)', db: 'Q345' } },

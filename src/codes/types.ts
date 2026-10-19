@@ -35,6 +35,10 @@ export interface Combo {
 export interface CodeProfile {
   id: CodeId
   labelKey: keyof Dict
+  /** Standard the app's member/connection checks follow (status card, report). Defaults to labelKey. */
+  checkLabelKey?: keyof Dict
+  /** Full basis with editions for the model tab and report header. Defaults to labelKey. */
+  basisLabelKey?: keyof Dict
   /** 설계법 */
   method: 'LRFD' | 'ASD' | 'LSD'
   /** 재료 카탈로그 (이름 → 물성) */

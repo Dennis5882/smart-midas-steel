@@ -305,10 +305,10 @@ main.splitting .right,main.splitting .chat{pointer-events:none}
 .bubble:has(.model-wizard){padding:0;overflow:hidden;border-radius:14px!important}
 .model-wizard{font-size:.83rem;line-height:1.5;container-type:inline-size;display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;height:min(780px,calc(100dvh - 285px));min-height:360px}
 .model-wizard .mw-banner{display:block;position:static;padding:18px 20px 15px;background:var(--panel);border:0;border-bottom:1px solid var(--border);box-shadow:none}
-.model-wizard>*{min-width:0} /* grid 자식이 긴 설계기준 이름만큼 넓어지지 않게 */
-.mw-brand{display:flex;align-items:center;gap:8px;font-size:.92rem;font-weight:650;color:var(--txt-hi)}
+.model-wizard>*{min-width:0} /* grid 자식이 긴 설계기준 이름만큼 넓어지지 않게 — 좁으면 설계기준 줄이 제목 아래로 내려감 */
+.mw-brand{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:.92rem;font-weight:650;color:var(--txt-hi)}
 .mw-brand svg{color:var(--cyan)}
-.mw-code-info{margin-left:auto;display:flex;align-items:center;justify-content:flex-end;flex:1 1 auto;gap:8px;min-width:0;font-size:.72rem;font-weight:500;color:var(--muted)}
+.mw-code-info{display:flex;align-items:center;justify-content:flex-end;flex:1 1 220px;gap:8px;min-width:0;font-size:.72rem;font-weight:500;color:var(--muted)}
 .mw-code-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;color:var(--txt)}
 .mw-code-change{padding:4px 10px;font-size:.7rem;white-space:nowrap;flex:none}
 .mw-brand>span:first-of-type{white-space:nowrap}

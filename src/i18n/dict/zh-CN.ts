@@ -88,6 +88,8 @@ export const zhCN: Dict = {
   check_unavailable: '尚无有效验算结果，请执行分析与设计验算。',
   save_failed: (path: string, reason: string) => `自动保存失败（${path}）：${reason}。工作已停止，请确认 Gen 保存文件夹后重试。`,
   code_CN: 'GB 51022',
+  code_CN_check: 'GB 50017-2017 · GB/T 50018-2025',
+  code_CN_basis: 'GB 51022-2015 · GB 50017-2017 · GB/T 50018-2025',
   /* 한국 KDS (2026-10-16) */
   kv_across_KR: '横风向组合荷载（5.13.1）',
   code_KR: 'KDS 41 30 10 · KDS 14 31',
@@ -591,7 +593,7 @@ export const zhCN: Dict = {
   rn_v1_0_0_4: '结果验证提速、发送确认比对全部数据字段、错误信息按界面语言显示',
   rn_v0_19_3_1: '简体中文的设计规范菜单仅显示 GB 50017-2017。',
   project_code_existing: '现有项目使用其他规范',
-  project_code_existing_hint: '现有项目的规范保持不变。请选择 GB 50017-2017 后开始建模，或继续编辑现有项目。',
+  project_code_existing_hint: '现有项目的规范保持不变。请选择 GB 51022 后开始建模，或继续编辑现有项目。',
   rn_v0_19_2_1: '简体中文优先使用本机已安装的微软雅黑，未安装时使用 Noto Sans SC。',
   rn_v0_19_1_1: '设计规范改为显示规范标识的下拉菜单，新项目按界面语言预选规范。',
   rn_v0_19_0_1: '将设计规范选择移至建模起点，并新增变更规范的说明。',

@@ -88,6 +88,8 @@ export const zhTW: Dict = {
   check_unavailable: '尚無有效檢核結果，請執行分析與設計檢核。',
   save_failed: (path: string, reason: string) => `自動儲存失敗（${path}）：${reason}。工作已停止，請確認 Gen 儲存資料夾後重試。`,
   code_CN: 'GB 51022',
+  code_CN_check: 'GB 50017-2017 · GB/T 50018-2025',
+  code_CN_basis: 'GB 51022-2015 · GB 50017-2017 · GB/T 50018-2025',
   /* 한국 KDS (2026-10-16) */
   kv_across_KR: '橫風向組合載重（5.13.1）',
   code_KR: 'KDS 41 30 10 · KDS 14 31',
@@ -591,7 +593,7 @@ export const zhTW: Dict = {
   rn_v1_0_0_4: '結果驗證加速、傳送確認比對全部資料欄位、錯誤訊息依介面語言顯示',
   rn_v0_19_3_1: '簡體中文的設計規範選單僅顯示 GB 50017-2017。',
   project_code_existing: '現有專案使用其他規範',
-  project_code_existing_hint: '現有專案的規範保持不變。請選擇 GB 50017-2017 後開始建模，或繼續編輯現有專案。',
+  project_code_existing_hint: '現有專案的規範保持不變。請選擇 GB 51022 後開始建模，或繼續編輯現有專案。',
   rn_v0_19_2_1: '簡體中文優先使用本機已安裝的微軟雅黑，未安裝時使用 Noto Sans SC。',
   rn_v0_19_1_1: '設計規範改為顯示規範識別的下拉選單，新專案依介面語言預選規範。',
   rn_v0_19_0_1: '將設計規範選擇移至建模起點，並新增變更規範的說明。',

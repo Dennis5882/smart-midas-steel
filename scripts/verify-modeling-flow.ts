@@ -93,6 +93,10 @@ for(const lang of ['ko','en','zh-TW','zh-CN'] as const) {
   assert.equal(advancedTitleKey('sec_seismic', LOADS_STEP), 'mw_coefficients')
   assert.equal(advancedTitleKey('sec_kr_snow', LOADS_STEP), 'mw_snow_coefficients')
   assert.equal(advancedTitleKey('sec_conn', LOADS_STEP), 'sec_conn')
-  assert.equal(advancedTitleKey('sec_sections', 3), 'mw_secondary')
+  const { SECTIONS_STEP, BAYS_STEP } = await import('../src/components/modelingFlow')
+  assert.equal(advancedTitleKey('sec_sections', SECTIONS_STEP), 'mw_secondary')
+  assert.equal(advancedTitleKey('sec_geometry', BAYS_STEP), 'mw_secondary')
+  assert.equal(advancedTitleKey('sec_cn_snow', LOADS_STEP), 'mw_snow_coefficients')
+  assert.equal(advancedTitleKey('sec_dead', LOADS_STEP), 'mw_more_settings')
 }
 console.log('Modeling flow: 7 stages, 4 languages × 3 codes, distinct frame/interfaces, optional parts, error routes, unique targets and read-only summaries passed.')

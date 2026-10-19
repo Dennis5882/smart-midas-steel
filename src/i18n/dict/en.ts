@@ -99,6 +99,8 @@ export const en = {
   check_unavailable: 'No valid design result — run analysis and design check.',
   save_failed: (path: string, reason: string) => `Automatic save failed (${path}): ${reason}. Work stopped. Check the Gen save folder and try again.`,
   code_CN: 'GB 51022',
+  code_CN_check: 'GB 50017-2017 · GB/T 50018-2025',
+  code_CN_basis: 'GB 51022-2015 · GB 50017-2017 · GB/T 50018-2025',
   /* 한국 KDS (2026-10-16) */
   kv_across_KR: 'Across-wind combination (5.13.1)',
   code_KR: 'KDS 41 30 10 · KDS 14 31',
@@ -605,7 +607,7 @@ export const en = {
   rn_v1_0_0_4: 'Faster result validation, send verification now compares every data field, and error messages follow the UI language',
   rn_v0_19_3_1: 'Simplified Chinese now offers only GB 50017-2017 in the design code selector.',
   project_code_existing: 'Existing project uses another code',
-  project_code_existing_hint: 'The existing project keeps its code. Select GB 50017-2017 to start modeling here, or resume editing the existing project.',
+  project_code_existing_hint: 'The existing project keeps its code. Select GB 51022 to start modeling here, or resume editing the existing project.',
   rn_v0_19_2_1: 'Simplified Chinese now prefers locally installed Microsoft YaHei, with Noto Sans SC as a fallback.',
   rn_v0_19_1_1: 'Replaced design code cards with a dropdown showing code identifiers; new projects default by display language.',
   rn_v0_19_0_1: 'Moved design code selection into project setup and added guidance when changing codes.',

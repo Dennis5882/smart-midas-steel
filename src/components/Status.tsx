@@ -42,7 +42,7 @@ export function StatusCard({ d, cs, spec }: { d: DesignResult | null; cs: ConnRe
       {scope.issues.map((i, n) => <div key={n} className="res-stat" style={{ color: 'var(--amber)', margin: '4px 0 0' }}>⚠ {t('sec_scope')}: {scopeMsg(i)}</div>)}
       <div className="res-stat" style={{ marginTop: 8, marginBottom: 0 }}>
         {used.map((g) => <div key={g}><span className="grade" data-g={g} style={{ marginLeft: 0 }}>{t(`gr_${g}`)}</span> {t(`gr_${g}_d`)}</div>)}
-        <div style={{ marginTop: 6 }}>· {t('src_anal')}<br />· {t('src_design', t(profileOf(code).labelKey))} {tc(code, 'src_design_why')}</div>
+        <div style={{ marginTop: 6 }}>· {t('src_anal')}<br />· {t('src_design', t(profileOf(code).checkLabelKey ?? profileOf(code).labelKey))} {tc(code, 'src_design_why')}</div>
       </div>
     </div>
   )

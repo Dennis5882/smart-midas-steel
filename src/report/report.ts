@@ -68,12 +68,12 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
     ${connections?.length ? `<br>${L('st_conns')} (${connections.length}): ${cnt(sum.conns)}` : ''}
     ${scope.issues.map((i) => `<br><span class="gr gr-expert">${L('sec_scope')}</span> ${esc(scopeMsg(i))}`).join('')}
     <ul>${used.map((g) => `<li>${grade({ grade: g, reasons: [] })} ${L(`gr_${g}_d`)}</li>`).join('')}</ul>
-    <div class="note">${L('src_anal')}<br>${esc(t('src_design', t(prof.labelKey)))} ${esc(tc(spec.code, 'src_design_why'))}</div></div>`)
+    <div class="note">${L('src_anal')}<br>${esc(t('src_design', t(prof.checkLabelKey ?? prof.labelKey)))} ${esc(tc(spec.code, 'src_design_why'))}</div></div>`)
 
   /* 1. 설계 개요 */
   h2('rep_s1')
   parts.push(table([t('sv_item'), t('sv_value')], [
-    [L('kv_code'), `${esc(t(prof.labelKey))} — ${esc(tc(spec.code, 'rep_code_refs'))}`],
+    [L('kv_code'), `${esc(t(prof.basisLabelKey ?? prof.labelKey))} — ${esc(tc(spec.code, 'rep_code_refs'))}`],
     [L('f_frame'), t(`frame_${spec.frame ?? 'gable'}`)],
     [L('kv_span'), `${spec.span} m${spec.frame === 'multi' && spec.spanList ? ` (${spec.spanList.join(' + ')} m)` : ''}`], [L('kv_length'), lengthText(spec)],
     [L('kv_eave'), `${spec.eaveHeight} m`], [L('kv_slope'), `${spec.roofSlope} (${f((G.theta * 180) / Math.PI, 1)}°)`],

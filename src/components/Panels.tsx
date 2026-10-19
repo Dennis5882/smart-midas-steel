@@ -75,7 +75,7 @@ export function ModelPanel() {
         <div className="stat"><div className="n">{sh.cases}</div><div className="l">{t('st_case')}</div></div>
       </div>
       <div className="scard"><h3>{t('sec_geom')}</h3>
-        <KV k={t('kv_code')} v={t(profileOf(sp.code).labelKey)} hi />
+        <KV k={t('kv_code')} v={t(profileOf(sp.code).basisLabelKey ?? profileOf(sp.code).labelKey)} hi />
         <KV k={t('kv_span')} v={`${sp.span} m`} hi />
         <KV k={t('kv_length')} v={lengthText(sp)} />
         <KV k={t('kv_eave')} v={`${sp.eaveHeight} m`} />

@@ -50,6 +50,8 @@ const phase6Input:ReportInput={built:{spec:qSpec,model:qModel,info:qLoads.info,c
 for (const [code, inp] of [['TW', input], ['KR', krInput], ['CN', cnInput], ['ADDITIONS',additionInput],['PHASE5',phase5Input],['PHASE6',phase6Input]] as const) for (const lang of ['ko', 'en', 'zh-TW', 'zh-CN'] as const) {
   setLang(lang)
   const html = buildReport(inp)
+  /* CN: 선택 라벨(GB 51022)과 별개로 '설계 검토' 근거는 실제 강재 규범, 머리는 판본 포함 */
+  if (code === 'CN') { assert.ok(html.includes('GB 50017-2017 · GB/T 50018-2025'), `${lang}: CN design-check basis`); assert.ok(html.includes('GB 51022-2015 · GB 50017-2017'), `${lang}: CN basis with editions`) }
   const doc = new DOMParser().parseFromString(html, 'text/html')
   /* 언어별 글꼴 + 계산서의 모든 글자가 축소 글꼴에 있는지 (없으면 PDF 에 빈 네모) */
   const htmlLang = (doc as any).documentElement.getAttribute('lang') ?? ''
