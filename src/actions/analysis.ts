@@ -1,4 +1,5 @@
 /* 해석 실행 · 결과 회수 */
+import type { BaseReactions } from '../domain/twFoundation'
 import { t, lt } from '../i18n'
 import { mapi } from '../mapi/client'
 import { S, notify, type ReactionSum } from '../state/store'
@@ -34,7 +35,7 @@ export async function analyzeCore(): Promise<void> {
   await autoSave('model') // doc/new 직후 무제 문서는 해석이 거부되고 확인 창이 뜬다 → 먼저 저장
   /* 저장이 성공한 뒤에 이전 결과를 비운다 — 저장 실패(폴더 없음 등)로 해석을 못 했는데 결과만 사라지지 않게 */
   S.analyzed = false
-  S.results = null; S.design = null; S.connections = null; S.opt = null; S.reactions = null; S.ratioView = false
+  S.results = null; S.design = null; S.connections = null; S.opt = null; S.reactions = null; S.baseReactions = null; S.ratioView = false
   S.repairPlan = null; S.repairComparison = null
   notify()
   const res = await mapi<{ message?: string }>('POST', '/doc/anal', {})
@@ -62,17 +63,34 @@ export async function showReactionsInGen(): Promise<void> {
 /** 하중 케이스별 반력 합계 — post/table REACTIONG 의 'SUMMATION OF REACTION FORCES PRINTOUT' */
 export async function fetchReactions(): Promise<void> {
   if (!S.built) return
-  const base = S.built.model.nodes.find((n) => n.z === 0)
+  /* 모든 지점의 케이스별 반력도 같은 표에서 — 기초 예비검토(twFoundation)용. 합계 표는 지점 지정과 무관하게 전체 합 */
+  const bases = S.built.model.nodes.filter((n) => n.z === 0).map((n) => n.id)
   const r = await mapi<any>('POST', '/post/TABLE', {
     Argument: {
       TABLE_NAME: 'Reaction', TABLE_TYPE: 'REACTIONG',
       UNIT: { FORCE: 'kN', DIST: 'm' }, STYLES: { FORMAT: 'Fixed', PLACE: 3 },
-      COMPONENTS: ['Node', 'Load', 'FX', 'FY', 'FZ'],
-      NODE_ELEMS: { KEYS: base ? [base.id] : [] },
+      COMPONENTS: ['Node', 'Load', 'FX', 'FY', 'FZ', 'MX', 'MY', 'MZ'],
+      NODE_ELEMS: { KEYS: bases },
       LOAD_CASE_NAMES: S.built.cases.map((c) => `${c}(ST)`),
     },
   }, 'Reaction')
   const sub = r?.Reaction?.SUB_TABLES?.[0]?.['SUMMATION OF REACTION FORCES PRINTOUT']?.DATA as string[][] | undefined
   S.reactions = (sub ?? []).map(([lc, fx, fy, fz]): ReactionSum => ({ lc, fx: +fx, fy: +fy, fz: +fz }))
+  S.baseReactions = parseBaseReactions(r?.Reaction?.DATA, new Set(bases), new Set(S.built.cases))
   notify()
+}
+
+/** REACTIONG 행 [번호, 절점, 하중, FX, FY, FZ, MX, MY, MZ] → 절점 → 케이스 → 6성분. 형식이 다르거나 빠지면 빈 Map (기초 검토만 생략) */
+export function parseBaseReactions(rows: unknown, bases: Set<number>, cases: Set<string>): BaseReactions {
+  const out: BaseReactions = new Map()
+  if (!Array.isArray(rows)) return out
+  for (const row of rows as string[][]) {
+    if (!Array.isArray(row) || row.length < 9) return new Map()
+    const node = Number(row[1]), lc = String(row[2]).replace(/\(ST\)$/, ''), v = row.slice(3, 9).map(Number)
+    if (!bases.has(node) || !cases.has(lc) || !v.every(Number.isFinite)) continue
+    if (!out.has(node)) out.set(node, new Map())
+    out.get(node)!.set(lc, v)
+  }
+  const complete = [...bases].every((n) => out.get(n)?.size === cases.size)
+  return complete ? out : new Map()
 }

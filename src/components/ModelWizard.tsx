@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, Building2, Send } from 'lucide-react'
-import { baySpans, columnSpans, frameSpans, type FactorySpec } from '../domain/types'
+import { baySpans, columnSpans, defaultTrussDepth, frameSpans, type FactorySpec } from '../domain/types'
 import { t } from '../i18n'
 import { BaseSymbol } from './FrameControls'
 import { MODEL_STEPS, REVIEW_STEP } from './modelingFlow'
@@ -36,6 +36,13 @@ function GeometrySketch({ spec, plan }: { spec: FactorySpec; plan: boolean }) {
         <path d={mono ? `M${left} 145 V${eave} L${right} ${ridge} V145`
           : `M${left} 145 V${eave} ${widths.reduce((acc, w, i) => { const x0 = left + widths.slice(0, i).reduce((a, b) => a + b, 0) * scale; return `${acc} L${x0 + w * scale / 2} ${eave - (w / 2) * spec.roofSlope * scale} L${x0 + w * scale} ${eave}` }, '')} V145`}
           fill="var(--tile)" stroke="var(--cyan)" strokeWidth="4" strokeLinejoin="round" />
+        {/* 트러스 지붕: 하현재(처마 − 춤) + Pratt 웨브 개념도 */}
+        {spec.frame === 'truss' && (() => {
+          const d = (spec.trussDepth ?? defaultTrussDepth(spec.span)) * scale, yb = eave + d, n = 8, w = spec.span * scale / n
+          const top = (x: number) => eave - Math.min(x - left, right - x) * spec.roofSlope
+          return <path d={`M${left} ${yb} H${right} ${Array.from({ length: n - 1 }, (_, i) => { const x = left + (i + 1) * w; return `M${x} ${yb} V${top(x)}` }).join(' ')} ${Array.from({ length: n }, (_, i) => { const a = i < n / 2 ? left + i * w : left + (i + 1) * w, b = i < n / 2 ? left + (i + 1) * w : left + i * w; return `M${a} ${top(a)} L${b} ${yb}` }).join(' ')}`}
+            stroke="var(--cyan)" strokeWidth="1.5" fill="none" />
+        })()}
         {/* 내부 기둥 (흔들림 기둥) — 다경간은 골(처마 높이), 한 지붕 다경간은 지붕선까지 */}
         {inner.map((xm, i) => { const x = left + xm * scale, top = spec.frame === 'gableCols' ? eave - Math.min(xm, spec.span - xm) * spec.roofSlope * scale : eave; return <path key={i} d={`M${x} 145 V${top}`} stroke="var(--cyan)" strokeWidth="2" strokeDasharray="4 3" /> })}
         <BaseSymbol x={left} y={145} fixed={spec.baseFixity === 'fixed'} />

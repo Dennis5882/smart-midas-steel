@@ -22,7 +22,7 @@ function depthDir(e: Element, ex: V3, a: Node, rising: (x: number) => boolean, s
   let d: V3
   switch (e.addition === 'platform-column' ? 'column' : e.role) {
     case 'column': d = [1, 0, 0]; break
-    case 'rafter': d = cross([0, 1, 0], ex); break // 골조면 안, 축에 직교
+    case 'rafter': case 'chord': case 'web': d = cross([0, 1, 0], ex); break // 골조면 안, 축에 직교 (트러스 현재·웨브도)
     case 'strut': d = [0, 0, 1]; break
     case 'purlin': { const s = rising(a.x) ? -1 : 1; /* 오르막 면 = 법선 −x 쪽 */ d = [s * Math.sin(Math.atan(slope)), 0, Math.cos(Math.atan(slope))]; break }
     default: d = cross([0, 0, 1], ex) // 거트·풍주: 벽면 법선(수평)
@@ -34,6 +34,12 @@ function depthDir(e: Element, ex: V3, a: Node, rising: (x: number) => boolean, s
 /** 단면 직사각형들 (u = 폭 방향, v = 춤 방향, mm) */
 function rects(section: string): [number, number, number, number][] | null {
   const kind = section.trim().split(/\s+/)[0]
+  if (kind === 'Z') {
+    const { H, B, C, t } = ccDims(section)
+    /* 웨브 중심, 위 플랜지 +u · 아래 플랜지 −u, 립은 웨브 쪽으로 */
+    return [[-t / 2, t / 2, -H / 2, H / 2], [-t / 2, B - t / 2, H / 2 - t, H / 2], [-(B - t / 2), t / 2, -H / 2, -H / 2 + t],
+      [B - 3 * t / 2, B - t / 2, H / 2 - C, H / 2 - t], [-(B - t / 2), -(B - 3 * t / 2), -H / 2 + t, -H / 2 + C]]
+  }
   if (kind === 'CC') {
     const { H, B, C, t } = ccDims(section)
     const u0 = -B / 2

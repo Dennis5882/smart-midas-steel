@@ -98,7 +98,7 @@ export async function runOptimize(): Promise<void> {
       before: start.sections, after: b.spec.sections, iters, weightBefore: wB, weightAfter: wA, converged,
       ok: valid && !blockedMembers(S.design) && S.design.ng === 0 && S.connections.every((c) => c.ratio <= 1),
       rows: ROLES.filter((r) => b.model.elements.some((e) => e.role === r)).map((r) => ({
-        role: r, before: start.sections[r], after: b.spec.sections[r], ratio: S.design!.byRole[r]?.ratio ?? 0,
+        role: r, before: start.sections[r] ?? '', after: b.spec.sections[r] ?? '', ratio: S.design!.byRole[r]?.ratio ?? 0,
         governs: lastRows.find((x) => x.role === r)?.governs ?? 'strength', tBefore: tB[r], tAfter: tA[r],
       })),
     }

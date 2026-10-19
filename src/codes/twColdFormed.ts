@@ -142,12 +142,17 @@ export interface CFCapacity {
 export function cfCapacity(name: string, sp: SectionProps, Fy: number, E: number, L: CFLengths, Cb: number): CFCapacity {
   const g = ccDims(name)
   const G = E / 2.6
-  const { A, Ix, rx, ry, J, Sy } = sp
-  const xc = (() => { /* 도심 ~ 웨브 중심선 거리 (중심선) */
+  /* 립 Z (점대칭): 도심 = 전단중심 → x0 = 0, 압축 휨좌굴은 약한 주축 rmin, 횡비틀림은 6.2-21 (Iyc = Iy/2).
+     강축 휨은 기하축 — 외장재가 퍼린을 구속(through-fastened)한다는 가정 (scope twZPurlin) */
+  const isZ = sp.kind === 'Z'
+  const { A, Ix, rx, J, Sy } = sp
+  const ry = isZ ? Math.sqrt((sp.Imin ?? sp.Iy) / A) : sp.ry
+  const xc = isZ ? 0 : (() => { /* 도심 ~ 웨브 중심선 거리 (중심선) */
     const b = g.B - g.t, c = g.C - g.t / 2, h = g.H - g.t
     return (2 * b * (b / 2) + 2 * c * b) / (h + 2 * b + 2 * c)
   })()
-  const { m, Cw } = shearCenter(g, Ix)
+  const sc = shearCenter(g, Ix)
+  const m = isZ ? 0 : sc.m, Cw = isZ ? sp.Cw : sc.Cw
   const x0 = xc + m
   const r0 = Math.sqrt(rx ** 2 + ry ** 2 + x0 ** 2)
   const sigEx = (Lx: number) => (Math.PI ** 2 * E) / (Lx / rx) ** 2
@@ -161,7 +166,8 @@ export function cfCapacity(name: string, sp: SectionProps, Fy: number, E: number
   /* 휨: 단면 강도 + 횡비틀림 (C3.1.2.1, 대칭축 휨) */
   const se = effSx(g, Fy, E)
   const Sf = Ix / (g.H / 2)
-  const FeL = (Cb * r0 * A * Math.sqrt(sigEy(L.Lb) * sigT(L.Lb))) / Sf
+  const FeL = isZ ? (Cb * Math.PI ** 2 * E * g.H * (sp.Iy / 2)) / (2 * Sf * L.Lb ** 2) // 6.2-21 點對稱 Z
+    : (Cb * r0 * A * Math.sqrt(sigEy(L.Lb) * sigT(L.Lb))) / Sf
   const Fc = FeL >= 2.78 * Fy ? Fy : FeL > 0.56 * Fy ? (10 / 9) * Fy * (1 - (10 * Fy) / (36 * FeL)) : FeL
   const Sc = effSx(g, Fc, E).Se
   // Even a laterally braced compression flange must satisfy 6.2.3.

@@ -3,9 +3,9 @@
 import type { ElementRole, FactoryModel } from '../domain/types'
 
 export const ROLE_COLOR: Record<ElementRole, string> = {
-  column: '#0b6e99', rafter: '#1d8653', purlin: '#5b6fd6', girt: '#c98a12', strut: '#c43030', post: '#2a9bc4', brace: '#c2399b',
+  column: '#0b6e99', rafter: '#1d8653', purlin: '#5b6fd6', girt: '#c98a12', strut: '#c43030', post: '#2a9bc4', brace: '#c2399b', chord: '#1d8653', web: '#c98a12',
 }
-const ROLE_WIDTH: Record<ElementRole, number> = { column: 2.2, rafter: 2.2, purlin: 0.8, girt: 0.8, strut: 1.3, post: 1.3, brace: 0.9 }
+const ROLE_WIDTH: Record<ElementRole, number> = { column: 2.2, rafter: 2.2, purlin: 0.8, girt: 0.8, strut: 1.3, post: 1.3, brace: 0.9, chord: 1.6, web: 0.8 }
 
 /** 강도비 구간 — 3D 탭 BANDS 와 같은 경계 (≤0.5 · ≤0.7 · ≤0.9 · ≤1.0 · >1.0) */
 export const RATIO_BANDS: [number, string][] = [[0.5, '#2f55c9'], [0.7, '#1d8653'], [0.9, '#0e8f8a'], [1.0, '#b56d00'], [Infinity, '#c43030']]

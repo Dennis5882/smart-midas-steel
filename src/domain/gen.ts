@@ -1,6 +1,7 @@
 /* 형상 모델 → Gen NX MAPI 페이로드 (순수 함수). 단위 m, kN (Gen 모델 단위계는 전송 전 db/UNIT 으로 맞춘다). */
 import { profileOf } from '../codes'
 import type { ElementRole, FactoryModel, FactorySpec } from './types'
+import { isAxialRole } from './types'
 
 export interface GenPayloads {
   UNIT: Record<string, unknown>
@@ -18,6 +19,9 @@ const ANGLE: Partial<Record<ElementRole, number>> = { girt: 90, post: 90 }
 const PINNED_BOTH: ElementRole[] = ['purlin', 'girt', 'strut']
 const PIN = '0000110', FIX = '0000000'
 
+/** Gen 으로 보내는 DB 단면 이름 — Z 는 같은 치수 립 C */
+export const genProxy = (name: string) => name.trim().startsWith('Z ') ? 'CC ' + name.trim().slice(2) : name
+
 export function buildGenPayloads(spec: FactorySpec, model: FactoryModel): GenPayloads {
   const prof = profileOf(spec.code)
   const mat = prof.materials[spec.material]
@@ -32,19 +36,20 @@ export function buildGenPayloads(spec: FactorySpec, model: FactoryModel): GenPay
   for (const e of model.elements) if (!sectId.has(e.section)) sectId.set(e.section, sectId.size + 1)
 
   /* TRUSS 요소에 쓰는 단면은 뒴(7번째 자유도) 옵션 불가 — "Section property considering 7th DOF ... only to the beam elements" (라이브 2026-10-15) */
-  const trussSects = new Set(model.elements.filter((e) => e.role === 'brace').map((e) => e.section))
+  const trussSects = new Set(model.elements.filter((e) => isAxialRole(e.role)).map((e) => e.section))
   const SECT: Record<string, unknown> = {}
   for (const [name, id] of sectId) {
     SECT[id] = {
       SECTTYPE: 'DBUSER',
       SECT_NAME: name.replace(/ /g, ''),
+      /* Gen DB 에 Z 없음 → 같은 치수 립 C 를 해석 대리 단면으로 (양단 핀이라 부재력 동일, A·Ix·J 동일 — Iy 만 다름, twZSections 참조) */
       SECT_BEFORE: {
         OFFSET_PT: 'CC', OFFSET_CENTER: 0, USER_OFFSET_REF: 0,
         HORZ_OFFSET_OPT: 0, USERDEF_OFFSET_YI: 0, VERT_OFFSET_OPT: 0, USERDEF_OFFSET_ZI: 0,
         USE_SHEAR_DEFORM: true, USE_WARPING_EFFECT: !trussSects.has(name),
-        SHAPE: prof.gen.shapeOf(name),
+        SHAPE: prof.gen.shapeOf(genProxy(name)),
         DATATYPE: 1,
-        SECT_I: { DB_NAME: prof.gen.sectionDbOf?.(name) ?? prof.gen.sectionDb, SECT_NAME: name },
+        SECT_I: { DB_NAME: prof.gen.sectionDbOf?.(genProxy(name)) ?? prof.gen.sectionDb, SECT_NAME: genProxy(name) },
       },
     }
   }
@@ -54,7 +59,7 @@ export function buildGenPayloads(spec: FactorySpec, model: FactoryModel): GenPay
 
   const ELEM: Record<string, unknown> = {}
   for (const e of model.elements) {
-    ELEM[e.id] = { TYPE: e.role === 'brace' ? 'TRUSS' : 'BEAM', MATL: twoMat && (e.role === 'purlin' || e.role === 'girt') ? 2 : 1, SECT: sectId.get(e.section), NODE: [e.n1, e.n2], ANGLE: e.addition ? 0 : ANGLE[e.role] ?? 0 }
+    ELEM[e.id] = { TYPE: isAxialRole(e.role) ? 'TRUSS' : 'BEAM', MATL: twoMat && (e.role === 'purlin' || e.role === 'girt') ? 2 : 1, SECT: sectId.get(e.section), NODE: [e.n1, e.n2], ANGLE: e.addition ? 0 : ANGLE[e.role] ?? 0 }
   }
 
   /* 단부 해제: 2차부재 양단 핀, 풍주는 지붕보에 닿는 상단만 핀(기초는 핀 지점이라 해제 불필요 — 양단 해제 시 기초 절점 회전 불안정) */

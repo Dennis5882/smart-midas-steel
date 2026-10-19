@@ -1,3 +1,5 @@
+import type { FootingInput, FootingResult } from '../domain/twFoundation'
+import { isTwUse, twUseSource } from '../codes/twOccupancy'
 import { additionLabelKey } from '../domain/additionTypes'
 import {craneTravel} from '../domain/craneTravel'
 import {activeFloorOpening,linkReview} from '../domain/phase6'
@@ -46,9 +48,11 @@ export interface ReportInput {
   connections: ConnResult[] | null
   /** 단면 자동 최적화를 했으면 물량 장에 변경 전후 표 */
   opt?: OptSummary | null
+  /** TW 기초 예비검토 (state/footing) */
+  footing?: { result: FootingResult; input: FootingInput } | null
 }
 
-export function buildReport({ built, reactions, design, connections, opt }: ReportInput): string {
+export function buildReport({ built, reactions, design, connections, opt, footing }: ReportInput): string {
   const { spec, model, info } = built
   const prof = profileOf(spec.code)
   const mat = prof.materials[spec.material]
@@ -74,6 +78,8 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   h2('rep_s1')
   parts.push(table([t('sv_item'), t('sv_value')], [
     [L('kv_code'), `${esc(t(prof.basisLabelKey ?? prof.labelKey))} — ${esc(tc(spec.code, 'rep_code_refs'))}`],
+    ...(spec.code === 'TW' && spec.asd ? [[L('f_asd'), L('asd_on')]] : []),
+    ...(spec.frame === 'truss' ? [[L('frame_truss'), `${L('f_trussDepth')} ${f(spec.trussDepth ?? 0, 2)} m · ${L('f_chord')} ${esc(spec.sections.chord ?? '')} · ${L('f_web')} ${esc(spec.sections.web ?? '')}`]] : []),
     [L('f_frame'), t(`frame_${spec.frame ?? 'gable'}`)],
     [L('kv_span'), `${spec.span} m${hasInteriorColumns(spec) && spec.spanList ? ` (${spec.spanList.join(' + ')} m)` : ''}`], [L('kv_length'), lengthText(spec)],
     [L('kv_eave'), `${spec.eaveHeight} m`], [L('kv_slope'), `${spec.roofSlope} (${f((G.theta * 180) / Math.PI, 1)}°)`],
@@ -89,7 +95,7 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
     const inputs=[...a.equipment, ...(spec.features?.crane && a.crane?[a.crane]:[]), ...(spec.features?.mezzanine && a.platform?[a.platform]:[]), ...(spec.features?.opening && a.wallOpening?[a.wallOpening]:[])]
     const units:Record<string,string>={x:'m',y:'m',x0:'m',x1:'m',height:'m',elevation:'m',eccentricity:'m',wheelSpacing:'m',beamSpacing:'m',weight:'kN',maxWheel:'kN',minWheel:'kN',lateral:'kN',braking:'kN',seismicWeight:'kN',driftLimitMm:'mm',dead:'kN/m²',live:'kN/m²'}
     const inputRows = (value: object, factors=false) => Object.entries(value).filter(([k])=>k!=='confirmed' && k!=='kind' && k!=='runway' && k!=='travel').map(([k,v])=>[
-      k==='id'?'ID':L((k==='seismicFraction'?'add_mass':`add_${k}`) as I18nKey),`${k==='manufacturer'&&!String(v).trim()?L('add_manufacturer_unset'):esc((/Bay$/.test(k)||k==='bay')?Number(v)+1:v)}${!factors && units[k] ? ` ${units[k]}` : ''}`,
+      k==='id'?'ID':L((k==='seismicFraction'?'add_mass':`add_${k}`) as I18nKey),`${k==='use'&&isTwUse(v)?`${L(`tw_use_${v}`)} — ${esc(twUseSource(v))}`:k==='manufacturer'&&!String(v).trim()?L('add_manufacturer_unset'):esc((/Bay$/.test(k)||k==='bay')?Number(v)+1:v)}${!factors && units[k] ? ` ${units[k]}` : ''}`,
     ])
     for (const value of inputs) parts.push(table([t('sv_item'),t('sv_value')],inputRows(value)))
     if (spec.features?.crane) {
@@ -122,7 +128,7 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   /* 2. 재료·단면 */
   h2('rep_s2')
   parts.push(`<p>${esc(spec.material)}: Fy = ${mat.fy} MPa, Fu = ${mat.fu} MPa, E = ${mat.E} MPa, γ = ${mat.gamma} kN/m³ (Gen NX ${esc(mat.gen.standard)} ${esc(mat.gen.db)})</p>`)
-  const secRows = [...ROLES.map((r) => ({ r, name: spec.sections[r], addition:undefined as import('../domain/additionTypes').AdditionUsage | undefined })), ...model.elements.filter((e)=>e.addition).filter((e,i,es)=>es.findIndex((v)=>v.section===e.section && v.role===e.role)===i).map((e)=>({r:e.role,name:e.section,addition:e.addition}))].map(({ r, name, addition }) => {
+  const secRows = [...ROLES.filter((r) => spec.sections[r]).map((r) => ({ r, name: spec.sections[r]!, addition:undefined as import('../domain/additionTypes').AdditionUsage | undefined })), ...model.elements.filter((e)=>e.addition).filter((e,i,es)=>es.findIndex((v)=>v.section===e.section && v.role===e.role)===i).map((e)=>({r:e.role,name:e.section,addition:e.addition}))].map(({ r, name, addition }) => {
     const p = sectionProps(name, spec.code)
     return [L(addition ? additionLabelKey(addition) : `role_${r}`), esc(name), f(p.A / 100, 1), f(p.Ix / 1e4, 0), f(p.Zx / 1e3, 0), f(p.rx / 10, 2), f(p.ry / 10, 2), esc(p.source === 'gen-db' ? t('section_gen_source', p.db!) : t('section_dimension_source'))]
   })
@@ -263,6 +269,15 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
         c.dims.stiffener && k.item === 'flangeBend' ? `${f(k.ratio, 3)} → ${L('cn_stiffener')}` : ok(k.ratio), esc(k.clause)])))
   }
   if (!connections?.length) parts.push(`<p>${L('need_design')}</p>`)
+  if (footing) {
+    const fi = footing.input
+    parts.push(`<h3>${L('ft_title')} — ${footing.result.ok ? 'OK' : 'NG'}</h3><p class="note">${L('ft_note')}</p>`)
+    parts.push(`<p>qa ${f(fi.qa, 0)} kN/m² · Df ${f(fi.depth, 2)} m · t ${f(fi.thickness, 2)} m · tanδ ${f(fi.friction, 2)} · γs ${f(fi.soilGamma, 1)} · γc ${f(fi.concreteGamma, 1)} kN/m³ — ${fi.confirmed && fi.source.trim() ? esc(fi.source) : L('ft_assumed')}</p>`)
+    parts.push(table([t('ft_group'), t('ft_size'), t('ft_bearing'), t('ft_ecc'), t('ft_sliding')], footing.result.rows.map((r) => [
+      `${L(`ft_group_${r.group}`)} ×${r.nodes} (N${r.node})`, `${r.B.toFixed(1)} × ${r.L.toFixed(1)} m${r.ok ? '' : ` — ${esc(t('ft_ng', footing.result.maxSize))}`}`,
+      ...(['bearing', 'eccentricity', 'sliding'] as const).map((k) => `${Number.isFinite(r.ratios[k]) ? ok(r.ratios[k]) : '∞'} <span class="note">${esc(r.governing[k])}</span>`)])))
+    parts.push(`<p class="note">${esc(t('ft_combos', footing.result.combos))}</p>`)
+  }
 
   /* 9. 물량 */
   h2('rep_s9')

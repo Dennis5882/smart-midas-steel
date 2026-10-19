@@ -3,7 +3,7 @@
 import data from '../data/gen-section-properties.json'
 import type { CodeId } from '../codes/types'
 
-export type ShapeKind = 'H' | 'CC' | 'P'
+export type ShapeKind = 'H' | 'CC' | 'Z' | 'P'
 
 export interface SectionProps {
   source?: 'gen-db' | 'dimensions'
@@ -31,6 +31,9 @@ export interface SectionProps {
   ry: number
   J: number
   Cw: number
+  /** Z (점대칭): 기하축 곱관성 Ixy·약한 주축 Imin (mm⁴) */
+  Ixy?: number
+  Imin?: number
 }
 
 const num = (s: string) => s.split('x').map(Number)
@@ -71,6 +74,26 @@ export function dimensionSectionProps(name: string): SectionProps {
       rx: Math.sqrt(Ix / A), ry: Math.sqrt(Iy / A),
       J: (t ** 3 * (h + 2 * b + 2 * cl)) / 3,
       Cw: ((t * b ** 3 * h ** 2) / 12) * ((3 * b * t + 2 * h * t) / (6 * b * t + h * t)),
+    }
+  }
+  if (kind === 'Z') {
+    /* 립 Z형강 'Z HxBxC/t' — 중심선, 위 플랜지 +x·아래 플랜지 −x, 립은 웨브 쪽으로 (점대칭: 도심 = 전단중심 = 웨브 중심) */
+    const [size, ts] = dims.split('/')
+    const [H, B, c] = num(size), t = +ts
+    const h = H - t, b = B - t, cl = c - t / 2
+    const A = t * (h + 2 * b + 2 * cl)
+    const Ix = (t * h ** 3) / 12 + 2 * b * t * (h / 2) ** 2 + 2 * ((t * cl ** 3) / 12 + cl * t * (h / 2 - cl / 2) ** 2)
+    const Iy = 2 * ((t * b ** 3) / 12 + b * t * (b / 2) ** 2) + 2 * cl * t * b ** 2
+    const Ixy = b * b * t * h / 2 + 2 * b * cl * t * (h / 2 - cl / 2)
+    const Imin = (Ix + Iy) / 2 - Math.hypot((Ix - Iy) / 2, Ixy)
+    const Sx = Ix / (H / 2), Sy = Iy / (b + t / 2)
+    return {
+      name, kind: 'Z', rolled: false, d: H, bf: B, tw: t, tf: t, h: H - 2 * t, A, Ix, Iy, Ixy, Imin,
+      Sx, Sy, Zx: Sx, Zy: Sy,
+      rx: Math.sqrt(Ix / A), ry: Math.sqrt(Iy / A),
+      J: (t ** 3 * (h + 2 * b + 2 * cl)) / 3,
+      /* 립 없는 Z 식 (립 무시 → 작게, 보수적) */
+      Cw: (t * b ** 3 * h ** 2 * (b + 2 * h)) / (12 * (2 * b + h)),
     }
   }
   if (kind === 'P') {

@@ -19,6 +19,8 @@ const ROLE_VAR: Record<ElementRole, [string, string, number]> = {
   column: ['--p-col', '#4cc2ff', 5], rafter: ['--p-raf', '#5ee6a8', 5],
   purlin: ['--p-pur', '#9b8cff', 2], girt: ['--p-girt', '#ffb454', 2], strut: ['--p-strut', '#ff6b6b', 3],
   post: ['--p-post', '#4cc2ff', 3], brace: ['--p-brace', '#ff6bd5', 2],
+  /* 트러스 하현재 = 지붕보 색 계열, 웨브 = 가새 색 계열 (테마 토큰) */
+  chord: ['--p-raf', '#5ee6a8', 3], web: ['--p-girt', '#ffb454', 1.5],
 }
 
 /* 3D 색 = 현재 테마의 CSS 변수(app.css --p-*) — 플롯할 때마다 읽어 테마 전환에 따라감 */

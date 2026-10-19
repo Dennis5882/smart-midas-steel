@@ -30,7 +30,7 @@ const { buildPortal } = await import('../src/domain/portal')
 const { buildGenPayloads } = await import('../src/domain/gen')
 for (const code of ['TW', 'CN', 'KR'] as const) {
   const base = defaultSpecFor(code), before = JSON.stringify(base)
-  for (const role of ROLES) {
+  for (const role of ROLES.filter((r) => base.sections[r])) { // 트러스 역할(chord·web)은 트러스 스펙에만
     const choices = modelingSectionChoices(base, role, base.sections[role])
     assert.ok(choices.options.length > 1, `${code}/${role}: multiple choices`)
     assert.ok(choices.selected, `${code}/${role}: default stays selected`)

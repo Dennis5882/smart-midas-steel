@@ -20,14 +20,16 @@ function FrameIcon({ frame }: { frame: FrameType }) {
     <path className="mw-icon-frame" d={frame === 'mono' ? 'M14 52 V28 L74 12 V52'
       : frame === 'multi' ? 'M10 52 V30 L27 17 L44 30 L61 17 L78 30 V52 M44 30 V52'
       : frame === 'gableCols' ? 'M10 52 V32 L44 14 L78 32 V52 M33 52 V20 M55 52 V20'
+      /* 트러스: 상현 + 하현 + 웨브 */
+      : frame === 'truss' ? 'M14 52 V30 L44 14 L74 30 V52 M14 36 H74 M29 36 V22 L44 36 V14 M59 36 V22 L44 36 M14 30 L29 36 M74 30 L59 36'
       : 'M14 52 V30 L44 14 L74 30 V52'} />
   </svg>
 }
 
-export function FrameTypePicker({ value, disabled, onChange }: { value: FrameType; disabled: boolean; onChange(v: FrameType): void }) {
+export function FrameTypePicker({ value, disabled, onChange, code }: { value: FrameType; disabled: boolean; onChange(v: FrameType): void; code?: FactorySpec['code'] }) {
   return <div className="mw-frame-picker" role="group" aria-label={t('f_frame')}>
     <span className="mw-picker-label">{t('f_frame')}</span>
-    <div className="mw-frame-options">{FRAME_TYPES.map((frame) => <button type="button" key={frame} disabled={disabled}
+    <div className="mw-frame-options">{FRAME_TYPES.filter((f) => f !== 'truss' || code === 'TW' || value === 'truss').map((frame) => <button type="button" key={frame} disabled={disabled}
       aria-pressed={value === frame} onClick={() => onChange(frame)}>
       <FrameIcon frame={frame} /><span>{t(`frame_${frame}`)}</span>
       {value === frame && <Check className="mw-choice-check" size={13} aria-hidden="true" />}

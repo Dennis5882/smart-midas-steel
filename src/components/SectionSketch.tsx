@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import { t } from '../i18n'
 
 /** CC 립 길이는 성질 레코드에 없어서 이름에서 읽는다 ('CC 150x65x20/3.2', 'LC-150x65x20x3.2'). */
-const lipOf = (name: string) => Number(name.trim().match(/^(?:CC\s+|LC-)\d[\d.]*x\d[\d.]*x(\d[\d.]*)/)?.[1] ?? 0)
+const lipOf = (name: string) => Number(name.trim().match(/^(?:CC\s+|Z\s+|LC-)\d[\d.]*x\d[\d.]*x(\d[\d.]*)/)?.[1] ?? 0)
 
 /** Scaled outline with key dimensions, beside the properties used by the checks. Drawing only — not a fabrication detail. */
 /** children = 카탈로그·출처 안내 (상세를 펼칠 때만 보임). warn = 상세 안에 주의 문구가 있음 → 요약에 표시 */
@@ -28,6 +28,11 @@ export function SectionSketch({ name, code, material, children, warn = false }: 
   let shape: string
   if (p.kind === 'H') {
     shape = `M${x0} ${y0}h${b}v${tf}h${-(b - tw) / 2}v${d - 2 * tf}h${(b - tw) / 2}v${tf}h${-b}v${-tf}h${(b - tw) / 2}v${-(d - 2 * tf)}h${-(b - tw) / 2}Z`
+  } else if (p.kind === 'Z') {
+    /* 립 Z — 점대칭 그림 (폭 = 두 플랜지 합) */
+    const sz = Math.min((W - 2 * pad) / (2 * p.bf), (Hh - 2 * pad) / p.d), bz = p.bf * sz, dz = p.d * sz, yz = cy - dz / 2
+    const c = Math.max(lipOf(name) * sz, tf)
+    shape = `M${cx - tw / 2} ${yz}H${cx + bz}V${yz + c}h${-tw}V${yz + tf}H${cx + tw / 2}V${yz + dz}H${cx - bz}V${yz + dz - c}h${tw}V${yz + dz - tf}H${cx - tw / 2}Z`
   } else if (p.kind === 'CC') {
     const c = Math.max(lipOf(name) * s, tf)
     shape = `M${x0 + b} ${y0}h${-b}v${d}h${b}v${-c}h${-tw}v${c - tf}h${-(b - 2 * tw)}v${-(d - 2 * tf)}h${b - 2 * tw}v${c - tf}h${tw}Z`
@@ -42,7 +47,7 @@ export function SectionSketch({ name, code, material, children, warn = false }: 
     ['Iy', (p.Iy / 1e4).toFixed(0), 'cm⁴'],
     ['Sx', (p.Sx / 1e3).toFixed(0), 'cm³'],
     // 치수 계산 냉간성형은 Zx 자리에 탄성계수가 들어 있다 — 소성 Zx 로 보이지 않게 뺀다
-    ...(p.kind === 'CC' && p.source !== 'gen-db' ? [] : [['Zx', (p.Zx / 1e3).toFixed(0), 'cm³'] as [string, string, string]]),
+    ...((p.kind === 'CC' || p.kind === 'Z') && p.source !== 'gen-db' ? [] : [['Zx', (p.Zx / 1e3).toFixed(0), 'cm³'] as [string, string, string]]),
     ['rx / ry', `${(p.rx / 10).toFixed(2)} / ${(p.ry / 10).toFixed(2)}`, 'cm'],
     ...(gamma ? [[t('section_unit_weight'), (gamma * p.A * 1e-6 * 1000 / 9.80665).toFixed(1), 'kg/m'] as [string, string, string]] : []),
   ]
@@ -57,7 +62,7 @@ export function SectionSketch({ name, code, material, children, warn = false }: 
     {/* 대부분은 그림만 보면 된다 — 성질 표는 필요할 때 펼친다 */}
     <details className="section-sketch-info">
       {summary}
-      <small className="mono">{p.kind === 'H' ? `tw ${mm(p.tw)} · tf ${mm(p.tf)} mm` : p.kind === 'CC' ? `t ${mm(p.tw)} · ${t('section_lip')} ${mm(lipOf(name))} mm` : `t ${mm(p.tw)} mm`}</small>
+      <small className="mono">{p.kind === 'H' ? `tw ${mm(p.tw)} · tf ${mm(p.tf)} mm` : p.kind === 'CC' || p.kind === 'Z' ? `t ${mm(p.tw)} · ${t('section_lip')} ${mm(lipOf(name))} mm` : `t ${mm(p.tw)} mm`}</small>
       <dl>{rows.map(([k, v, u]) => <div key={k}><dt>{k}</dt><dd className="mono">{v} <small>{u}</small></dd></div>)}</dl>
       <small>{t(p.source === 'gen-db' ? 'section_sketch_gen' : 'section_sketch_dim')}</small>
       {children}

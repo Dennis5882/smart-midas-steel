@@ -94,4 +94,5 @@ export const KR_LC: readonly string[] = [
 
 export const KR_CATALOG: Record<ElementRole, readonly string[]> = {
   column: KR_H, rafter: KR_H, strut: KR_H, post: KR_H, purlin: [...KR_LC, ...KR_LH, ...KR_H.slice(0, 12)], girt: [...KR_LC, ...KR_LH, ...KR_H.slice(0, 12)], brace: KR_PIPE,
+  chord: [], web: [],
 }

@@ -10,7 +10,7 @@ export function krSynthetic(spec: FactorySpec) {
   const combos = Object.values<any>(loads['LCOM-GEN']).map((c) => c.NAME as string)
   const results: Results = { beam: new Map(), truss: new Map(), sway: new Map(), disp: new Map(), combos }
   for (const e of model.elements) {
-    if (e.role === 'brace') { results.truss.set(e.id, new Map(combos.map((c) => [c, -20]))); continue }
+    if (e.role === 'brace' || e.role === 'web') { results.truss.set(e.id, new Map(combos.map((c) => [c, -20]))); continue }
     const pts = [0, 1, 2, 3, 4].map((i) => ({ P: e.role === 'column' ? -150 : -5, Vy: 0, Vz: 10, My: (e.role === 'column' || e.role === 'rafter' ? 200 : 3) * (1 - i / 2), Mz: 0.5 }))
     results.beam.set(e.id, new Map(combos.map((c) => [c, pts])))
   }

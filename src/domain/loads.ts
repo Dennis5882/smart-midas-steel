@@ -14,6 +14,7 @@ import { BASIN } from '../codes/twSites'
 import { buildCnLoads } from './cnLoads'
 import { buildKrLoads, type KrLoadInfo } from './krLoads'
 import { additionErrors, factoryOnly, hasAdditions } from './additions'
+import { ASD_COMBOS } from '../codes/twAsd'
 import { buildAdditionLoads } from './additionLoads'
 import type { AdditionModel, AdditionFactors } from './additionTypes'
 
@@ -353,6 +354,20 @@ function buildFactoryLoads(spec: FactorySpec, model: FactoryModel): LoadPayloads
           const vv = k === 'W' || k === 'E' ? v! : variants[k][0]
           return vv.parts.map((p) => ({ ANAL: 'ST', LCNAME: p.lc, FACTOR: f * p.f * (k === 'E' ? om : 1) }))
         }),
+      }
+    }
+  }
+
+  /* TW ASD 2.2 — 같은 풍·지진 변형, 1/3 할증 없음 (codes/twAsd ASD_COMBOS). 접합·LRFD 검토에는 쓰지 않는 'asd' 용도 */
+  if (spec.code === 'TW' && spec.asd) for (const c of ASD_COMBOS) {
+    const wOrE = c.terms.map(([k]) => k).find((k) => k === 'W' || k === 'E') as 'W' | 'E' | undefined
+    for (const v of wOrE ? variants[wOrE] : [null]) {
+      no++
+      const name = `ASD ${c.ref}${v?.tag ?? ''}`
+      comboKind[name] = 'asd'
+      LCOM[no] = {
+        NAME: name, ACTIVE: 'ACTIVE', iTYPE: 0, DESC: c.terms.map(([k, f]) => `${f}${k}`).join('+'),
+        vCOMB: c.terms.flatMap(([k, f]) => (k === 'W' || k === 'E' ? v! : variants[k as LoadCaseType][0]).parts.map((p) => ({ ANAL: 'ST', LCNAME: p.lc, FACTOR: f * p.f }))),
       }
     }
   }

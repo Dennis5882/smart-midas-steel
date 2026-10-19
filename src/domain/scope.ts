@@ -1,3 +1,4 @@
+import { profileOf } from '../codes'
 import { activeOpening, additionErrors, hasAdditions } from './additions'
 /* 적용범위 게이트 (평가 보고서 P0-4, 기획서 14장) — 자동설계가 맞는 건물인지 Gen 전송 전에 판정한다.
    block: 이 앱의 모델·하중으로는 표현할 수 없음 → [실행] 막음 (전문가 모드 = Gen NX 에서 직접 모델링)
@@ -8,11 +9,11 @@ import { validateCnSpec } from './cnLoads'
 import { validateKrSpec } from './krLoads'
 import { isPartialKR } from '../codes/krLateral'
 import { portalGeometry } from './portal'
-import { columnSpans, hasInteriorColumns, type FactorySpec } from './types'
+import { columnSpans, defaultTrussDepth, hasInteriorColumns, type FactorySpec } from './types'
 
 export type ScopeKey =
   | 'additionInput' | 'additionReview' | 'craneAssumed' | 'siteAssumed' | 'crane' | 'mezzanine' | 'multiSpan' | 'opening' | 'openingCN'
-  | 'span' | 'eave' | 'eaveHigh' | 'slope' | 'bayRatio' | 'baySpacing' | 'length' | 'hnR' | 'cn' | 'monoTW' | 'multi' | 'gableCols' | 'craneInterior' | 'multiTW' | 'kr' | 'multiKR'
+  | 'span' | 'eave' | 'eaveHigh' | 'slope' | 'bayRatio' | 'baySpacing' | 'length' | 'hnR' | 'cn' | 'monoTW' | 'multi' | 'gableCols' | 'craneInterior' | 'multiTW' | 'kr' | 'multiKR' | 'twMatSS' | 'twMatImported' | 'twZPurlin' | 'twAsd' | 'twAsdAdditions' | 'truss' | 'trussCode' | 'trussDepth'
 export interface ScopeIssue { key: ScopeKey; level: 'block' | 'warn'; args: (string | number)[] }
 export interface ScopeResult { issues: ScopeIssue[]; blocked: boolean }
 
@@ -39,6 +40,11 @@ export function checkScope(spec: FactorySpec, f: ScopeFeatures = spec.features ?
   if (f.crane && spec.additions?.crane && !spec.additions.crane.manufacturer?.trim()) warn('craneAssumed')
   /* TW 工址 조건이 위치 기반 제안값이면 확정된 법규 산정으로 표시하지 않는다 (현지화 검토 P0) */
   if (spec.code === 'TW' && spec.siteBasis !== 'confirmed') warn('siteAssumed')
+  /* 13.2.1 내진 부재 강재 목록 밖 — SS(용접 주구조 부적합, 3.2 해설), ASTM(3.1.2 검사·동등성) */
+  if (spec.code === 'TW' && spec.material === 'SS400') warn('twMatSS')
+  if (spec.code === 'TW' && spec.asd) { warn('twAsd'); if (hasAdditions({ ...spec, features: f })) block('twAsdAdditions') }
+  if (spec.code === 'TW' && [spec.sections.purlin, spec.sections.girt].some((n) => n.trim().startsWith('Z '))) warn('twZPurlin')
+  if (spec.code === 'TW' && profileOf('TW').materials[spec.material]?.gen.standard.startsWith('ASTM')) warn('twMatImported', spec.material)
   if (f.multiSpan && !hasInteriorColumns(spec)) block('multiSpan') // 다경간·한 지붕 다경간 형식을 고르면 지원
   /* 크레인은 바깥 기둥 열(x = 0, 스팬) 레일 — 내부 기둥이 있으면 전체 폭 크레인이 지나갈 수 없다 */
   if (f.crane && hasInteriorColumns(spec)) block('craneInterior')
@@ -63,6 +69,13 @@ export function checkScope(spec: FactorySpec, f: ScopeFeatures = spec.features ?
     if (spec.code === 'KR') warn('multiKR')
   }
   if (spec.frame === 'gableCols') warn('gableCols')
+  if (spec.frame === 'truss') {
+    if (spec.code !== 'TW') block('trussCode')
+    else warn('truss')
+    const d = spec.trussDepth ?? defaultTrussDepth(spec.span)
+    if (!(d >= 0.5 && d <= spec.eaveHeight - 2)) block('trussDepth')
+    if (f.crane) block('craneInterior') // 하현재 아래 크레인 — 현재 크레인 경로는 기둥 브래킷 기준, 트러스 미검토
+  }
   if (spec.frame === 'mono') {
     if (spec.eaveHeight <= LIMITS.eave && G.ridgeZ > LIMITS.eave) block('eaveHigh', r2(G.ridgeZ))
     if (spec.code === 'TW') warn('monoTW')

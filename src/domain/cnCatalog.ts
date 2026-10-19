@@ -355,4 +355,4 @@ const CC: readonly string[] = [
 // Rolled H sections are also valid secondary members when the available CC
 // database has no section satisfying the local wind / stability checks.
 const SECONDARY = [...CC, ...H.filter((s) => +s.split(' ')[1].split('x')[0] <= 400)]
-export const CN_CATALOG: Record<ElementRole, readonly string[]> = { column:H, rafter:H, strut:H, post:H, purlin:SECONDARY, girt:SECONDARY, brace:P }
+export const CN_CATALOG: Record<ElementRole, readonly string[]> = { column:H, rafter:H, strut:H, post:H, purlin:SECONDARY, girt:SECONDARY, brace:P, chord:[], web:[] }

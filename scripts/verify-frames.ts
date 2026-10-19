@@ -223,4 +223,61 @@ for (const base of [DEFAULT_SPEC, CN_DEFAULT_SPEC]) {
   }
 }
 
+/* ── 트러스 지붕 (TW, v2.4.9): 하현재·Pratt 웨브, TRUSS 요소, 평형, 설계 경로, 접합 게이트, 적용범위 ── */
+{
+  const { withTrussDefaults, defaultTrussDepth } = await import('../src/domain/types')
+  const { krSynthetic } = await import('./kr-synth')
+  const { runDesign } = await import('../src/domain/design')
+  const { runConnections } = await import('../src/domain/connections')
+  const { quantities } = await import('../src/domain/quantities')
+  const { buildDxf, buildDrawingSvgs } = await import('../src/drawing/drawings')
+  const { proposeSections } = await import('../src/domain/optimize')
+  const spec = withTrussDefaults({ ...structuredClone(DEFAULT_SPEC), span: 30, frame: 'truss' as const })
+  const G = portalGeometry(spec), model = buildPortal(spec), node = new Map(model.nodes.map((p) => [p.id, p]))
+  const d = defaultTrussDepth(30)
+  ok(d === 1.5 && G.truss?.depth === 1.5 && Math.abs(G.truss.zb - (spec.eaveHeight - 1.5)) < 1e-12, 'truss: depth span/20 = 1.5 m, zb = eave − 1.5')
+  const ys = [...new Set(model.nodes.map((p) => +p.y.toFixed(4)))].sort((a, b) => a - b), inner = ys.slice(1, -1)
+  const chords = model.elements.filter((e) => e.role === 'chord'), webs = model.elements.filter((e) => e.role === 'web')
+  const panels = G.xs.length - 1
+  ok(chords.length === panels * inner.length && chords.every((e) => node.get(e.n1)!.z === G.truss!.zb && node.get(e.n2)!.z === G.truss!.zb), `truss: bottom chord ${panels} panels × ${inner.length} interior frames at zb`)
+  ok(webs.length === (panels - 1 + panels) * inner.length, 'truss: verticals at interior panel points + one Pratt diagonal per panel')
+  ok(!chords.some((e) => [ys[0], ys.at(-1)].includes(+node.get(e.n1)!.y.toFixed(4))), 'truss: gable frames keep rafter + posts (no chord)')
+  /* Pratt: 경사재는 지지점 쪽 상현 → 중앙 쪽 하현 */
+  const mid = spec.span / 2
+  const diag = webs.filter((e) => node.get(e.n1)!.x !== node.get(e.n2)!.x)
+  ok(diag.every((e) => { const a = node.get(e.n1)!, b = node.get(e.n2)!; return a.z > b.z && Math.abs(b.x - mid) < Math.abs(a.x - mid) }), 'truss: Pratt diagonals top-outer → bottom-inner')
+  /* 기둥에 zb 절점, 모든 절점 연결 */
+  ok(model.elements.filter((e) => e.role === 'column' && inner.includes(+node.get(e.n1)!.y.toFixed(4))).some((e) => Math.abs(node.get(e.n2)!.z - G.truss!.zb) < 1e-9), 'truss: column node at bottom-chord level')
+  const deg = new Map<number, number>(); for (const e of model.elements) for (const k of [e.n1, e.n2]) deg.set(k, (deg.get(k) ?? 0) + 1)
+  ok(model.nodes.every((p) => p.z === 0 || (deg.get(p.id) ?? 0) >= 2), 'truss: no dangling node')
+  const gp = buildGenPayloads(spec, model)
+  ok(webs.every((e) => (gp.ELEM[e.id] as any).TYPE === 'TRUSS') && chords.every((e) => (gp.ELEM[e.id] as any).TYPE === 'BEAM'), 'Gen: webs TRUSS, chords BEAM')
+  ok(Object.values(gp.SECT as Record<string, any>).filter((x) => x.SECT_NAME === spec.sections.web!.replace(/ /g, '')).every((x) => x.SECT_BEFORE.USE_WARPING_EFFECT === false), 'Gen: web section without warping DOF (TRUSS)')
+  const loads = buildLoadPayloads(spec, model), tot = totals(spec, model, loads)
+  near(-tot.LR[2], loads.info.roofLive * spec.span * spec.bays * spec.baySpacing, 1e-9, 'truss: LR total = q·B·L (roof on top chord)')
+  const plain = { ...structuredClone(DEFAULT_SPEC), span: 30 }
+  ok(JSON.stringify(loads.info.wind.cases) === JSON.stringify(buildLoadPayloads(plain, buildPortal(plain)).info.wind.cases), 'truss: same wind cases as the gable of the same width')
+  /* 설계·접합·물량·도면 */
+  const syn = krSynthetic(spec), des = runDesign(spec, syn.model, syn.loads.info, syn.results)
+  const dm = (r: string) => des.members.filter((m) => m.role === r)
+  ok(dm('chord').length === chords.length && dm('web').length === webs.length && dm('web').every((m) => m.part === -1), 'design: chords (beam-column) and webs (axial) checked')
+  ok(dm('chord').every((m) => m.lengths.KLy === 3 * m.lengths.KLx), 'design: bottom chord out-of-plane = 3 panels (assumed)')
+  const topEls = dm('rafter').filter((m) => inner.includes(+node.get(syn.model.elements.find((e) => e.id === m.id)!.n1)!.y.toFixed(4)))
+  ok(topEls.length > 0 && topEls.every((m) => m.lengths.KLx < 3000), 'design: top chord KLx = panel length on truss frames')
+  const cs = runConnections(spec, syn.model, syn.loads.info, syn.results)
+  ok(!cs.some((c) => c.type === 'knee' || c.type === 'apex') && cs.some((c) => c.type === 'base'), 'connections: no end-plate knee/apex on truss frames')
+  const q = quantities(spec, syn.model, cs)
+  ok(q.members.some((r: any) => r.role === 'chord') && q.members.some((r: any) => r.role === 'web'), 'quantities: chord and web rows')
+  const dxf = buildDxf({ spec, model: syn.model, connections: cs, title: 't' }), svgs = buildDrawingSvgs({ spec, model: syn.model, connections: cs, title: 't' })
+  ok(dxf.includes('CHORD') && dxf.includes('WEB') && svgs.length > 0, 'drawings: DXF layers CHORD/WEB, SVG sheets')
+  const prop = proposeSections(spec, syn.model, syn.loads.info, syn.results, des)
+  ok(prop.rows.some((r) => r.role === 'chord') && prop.rows.some((r) => r.role === 'web') && prop.rows.some((r) => r.role === 'column'), 'optimizer sizes chord/web/column on truss frames')
+  /* 적용범위·입력 */
+  ok(checkScope(spec).issues.some((i) => i.key === 'truss' && i.level === 'warn') && !checkScope(spec).blocked, 'scope: truss warning (TW)')
+  ok(checkScope({ ...withTrussDefaults({ ...structuredClone(CN_DEFAULT_SPEC), frame: 'truss' as const }) }).issues.some((i) => i.key === 'trussCode' && i.level === 'block'), 'scope: truss blocked outside TW')
+  ok(checkScope({ ...spec, trussDepth: spec.eaveHeight - 1 }).issues.some((i) => i.key === 'trussDepth'), 'scope: truss depth too large blocked')
+  const sp2 = toSpec(DEFAULT_SPEC, { ...initVals(DEFAULT_SPEC), frame: 'truss' }, false)
+  ok(sp2.frame === 'truss' && !!sp2.sections.chord && !!sp2.sections.web && sp2.trussDepth === defaultTrussDepth(DEFAULT_SPEC.span), 'card → truss with default chord/web/depth')
+}
+
 console.log(`Frames: ${n} checks passed (mono-slope + multi-span + TW 表2.8: geometry, releases, loads, wind, snow, scope, quantities, inputs)`)

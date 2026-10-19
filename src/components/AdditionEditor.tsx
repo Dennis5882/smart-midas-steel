@@ -10,6 +10,7 @@ import { sectionCatalogOptions } from '../domain/sectionCatalog'
 import { additionPartForPath, type AdditionPart } from './modelingFlow'
 import {craneInputIssues,type CraneInputIssue} from '../domain/craneInput'
 import {craneTravel} from '../domain/craneTravel'
+import { isTwUse, TW_USES, twUseLive, twUseMassMin, twUseSource } from '../codes/twOccupancy'
 
 function craneIssueText(issue:CraneInputIssue,spec:FactorySpec):string {
   const key=issue.field.replace(/^(runway|travel)\./,''),label=key==='confirmed'?t(issue.field.startsWith('runway.')?'add_runway':'ms_crane'):(issue.field.startsWith('runway.')?t('add_runway')+' · ':'')+t((key==='section'?'add_beamSection':key==='configuration'?'add_crane':`add_${key}`) as I18nKey)
@@ -125,6 +126,11 @@ export function AdditionEditor({spec, value, onChange, disabled, attempted = fal
       </div></fieldset>
     })()}
     {show('platform') && spec.features?.mezzanine && p && <fieldset id={`${idPrefix??id}.platform`} tabIndex={-1} disabled={disabled}><legend>{t('add_platform')}</legend><p className="mw-note">{t('add_platform_note')}</p><div className="pe-grid">
+      {spec.code === 'TW' && <div className="pe-f pe-full"><label htmlFor={`${id}-use`}>{t('add_use')}</label><select id={`${id}-use`} value={p.use ?? ''} onChange={(e)=>{
+        const u=e.target.value
+        if(!isTwUse(u)){const {use:_,...rest}=p;update({...a,platform:{...rest,confirmed:false}});return}
+        update({...a,platform:{...p,use:u,live:Math.max(p.live,twUseLive(u)),liveMassFraction:Math.max(p.liveMassFraction,twUseMassMin(u)),source:p.source.trim()?p.source:twUseSource(u),confirmed:false}})
+      }}><option value="">{t('tw_use_none')}</option>{TW_USES.map((u)=><option key={u} value={u}>{t(`tw_use_${u}`)}</option>)}</select><small className="mw-note">{p.use ? twUseSource(p.use) : t('tw_use_note')}</small></div>}
       {(['elevation','x0','x1','firstBay','lastBay','beamSpacing','beamSection','columnSection','dead','live','liveMassFraction','deflectionDivisor'] as const).map((k)=>input(/Bay$/.test(k)?{...p,[k]:p[k as 'firstBay'|'lastBay']+1}:p,k,(v)=>update({...a,platform:{...p,[k]:/Bay$/.test(k)?v-1:v,confirmed:false}}),['elevation','x0','x1','beamSpacing'].includes(k)?'m':['dead','live'].includes(k)?'kN/m²':''))}
       {confirm(p,(patch)=>update({...a,platform:{...p,...patch}}))}
     </div></fieldset>}

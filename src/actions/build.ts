@@ -125,6 +125,7 @@ function clearBuilt(): void {
   S.genChanged = 0
   S.analyzed = false
   S.reactions = null
+  S.baseReactions = null
   S.results = null
   S.design = null
   S.connections = null

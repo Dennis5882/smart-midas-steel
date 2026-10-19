@@ -19,6 +19,8 @@ export interface CCDemand {
   f: { P: number; Mx: number; My: number; V: number }
   /** 압축 플랜지가 외장재에 구속 */
   braced: boolean
+  /** TW ASD 2.2 조합 수요 (spec.asd) — LRFD 검토에는 쓰지 않음 */
+  asd?: true
 }
 export interface CCLoad { zone: CCZone | string; A: number; pPos: number; pNeg: number; demands: CCDemand[] }
 
@@ -74,7 +76,13 @@ export function ccLoads(spec: FactorySpec, model: FactoryModel, info: LoadInfo):
     const wNeg = 0.9 * wD + 1.6 * pNeg * trib
     out.set(e.id, {
       zone, A, pPos, pNeg,
-      demands: [mk(`C&C+ z${zone} 2.2-3`, wPos, true), mk(`C&C− z${zone} 2.2-6`, wNeg, wNeg > 0)],
+      demands: [mk(`C&C+ z${zone} 2.2-3`, wPos, true), mk(`C&C− z${zone} 2.2-6`, wNeg, wNeg > 0),
+        /* ASD 2.2-2 D+0.75(L+1.25W) · 2.2-4 0.7D+1.25W — 약축 자중은 계수 1.0 */
+        ...(spec.asd ? (() => {
+          const wPa = wD + 0.75 * wL + 0.9375 * pPos * trib, wNa = 0.7 * wD + 1.25 * pNeg * trib
+          const a = (combo: string, w: number, braced: boolean): CCDemand => ({ ...mk(combo, w, braced), f: { ...mk(combo, w, braced).f, My: My / 1.2 }, asd: true })
+          return [a(`C&C+ z${zone} ASD 2.2-2`, wPa, true), a(`C&C− z${zone} ASD 2.2-4`, wNa, wNa > 0)]
+        })() : [])],
     })
   }
   return out

@@ -1,6 +1,6 @@
 /* 대만(TW) 라이브 회귀 — live-cn.ts 와 같은 방식. MAPI-Key 는 표준입력으로 받아 메모리에만 둔다(파일·인자 금지).
    현재 Gen 문서를 자동 저장한 뒤 새 모델을 만든다 → 시험용 Gen 세션에서 실행.
-   실행: node --import tsx scripts/live-tw.ts [--optimize] [--frame mono|multi|gableCols] [--out <경로 접두사>]
+   실행: node --import tsx scripts/live-tw.ts [--optimize] [--frame mono|multi|gableCols|truss] [--span m] [--out <경로 접두사>]
    출력: <out>.html (계산서) · .dxf · -summary.json (스펙·반력·검토·접합·최적화 — 계산서 재생성용) */
 import { readMapiKey } from './mapi-key'
 import { blockedMembers } from '../src/domain/validity'
@@ -11,7 +11,7 @@ import { join } from 'node:path'
 let key = await readMapiKey()
 ;(globalThis as any).document = { documentElement: { lang: 'ko', dataset: {} } }
 const { S } = await import('../src/state/store')
-const { DEFAULT_SPEC, normalizeSpans } = await import('../src/domain/types')
+const { DEFAULT_SPEC, normalizeSpans, withTrussDefaults } = await import('../src/domain/types')
 const { sendModel } = await import('../src/actions/build')
 const { analyzeCore } = await import('../src/actions/analysis')
 const { fetchResults } = await import('../src/actions/results')
@@ -30,7 +30,7 @@ const t0 = Date.now()
 const sec = () => `${((Date.now() - t0) / 1000).toFixed(0)}s`
 try {
   const fr = arg('--frame')
-  const spec = normalizeSpans({ ...structuredClone(DEFAULT_SPEC), ...(fr === 'mono' ? { frame: 'mono' as const } : fr === 'multi' || fr === 'gableCols' ? { frame: fr as 'multi' | 'gableCols', spanList: process.argv.includes('--spans') ? process.argv[process.argv.indexOf('--spans') + 1].split(',').map(Number) : [24, 24] } : {}) })
+  const spec = withTrussDefaults(normalizeSpans({ ...structuredClone(DEFAULT_SPEC), ...(process.argv.includes('--span') ? { span: +process.argv[process.argv.indexOf('--span') + 1] } : {}), ...(fr === 'truss' ? { frame: 'truss' as const } : fr === 'mono' ? { frame: 'mono' as const } : fr === 'multi' || fr === 'gableCols' ? { frame: fr as 'multi' | 'gableCols', spanList: process.argv.includes('--spans') ? process.argv[process.argv.indexOf('--spans') + 1].split(',').map(Number) : [24, 24] } : {}) }))
   if (checkScope(spec).blocked) throw new Error('sample spec is out of scope')
   await sendModel(spec)
   console.log(`[${sec()}] TW model sent: nodes ${S.built!.model.nodes.length}, elems ${S.built!.model.elements.length}, cases ${S.built!.cases.length}, combos ${S.built!.combos}`)

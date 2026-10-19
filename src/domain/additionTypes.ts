@@ -25,6 +25,8 @@ export interface PlatformOptions {
   beamSection: string; columnSection: string; dead: number; live: number; liveMassFraction: number
   source: string; confirmed: boolean
   deflectionDivisor: number
+  /** TW 廠房用途 (建築技術規則 構造編 第17條) — 활하중·지진 질량 비율의 하한 */
+  use?: import('../codes/twOccupancy').TwUse
 }
 export interface AdditionFactors {
   dead: number; live: number; accompanyingLive: number; crane: number

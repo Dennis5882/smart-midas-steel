@@ -8,7 +8,7 @@ import { CPI_KEYS, SITES_KR, REGIONS_KR } from '../codes/krLateral'
 import { sectionProps } from '../domain/sections'
 import { portalGeometry } from '../domain/portal'
 import { LIMITS } from '../domain/scope'
-import { baySpans, columnSpans, FRAME_TYPES, frameSpans, hasInteriorColumns, normalizeBays, normalizeSpans, type FactorySpec, type FrameType } from '../domain/types'
+import { baySpans, columnSpans, FRAME_TYPES, frameSpans, hasInteriorColumns, normalizeBays, normalizeSpans, type FactorySpec, type FrameType, defaultTrussDepth, TRUSS_DEFAULTS, withTrussDefaults } from '../domain/types'
 import { t, type I18nKey } from '../i18n'
 import { ADDITIONS_STEP, BAYS_STEP, LOADS_STEP, SECTIONS_STEP } from './modelingFlow'
 
@@ -53,7 +53,7 @@ export function numericStep(f: Field): number {
 
 export const GROUPS: Group[] = [
   { title: 'sec_geometry', fields: [
-    { path: 'frame', label: 'f_frame', kind: 'select', options: () => FRAME_TYPES.map((v) => ({ value: v, label: t(`frame_${v}`) })) },
+    { path: 'frame', label: 'f_frame', kind: 'select', options: (sp) => FRAME_TYPES.filter((v) => v !== 'truss' || sp.code === 'TW').map((v) => ({ value: v, label: t(`frame_${v}`) })) },
     { path: 'span', label: 'f_span', unit: 'm', kind: 'num' },
     { path: 'eaveHeight', label: 'f_eave', unit: 'm', kind: 'num' },
     { path: 'bays', label: 'f_bays', kind: 'int' },
@@ -70,6 +70,8 @@ export const GROUPS: Group[] = [
   { title: 'sec_sections', fields: [
     { path: 'material', label: 'f_material', kind: 'select', options: (sp) =>
       Object.keys(profileOf(sp.code).materials).map((m) => ({ value: m, label: m })) },
+    /* TW 容許應力 ASD 검토 추가 (LRFD 와 둘 다) — codes/twAsd */
+    { path: 'asd', label: 'f_asd', kind: 'select', fallback: 'false', options: () => [{ value: 'false', label: t('asd_off') }, { value: 'true', label: t('asd_on') }] },
     { path: 'sections.column', label: 'f_column', kind: 'text' },
     { path: 'sections.rafter', label: 'f_rafter', kind: 'text' },
     { path: 'sections.purlin', label: 'f_purlin', kind: 'text' },
@@ -163,6 +165,9 @@ export const KR_GROUPS: Group[] = [
 const BAY_LIST: Field = { path: 'bayList', label: 'f_bayList', unit: 'm', kind: 'list', full: true }
 /** 다경간: 스팬 한 칸 대신 경간별 폭 목록 (합계 = 전체 폭) */
 const SPAN_LIST: Field = { path: 'spanList', label: 'f_spanList', unit: 'm', kind: 'list', full: true }
+/** 트러스 지붕: 처마 춤 + 하현재·웨브 단면 */
+const trussGroups = (g: Group): Group => g.title === 'sec_geometry' ? { ...g, fields: g.fields.flatMap((f) => (f.path === 'roofSlope' ? [f, { path: 'trussDepth', label: 'f_trussDepth', unit: 'm', kind: 'num' } as Field] : [f])) }
+  : g.title === 'sec_sections' ? { ...g, fields: g.fields.flatMap((f) => (f.path === 'sections.rafter' ? [f, { path: 'sections.chord', label: 'f_chord', kind: 'text', fallback: TRUSS_DEFAULTS.chord } as Field, { path: 'sections.web', label: 'f_web', kind: 'text', fallback: TRUSS_DEFAULTS.web } as Field] : [f])) } : g
 const multiGeometry = (g: Group): Group => g.title !== 'sec_geometry' ? g
   : { ...g, fields: g.fields.flatMap((f) => (f.path === 'span' ? [SPAN_LIST] : [f])) }
 /** 개별 간격: 베이 수·공통 간격 대신 베이별 목록 (자유골조와 위저드 공통). */
@@ -173,8 +178,9 @@ export const groupsFor = (code: FactorySpec['code'], free = false, frame?: Frame
     : code === 'KR' ? [...GROUPS.filter((g) => !['sec_wind', 'sec_seismic', 'sec_conn'].includes(g.title)), ...KR_GROUPS] : GROUPS)
     .map((g) => individual ? individualGeometry(g) : g)
     .map((g) => frame === 'multi' || frame === 'gableCols' ? multiGeometry(g) : g)
+    .map((g) => frame === 'truss' ? trussGroups(g) : g)
     .map((g) => code === 'CN' ? { ...g, fields: g.fields.filter((f) => f.path !== 'restraints.braceCrossing') } : g)
-export const FIELDS = [...GROUPS, ...CN_GROUPS, ...KR_GROUPS].flatMap((g) => g.fields)
+export const FIELDS = [...GROUPS.map(trussGroups), ...CN_GROUPS, ...KR_GROUPS].flatMap((g) => g.fields)
 export const parseList = (raw: string) => raw.split(/[,，、\s]+/).filter(Boolean).map(Number)
 
 export const getPath = (o: any, p: Path): unknown => p.split('.').reduce((a, k) => a?.[k], o)
@@ -193,6 +199,7 @@ export function toSpec(base: FactorySpec, vals: Record<Path, string>, free: bool
     if ((f.path.startsWith('restraints.') || f.path === 'siteBasis') && raw === 'assumed' && getPath(base, f.path) === undefined) continue
     /* 근단층 거리는 鄉鎮이 바뀌면 비워진다 — 빈 값도 그대로 반영해 이전 鄉鎮 거리가 남지 않게 */
     if (f.path === 'seismic.nearFault') { sp = setPath(sp, f.path, raw?.trim() ? raw.trim() : undefined); continue }
+    if (f.path === 'asd') { sp = setPath(sp, f.path, raw === 'true' ? true : undefined); continue }
     if (f.kind === 'list') {
       const l = parseList(raw)
       if (!listError(raw, f.path === 'bayList' && individual && !free)) sp = setPath(sp, f.path, l)
@@ -201,13 +208,14 @@ export function toSpec(base: FactorySpec, vals: Record<Path, string>, free: bool
       if (Number.isFinite(n) && (f.min !== undefined ? n >= f.min : n > 0)) sp = setPath(sp, f.path, n)
     } else if (raw.trim()) sp = setPath(sp, f.path, f.numeric ? +raw : raw.trim())
   }
-  return normalizeSpans(normalizeBays(sp))
+  return withTrussDefaults(normalizeSpans(normalizeBays(sp)))
 }
 
 export const initVals = (sp: FactorySpec): Record<Path, string> => ({
   ...Object.fromEntries(FIELDS.map((f) => [f.path, String(getPath(sp, f.path) ?? f.fallback ?? '')])),
   bayList: baySpans(sp).join(', '),
   frame: sp.frame ?? 'gable',
+  trussDepth: String(sp.trussDepth ?? defaultTrussDepth(sp.span)),
   /* 다경간으로 바꾸면 처음엔 지금 스팬 두 개 */
   spanList: (sp.spanList ?? [sp.span, sp.span]).join(', '),
 })

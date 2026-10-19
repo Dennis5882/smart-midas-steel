@@ -1,3 +1,4 @@
+import { defaultFootingInput } from '../domain/twFoundation'
 /* ════════════════════════════════════════════════════════════
    STATE — story 프로젝트와 같은 mutable store.
    액션은 S 를 직접 변경한 뒤 notify() — React 는 useStore() 로 구독(version 기반 재렌더).
@@ -101,6 +102,10 @@ export function freshWorkState() {
     built: null as Built | null,
     analyzed: false,
     reactions: null as ReactionSum[] | null,
+    /** 지점별 케이스 반력 — 기초 예비검토 (TW) */
+    baseReactions: null as import('../domain/twFoundation').BaseReactions | null,
+    /** 기초 예비검토 입력 — Gen 재해석 없이 결과 탭에서 바로 재계산 */
+    footingInput: defaultFootingInput(),
     results: null as Results | null,
     design: null as DesignResult | null,
     connections: null as ConnResult[] | null,

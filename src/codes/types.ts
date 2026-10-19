@@ -23,7 +23,8 @@ export interface SteelMaterial {
 export type LoadCaseType = 'D' | 'L' | 'W' | 'E' | 'S'
 
 /** 조합 용도 — basic: 일반 강도 검토 / amplified: 내진 특별 규정의 증폭 지진력 E′ 조합 / gravity: 용량 설계용 중력 조합 */
-export type ComboKind = 'basic' | 'amplified' | 'gravity'
+/** asd = TW 容許應力 2.2 조합 (spec.asd) — ASD 부재 검토 전용, LRFD 검토·접합에는 쓰지 않음 */
+export type ComboKind = 'basic' | 'amplified' | 'gravity' | 'asd'
 
 /** terms: [하중케이스 종류, 계수]. 풍·지진은 ± 방향 별도 조합으로 전개 */
 export interface Combo {

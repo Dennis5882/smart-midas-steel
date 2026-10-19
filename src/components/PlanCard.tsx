@@ -244,7 +244,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
       const basic = filtered.fields.filter((f) => !advanced.includes(f))
       return <section className="mw-group" key={g.title}>
         {basic.length > 0 && <><h4>{t(g.title)}</h4>
-          {step === 1 && g.title === 'sec_geometry' && <FrameTypePicker value={spec.frame ?? 'gable'} disabled={!live || s.busy} onChange={(frame) => set('frame', frame)} />}
+          {step === 1 && g.title === 'sec_geometry' && <FrameTypePicker code={spec.code} value={spec.frame ?? 'gable'} disabled={!live || s.busy} onChange={(frame) => set('frame', frame)} />}
           {fields({ ...g, fields: basic })}</>}
         {advanced.length > 0 && <details className="mw-advanced" open={attempted && advanced.some((f) => errors.includes(f)) || undefined}>
           <summary>{t(advancedTitleKey(g.title, step))}<span>{t('mw_advanced')}</span></summary>

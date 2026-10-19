@@ -206,5 +206,50 @@ eq(now.conns, G.conns, 'connection dims and per-item ratios')
   n += 8
 }
 
+/* ── TW 강재 목록 (v2.4.9): Gen 표준·DB 이름, 두께별 Fy, 적용범위 경고 ── */
+{
+  const { TW } = await import('../src/codes/tw')
+  const { checkScope } = await import('../src/domain/scope')
+  const want: Record<string, [string, string, number, number]> = {
+    SN400B: ['CNS(S)', 'SN400', 235, 400], SN490B: ['CNS(S)', 'SN490', 325, 490], SM490A: ['CNS(S)', 'SM490', 325, 490],
+    SM400A: ['CNS(S)', 'SM400', 235, 400], SM490YA: ['CNS(S)', 'SM490Y', 355, 490], SM520B: ['CNS(S)', 'SM520', 355, 520], SS400: ['CNS(S)', 'SS400', 235, 400],
+    A36: ['ASTM(S)', 'A36', 250, 400], A572Gr50: ['ASTM(S)', 'A572-50', 345, 450], A992: ['ASTM(S)', 'A992', 345, 450],
+  }
+  assert.deepEqual(Object.keys(TW.materials).sort(), Object.keys(want).sort())
+  for (const [m, [std, db, fy, fu]] of Object.entries(want)) {
+    const p = TW.materials[m]
+    assert.ok(p.gen.standard === std && p.gen.db === db && p.fy === fy && p.fu === fu, `${m} Gen ${std} ${db}, fy ${fy}, fu ${fu}`)
+    assert.ok(TW.fyAt!(m, 20) === fy || (m === 'SM490A' && TW.fyAt!(m, 20) === 315), `${m} fyAt(20 mm)`)
+  }
+  assert.equal(TW.fyAt!('SS400', 10), 245); assert.equal(TW.fyAt!('SM490YA', 60), 335); assert.equal(TW.fyAt!('A36', 60), 250)
+  const keys = (m: string) => checkScope({ ...structuredClone(DEFAULT_SPEC), material: m }).issues.map((i) => i.key)
+  assert.ok(keys('SS400').includes('twMatSS') && !keys('SS400').includes('twMatImported'), 'SS400 → 13.2.1 warning')
+  assert.ok(['A36', 'A572Gr50', 'A992'].every((m) => keys(m).includes('twMatImported')), 'ASTM → 3.1.2 warning')
+  assert.ok(['SN400B', 'SM400A', 'SM520B'].every((m) => !keys(m).some((k) => k.startsWith('twMat'))), 'CNS SN/SM → no material warning')
+  n += 17
+}
+
+/* ── 廠房用途 → 바닥 활하중 (建築技術規則 構造編 第17條) · 판본 표기 ── */
+{
+  const { twUseLive, twUseMassMin, twUseIssue, twUseSource } = await import('../src/codes/twOccupancy')
+  const { additionErrors, defaultAdditions, defaultPlatform } = await import('../src/domain/additions')
+  const { profileOf } = await import('../src/codes')
+  const { zhTW } = await import('../src/i18n/dict/zh-TW')
+  assert.ok(Math.abs(twUseLive('C2') - 4.903325) < 1e-12 && Math.abs(twUseLive('C1') - 4.903325) < 1e-12 && Math.abs(twUseLive('warehouse') - 5.88399) < 1e-12, 'Art.17 C-1/C-2 500, warehouse 600 kgf/m²')
+  assert.equal(twUseMassMin('warehouse'), 0.25); assert.equal(twUseMassMin('C2'), 0)
+  assert.ok(twUseSource('warehouse').includes('第17條') && twUseSource('warehouse').includes('1/4'))
+  const base = { ...structuredClone(DEFAULT_SPEC), features: { crane: false, mezzanine: true, multiSpan: false, opening: false } }
+  const plat = (o: object) => ({ ...base, additions: { ...defaultAdditions(base), platform: { ...defaultPlatform(base), ...o } } })
+  const keys = (sp: any) => additionErrors(sp, false).map((e) => e.key)
+  assert.ok(!keys(plat({})).some((k) => k.startsWith('add_tw_use')), 'no use → no Art.17 check')
+  assert.ok(keys(plat({ use: 'C2', live: 2 })).includes('add_tw_use_live'), 'C-2 with 2 kN/m² → below table')
+  assert.ok(!keys(plat({ use: 'C2', live: twUseLive('C2') })).some((k) => k.startsWith('add_tw_use')), 'C-2 at table value ok')
+  assert.ok(keys(plat({ use: 'warehouse', live: 6, liveMassFraction: 0.1 })).includes('add_tw_use_mass'), 'warehouse mass < 1/4')
+  assert.equal(twUseIssue({ use: 'warehouse', live: 6, liveMassFraction: 0.25 }), undefined)
+  assert.ok(!keys({ ...plat({ use: 'C2', live: 2 }), code: 'CN' as const }).some((k) => k.startsWith('add_tw_use')), 'use ignored outside TW')
+  assert.ok(String((zhTW as any)[profileOf('TW').basisLabelKey!]).includes('99年') && String(zhTW.rep_code_refs).includes('112年'), 'TW basis edition label')
+  n += 11
+}
+
 console.log(`TW verify: ${n} checks passed (hand ${nHand}, load balance ${nLoad}, golden ${n - nHand - nLoad} incl. ${now.members.length} members)`)
 console.log(`  fixture ${fx.captured.slice(0, 10)} · max ${G.summary.maxRatio} · NG ${G.summary.ng} · conns ${G.summary.conns.map((c) => `${c.type} ${c.ratio.toFixed(3)}`).join(', ')}`)

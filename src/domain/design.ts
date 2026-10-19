@@ -14,6 +14,7 @@ import { factoryOnly } from './additions'
 import { profileOf } from '../codes'
 import { runCnDesign } from './cnDesign'
 import { KR_DEFL, krPurlinDefl, runKrDesign } from './krDesign'
+import { asdCb, asdCheck, cfAsdScale } from '../codes/twAsd'
 import { b1Of, b2Of, capacity, cbOf, check, kSway, SLENDER_LIMIT, type Capacity, type CheckResult } from '../codes/twSteel'
 import type { Results } from '../actions/results'
 import type { LoadInfo } from './loads'
@@ -39,7 +40,9 @@ export interface MemberCheck {
   combo: string
   /** 지배 지점 0..4 (I, 1/4, 2/4, 3/4, J), 가새는 -1 */
   part: number
-  eq: CheckResult['eq'] | 'KL/r' | 'C5' | 'C3.3' | `TW CF ${string}` | `GB ${string}` | `KDS ${string}`
+  eq: CheckResult['eq'] | 'KL/r' | 'C5' | 'C3.3' | `TW CF ${string}` | `GB ${string}` | `KDS ${string}` | `ASD ${string}`
+  /** TW ASD 부재 검토 (spec.asd) — 비율이 LRFD 보다 크면 ratio·eq·combo 가 이것으로 */
+  asd?: { ratio: number; combo: string; eq: string; part: number; /** 병합 전 LRFD 비율 (KL/r 제외) */ lrfd: number }
   forces: { P: number; Mx: number; My: number; V: number }
   cap: Pick<Capacity, 'phiPnc' | 'phiPnt' | 'phiMnx' | 'phiMny' | 'phiVn' | 'mxMode' | 'compact' | 'KLr' | 'lambdaC'>
   B: number
@@ -118,17 +121,26 @@ function runFactoryDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
   /* 기둥 면내 K — G_top = (Ic/Lc) / (Ir/Lr), 지붕보 길이 = 처마~처마 경사길이(대칭 횡이동 = 역대칭 곡률), G_bottom = 핀 10 / 고정 1 */
   const col = sectionProps(spec.sections.column, spec.code), raf = sectionProps(spec.sections.rafter, spec.code)
   /* 기둥 열마다 높이 h = 그 열 처마 높이 (편경사는 좌우 다름, 박공은 같음) */
-  const Kcol = (h: number) => kSway((col.Ix / h) / (raf.Ix / G.rafterLen), spec.baseFixity === 'fixed' ? 1 : 10)
-  const KcolAt = new Map(G.eaveXs.map((x) => [x, Kcol(G.zAt(x))]))
+  /* 트러스 지붕: 기둥 상단은 트러스(춤 d)에 강접 — G_top = 0.1(매우 강함), 기둥 길이 = 기초 ~ 하현재 zb */
+  const Kcol = (h: number) => kSway(G.truss ? 0.1 : (col.Ix / h) / (raf.Ix / G.rafterLen), spec.baseFixity === 'fixed' ? 1 : 10)
+  const colH = (x: number) => (G.truss ? G.truss.zb : G.zAt(x))
+  const KcolAt = new Map(G.eaveXs.map((x) => [x, Kcol(colH(x))]))
   const Lsec = (spec.baySpacing / (sagCount(spec) + 1))
 
+  /* 트러스 프레임(하현재가 있는 y) — 박공 프레임 지붕보는 일반 지붕보 */
+  const trussYs = new Set(model.elements.filter((x) => x.role === 'chord').map((x) => +nodes.get(x.n1)!.y.toFixed(4)))
+  const isTrussFrame = (e: { n1: number }) => trussYs.has(+nodes.get(e.n1)!.y.toFixed(4))
   const lengthsOf = (role: ElementRole, Lel: number, e: { n1: number; n2: number; lean?: true }) => {
     const flyL = support(spec, 'flyBraces') === 'none' ? (role === 'rafter' ? G.slopeLen : G.zAt(nodes.get(e.n1)!.x)) : Lel
     const crossL = support(spec, 'braceCrossing') === 'none' ? Lel : Lel / 2
     switch (role) {
       /* 흔들림 기둥(다경간 내부): 양단 핀 → 면내 K = 1, L = 기둥 전체 높이 */
-      case 'column': { const x = nodes.get(e.n1)!.x; return { KLx: mm((e.lean ? 1 : KcolAt.get(x)!) * G.zAt(x)), KLy: mm(flyL), Lb: mm(flyL) } }
-      case 'rafter': return { KLx: mm(G.slopeLen), KLy: mm(flyL), Lb: mm(flyL) }
+      case 'column': { const x = nodes.get(e.n1)!.x; return { KLx: mm((e.lean ? 1 : KcolAt.get(x)!) * (e.lean ? G.zAt(x) : colH(x))), KLy: mm(G.truss ? Math.min(flyL, colH(x)) : flyL), Lb: mm(G.truss ? Math.min(flyL, colH(x)) : flyL) } }
+      /* 트러스 상현재: 패널점 사이(퍼린이 횡지지) */
+      case 'rafter': return G.truss && isTrussFrame(e) ? { KLx: mm(Lel), KLy: mm(Lel), Lb: mm(Lel) } : { KLx: mm(G.slopeLen), KLy: mm(flyL), Lb: mm(flyL) }
+      /* 하현재: 면내 패널, 면외 횡지지 3패널 가정 (scope truss) */
+      case 'chord': return { KLx: mm(Lel), KLy: mm(3 * Lel), Lb: mm(3 * Lel) }
+      case 'web': return { KLx: mm(Lel), KLy: mm(Lel), Lb: mm(Lel) }
       case 'purlin': case 'girt': return { KLx: mm(Lel), KLy: mm(Math.min(Lel, Lsec)), Lb: mm(Math.min(Lel, Lsec)) }
       case 'post': return { KLx: mm(G.zAt(nodes.get(e.n1)!.x)), KLy: mm(flyL), Lb: mm(flyL) }
       case 'brace': return { KLx: mm(crossL), KLy: mm(crossL), Lb: mm(crossL) }
@@ -140,6 +152,13 @@ function runFactoryDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
   const kindOf = (c: string) => info.comboKind?.[c] ?? 'basic'
   const usable = (role: ElementRole, c: string) => kindOf(c) === 'basic' || (role === 'brace' && kindOf(c) === 'amplified')
   let col13: ColumnAxial13 | null = null
+  /* TW ASD 부재 검토 — 'asd' 조합이 있으면 (spec.asd → loads.ts) 부재마다 max(LRFD, ASD) */
+  const asdOn = Object.values(info.comboKind ?? {}).includes('asd')
+  const mergeAsd = (b: MemberCheck, a: Omit<NonNullable<MemberCheck['asd']>, 'lrfd'> & { f?: MemberCheck['forces'] }) => {
+    const { f, ...rest } = a
+    b.asd = { ...rest, lrfd: b.ratio }
+    if (a.ratio > b.ratio) { b.ratio = a.ratio; b.eq = a.eq as MemberCheck['eq']; b.combo = a.combo; b.part = a.part; if (f) b.forces = f }
+  }
 
   const cc = ccLoads(spec, model, info)
   /** 두께별 Fy — 판 두께 max(tf, tw) (프로필 fyAt, 없으면 재료 fy) */
@@ -175,9 +194,25 @@ function runFactoryDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
         consider(combo, i, { P: p.P, Mx: Math.abs(p.My), My: Math.abs(p.Mz) * myScale, V: Math.abs(p.Vz) }, braced)
       }
     }
-    for (const d of cc.get(e.id)?.demands ?? []) consider(d.combo, 2, d.f, d.braced)
+    for (const d of cc.get(e.id)?.demands ?? []) if (!d.asd) consider(d.combo, 2, d.f, d.braced)
     if (!best) return null
     const b = best as MemberCheck
+    if (asdOn) {
+      /* ASD — 冷軋型鋼 1.3.1 허용강도 (LRFD 설계강도 ÷ φΩ), 같은 조합식 */
+      const ca = cfAsdScale(cf)
+      let top: (Omit<NonNullable<MemberCheck['asd']>, 'lrfd'> & { f?: MemberCheck['forces'] }) | undefined
+      const take = (combo: string, part: number, f: MemberCheck['forces'], braced: boolean) => {
+        const r = cfCheck(ca, f, braced)
+        if (!top || r.ratio > top.ratio) top = { ratio: r.ratio, combo, eq: `ASD ${r.eq.replace('TW CF ', 'CF ')}`, part, f }
+      }
+      for (const [combo, pts] of beam ?? []) {
+        if (kindOf(combo) !== 'asd') continue
+        const braced = e.role === 'purlin' && Math.sign(pts[2]?.My ?? 0) === sag
+        pts.forEach((p, i) => take(combo, i, { P: p.P, Mx: Math.abs(p.My), My: Math.abs(p.Mz) * myScale, V: Math.abs(p.Vz) }, braced))
+      }
+      for (const d of cc.get(e.id)?.demands ?? []) if (d.asd) take(d.combo, 2, d.f, d.braced)
+      if (top) mergeAsd(b, top)
+    }
     const slender = maxComp > 1e-3
       ? { value: Math.max(KLx / sp.rx, KLy / sp.ry), limit: SLENDER_LIMIT.compression }
       : { value: Math.max(KLx, KLy) / Math.min(sp.rx, sp.ry), limit: SLENDER_LIMIT.tension }
@@ -188,7 +223,7 @@ function runFactoryDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
   const members: MemberCheck[] = []
   for (const e of model.elements) {
     if (roles && !roles.includes(e.role)) continue
-    if ((e.role === 'purlin' || e.role === 'girt') && sectionProps(e.section, spec.code).kind === 'CC') {
+    if ((e.role === 'purlin' || e.role === 'girt') && ['CC', 'Z'].includes(sectionProps(e.section, spec.code).kind)) {
       const m = coldFormedMember(e, dist(nodes.get(e.n1)!, nodes.get(e.n2)!))
       if (m) members.push(m)
       continue
@@ -212,7 +247,7 @@ function runFactoryDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
       }
     }
 
-    if (e.role === 'brace') {
+    if (e.role === 'brace' || e.role === 'web') {
       for (const [combo, P] of res.truss.get(e.id) ?? []) {
         if (!usable(e.role, combo)) continue
         if (P < 0) maxComp = Math.max(maxComp, -P)
@@ -260,6 +295,25 @@ function runFactoryDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
     }
     if (!best) continue
     const b = best as MemberCheck
+    if (asdOn) {
+      /* ASD 5~8장 — Cm: 골조 기둥·지붕보 0.85(횡이동), 그 밖 양단 핀 + 횡하중 1.0 */
+      const Cm = frame || e.role === 'chord' ? 0.85 : 1, Fy = fyOf(sp)
+      let top: (Omit<NonNullable<MemberCheck['asd']>, 'lrfd'> & { f?: MemberCheck['forces'] }) | undefined
+      const take = (combo: string, part: number, f: MemberCheck['forces'], Cb: number) => {
+        const r = asdCheck(sp, Fy, mat.E, { KLx, KLy, Lb }, Cb, f, Cm)
+        if (!top || r.ratio > top.ratio) top = { ratio: r.ratio, combo, eq: r.eq, part, f }
+      }
+      if (e.role === 'brace' || e.role === 'web') for (const [combo, P] of res.truss.get(e.id) ?? []) { if (kindOf(combo) === 'asd') take(combo, -1, { P, Mx: 0, My: 0, V: 0 }, 1) }
+      else {
+        const myScale = e.role === 'purlin' || e.role === 'girt' ? 1 / (sagCount(spec) + 1) ** 2 : 1
+        for (const [combo, pts] of res.beam.get(e.id) ?? []) {
+          if (kindOf(combo) !== 'asd') continue
+          const Cb = asdCb(pts.map((p) => p.My))
+          pts.forEach((p, i) => take(combo, i, { P: p.P, Mx: Math.abs(p.My), My: Math.abs(p.Mz) * myScale, V: Math.abs(p.Vz) }, Cb))
+        }
+      }
+      if (top) mergeAsd(b, top)
+    }
     /* 4.4 세장비 — 압축이 있으면 200, 인장만이면 300 */
     const r = Math.min(sp.rx, sp.ry)
     const slender = maxComp > 1e-3

@@ -3,6 +3,7 @@
    - TRUSSFORCE: 가새 축력
    - REACTIONG 합계 + DISPLACEMENTG 처마 절점: 조합별 B2 (8.2-5) 산정
    - DISPLACEMENTG 사용 하중(ST): 풍·지진 층간변위각, 지붕 활하중 처짐 */
+import { isAxialRole } from '../domain/types'
 import type { Built } from '../state/store'
 import { mapi } from '../mapi/client'
 import { stage } from './job'
@@ -55,8 +56,8 @@ export async function fetchResults(b: Built): Promise<Results> {
   const combos = b.comboNames
   requireResult(combos.length > 0 && new Set(combos).size === combos.length, 'COMBINATIONS', 'invalid')
   const cb = combos.map((c) => `${c}(CB)`)
-  const beamIds = model.elements.filter((e) => e.role !== 'brace').map((e) => e.id)
-  const trussIds = model.elements.filter((e) => e.role === 'brace').map((e) => e.id)
+  const beamIds = model.elements.filter((e) => !isAxialRole(e.role)).map((e) => e.id)
+  const trussIds = model.elements.filter((e) => isAxialRole(e.role)).map((e) => e.id)
   const { eaves: eaveNodes, tops: columnTops, nodes: svcNodes } = serviceNodes(spec, model)
   const svcCases = b.cases.filter((c) => spec.code === 'CN' || !!b.info.additions || c !== 'D')
   /* 행 검증은 Set 조회 — 배열 includes 는 11만 행 × 410 요소로 화면 스레드에서 수천만 번 비교 */

@@ -10,12 +10,23 @@ import * as L from './twLateral'
 export const TW: CodeProfile = {
   id: 'TW',
   labelKey: 'code_TW',
+  /* 판본: 內政部 法規沿革 GL000143 — 96年6月11日 修正發布, 99年9月16日 13.2 點 修正 (2026-10-19 확인, 통합 개정은 110년 연구 초안 단계) */
+  basisLabelKey: 'code_TW_basis',
   method: 'LRFD',
   /* ⚠ fy·fu 는 CNS 13812/2947 두께 ≤ 40mm 통상값 — KB 에 수치 표가 없어 원문 대조 전 (두께 > 40mm 는 fy 가 낮아짐) */
   materials: {
     SN400B: { fy: 235, fu: 400, E: 200000, nu: 0.3, gamma: 77, gen: { standard: 'CNS(S)', db: 'SN400' } },
     SN490B: { fy: 325, fu: 490, E: 200000, nu: 0.3, gamma: 77, gen: { standard: 'CNS(S)', db: 'SN490' } },
     SM490A: { fy: 325, fu: 490, E: 200000, nu: 0.3, gamma: 77, gen: { standard: 'CNS(S)', db: 'SM490' } },
+    /* v2.4.9 추가 — LRFD 3.2 의 CNS 2947 SM400A·SM490YA·SM520B, CNS 2473 SS400 (용접 주구조·13.2.1 내진 부재 목록 밖 → scope twMatSS),
+       ASTM A36·A572 Gr.50·A992 (3.2 목록 밖 → 3.1.2 검사·13.2.1 동등성, scope twMatImported). Gen DB 이름은 DLL 문자열(ASTM(S) A36·A572-50·A992). */
+    SM400A: { fy: 235, fu: 400, E: 200000, nu: 0.3, gamma: 77, gen: { standard: 'CNS(S)', db: 'SM400' } },
+    SM490YA: { fy: 355, fu: 490, E: 200000, nu: 0.3, gamma: 77, gen: { standard: 'CNS(S)', db: 'SM490Y' } },
+    SM520B: { fy: 355, fu: 520, E: 200000, nu: 0.3, gamma: 77, gen: { standard: 'CNS(S)', db: 'SM520' } },
+    SS400: { fy: 235, fu: 400, E: 200000, nu: 0.3, gamma: 77, gen: { standard: 'CNS(S)', db: 'SS400' } },
+    A36: { fy: 250, fu: 400, E: 200000, nu: 0.3, gamma: 77, gen: { standard: 'ASTM(S)', db: 'A36' } },
+    A572Gr50: { fy: 345, fu: 450, E: 200000, nu: 0.3, gamma: 77, gen: { standard: 'ASTM(S)', db: 'A572-50' } },
+    A992: { fy: 345, fu: 450, E: 200000, nu: 0.3, gamma: 77, gen: { standard: 'ASTM(S)', db: 'A992' } },
   },
   defaultMaterial: 'SN400B',
   /* ⚠ 두께별 Fy — CNS 13812(SN)·2947(SM) = JIS G3136·G3106 통상값 (KB 에 표 없음, 원문 대조 전): SN 은 40 mm 초과 −20 MPa(400)·−30 MPa(490),
@@ -23,6 +34,10 @@ export const TW: CodeProfile = {
   fyAt: (m, t) => {
     const T: Record<string, [number, number][]> = {
       SN400B: [[40, 235], [100, 215]], SN490B: [[40, 325], [100, 295]], SM490A: [[16, 325], [40, 315], [100, 295]],
+      /* JIS G3106·G3101 (= CNS 2947·2473) 두께 구분 통상값, ASTM A6/A36·A572·A992 최소 항복 (원문 대조 전) */
+      SM400A: [[16, 245], [40, 235], [100, 215]], SS400: [[16, 245], [40, 235], [100, 215]],
+      SM490YA: [[16, 365], [40, 355], [75, 335], [100, 325]], SM520B: [[16, 365], [40, 355], [75, 335], [100, 325]],
+      A36: [[200, 250]], A572Gr50: [[100, 345]], A992: [[100, 345]],
     }
     const row = T[m]?.find(([tm]) => t <= tm)
     return row ? row[1] : T[m]?.at(-1)?.[1] ?? 235

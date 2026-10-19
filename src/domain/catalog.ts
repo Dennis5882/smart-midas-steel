@@ -52,4 +52,6 @@ export const PIPE: readonly string[] = [
 /** 역할별 후보 목록 — 프레임·스트럿·풍주 = RH, 퍼린·거트 = CC, 가새 = P */
 export const CATALOG: Record<ElementRole, readonly string[]> = {
   column: RH, rafter: RH, strut: RH, post: RH, purlin: CC, girt: CC, brace: PIPE,
+  /* 트러스 (TW): 하현재 = RH, 웨브 = 원형강관 */
+  chord: RH, web: PIPE,
 }

@@ -94,7 +94,7 @@ function roleLengths(model: FactoryModel): Record<ElementRole, number> {
 export function roleTons(spec: FactorySpec, model: FactoryModel, sections: Sections = spec.sections): Record<ElementRole, number> {
   const L = roleLengths(model)
   const gamma = profileOf(spec.code).materials[spec.material].gamma
-  const out = Object.fromEntries(ROLES.map((r) => [r, (gamma * sectionProps(sections[r], spec.code).A * 1e-6 * L[r]) / 9.80665])) as Record<ElementRole, number>
+  const out = Object.fromEntries(ROLES.map((r) => [r, sections[r] && L[r] > 0 ? (gamma * sectionProps(sections[r]!, spec.code).A * 1e-6 * L[r]) / 9.80665 : 0])) as Record<ElementRole, number>
   const nodes = new Map(model.nodes.map((n) => [n.id,n]))
   for (const e of model.elements.filter((e) => e.addition)) {
     const a = nodes.get(e.n1)!, b = nodes.get(e.n2)!
@@ -144,7 +144,7 @@ export function proposeSections(spec: FactorySpec, model: FactoryModel, info: Lo
     .sort((a, b) => sectionProps(a, spec.code).A - sectionProps(b, spec.code).A)
   const A = (s: string) => sectionProps(s, spec.code).A
   /* 증폭은 현재(해석된) 단면보다 가벼운 후보에만 — 무거운 후보는 부재력이 줄어드는 쪽이고, 현재 부재력에 이미 재분배가 들어 있다 */
-  const tgt = (r: ElementRole, sec: string) => (A(sec) < A(cur[r]) - 1e-6 ? target / Math.max(1, ctl.amp?.[r] ?? 1) : target)
+  const tgt = (r: ElementRole, sec: string) => (A(sec) < A(cur[r]!) - 1e-6 ? target / Math.max(1, ctl.amp?.[r] ?? 1) : target)
   const banned = (c: string, r: string) => (ctl.bans ?? []).some((b) => A(c) <= A(b.column) + 1e-6 && A(r) <= A(b.rafter) + 1e-6)
 
   /** 역할 r 을 sec 로 바꿨을 때 강도 최대비 (세장 H 는 Infinity) */
@@ -162,18 +162,26 @@ export function proposeSections(spec: FactorySpec, model: FactoryModel, info: Lo
   const rows: OptRow[] = []
   const push = (r: ElementRole, after: string, ratio: number, governs: OptRow['governs']) => {
     sections[r] = after
-    rows.push({ role: r, before: cur[r], after, ratio, governs, tBefore: tons(r, cur[r]), tAfter: tons(r, after) })
+    rows.push({ role: r, before: cur[r]!, after, ratio, governs, tBefore: tons(r, cur[r]!), tAfter: tons(r, after) })
   }
 
   /* ── 2차부재: 강도(+ 퍼린 처짐, 가새 종방향 변위) 통과 최경량 ── */
   const sv = design.service
   const driftY = Math.max(svcRatio(sv, 'windDriftY'), svcRatio(sv, 'seisDriftY'))
   const braceA0 = sectionProps(cur.brace, spec.code).A
-  for (const r of present.filter((x) => x !== 'column' && x !== 'rafter')) {
+  /* 트러스 지붕: 문형 라멘 강성식이 맞지 않음 → 기둥·상현재·하현재·웨브도 강도 반복 + 사용성 하한 근사
+     (횡변위 ∝ 1/Ic — 트러스가 기둥보다 훨씬 강함, 지붕 처짐 ∝ 1/A_현재) */
+  const truss = !!portalGeometry(spec).truss
+  const driftXr = Math.max(svcRatio(sv, 'windDriftX'), svcRatio(sv, 'seisDriftX')), deflR = svcRatio(sv, 'rafterDefl')
+  const stiffOK = (r: ElementRole, sec: string) => !truss
+    || (r === 'column' ? sectionProps(sec, spec.code).Ix * target >= sectionProps(cur.column, spec.code).Ix * driftXr
+      : r === 'rafter' || r === 'chord' ? sectionProps(sec, spec.code).A * target >= sectionProps(cur[r]!, spec.code).A * deflR : true)
+  for (const r of present.filter((x) => truss || (x !== 'column' && x !== 'rafter'))) {
     let pick: string | null = null, ratio = 0, governs: OptRow['governs'] = 'strength'
     for (const sec of byArea(r)) {
       const s = strength(r, sec)
       if (s > tgt(r, sec)) continue
+      if (!stiffOK(r, sec)) { governs = 'service'; continue }
       if (r === 'purlin' && purlinDefl(spec, info, sec) / (spec.baySpacing / purlinLimitDiv(spec.code)) > target) { governs = 'service'; continue }
       if (r === 'brace' && (driftY * braceA0) / sectionProps(sec, spec.code).A > target) { governs = 'service'; continue }
       if (spec.code === 'CN' && ((r === 'girt' && cnGirtDeflRatio(spec, info, sec) > target) || (r === 'post' && cnPostDeflRatio(spec, info, sec) > target))) { governs = 'service'; continue }
@@ -181,11 +189,11 @@ export function proposeSections(spec: FactorySpec, model: FactoryModel, info: Lo
       break
     }
     if (pick) push(r, pick, ratio, governs)
-    else push(r, cur[r], strength(r, cur[r]), 'none')
+    else push(r, cur[r]!, strength(r, cur[r]!), 'none')
   }
 
   /* ── 골조: 강도 통과 목록 × 추정 사용성 → 최소 강재량 쌍 ── */
-  if (present.includes('column') && present.includes('rafter')) {
+  if (!truss && present.includes('column') && present.includes('rafter')) {
     const passC = byArea('column').map((s) => ({ s, r: strength('column', s) })).filter((x) => x.r <= tgt('column', x.s))
     const passR = byArea('rafter').map((s) => ({ s, r: strength('rafter', s) })).filter((x) => x.r <= tgt('rafter', x.s))
     const f0 = frameStiff(spec, cur.column, cur.rafter)
@@ -202,7 +210,7 @@ export function proposeSections(spec: FactorySpec, model: FactoryModel, info: Lo
       // Check the available connection layout while choosing the frame pair.
       // A stronger beam alone does not ensure an eight-bolt end plate can pass.
       const candidate = { ...spec, sections: { ...sections, column: c.s, rafter: r.s } }
-      const candidateModel = { ...model, elements: model.elements.map((e) => ({ ...e, section: e.addition ? e.section : candidate.sections[e.role] })) }
+      const candidateModel = { ...model, elements: model.elements.map((e) => ({ ...e, section: e.addition ? e.section : candidate.sections[e.role] ?? e.section })) }
       if (runConnections(candidate, candidateModel, info, res).some((x) => x.type !== 'brace' && x.ratio > 1)) continue
       best = { c, r, t }
     }

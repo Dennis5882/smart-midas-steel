@@ -1,3 +1,4 @@
+import { twUseIssue, twUseKgf } from '../codes/twOccupancy'
 import { profileOf } from '../codes'
 import { portalGeometry } from './portal'
 import { sectionProps } from './sections'
@@ -44,7 +45,7 @@ export function defaultPlatform(s: FactorySpec): PlatformOptions {
 export function bayStations(s: FactorySpec): number[] { return baySpans(s).reduce<number[]>((a, v) => [...a, a[a.length - 1] + v], [0]) }
 const finite = (...v: number[]) => v.every(Number.isFinite)
 const inRange = (n: number, lo: number, hi: number) => Number.isFinite(n) && n >= lo && n <= hi
-export interface AdditionError { path: string; key: 'add_invalid_equipment' | 'add_invalid_crane' | 'add_invalid_platform' | 'add_invalid_factors' | 'add_invalid_opening' | import('./phase6').Phase6Error['key']; name: string }
+export interface AdditionError { path: string; key: 'add_tw_use_live' | 'add_tw_use_mass' | 'add_invalid_equipment' | 'add_invalid_crane' | 'add_invalid_platform' | 'add_invalid_factors' | 'add_invalid_opening' | import('./phase6').Phase6Error['key']; name: string }
 export function additionErrors(s: FactorySpec, requireConfirmation = true): AdditionError[] {
   const out: AdditionError[] = [], a = s.additions, length = bayStations(s).at(-1)!, G = portalGeometry(s)
   const confirmed = (x: { source: string; confirmed: boolean }) => !requireConfirmation || (x.confirmed && !!x.source.trim())
@@ -64,6 +65,8 @@ export function additionErrors(s: FactorySpec, requireConfirmation = true): Addi
   if (s.features?.mezzanine && (!p || !finite(p.elevation, p.x0, p.x1, p.firstBay, p.lastBay, p.beamSpacing, p.dead, p.live, p.liveMassFraction)
     || !(p.elevation > 0 && p.elevation < Math.min(...G.eaveXs.map(G.zAt)) && p.x0 >= 0 && p.x1 <= s.span && p.x1 - p.x0 >= .5 && p.beamSpacing >= .5 && (p.x1 - p.x0) / p.beamSpacing <= 40 && Number.isInteger(p.firstBay) && Number.isInteger(p.lastBay) && p.firstBay >= 0 && p.lastBay <= s.bays && p.lastBay > p.firstBay && p.dead >= 0 && p.live > 0 && inRange(p.liveMassFraction, 0, 1))
     || !(p.deflectionDivisor >= 100 && Number.isFinite(p.deflectionDivisor)) || !sectionsOK || !confirmed(p) || (c && Math.abs(p.elevation - c.elevation) < .5))) out.push({ path: 'platform', key: 'add_invalid_platform', name: p?.id ?? 'platform' })
+  const useIssue = s.code === 'TW' && s.features?.mezzanine && p ? twUseIssue(p) : undefined
+  if (useIssue && p?.use) out.push({ path: 'platform', key: useIssue === 'live' ? 'add_tw_use_live' : 'add_tw_use_mass', name: `${twUseKgf(p.use)} kgf/m²` })
   if ((c || p || a?.link?.mode==='sliding') && (!a || ![a.factors.dead, a.factors.live, a.factors.accompanyingLive, a.factors.crane].every((v) => finite(v) && v >= 0 && v <= 3) || a.factors.dead < 1 || a.factors.live < 1 || (c && a.factors.crane < 1) || !confirmed(a.factors))) out.push({ path: 'factors', key: 'add_invalid_factors', name: '' })
   const o=activeOpening(s)
   if(s.features?.opening) {

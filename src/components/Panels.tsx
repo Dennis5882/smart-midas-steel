@@ -12,6 +12,7 @@ import { dimValue } from '../report/dims'
 import { StaleBanner } from './StaleBanner'
 import { selectTask } from '../state/ui'
 import { MemberTable, SummaryCards } from './MemberTable'
+import { FootingCard } from './FootingCard'
 import { lengthText, ROLES, type FactoryModel, type FactorySpec } from '../domain/types'
 import { t, tc, type I18nKey } from '../i18n'
 import { useStore, type AppState } from '../state/store'
@@ -76,12 +77,14 @@ export function ModelPanel() {
       </div>
       <div className="scard"><h3>{t('sec_geom')}</h3>
         <KV k={t('kv_code')} v={t(profileOf(sp.code).basisLabelKey ?? profileOf(sp.code).labelKey)} hi />
+        {sp.code === 'TW' && sp.asd && <KV k={t('f_asd')} v={t('asd_on')} />}
+        {sp.frame === 'truss' && <KV k={t('frame_truss')} v={`${t('f_trussDepth')} ${sp.trussDepth} m`} />}
         <KV k={t('kv_span')} v={`${sp.span} m`} hi />
         <KV k={t('kv_length')} v={lengthText(sp)} />
         <KV k={t('kv_eave')} v={`${sp.eaveHeight} m`} />
         <KV k={t('kv_slope')} v={`${sp.roofSlope} (${f1((Math.atan(sp.roofSlope) * 180) / Math.PI)}°)`} />
         <KV k={t('kv_base')} v={t(sp.baseFixity === 'fixed' ? 'base_fixed' : 'base_pinned')} />
-        {ROLES.map((r) => (
+        {ROLES.filter((r) => (r !== 'chord' && r !== 'web') || count(r) > 0).map((r) => (
           <KV key={r} k={t(`role_${r}`)} v={count(r)} />
         ))}
       </div>
@@ -289,6 +292,7 @@ export function ResultsPanel() {
       {s.design && <DesignTables d={s.design} />}
       {s.design && <MemberTable d={s.design} />}
       {!!s.connections?.length && <ConnTables cs={s.connections} />}
+      <FootingCard />
       {!!s.reactions?.length && (
         <div className="scard"><h3>{t('res_react')}</h3>
           <table>

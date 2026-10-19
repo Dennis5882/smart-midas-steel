@@ -14,10 +14,11 @@ import { Dxf, toSvgSheets, type SvgLayerStyle } from './dxf'
 const LAYERS = [
   { name: 'GRID', color: 8 }, { name: 'COLUMN', color: 4 }, { name: 'RAFTER', color: 3 }, { name: 'PURLIN', color: 5 },
   { name: 'GIRT', color: 30 }, { name: 'STRUT', color: 1 }, { name: 'POST', color: 6 }, { name: 'BRACE', color: 210 },
+  { name: 'CHORD', color: 3 }, { name: 'WEB', color: 40 },
   { name: 'DIM', color: 2 }, { name: 'TEXT', color: 7 }, { name: 'BORDER', color: 7 },
 ]
-const LAYER_OF: Record<ElementRole, string> = { column: 'COLUMN', rafter: 'RAFTER', purlin: 'PURLIN', girt: 'GIRT', strut: 'STRUT', post: 'POST', brace: 'BRACE' }
-const ROLE_EN: Record<ElementRole, string> = { column: 'Column', rafter: 'Rafter', purlin: 'Purlin', girt: 'Girt', strut: 'Strut', post: 'Gable post', brace: 'Bracing' }
+const LAYER_OF: Record<ElementRole, string> = { column: 'COLUMN', rafter: 'RAFTER', purlin: 'PURLIN', girt: 'GIRT', strut: 'STRUT', post: 'POST', brace: 'BRACE', chord: 'CHORD', web: 'WEB' }
+const ROLE_EN: Record<ElementRole, string> = { column: 'Column', rafter: 'Rafter', purlin: 'Purlin', girt: 'Girt', strut: 'Strut', post: 'Gable post', brace: 'Bracing', chord: 'Bottom chord', web: 'Truss web' }
 const TXT = 250 // 기본 글자 높이 mm
 
 export interface DrawingInput { spec: FactorySpec; model: FactoryModel; connections: ConnResult[] | null; title: string }
@@ -27,6 +28,7 @@ const SVG_STYLE: Record<string, SvgLayerStyle> = {
   GRID: { color: '#9aa1ad', width: 0.5, dash: '6 4' }, COLUMN: { color: '#0b6e99', width: 1.6 }, RAFTER: { color: '#1d8653', width: 1.6 },
   PURLIN: { color: '#2f55c9', width: 0.7 }, GIRT: { color: '#b56d00', width: 0.7 }, STRUT: { color: '#c43030', width: 1 },
   POST: { color: '#8e3fb5', width: 1 }, BRACE: { color: '#c2399b', width: 0.7 }, DIM: { color: '#7a5d00', width: 0.5 },
+  CHORD: { color: '#1d8653', width: 1.2 }, WEB: { color: '#a8690a', width: 0.6 },
   TEXT: { color: '#111', width: 0.5 }, BORDER: { color: '#111', width: 0.8 },
 }
 

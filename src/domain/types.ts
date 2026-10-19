@@ -4,8 +4,19 @@ import type { ScopeFeatures } from './scope'
 import type { AdditionModel, AdditionUsage, FactoryAdditions } from './additionTypes'
 
 /* 공장형 단경간 포털 프레임 입력 스펙. 단위: m, kN */
-export type FrameType = 'gable' | 'mono' | 'multi' | 'gableCols'
-export const FRAME_TYPES: FrameType[] = ['gable', 'gableCols', 'multi', 'mono']
+export type FrameType = 'gable' | 'mono' | 'multi' | 'gableCols' | 'truss'
+export const FRAME_TYPES: FrameType[] = ['gable', 'gableCols', 'multi', 'mono', 'truss']
+/** 트러스 지붕 (TW, v2.4.9) — 박공 지붕선 = 상현재(rafter), 하현재(chord)·웨브(web) 추가. 박공 프레임은 지붕보 + 풍주 그대로 */
+export const isTruss = (spec: Pick<FactorySpec, 'frame'>) => spec.frame === 'truss'
+/** 트러스 기본 단면 (TW CNS2020) — 하현재 RH, 웨브 원형강관 */
+export const TRUSS_DEFAULTS = { chord: 'RH 200x100x5.5x8', web: 'P 89.1x3.2' } as const
+/** 트러스 입력이 비었으면 기본값 (하현재·웨브 단면, 처마 춤) — 트러스가 아니면 그대로 */
+export function withTrussDefaults<T extends Pick<FactorySpec, 'frame' | 'sections' | 'trussDepth' | 'span'>>(spec: T): T {
+  if (spec.frame !== 'truss') return spec
+  return { ...spec, trussDepth: spec.trussDepth ?? defaultTrussDepth(spec.span), sections: { ...spec.sections, chord: spec.sections.chord || TRUSS_DEFAULTS.chord, web: spec.sections.web || TRUSS_DEFAULTS.web } }
+}
+/** 처마 트러스 춤 기본값 (m) — 스팬/20, 1.0~2.5 */
+export const defaultTrussDepth = (span: number) => Math.min(2.5, Math.max(1, Math.round(span / 20 * 10) / 10))
 
 export interface FactorySpec {
   /** 설계기준 (UI 언어와 독립) */
@@ -57,13 +68,17 @@ export interface FactorySpec {
   fc: number
   /** 앵커볼트 인장강도 Fu (MPa) */
   anchorFu: number
-  sections: { column: string; rafter: string; purlin: string; girt: string; strut: string; post: string; brace: string }
+  sections: { column: string; rafter: string; purlin: string; girt: string; strut: string; post: string; brace: string; /** 트러스 하현재·웨브 (frame 'truss') */ chord?: string; web?: string }
+  /** 트러스 지붕 처마 춤 (m) — 하현재 높이 = 처마 − 춤 */
+  trussDepth?: number
   material: string
   /** 적용범위 질문 답 (크레인·메자닌·다경간·큰 개구부) — domain/scope.ts */
   features?: ScopeFeatures
   additions?: FactoryAdditions
   /** China: secondary members may use a different certified steel grade. */
   secondaryMaterial?: string
+  /** TW: 容許應力設計法(ASD) 부재 검토 추가 — LRFD 와 둘 다 만족 (codes/twAsd). 접합은 LRFD 그대로 */
+  asd?: boolean
   /** GB inputs, used only when code === CN. Pressures kN/m², periods s. */
   china?: { w0: number; terrain: 'A' | 'B' | 'C' | 'D'; /** 미사용 — GB 51022 4.2.1 β(1.1·1.5)로 대체 (이전 저장값 호환) */ betaZ?: number; topography: number; alphaMax: number; Tg: number; Tx: number; Ty: number; damping: number; snow: number; snowMu: number; gamma0: number; concreteBearing: number; anchorFt: number }
   /** KDS 입력 (code === KR 에서만). 풍 KDS 41 12 00 5장: V0 기본풍속(m/s, 그림 5.5-1), 지표면조도 A~D, K_zt 지형계수, K_D 풍향계수, cpi 표 5.7-4 밀폐 분류,
@@ -115,8 +130,12 @@ export function lengthText(spec: FactorySpec): string {
 
 export interface Node { id: number; x: number; y: number; z: number }
 /** post = 박공벽 풍주, brace = X-가새(TRUSS) */
-export type ElementRole = 'column' | 'rafter' | 'purlin' | 'girt' | 'strut' | 'post' | 'brace'
-export const ROLES: ElementRole[] = ['column', 'rafter', 'purlin', 'girt', 'strut', 'post', 'brace']
+export type ElementRole = 'column' | 'rafter' | 'purlin' | 'girt' | 'strut' | 'post' | 'brace' | 'chord' | 'web'
+export const ROLES: ElementRole[] = ['column', 'rafter', 'purlin', 'girt', 'strut', 'post', 'brace', 'chord', 'web']
+/** 축력 부재 (Gen TRUSS) — X-가새·트러스 웨브 */
+export const isAxialRole = (r: ElementRole) => r === 'brace' || r === 'web'
+/** 역할 단면 — 트러스 역할은 스펙에 없을 수 있음 */
+export const roleSection = (s: FactorySpec['sections'], r: ElementRole): string | undefined => s[r]
 /** wall: 벽 부재가 붙은 면 — 'x0'·'xL' = 측벽(x=0, x=스팬), 'y0'·'yL' = 박공벽(y=0, y=길이), 'roof' = 지붕 가새 */
 export type Face = 'x0' | 'xL' | 'y0' | 'yL' | 'roof'
 export interface Element { id: number; n1: number; n2: number; role: ElementRole; section: string; face?: Face; /** 흔들림 기둥(다경간 내부): 상단 핀·기초 핀, 면내 K = 1 */ lean?: true

@@ -235,7 +235,7 @@ export function runConnections(spec: FactorySpec, model: FactoryModel, info: Loa
   if (spec.code === 'KR') return runKrConnections(spec, model, info, res)
   const kind = (c: string) => info.comboKind?.[c] ?? 'basic'
   const basic = (c: string) => kind(c) === 'basic'
-  const withAmp = (c: string) => kind(c) !== 'gravity'
+  const withAmp = (c: string) => kind(c) === 'basic' || kind(c) === 'amplified'
   const seis13 = Object.values(info.comboKind ?? {}).includes('amplified')
   const nodes = new Map(model.nodes.map((n) => [n.id, n]))
   const out: ConnResult[] = []
@@ -245,7 +245,8 @@ export function runConnections(spec: FactorySpec, model: FactoryModel, info: Loa
   const baseF = model.elements.filter((e) => e.role === 'column' && at(e.n1).z === 0).flatMap((e) => endForces(res, e.id, 0, withAmp)) // 13.4.5
   /* 처마: 처마 절점에 닿는 지붕보 끝 (I 단이 처마면 I, 아니면 J) */
   const G = portalGeometry(spec)
-  const kneeEls = model.elements.filter((e) => e.role === 'rafter' && (G.isEaveNode(at(e.n1)) || G.isEaveNode(at(e.n2))))
+  /* 트러스 지붕: 처마·마루는 트러스 절점(거셋) — 단부판 접합 대상 아님 (scope truss, 범위 밖) */
+  const kneeEls = G.truss ? [] : model.elements.filter((e) => e.role === 'rafter' && (G.isEaveNode(at(e.n1)) || G.isEaveNode(at(e.n2))))
   const kneePart = (e: (typeof kneeEls)[number]) => (G.isEaveNode(at(e.n1)) ? 0 : 4) as 0 | 4
   const kneeF = kneeEls.flatMap((e) => endForces(res, e.id, kneePart(e), basic))
   /* 13.6.1 용량 설계 힘 — 지붕보 Mp, 전단 Vg + 2Mp/Lh ≤ V(13.3-1) */
@@ -289,7 +290,7 @@ export function runConnections(spec: FactorySpec, model: FactoryModel, info: Loa
     if (done) break
   }
   /* 마루 접합은 마루가 있는 형식만 (편경사 없음) */
-  for (const [type, forces, colName] of [['knee', kneeF, spec.sections.column], ...(G.ridges.length ? [['apex', apexF, null]] as const : [])] as const) {
+  for (const [type, forces, colName] of (G.truss ? [] : [['knee', kneeF, spec.sections.column], ...(G.ridges.length ? [['apex', apexF, null]] as const : [])] as const)) {
     for (const d of [20, 22, 24, 27, 30]) {
       const r = endPlateFor(spec, forces, d, spec.sections.rafter, colName)
       if (r && (r.ratio <= 1 || d === 30)) {

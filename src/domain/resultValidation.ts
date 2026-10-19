@@ -47,7 +47,7 @@ export function validateDesignResults(spec: FactorySpec, model: FactoryModel, in
   for (const e of model.elements) {
     if (roles && !roles.includes(e.role)) continue
     for (const c of combos) {
-      if (e.role === 'brace') {
+      if (e.role === 'brace' || e.role === 'web') {
         requireResult(Number.isFinite(res.truss.get(e.id)?.get(c)), 'TRUSSFORCE', 'missing', `${e.id} · ${c}`)
       } else {
         const ps = res.beam.get(e.id)?.get(c)

@@ -1,4 +1,4 @@
-import { baySpans, columnSpans, frameSpans, type Element, type ElementRole, type Face, type FactoryModel, type FactorySpec, type FrameType, type Node } from './types'
+import { baySpans, columnSpans, defaultTrussDepth, frameSpans, isTruss, withTrussDefaults, type Element, type ElementRole, type Face, type FactoryModel, type FactorySpec, type FrameType, type Node } from './types'
 import { applyAdditions } from './additions'
 
 /** 지붕면 하나 (횡단면, x 증가 방향). rising = x 가 커질수록 높아짐 — 법선 (∓sinθ, 0, cosθ) 방향과 풍상·풍하 판정에 쓴다 */
@@ -100,6 +100,7 @@ export function portalGeometry(spec: FactorySpec): Geometry {
     sRoof, gWall: eaveHeight / nGirt, length: spans.reduce((a, b) => a + b, 0), spans,
     theta: Math.atan(roofSlope), ridgeZ,
     frame: (mono ? 'mono' : inner.length ? 'gableCols' : 'gable') as FrameType,
+    ...(isTruss(spec) && !mono && !inner.length ? { truss: { depth: spec.trussDepth ?? defaultTrussDepth(span), zb: eaveHeight - (spec.trussDepth ?? defaultTrussDepth(span)) } } : {}),
     /** 흔들림 기둥 열 x (다경간 내부) */
     leanXs: inner,
     valleys: [] as number[],
@@ -119,6 +120,8 @@ export function portalGeometry(spec: FactorySpec): Geometry {
 export interface Geometry {
   rise: number; slopeLen: number; nPurlin: number; nGirt: number; xs: number[]; zAt: (x: number) => number; girtZs: number[]; postXs: number[]
   sRoof: number; gWall: number; length: number; spans: number[]; theta: number; ridgeZ: number; frame: FrameType; leanXs: number[]; valleys: number[]
+  /** 트러스 지붕: 하현재 높이 zb (m) — 없으면 일반 지붕보 */
+  truss?: { zb: number; depth: number }
   symmetric: boolean; eaveXs: number[]; ridges: number[]; planes: RoofPlane[]; eaveSide: (x: number) => 'x0' | 'xL' | null; isRidge: (x: number) => boolean
   roofTrib: (x: number) => RoofTrib[]; nearEave: (x: number, a: number, eps?: number) => boolean; nearRidge: (x: number, a: number, eps?: number) => boolean
   isEaveNode: (n: { x: number; z: number }) => boolean; isRidgeNode: (n: { x: number; z: number }) => boolean; deflXs: number[]; isDeflNode: (n: { x: number; z: number }) => boolean
@@ -198,7 +201,8 @@ function multiGeometry(spec: FactorySpec): Geometry {
 
 /** 단경간 포털 프레임 + 2차부재 + 박공벽 풍주·거트 + 양 끝 베이 X-가새 형상 생성 (순수 함수).
     전역: X = 스팬, Y = 길이, Z = 높이. */
-export function buildPortal(spec: FactorySpec): FactoryModel {
+export function buildPortal(spec0: FactorySpec): FactoryModel {
+  const spec = withTrussDefaults(spec0)
   const { sections: sec } = spec
   const G = portalGeometry(spec)
   const bays = G.spans.length
@@ -224,7 +228,9 @@ export function buildPortal(spec: FactorySpec): FactoryModel {
     /* 기둥: 거트 높이마다 절점 */
     for (const x of G.eaveXs) {
       /* 박공 프레임 기둥은 박공벽 거트 높이에도 절점 — 편경사는 측벽·박공벽 거트 높이가 달라, 없으면 박공 거트 끝이 떠서 불안정 */
-      const zs = gable ? [...new Set([...G.girtZsAt(x), ...G.endGirtZs.filter((z) => z < G.zAt(x) - 1e-6)])].sort((p, q) => p - q) : G.girtZsAt(x)
+      const zs0 = gable ? [...new Set([...G.girtZsAt(x), ...G.endGirtZs.filter((z) => z < G.zAt(x) - 1e-6)])].sort((p, q) => p - q) : G.girtZsAt(x)
+      /* 트러스 프레임(박공 제외): 하현재가 기둥에 닿는 높이 zb 에 절점 */
+      const zs = G.truss && !gable ? [...new Set([...zs0, G.truss.zb])].sort((p, q) => p - q) : zs0
       let prev = node(x, y, 0)
       for (const z of [...zs, G.zAt(x)]) {
         const cur = node(x, y, z)
@@ -253,9 +259,19 @@ export function buildPortal(spec: FactorySpec): FactoryModel {
         }
       }
     }
-    /* 지붕보: 퍼린 위치마다 절점 */
+    /* 지붕보: 퍼린 위치마다 절점 (트러스 프레임은 상현재) */
     for (let i = 0; i < G.xs.length - 1; i++) {
       elem(node(G.xs[i], y, G.zAt(G.xs[i])), node(G.xs[i + 1], y, G.zAt(G.xs[i + 1])), 'rafter', sec.rafter)
+    }
+    /* 트러스: 하현재(zb, 처마 기둥 사이 연속) · 수직재(내부 패널점) · 경사재(Pratt — 중력에서 인장: 지지점 쪽 상현 → 중앙 쪽 하현) */
+    if (G.truss && !gable) {
+      const zb = G.truss.zb, xs = G.xs, mid = (xs[0] + xs[xs.length - 1]) / 2
+      for (let i = 0; i < xs.length - 1; i++) elem(node(xs[i], y, zb), node(xs[i + 1], y, zb), 'chord', sec.chord!)
+      for (let i = 1; i < xs.length - 1; i++) elem(node(xs[i], y, zb), node(xs[i], y, G.zAt(xs[i])), 'web', sec.web!)
+      for (let i = 0; i < xs.length - 1; i++) {
+        const [a, b] = xs[i + 1] <= mid + 1e-9 ? [xs[i], xs[i + 1]] : [xs[i + 1], xs[i]] // a = 지지점 쪽
+        elem(node(a, y, G.zAt(a)), node(b, y, zb), 'web', sec.web!)
+      }
     }
     /* 박공 거트: 기둥·풍주 사이, 거트 높이마다 */
     if (gable) {
