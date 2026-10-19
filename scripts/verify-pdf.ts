@@ -25,7 +25,7 @@ import { defaultSpecFor } from '../src/domain/types'
 
 ;(globalThis as any).document = { documentElement: { lang: 'ko', dataset: {} } }
 const { buildReport } = await import('../src/report/report')
-const { setLang } = await import('../src/i18n')
+const { setLang, t } = await import('../src/i18n')
 pdfMake.setLocalAccessPolicy((path) => path.startsWith(resolve('public/fonts')))
 pdfMake.setUrlAccessPolicy(() => false)
 mkdirSync('output/pdf', { recursive: true }); mkdirSync('output/docx', { recursive: true })
@@ -51,7 +51,7 @@ for (const [code, inp] of [['TW', input], ['KR', krInput], ['CN', cnInput], ['AD
   setLang(lang)
   const html = buildReport(inp)
   /* CN: 선택 라벨(GB 51022)과 별개로 '설계 검토' 근거는 실제 강재 규범, 머리는 판본 포함 */
-  if (code === 'CN') { assert.ok(html.includes('GB 50017-2017 · GB/T 50018-2025'), `${lang}: CN design-check basis`); assert.ok(html.includes('GB 51022-2015 · GB 50017-2017'), `${lang}: CN basis with editions`) }
+  if (code === 'CN') { assert.ok(html.includes(t('code_CN_check')) && t('code_CN_check').startsWith('GB 51022-2015'), `${lang}: CN design-check basis`); assert.ok(html.includes('GB 51022-2015 · GB 50017-2017'), `${lang}: CN basis with editions`) }
   const doc = new DOMParser().parseFromString(html, 'text/html')
   /* 언어별 글꼴 + 계산서의 모든 글자가 축소 글꼴에 있는지 (없으면 PDF 에 빈 네모) */
   const htmlLang = (doc as any).documentElement.getAttribute('lang') ?? ''

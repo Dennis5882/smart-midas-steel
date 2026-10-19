@@ -11,7 +11,7 @@
 | [대만 공장 위저드 개발 명세](taiwan_factory_steel_wizard_dev_spec.md) | 최초 제품·모델링·범위 설계 원안 | 클릭형 7단계와 3개 국가 흐름이 우선. 미지원 확장은 로드맵 별도 후보 |
 | [대만·중국 횡단면 위저드](taiwan_china_factory_steel_cross_section_wizard.md) | 박공·편경사·다경간 및 종방향 모델링 제안 | 형상 선택·개별 베이 반영, 국가별 해석/상세 한계 유지 |
 | [shadcn UI 권고](smart-midas-steel-shadcn-ui-recommendations.md) | 초기 화면·접근성·상태·작업 경험 개선 근거 | 핵심 흐름 반영, 남은 실제 사용자 검증은 R09 |
-| [통합 평가 보고서](smart-midas-steel-integrated-evaluation.md) | v0.6~v1.7 평가·후속 조치·시험 이력 | 당시 점수·미완료 목록을 현황으로 재사용하지 않음. 잔여 과제는 R01~R10로 이관 |
+| [통합 평가 보고서](smart-midas-steel-integrated-evaluation.md) | v0.6~v1.7 평가·후속 조치·시험 이력 | 당시 점수·미완료 목록을 현황으로 재사용하지 않음. 잔여 과제는 R01~R11로 이관 |
 
 ## 현재 기능 문서는 reference로 이동
 

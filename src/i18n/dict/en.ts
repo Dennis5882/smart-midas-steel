@@ -99,7 +99,7 @@ export const en = {
   check_unavailable: 'No valid design result — run analysis and design check.',
   save_failed: (path: string, reason: string) => `Automatic save failed (${path}): ${reason}. Work stopped. Check the Gen save folder and try again.`,
   code_CN: 'GB 51022',
-  code_CN_check: 'GB 50017-2017 · GB/T 50018-2025',
+  code_CN_check: 'GB 51022-2015 · GB 50017-2017 · GB/T 50018-2025',
   code_CN_basis: 'GB 51022-2015 · GB 50017-2017 · GB/T 50018-2025',
   /* 한국 KDS (2026-10-16) */
   kv_across_KR: 'Across-wind combination (5.13.1)',

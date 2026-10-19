@@ -88,7 +88,7 @@ export const zhCN: Dict = {
   check_unavailable: '尚无有效验算结果，请执行分析与设计验算。',
   save_failed: (path: string, reason: string) => `自动保存失败（${path}）：${reason}。工作已停止，请确认 Gen 保存文件夹后重试。`,
   code_CN: 'GB 51022',
-  code_CN_check: 'GB 50017-2017 · GB/T 50018-2025',
+  code_CN_check: 'GB 51022-2015 · GB 50017-2017 · GB/T 50018-2025',
   code_CN_basis: 'GB 51022-2015 · GB 50017-2017 · GB/T 50018-2025',
   /* 한국 KDS (2026-10-16) */
   kv_across_KR: '横风向组合荷载（5.13.1）',

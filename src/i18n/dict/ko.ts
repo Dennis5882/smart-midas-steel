@@ -90,7 +90,7 @@ export const ko: Dict = {
   check_unavailable: '유효한 검토 결과가 없습니다. 해석과 설계 검토를 실행해 주세요.',
   save_failed: (path: string, reason: string) => `자동 저장 실패 (${path}): ${reason}. 작업을 중단했습니다. Gen 저장 폴더를 확인한 뒤 다시 실행해 주세요.`,
   code_CN: 'GB 51022',
-  code_CN_check: 'GB 50017-2017 · GB/T 50018-2025',
+  code_CN_check: 'GB 51022-2015 · GB 50017-2017 · GB/T 50018-2025',
   code_CN_basis: 'GB 51022-2015 · GB 50017-2017 · GB/T 50018-2025',
   /* 한국 KDS (2026-10-16) */
   kv_across_KR: '풍직각방향 조합하중 (5.13.1)',
