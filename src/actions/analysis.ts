@@ -4,7 +4,7 @@ import { mapi } from '../mapi/client'
 import { S, notify, type ReactionSum } from '../state/store'
 import { addMsg, log, tab } from '../state/ui'
 import { autoSave } from './save'
-import { beginJob, endJob, failMsg, stage } from './job'
+import { beginJob, Cancelled, endJob, failMsg, stage } from './job'
 import { assertGenSync } from './genSync'
 
 /* doc/anal 은 거부 시 HTTP 200 + message 로 회신(에러 필드 아님) → 메시지 직접 점검 */
@@ -18,6 +18,7 @@ export async function runAnalysis(): Promise<void> {
   try {
     await assertGenSync() // Gen 에서 모델을 바꿨으면 해석하지 않음 (앱 정보와 다른 모델)
     await analyzeCore()
+    await showReactionsInGen()
     addMsg('bot', lt('anal_done'))
     tab('resP')
   } catch (e) {
@@ -41,6 +42,21 @@ export async function analyzeCore(): Promise<void> {
   S.analyzed = true
   log(t('log_anal'), 'ok')
   await fetchReactions()
+}
+
+/** Gen 을 후처리 모드로 — 첫 기본 하중조합의 연직 반력(FZ)을 값과 함께 표시 (view/RESULTGRAPHIC, 라이브 2026-10-19 확인).
+    화면 조작이라 실패해도 해석·결과는 그대로 둔다 (취소는 그대로 전달) */
+export async function showReactionsInGen(): Promise<void> {
+  const b = S.built
+  if (!b || !S.analyzed) return
+  const combo = b.comboNames.find((c) => (b.info.comboKind?.[c] ?? 'basic') === 'basic') ?? b.comboNames[0]
+  if (!combo) return
+  try {
+    await mapi('POST', '/view/RESULTGRAPHIC', { Argument: {
+      CURRENT_MODE: 'reactionforces/moments', LOAD_CASE_COMB: { TYPE: 'CB', NAME: combo },
+      COMPONENTS: { COMP: 'FZ' }, TYPE_OF_DISPLAY: { VALUES: { OPT_CHECK: true, DECIMAL_PT: 1 } },
+    } }, `reactions · ${combo}`)
+  } catch (e) { if (e instanceof Cancelled) throw e }
 }
 
 /** 하중 케이스별 반력 합계 — post/table REACTIONG 의 'SUMMATION OF REACTION FORCES PRINTOUT' */

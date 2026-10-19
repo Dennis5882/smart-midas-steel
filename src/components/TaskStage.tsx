@@ -1,6 +1,7 @@
 import { ArrowRight, Play, FileText, FileDown, Ruler, Table2, RotateCcw } from 'lucide-react'
 import { executeAction, openCurrentModel } from '../agent/session'
 import { restoreBackup } from '../actions/build'
+import { showReactionsInGen } from '../actions/analysis'
 import { t } from '../i18n'
 import { useStore } from '../state/store'
 import { selectTask, tab } from '../state/ui'
@@ -37,7 +38,7 @@ export function TaskStage({ onOpenMapi }: { onOpenMapi(): void }) {
     {s.task === 'analysis' && <>
       {s.analyzed && <div className="task-success">✓ {t('anal_done')}</div>}
       {s.reactions?.length ? <div className="task-stat-grid"><div><span>{t('res_react')}</span><strong>{s.reactions.length}</strong></div><div><span>{t('wf_anal')}</span><strong>{t(`flow_status_${stale ? 'stale' : s.analyzed ? 'done' : 'ready'}`)}</strong></div></div> : <div className="task-empty"><Play size={26} /><p>{t('flow_analysis_hint')}</p></div>}
-      {s.reactions?.length ? <button className="btn btn-ghost" onClick={() => tab('resP')}>{t('flow_reactions')}</button> : null}
+      {s.reactions?.length ? <button className="btn btn-ghost" disabled={s.busy || !!stale} title={t('flow_reactions_hint')} onClick={() => { tab('resP'); void showReactionsInGen() }}>{t('flow_reactions')}</button> : null}
     </>}
     {(s.task==='design'||s.task==='optimize')&&<RepairPanel/>}
     {s.task === 'design' && <>{s.design && b ? <><StatusCard d={s.design} cs={s.connections} spec={b.spec} /><button className="btn btn-ghost" onClick={() => tab('resP')}>{t('flow_view_results')}</button></> : <div className="task-empty"><FileText size={26} /><p>{t('flow_design_hint')}</p></div>}{ng && <p className="task-warning">{t('flow_ng_note')}</p>}</>}

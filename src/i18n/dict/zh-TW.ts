@@ -50,7 +50,7 @@ export const zhTW: Dict = {
   flow_api_log: 'API 紀錄', flow_elapsed: (n: number) => `${n} 秒`, flow_requested: '已請求輸出',
   flow_previous: '舊版次', flow_revision: (n: number) => `模型版次 ${n}`, flow_read: '已確認',
   flow_unread: (n: number) => `${n} 個未確認問題`, flow_model_summary: (nodes: number, elements: number) => `節點 ${nodes} · 元素 ${elements}`,
-  flow_reactions: '檢視反力', flow_opt_empty: '執行最佳化後可比較前後鋼材量。', flow_history_local: '紀錄保留於此分頁，重新載入或關閉分頁即會清除。',
+  flow_reactions_hint: '將 Gen 切換至後處理模式顯示反力，並開啟結果頁籤。', flow_reactions: '檢視反力', flow_opt_empty: '執行最佳化後可比較前後鋼材量。', flow_history_local: '紀錄保留於此分頁，重新載入或關閉分頁即會清除。',
   ws_title: '建模工作區', ws_kicker: 'STEEL WORKSPACE', ws_start_title: '要建立哪種構架？',
   ws_start_hint: '選擇建物類型，依序設定幾何、材料與載重。',
   ws_home: '開始畫面', ws_resume: '繼續編輯', ws_resume_hint: '返回已輸入的資料及目前步驟。',
@@ -504,6 +504,8 @@ export const zhTW: Dict = {
   g_help_2: '版本說明',
   g_help_2_cmd: '版本說明',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_3_8_1: '分析完成後，Gen NX 切換至後處理模式，並顯示第一個載重組合的垂直反力數值。',
+  rn_v2_3_8_2: '分析步驟的「反力確認」按鈕會在 Gen 重新顯示反力並開啟結果頁籤（先前按下沒有變化）。',
   rn_v2_3_7_1: '模型建立完成後，Gen NX 畫面以 ISO 視角顯示完整模型（先前停留在原點附近的放大畫面）。',
   rn_v2_3_7_2: '模型建立後，網頁也會開啟 3D 預覽頁籤並將相機重設為 ISO 全景。',
   rn_v2_3_6_1: '斷面卡片僅顯示斷面圖，點選「詳細」展開板厚、A、Ix、Iy、Sx、Zx、迴轉半徑與單位重；輸入中的不完整斷面名稱不繪製。',

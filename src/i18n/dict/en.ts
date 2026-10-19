@@ -58,7 +58,7 @@ export const en = {
   flow_api_log: 'API log', flow_elapsed: (n: number) => `${n} s`, flow_requested: 'Output requested',
   flow_previous: 'Previous revision', flow_revision: (n: number) => `Model revision ${n}`, flow_read: 'Mark as read',
   flow_unread: (n: number) => `${n} unread issues`, flow_model_summary: (nodes: number, elements: number) => `${nodes} nodes · ${elements} elements`,
-  flow_reactions: 'View reactions', flow_opt_empty: 'Run optimization to compare steel quantities before and after.',
+  flow_reactions_hint: 'Switches Gen to post mode to show reactions and opens the Results tab.', flow_reactions: 'View reactions', flow_opt_empty: 'Run optimization to compare steel quantities before and after.',
   flow_history_local: 'History is kept in this tab session. Reloading or closing the tab clears it.',
   ws_title: 'Modeling workspace', ws_kicker: 'STEEL WORKSPACE', ws_start_title: 'What will you build?',
   ws_start_hint: 'Choose a building type, then define geometry, materials and loads step by step.',
@@ -518,6 +518,8 @@ export const en = {
   g_help_2: 'Release notes',
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_3_8_1: 'After analysis, Gen NX switches to post mode and shows the vertical reactions of the first load combination with values.',
+  rn_v2_3_8_2: 'The Reactions button on the analysis step now shows reactions in Gen again and opens the Results tab (previously it did nothing visible).',
   rn_v2_3_7_1: 'After the model is created, the Gen NX view now fits the whole model in ISO view (it previously stayed zoomed in near the origin).',
   rn_v2_3_7_2: 'Right after creation the web view also opens the 3D preview tab and resets the camera to the full ISO view.',
   rn_v2_3_6_1: 'Section cards show only the outline; Details expands plate thickness, A, Ix, Iy, Sx, Zx, radii of gyration and unit weight. Partially typed section names are not drawn.',

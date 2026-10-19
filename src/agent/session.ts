@@ -1,5 +1,5 @@
 /* Typed UI actions, optional legacy text adapter, settings and connection tests. */
-import { fetchReactions, runAnalysis } from '../actions/analysis'
+import { fetchReactions, runAnalysis, showReactionsInGen } from '../actions/analysis'
 import { runDesignCheck } from '../actions/design'
 import { runOptimize } from '../actions/optimize'
 import { downloadDrawings, downloadQuantities, openReport, downloadReportPdf } from '../actions/outputs'
@@ -77,6 +77,7 @@ export async function executeAction(c: Intent): Promise<void> {
       if (!S.built) { addMsg('bot', lt('no_model')); break }
       if (!S.analyzed) { addMsg('bot', lt('need_anal')); break }
       await fetchReactions()
+      await showReactionsInGen()
       addMsg('bot', lt('react_done'))
       tab('resP')
       break

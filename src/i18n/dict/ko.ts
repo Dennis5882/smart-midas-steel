@@ -50,7 +50,7 @@ export const ko: Dict = {
   flow_api_log: 'API 로그', flow_elapsed: (n: number) => `${n}초`, flow_requested: '출력 요청됨',
   flow_previous: '이전 개정', flow_revision: (n: number) => `모델 개정 ${n}`, flow_read: '확인 완료',
   flow_unread: (n: number) => `미확인 문제 ${n}건`, flow_model_summary: (nodes: number, elements: number) => `절점 ${nodes} · 요소 ${elements}`,
-  flow_reactions: '반력 확인', flow_opt_empty: '최적화를 실행하면 변경 전후 철골량을 비교할 수 있습니다.',
+  flow_reactions_hint: 'Gen 을 후처리 모드로 바꿔 반력을 표시하고 결과 탭을 엽니다.', flow_reactions: '반력 확인', flow_opt_empty: '최적화를 실행하면 변경 전후 철골량을 비교할 수 있습니다.',
   flow_history_local: '이력은 현재 탭에서 유지됩니다. 새로고침하거나 탭을 닫으면 초기화됩니다.',
   ws_title: '모델링 작업', ws_kicker: 'STEEL WORKSPACE', ws_start_title: '어떤 골조를 만들까요?',
   ws_start_hint: '건물 유형을 고르고 형상·재료·하중을 순서대로 설정하세요.',
@@ -506,6 +506,8 @@ export const ko: Dict = {
   g_help_2: '릴리즈 노트',
   g_help_2_cmd: '릴리즈 노트',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_3_8_1: '해석이 끝나면 Gen NX를 후처리 모드로 바꾸고 첫 하중조합의 연직 반력을 값과 함께 표시합니다.',
+  rn_v2_3_8_2: '해석 단계의 반력 확인 버튼이 Gen에 반력을 다시 표시하고 결과 탭을 엽니다(이전에는 눌러도 변화가 없었습니다).',
   rn_v2_3_7_1: '모델 생성이 끝나면 Gen NX 화면을 ISO 시점의 전체 보기로 맞춥니다(이전에는 원점 근처가 확대된 채 남았습니다).',
   rn_v2_3_7_2: '모델 생성 직후 웹 화면도 3D 미리보기 탭을 열고 ISO 전체 보기로 카메라를 다시 맞춥니다.',
   rn_v2_3_6_1: '단면 카드는 단면도만 보여 주고, 상세를 누르면 판 두께·A·Ix·Iy·Sx·Zx·회전반경·단위중량을 펼칩니다. 입력 중인 불완전한 단면명은 그리지 않습니다.',
