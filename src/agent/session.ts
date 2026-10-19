@@ -2,7 +2,7 @@
 import { fetchReactions, runAnalysis, showReactionsInGen } from '../actions/analysis'
 import { runDesignCheck } from '../actions/design'
 import { runOptimize } from '../actions/optimize'
-import { downloadDrawings, downloadQuantities, openReport, downloadReportPdf, downloadReportDocx } from '../actions/outputs'
+import { downloadDrawings, downloadDrawingsPdf, downloadQuantities, openReport, downloadReportPdf, downloadReportDocx } from '../actions/outputs'
 import type { CodeId } from '../codes'
 import { portalGeometry } from '../domain/portal'
 import { TEMPLATES } from '../domain/templates'
@@ -17,7 +17,7 @@ import type { TaskId } from '../state/store'
 import { parseCommand, type Intent } from './parse'
 import { confirmAction } from '../components/ConfirmDialog'
 
-const BUSY_BLOCKED = new Set<string>(['new', 'analyze', 'design', 'optimize', 'report', 'drawings', 'pdf', 'docx', 'quantities', 'reactions', 'conn'])
+const BUSY_BLOCKED = new Set<string>(['new', 'analyze', 'design', 'optimize', 'report', 'drawings', 'drawings_pdf', 'pdf', 'docx', 'quantities', 'reactions', 'conn'])
 
 /** 사용자 입력 1건 처리 (로컬 명령) */
 export async function send(raw: string): Promise<void> {
@@ -31,7 +31,7 @@ export async function send(raw: string): Promise<void> {
 export async function executeAction(c: Intent): Promise<void> {
   /* Busy jobs and pending confirmations cannot replace inputs or launch another Gen/output action. */
   if ((S.busy || S.confirm) && BUSY_BLOCKED.has(c.intent)) { addMsg('bot', lt('busy')); return }
-  const task = ({ analyze: 'analysis', reactions: 'analysis', design: 'design', optimize: 'optimize', report: 'outputs', pdf: 'outputs', drawings: 'outputs', quantities: 'outputs' } as Record<string, TaskId>)[c.intent]
+  const task = ({ analyze: 'analysis', reactions: 'analysis', design: 'design', optimize: 'optimize', report: 'outputs', pdf: 'outputs', docx: 'outputs', drawings: 'outputs', drawings_pdf: 'outputs', quantities: 'outputs' } as Record<string, TaskId>)[c.intent]
   if (task) {
     const reason = unavailable(S, task)
     if (reason) { addMsg('bot', lt(reason), 'warn'); return }
@@ -71,6 +71,7 @@ export async function executeAction(c: Intent): Promise<void> {
     case 'optimize': await runOptimize(); break
     case 'report': openReport(); break
     case 'drawings': downloadDrawings(); break
+    case 'drawings_pdf': await downloadDrawingsPdf(); break
     case 'pdf': await downloadReportPdf(); break
     case 'docx': await downloadReportDocx(); break
     case 'quantities': downloadQuantities(); break

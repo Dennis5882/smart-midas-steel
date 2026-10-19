@@ -4,7 +4,7 @@ import { render, t, type I18nKey } from '../i18n'
 import { S, notify, useStore, type Activity, type JobKind } from '../state/store'
 import { tab } from '../state/ui'
 
-const JOB_LABEL: Record<JobKind, I18nKey> = { build: 'wf_build', anal: 'wf_anal', design: 'wf_design', opt: 'flow_optimize', pdf: 'g_design_5', restore: 'wf_restore' }
+const JOB_LABEL: Record<JobKind, I18nKey> = { build: 'wf_build', anal: 'wf_anal', design: 'wf_design', opt: 'flow_optimize', pdf: 'g_design_5', docx: 'out_docx', dwgpdf: 'out_drawings_pdf', restore: 'wf_restore' }
 const time = (at: number) => new Date(at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 const acknowledge = (id: number) => { const a = S.activity.find((e) => e.id === id); if (a) a.acknowledged = true; notify() }
 

@@ -35,7 +35,7 @@ export class Dxf {
   }
   /** align: 0 = 왼쪽, 1 = 가운데, 2 = 오른쪽 (기준점 = 글자 아래선) */
   text(layer: string, x: number, y: number, h: number, s: string, align: 0 | 1 | 2 = 0, rot = 0): void {
-    const ascii = s.replace(/[^\x20-\x7e]/g, '?')
+    const ascii = toAscii(s)
     this.rec({ k: 't', layer, x, y, h, s: ascii, align, rot })
     const al = align ? `\n72\n${align}\n11\n${r(x)}\n21\n${r(y)}\n31\n0` : ''
     this.ents.push(`0\nTEXT\n8\n${layer}\n10\n${r(x)}\n20\n${r(y)}\n30\n0\n40\n${r(h)}\n1\n${ascii}${rot ? `\n50\n${rot}` : ''}${al}`)
@@ -85,5 +85,9 @@ export function toSvgSheets(d: Dxf, style: Record<string, SvgLayerStyle>): { nam
     return { name: sh.name, svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" font-family="Arial,Helvetica,sans-serif" style="width:100%;height:auto">${body}</svg>` }
   })
 }
+
+/** DXF R12 는 ASCII 만 — 치수·단위 기호는 읽히는 글자로 바꾸고 나머지만 '?' (예전엔 PL 250×704×28 → PL 250?704?28) */
+const ASCII_SUB: Record<string, string> = { '×': 'x', '·': '.', '²': '2', '³': '3', '°': ' deg', '−': '-', '–': '-', '—': '-', '≤': '<=', '≥': '>=', 'φ': 'phi', 'Ø': 'D' }
+export const toAscii = (s: string) => s.replace(/[^\x20-\x7e]/g, (c) => ASCII_SUB[c] ?? '?')
 
 const r = (v: number) => (Math.round(v * 100) / 100).toString()

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { cancelJob } from '../actions/job'
 import { t, type I18nKey } from '../i18n'
-import { useStore } from '../state/store'
+import { useStore, FILE_JOBS } from '../state/store'
 import { jobSteps } from '../state/jobSteps'
 import { tab } from '../state/ui'
 
@@ -32,7 +32,7 @@ export function JobBar() {
           {label}{pct !== null && ` ${j.step}/${j.total}`}
         </span>
         <span className="jb-time">{t('job_elapsed', sec)}</span>
-        <button className="btn btn-ghost jb-cancel" disabled={j.cancel} title={t(j.kind === 'pdf' ? 'pdf_cancel_tip' : 'job_cancel_tip')} onClick={cancelJob}>
+        <button className="btn btn-ghost jb-cancel" disabled={j.cancel} title={t(FILE_JOBS.has(j.kind) ? 'pdf_cancel_tip' : 'job_cancel_tip')} onClick={cancelJob}>
           {j.cancel ? t('job_cancelling') : t('job_cancel')}
         </button>
       </div>

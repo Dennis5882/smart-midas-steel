@@ -2,7 +2,7 @@
    진행: 단계(stage) = 문구 키 + 예상 MAPI 호출 수, mapi() 가 호출마다 step++·detail 갱신. 최적화는 iter 로 반복 수를 따로 표시.
    취소: 협조식 — 플래그만 세우고 다음 MAPI 호출 직전에 Cancelled 를 던진다. Gen 이 처리 중인 호출(해석 등)은 끝까지 기다린다(중단 API 없음). */
 import { t, type I18nKey, lt } from '../i18n'
-import { S, notify, type Job, type JobKind } from '../state/store'
+import { S, notify, type Job, type JobKind, FILE_JOBS } from '../state/store'
 import { addMsg, recordActivity } from '../state/ui'
 import { ResultValidationError } from '../domain/resultValidation'
 import { QuantityError } from '../domain/quantities'
@@ -18,7 +18,7 @@ export function beginJob(kind: JobKind): boolean {
   if (S.busy) { addMsg('bot', lt('busy')); return false }
   S.busy = true
   S.lastFail = null
-  if (kind !== 'pdf') S.resultRevision++
+  if (!FILE_JOBS.has(kind)) S.resultRevision++
   S.job = { kind, stage: '', step: 0, total: 0, detail: '', t0: Date.now(), cancel: false }
   S.job.activityId = recordActivity({ source: 'job', kind, status: 'running', level: 'info' })
   notify()

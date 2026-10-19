@@ -45,7 +45,9 @@ export type ChatMsg = { ts?: string } & (
 export interface Built { spec: FactorySpec; model: FactoryModel; info: LoadInfo; cases: string[]; combos: number; comboNames: string[]; sent?: Record<string, Record<string, unknown>> }
 
 /** 진행 중 작업 — stage = 문구 키, step/total = 이 단계 MAPI 호출 수, iter = 최적화 반복 [n, 최대] */
-export type JobKind = 'build' | 'anal' | 'design' | 'opt' | 'pdf' | 'restore'
+export type JobKind = 'build' | 'anal' | 'design' | 'opt' | 'pdf' | 'docx' | 'dwgpdf' | 'restore'
+/** 파일 생성 작업 — Gen·결과를 바꾸지 않음 (결과 개정 유지, 취소 안내 문구 공통) */
+export const FILE_JOBS: ReadonlySet<JobKind> = new Set<JobKind>(['pdf', 'docx', 'dwgpdf'])
 export interface Job { kind: JobKind; stage: string; step: number; total: number; detail: string; t0: number; cancel: boolean; iter?: [number, number]; activityId?: number }
 
 /** 반력 합계 (하중 케이스별) */

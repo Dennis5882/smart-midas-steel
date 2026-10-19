@@ -11,6 +11,8 @@ const PLAN: Record<JobKind, I18nKey[]> = {
   design: ['st_sync', 'st_results', 'st_check'],
   opt: ['st_sync', 'st_results', 'st_send', 'st_verify', 'st_anal'],
   pdf: ['pdf_start'],
+  docx: ['docx_start'],
+  dwgpdf: ['dwg_pdf_start'],
   restore: ['st_restore'],
 }
 

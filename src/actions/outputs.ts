@@ -1,6 +1,6 @@
 /* 산출물 (M5·M6) — 계산서(PDF 직접 다운로드 / HTML 새 창)·도면(DXF)·물량(CSV).
    브라우저 안에서 생성하며 PDF는 파일 생성·페이지 수 확인 후 다운로드한다. */
-import { buildDxf } from '../drawing/drawings'
+import { buildDrawingSvgs, buildDxf } from '../drawing/drawings'
 import { getLang, t, lt } from '../i18n'
 import { buildReport } from '../report/report'
 import { LOSS, QuantityError, quantities } from '../domain/quantities'
@@ -77,7 +77,7 @@ export async function downloadReportPdf(): Promise<void> {
 export async function downloadReportDocx(): Promise<void> {
   if (!canOutput()) return
   if (!S.built) { addMsg('bot', lt('no_model')); return }
-  if (!beginJob('pdf')) return
+  if (!beginJob('docx')) return
   try {
     stage('docx_start')
     const name = `steel_report_${S.built.spec.code}_${getLang()}_${stamp()}.docx`
@@ -131,7 +131,30 @@ export function downloadDrawings(): void {
   if (!canOutput()) return
   if (!S.built) { addMsg('bot', lt('no_model')); return }
   const dxf = buildDxf({ spec: S.built.spec, model: S.built.model, connections: S.connections, title: 'STEEL PORTAL FACTORY' })
-  download(`steel_drawings_${stamp()}.dxf`, dxf, 'application/dxf')
+  download(`steel_drawings_${S.built.spec.code}_${stamp()}.dxf`, dxf, 'application/dxf')
   log(t('log_dxf'), 'ok')
   addMsg('bot', S.connections ? t('dxf_done') : t('dxf_partial'))
+}
+
+/** 도면 PDF — DXF 와 같은 시트를 A3 가로 PDF 로 (인쇄·공유용, 편집은 DXF) */
+export async function downloadDrawingsPdf(): Promise<void> {
+  if (!canOutput()) return
+  if (!S.built) { addMsg('bot', lt('no_model')); return }
+  if (!beginJob('dwgpdf')) return
+  try {
+    stage('dwg_pdf_start')
+    const name = `steel_drawings_${S.built.spec.code}_${stamp()}.pdf`
+    const sheets = buildDrawingSvgs({ spec: S.built.spec, model: S.built.model, connections: S.connections, title: 'STEEL PORTAL FACTORY' })
+    const { createDrawingsPdf } = await import('../report/pdf')
+    checkCancel()
+    const { blob, pages } = await createDrawingsPdf(sheets, name.replace(/\.pdf$/, ''))
+    checkCancel()
+    downloadBlob(name, blob)
+    log(t('log_dwg_pdf'), 'ok')
+    addMsg('bot', lt(S.connections ? 'dwg_pdf_done' : 'dwg_pdf_partial', name, pages, (blob.size / 1024).toFixed(0)))
+  } catch (e) {
+    addMsg('bot', failMsg(e, (m) => t('dwg_pdf_failed', m)))
+  } finally {
+    endJob()
+  }
 }

@@ -17,6 +17,7 @@ export type Intent =
   | { intent: 'docx' }
   | { intent: 'quantities' }
   | { intent: 'drawings' }
+  | { intent: 'drawings_pdf' }
   | { intent: 'status' }
   | { intent: 'conn' }
   | { intent: 'clear' }
@@ -46,6 +47,8 @@ export function parseCommand(raw: string): Intent {
   if (/(connection|연결\s*확인|연결|連線確認|連接檢查|連線|連接)/i.test(txt)) return { intent: 'conn' }
   if (/(status|상태|狀態)/i.test(txt)) return { intent: 'status' }
   if (/(reaction|반력|反力)/i.test(txt)) return { intent: 'reactions' }
+  /* 도면 PDF — 도면 단어 + pdf, 계산서 단어가 없을 때만 ('계산서 PDF 도면 포함'은 계산서) */
+  if (/(drawing|dxf|도면|圖說|圖紙|图纸)/i.test(txt) && /pdf/i.test(txt) && !/(report|계산서|보고서|計算書|计算书)/i.test(txt)) return { intent: 'drawings_pdf' }
   if (/(docx|word|워드|文書|文档)/i.test(txt)) return { intent: 'docx' }
   if (/pdf/i.test(txt)) return { intent: 'pdf' }
   if (/(quantit|csv|물량|數量|材料表)/i.test(txt)) return { intent: 'quantities' }

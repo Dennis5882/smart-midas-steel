@@ -37,6 +37,8 @@ export interface CodeProfile {
   labelKey: keyof Dict
   /** Standard the app's member/connection checks follow (status card, report). Defaults to labelKey. */
   checkLabelKey?: keyof Dict
+  /** Start-screen design-code dropdown only (zh-CN shows the full standard title). Defaults to labelKey. */
+  selectLabelKey?: keyof Dict
   /** Full basis with editions for the model tab and report header. Defaults to labelKey. */
   basisLabelKey?: keyof Dict
   /** 설계법 */

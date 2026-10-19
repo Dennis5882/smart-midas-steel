@@ -199,9 +199,14 @@ main.splitting .right,main.splitting .chat{pointer-events:none}
 .task-success{font-size:.76rem;line-height:1.8;color:var(--green);padding:12px;border:1px solid color-mix(in srgb,var(--green) 25%,var(--border));border-radius:8px}
 .task-warning{font-size:.74rem;line-height:1.8;color:var(--amber);padding:12px;border-left:2px solid var(--amber);background:var(--tip-bg);margin:14px 0}
 .task-content>.scard{font-size:.8rem}.task-content>.btn{margin-top:10px;font-size:.72rem}
-.output-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin:18px 0}
-.output-grid button{display:flex;flex-direction:column;align-items:flex-start;gap:14px;text-align:left;padding:20px 17px;border:1px solid var(--border);border-radius:10px;background:var(--panel);color:var(--cyan);font:inherit;cursor:pointer}
-.output-grid button:not(:disabled):hover{border-color:var(--cyan);background:var(--tip-bg)}.output-grid strong{font-size:.84rem;font-weight:600;color:var(--txt-hi)}.output-grid button>span{font:.65rem var(--font-mono);border:1px solid var(--border);border-radius:4px;padding:2px 6px;color:var(--muted)}
+.export-list{display:grid;gap:11px;margin:18px 0}
+.report-export{padding:16px 17px;border:1px solid var(--border);border-radius:10px;background:var(--panel)}
+.report-export-head{display:flex;align-items:center;gap:10px;color:var(--cyan)}.report-export-head strong{font-size:.84rem;font-weight:600;color:var(--txt-hi)}
+.report-export-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-top:14px}
+.report-formats{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.report-formats button{font:.75rem var(--font-mono);padding:7px 16px;background:transparent;color:var(--muted);border:0;border-right:1px solid var(--border);cursor:pointer}
+.report-formats button:last-child{border-right:0}.report-formats button.on{background:var(--tip-bg);color:var(--cyan);font-weight:600}
+.report-export-row .btn{display:inline-flex;align-items:center;gap:6px}
 .notice-center{max-height:180px;flex-shrink:0;overflow-y:auto;border-bottom:1px solid var(--border)}
 .flow-notice{display:flex;align-items:flex-start;gap:10px;padding:10px 16px;background:var(--tip-bg);font-size:.73rem;line-height:1.7;color:var(--txt-2);border-left:3px solid var(--cyan)}
 .flow-notice+.flow-notice{border-top:1px solid var(--border)}.flow-notice.warn{border-left-color:var(--amber)}.flow-notice.error{border-left-color:var(--red)}

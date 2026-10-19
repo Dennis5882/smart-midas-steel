@@ -7,7 +7,8 @@ import assert from 'node:assert/strict'
 import { DOMParser, XMLSerializer } from '@xmldom/xmldom'
 import pdfMake from 'pdfmake'
 import { PDFDocument } from 'pdf-lib'
-import { reportFontFile, reportPdfDefinition } from '../src/report/pdf'
+import { drawingsPdfDefinition, reportFontFile, reportPdfDefinition } from '../src/report/pdf'
+import { buildDrawingSvgs } from '../src/drawing/drawings'
 import { Packer } from 'docx'
 import JSZip from 'jszip'
 import { reportDocxDocument, reportDocxFont } from '../src/report/docx'
@@ -91,4 +92,24 @@ for (const [code, inp] of [['TW', input], ['KR', krInput], ['CN', cnInput], ['AD
   assert.deepEqual(lost.slice(0, 10), [], `${code}/${lang}: report text missing from Word`)
   writeFileSync(`output/docx/steel-report-${code}-${lang}.docx`, docxBuf)
   console.log(JSON.stringify({ path, font: font.split(/[\\/]/).pop(), pages: pdf.getPageCount(), bytes: buffer.length }))
+}
+
+/* 도면 PDF: DXF 와 같은 시트를 A3 가로 한 장씩, 선 굵기는 pt 환산(vector-effect 제거) */
+{
+  /* 도면 글자는 ASCII — PDF 표준 Helvetica (CJK 글꼴 불필요) */
+  pdfMake.addFonts({ Helvetica: { normal: 'Helvetica', bold: 'Helvetica-Bold', italics: 'Helvetica-Oblique', bolditalics: 'Helvetica-BoldOblique' } })
+  for (const [code, inp] of [['TW', input], ['CN', cnInput], ['PHASE6', phase6Input]] as const) {
+    const sheets = buildDrawingSvgs({ spec: inp.built.spec, model: inp.built.model, connections: inp.connections, title: 'STEEL PORTAL FACTORY' })
+    const def = drawingsPdfDefinition(sheets, `drawings-${code}`)
+    const svgs = (def.content as { svg: string }[]).map((c) => c.svg)
+    assert.ok(svgs.every((x) => /^[\t\n\r\x20-\x7e]*$/.test(x)), `${code}: drawing text is ASCII`)
+    assert.ok(svgs.every((x) => !x.includes('vector-effect') && /width="[\d.]+" height="[\d.]+"/.test(x)), `${code}: drawing SVG prepared for PDF`)
+    const buffer = await pdfMake.createPdf(def).getBuffer()
+    const pdf = await PDFDocument.load(buffer)
+    assert.equal(pdf.getPageCount(), sheets.length, `${code}: one A3 page per drawing sheet`)
+    const { width, height } = pdf.getPage(0).getSize()
+    assert.ok(Math.abs(width - 1190.55) < 1 && Math.abs(height - 841.89) < 1, `${code}: A3 landscape`)
+    writeFileSync(`output/pdf/steel-drawings-${code}.pdf`, buffer)
+    console.log(JSON.stringify({ drawings: code, pages: sheets.length, bytes: buffer.length }))
+  }
 }

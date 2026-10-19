@@ -17,7 +17,7 @@ export const TASKS: { id: Exclude<TaskId, 'history'>; label: I18nKey; hint: I18n
   { id: 'outputs', label: 'flow_outputs', hint: 'flow_outputs_hint' },
 ]
 type FlowState = Pick<AppState, 'busy' | 'confirm' | 'built' | 'analyzed' | 'design' | 'connections' | 'opt' | 'job' | 'lastFail' | 'genChanged' | 'draftSpec' | 'draftInvalid' | 'mapiKey' | 'activity' | 'modelRevision' | 'resultRevision'>
-export const taskOfJob = (kind: string): TaskId => ({ build: 'model', restore: 'model', anal: 'analysis', design: 'design', opt: 'optimize', pdf: 'outputs' }[kind] as TaskId ?? 'model')
+export const taskOfJob = (kind: string): TaskId => ({ build: 'model', restore: 'model', anal: 'analysis', design: 'design', opt: 'optimize', pdf: 'outputs', docx: 'outputs', dwgpdf: 'outputs' }[kind] as TaskId ?? 'model')
 export const isStale = (s: Pick<FlowState, 'built' | 'genChanged' | 'draftSpec' | 'draftInvalid'>) => !!s.built && (s.genChanged > 0 || s.draftInvalid || specChanged(s.draftSpec, s.built.spec))
 
 export function unavailable(s: FlowState, task: TaskId): I18nKey | null {

@@ -1,8 +1,9 @@
-import { ArrowRight, Play, FileText, FileDown, FileType, Ruler, Table2, RotateCcw } from 'lucide-react'
+import { useState } from 'react'
+import { ArrowRight, Play, FileText, Download, Ruler, Table2, RotateCcw } from 'lucide-react'
 import { executeAction, openCurrentModel } from '../agent/session'
 import { restoreBackup } from '../actions/build'
 import { showReactionsInGen } from '../actions/analysis'
-import { t } from '../i18n'
+import { t, type I18nKey } from '../i18n'
 import { useStore } from '../state/store'
 import { selectTask, tab } from '../state/ui'
 import { isStale, TASKS, taskStatus, taskOfJob, unavailable } from '../state/taskFlow'
@@ -12,6 +13,37 @@ import { checkScope } from '../domain/scope'
 import { ArtifactList, ActivityHistory } from './ActivityViews'
 import { StatusCard } from './Status'
 import { RepairPanel } from './RepairPanel'
+
+/* 산출물 카드 — 형식을 고른 뒤 한 번에 추출. 고른 형식은 이 브라우저에 기억 (계산서 PDF·Word·HTML, 도면 DXF·PDF, 물량 CSV) */
+type OutIntent = 'pdf' | 'docx' | 'report' | 'drawings' | 'drawings_pdf' | 'quantities'
+const OUTPUTS: { id: string; title: I18nKey; Icon: typeof FileText; formats: [OutIntent, string][] }[] = [
+  { id: 'report', title: 'out_report', Icon: FileText, formats: [['pdf', 'PDF'], ['docx', 'Word'], ['report', 'HTML']] },
+  { id: 'drawings', title: 'out_drawings', Icon: Ruler, formats: [['drawings', 'DXF'], ['drawings_pdf', 'PDF']] },
+  { id: 'quantities', title: 'out_quantities', Icon: Table2, formats: [['quantities', 'CSV']] },
+]
+function ExportCard({ out, reason }: { out: (typeof OUTPUTS)[number]; reason: I18nKey | null }) {
+  const key = `sms_format_${out.id}`
+  const [fmt, setFmt] = useState<OutIntent>(() => {
+    try { const v = localStorage.getItem(key); return out.formats.find(([f]) => f === v)?.[0] ?? out.formats[0][0] } catch { return out.formats[0][0] }
+  })
+  const pick = (f: OutIntent) => { setFmt(f); try { localStorage.setItem(key, f) } catch { /* private mode */ } }
+  return <div className="report-export">
+    <div className="report-export-head"><out.Icon size={22} /><strong>{t(out.title)}</strong></div>
+    <div className="report-export-row">
+      <div className="report-formats" role="radiogroup" aria-label={t('out_format')} onKeyDown={(e) => {
+        // ARIA radio: 방향키로 이동·선택, 그룹은 Tab 한 번
+        const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0
+        if (!step) return
+        e.preventDefault()
+        const i = out.formats.findIndex(([f]) => f === fmt), n = out.formats.length, next = out.formats[(i + step + n) % n][0]
+        pick(next)
+        e.currentTarget.querySelectorAll<HTMLButtonElement>('[role=radio]')[(i + step + n) % n]?.focus()
+      }}>{out.formats.map(([f, label]) =>
+        <button key={f} type="button" role="radio" aria-checked={fmt === f} tabIndex={fmt === f ? 0 : -1} className={fmt === f ? 'on' : ''} onClick={() => pick(f)}>{label}</button>)}</div>
+      <button className="btn btn-c" disabled={!!reason} title={reason ? t(reason) : undefined} onClick={() => void executeAction({ intent: fmt })}><Download size={15} />{t('out_export')}</button>
+    </div>
+  </div>
+}
 
 export function TaskStage({ onOpenMapi }: { onOpenMapi(): void }) {
   const s = useStore()
@@ -43,9 +75,7 @@ export function TaskStage({ onOpenMapi }: { onOpenMapi(): void }) {
     {(s.task==='design'||s.task==='optimize')&&<RepairPanel/>}
     {s.task === 'design' && <>{s.design && b ? <><StatusCard d={s.design} cs={s.connections} spec={b.spec} /><button className="btn btn-ghost" onClick={() => tab('resP')}>{t('flow_view_results')}</button></> : <div className="task-empty"><FileText size={26} /><p>{t('flow_design_hint')}</p></div>}{ng && <p className="task-warning">{t('flow_ng_note')}</p>}</>}
     {s.task === 'optimize' && <>{s.opt ? <><div className="task-stat-grid"><div><span>{t('op_before')} · {t('op_tons')}</span><strong>{s.opt.weightBefore.toFixed(2)}</strong></div><div><span>{t('op_after')} · {t('op_tons')}</span><strong>{s.opt.weightAfter.toFixed(2)}</strong></div></div>{b && s.design && <StatusCard d={s.design} cs={s.connections} spec={b.spec} />}<button className="btn btn-ghost" onClick={() => tab('resP')}>{t('flow_view_results')}</button></> : <div className="task-empty"><Ruler size={26} /><p>{t('flow_opt_empty')}</p></div>}</>}
-    {s.task === 'outputs' && <>{ng && <p className="task-warning">{t('flow_ng_note')}</p>}<div className="output-grid">{([
-      ['pdf', 'g_design_5', 'PDF', FileDown], ['docx', 'out_docx', 'DOCX', FileType], ['report', 'btn_html', 'HTML', FileText], ['drawings', 'g_design_3', 'DXF', Ruler], ['quantities', 'g_design_6', 'CSV', Table2],
-    ] as const).map(([intent, key, format, Icon]) => <button key={intent} disabled={!!reason} title={reason ? t(reason) : undefined} onClick={() => void executeAction({ intent })}><Icon size={25} /><strong>{t(key)}</strong><span>{format}</span></button>)}</div><p className="ws-start-note">{t('flow_output_note')}</p><ArtifactList /></>}
+    {s.task === 'outputs' && <>{ng && <p className="task-warning">{t('flow_ng_note')}</p>}<div className="export-list">{OUTPUTS.map((o) => <ExportCard key={o.id} out={o} reason={reason} />)}</div><p className="ws-start-note">{t('flow_output_note')}</p><ArtifactList /></>}
   </div>
     {s.task !== 'outputs' && !repairFailed && <div className="task-primary-row"><button className="btn btn-c" disabled={done && !stale ? s.busy || !!s.confirm : !!reason} onClick={done && !stale ? next : run}>{done && !stale ? <ArrowRight size={16} /> : <Play size={16} />}{t(done && !stale ? s.task === 'analysis' ? 'flow_next_design' : 'flow_next_outputs' : failed ? 'flow_retry' : s.task === 'analysis' ? 'flow_run_analysis' : s.task === 'design' ? 'flow_run_design' : 'flow_run_opt')}</button>{done && <button className="btn btn-ghost" disabled={!!reason} onClick={run}>{t(s.task === 'analysis' ? 'flow_run_analysis' : s.task === 'design' ? 'flow_run_design' : 'flow_run_opt')}</button>}{s.task === 'design' && s.design && <button className="btn btn-ghost" onClick={() => selectTask('optimize')}>{t('flow_optimize')}</button>}</div>}
   </div>

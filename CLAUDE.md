@@ -110,6 +110,10 @@ Vite 8 + TypeScript + React 19 + Tailwind v4 + shadcn/ui(new-york) + **Vercel Fu
 
 - `report/docx.ts`가 PDF와 같은 계산서 HTML을 `docx`(9.8.1, 지연 로딩 청크)로 변환한다. h1→Title, h2~h4→Heading1~3, 본문 Normal, 캡션 Caption, 목록 글머리표 — Word 기본 스타일 id라 회사 양식 스타일을 덮으면 그대로 적용된다. 표는 Word 표(머리글 반복, 넓은 표는 PDF와 같은 열 분할), 그림은 표시 크기(최대 600 px)×2.5 PNG — 도면 SVG viewBox 가 mm 단위(폭 44 000)라 viewBox 크기로 그리면 캔버스 한도 초과로 빠진다. 글꼴: ko 맑은 고딕·zh-TW 微軟正黑體·zh-CN 微软雅黑·en Calibri. 머리글 = 제목, 바닥글 = 쪽 번호(임시) — **회사 표준 양식(.docx/.dotx) 적용은 양식 파일 수령 후**(jszip 으로 styles·header/footer·sectPr 합치기 예정). 회귀는 `verify-pdf.ts`가 같은 24개 계산서로 Word 도 검사(스타일·표·그림 수·글꼴·글자 누락, 그림은 1×1 PNG 스텁). 브라우저 실물 확인: Word COM 으로 열어 PDF 내보내기.
 
+### v2.4.3 산출물 카드·도면 PDF
+
+- 산출물 화면 = `TaskStage` `OUTPUTS` 카드 3개(계산서 PDF·Word·HTML / 도면 DXF·PDF / 물량 CSV) — 형식 선택(ARIA radio, 방향키) 후 추출, 카드별 형식은 localStorage `sms_format_<id>`. 작업 종류 `docx`·`dwgpdf` 분리(`FILE_JOBS` — 결과 개정 유지). 도면 PDF `report/pdf.ts drawingsPdfDefinition`: DXF 와 같은 SVG 시트를 A3 가로 한 장씩, vector-effect 대신 선 굵기·점선을 pt 환산, 글꼴은 PDF 표준 Helvetica(도면 글자는 `dxf.toAscii` 로 ASCII — × → x, · → . 등, 예전 '?' 깨짐 수정). 명령 '도면 PDF'(계산서 단어가 있으면 계산서). 시작 화면 설계기준 드롭다운만 프로필 `selectLabelKey`(간체 CN = `GB 51022-2015 门式刚架轻型房屋钢结构技术规范`). BASE URL 은 드롭다운(`baseUrlOptions` — 언어 기본 서버 먼저 + 직접 입력, v2.4.2).
+
 ### v0.12.0 보완
 
 - PDF는 `actions/outputs.ts`의 `downloadReportPdf()` → `report/pdf.ts`로 직접 파일을 생성한다. pdfmake/pdf-lib는 지연 로딩하며 보고서 데이터는 서버로 전송하지 않는다. 글꼴은 계산서 언어별 축소본 `public/fonts/report-{kr,tc,sc}.otf`(Noto Sans CJK OFL, 앱 소스 글자 2034자만, 각 ~0.8 MB — 원본 16 MB) 중 하나만 로드: 번체 TC·간체 SC·그 밖 KR(한자 자형이 지역별로 다름). 문구에 새 글자가 생기면 `python scripts/subset-fonts.py <원본 OTF 폴더>` 재실행 — `verify-pdf.ts` 가 계산서 글자가 글꼴에 모두 있는지 확인(없으면 실패). 표·SVG를 벡터로 저장하고 넓은 표는 식별열을 반복해 분리한다. 실제 PDF의 페이지 수·크기를 확인한 뒤 다운로드 시작을 알린다. 취소 시 PDF 생성 완료 후 파일 다운로드를 중단한다.

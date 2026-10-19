@@ -117,12 +117,51 @@ export function reportFontFile(lang: string): string {
   return `report-${/^zh-(hant|tw|hk)/.test(l) ? 'tc' : /^zh/.test(l) ? 'sc' : 'kr'}.otf`
 }
 
-export async function createReportPdf(html: string): Promise<{ blob: Blob; pages: number }> {
+/** 도면 PDF — DXF 와 같은 시트(SVG, mm viewBox)를 A3 가로에 한 장씩. 선 굵기는 종이 기준 pt 로 환산
+    (SVG 의 vector-effect 는 PDF 변환기가 무시하므로 viewBox 단위로 다시 계산).
+    도면 글자는 ASCII 뿐(Dxf.text → toAscii)이라 계산서 CJK 글꼴 대신 PDF 표준 Helvetica */
+export const DRAWING_FONT = 'Helvetica'
+export function drawingsPdfDefinition(sheets: { name: string; svg: string }[], title: string): TDocumentDefinitions {
+  const W = 1190.55 - 60, H = 841.89 - 60 // A3 가로 − 여백 30 pt
+  return {
+    info: { title, author: 'Smart MIDAS Steel', subject: 'Structural drawings' },
+    pageSize: 'A3', pageOrientation: 'landscape', pageMargins: [30, 30, 30, 30],
+    defaultStyle: { font: DRAWING_FONT, fontSize: 9 },
+    content: sheets.map((sh, i) => {
+      const box = (sh.svg.match(/viewBox="([^"]+)"/)?.[1] ?? '0 0 1000 700').split(/[\s,]+/).map(Number)
+      const vw = box[2] || 1000, vh = box[3] || 700, scale = Math.min(W / vw, H / vh) // pt per viewBox unit
+      const svg = sh.svg
+        .replace(/ style="[^"]*"/, ` width="${vw}" height="${vh}"`)
+        .replace(/font-family="[^"]*"/, `font-family="${DRAWING_FONT}"`)
+        .replace(/ vector-effect="non-scaling-stroke"/g, '')
+        .replace(/stroke-width="([\d.]+)"/g, (_, w: string) => `stroke-width="${(Number(w) * 0.6 / scale).toFixed(2)}"`)
+        .replace(/stroke-dasharray="([^"]+)"/g, (_, d: string) => `stroke-dasharray="${d.split(/\s+/).map((v) => (Number(v) / scale).toFixed(1)).join(' ')}"`)
+      return { svg, width: vw * scale, height: vh * scale, alignment: 'center' as const, ...(i ? { pageBreak: 'before' as const } : {}) }
+    }),
+  }
+}
+
+async function loadPdfMake(lang: string) {
   const [pdfMakeModule, { PDFDocument }] = await Promise.all([import('pdfmake/build/pdfmake'), import('pdf-lib')])
   const pdfMake = pdfMakeModule.default
-  const doc = new DOMParser().parseFromString(html, 'text/html')
-  const font = new URL(`/fonts/${reportFontFile(doc.documentElement.getAttribute('lang') ?? '')}`, window.location.origin).href
+  const font = new URL(`/fonts/${reportFontFile(lang)}`, window.location.origin).href
   pdfMake.addFonts({ [FONT]: { normal: font, bold: font, italics: font, bolditalics: font } })
+  return { pdfMake, PDFDocument }
+}
+
+export async function createDrawingsPdf(sheets: { name: string; svg: string }[], title: string): Promise<{ blob: Blob; pages: number }> {
+  const [pdfMakeModule, { PDFDocument }, helvetica] = await Promise.all([import('pdfmake/build/pdfmake'), import('pdf-lib'), import('pdfmake/build/standard-fonts/Helvetica')])
+  const pdfMake = pdfMakeModule.default as typeof pdfMakeModule.default & { addFontContainer(c: unknown): void }
+  pdfMake.addFontContainer(helvetica.default)
+  const blob = await pdfMake.createPdf(drawingsPdfDefinition(sheets, title)).getBlob()
+  const pages = (await PDFDocument.load(await blob.arrayBuffer())).getPageCount()
+  if (!pages || blob.size < 100) throw new Error('Empty PDF output')
+  return { blob, pages }
+}
+
+export async function createReportPdf(html: string): Promise<{ blob: Blob; pages: number }> {
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  const { pdfMake, PDFDocument } = await loadPdfMake(doc.documentElement.getAttribute('lang') ?? '')
   const definition = reportPdfDefinition(doc, (el) => new XMLSerializer().serializeToString(el))
   const blob = await pdfMake.createPdf(definition).getBlob()
   const bytes = await blob.arrayBuffer()
