@@ -1,5 +1,7 @@
 # Smart MIDAS Steel 통합 평가 보고서
 
+> 아카이브 · 2026-10-19 정리. 과거 계획·구현·검증 기록입니다. 당시 미완료 항목이 모두 완료됐다는 뜻은 아닙니다. 현재 상태는 [현황](../../current-status.md), 남은 과제는 [로드맵](../../roadmap.md)을 우선 확인하세요.
+
 > 웹페이지 접속 평가 + Gen NX 제품 라이브 검증 평가  
 > 평가일: 2026-10-15  
 > 대상: [Smart MIDAS Steel](https://smart-midas-steel.vercel.app/) → [steel.midasapi.space](https://steel.midasapi.space/zh-TW/)  
@@ -563,7 +565,7 @@ Smart MIDAS Steel은 **기술 데모를 넘어 실제 구조모델과 결과를 
 
 대만은 실제 해석결과를 고정한 기준 모델 회귀가 있다. 중국은 규범 표·하중·형상 등 앵커 검증이 있지만, 대만과 동등한 전체 결과 고정 회귀를 보강해야 한다. 냉간성형강 근사, 접합 강성·회전능력, 앵커 정착 등은 여전히 상세 검토 대상이다.
 
-- 근거: `scripts/verify-tw.ts`, `scripts/tw-golden.ts`, `scripts/verify-cn.ts`, `docs/china_code_implementation.md`
+- 근거: `scripts/verify-tw.ts`, `scripts/tw-golden.ts`, `scripts/verify-cn.ts`, `docs/reference/china_code_implementation.md`
 - 권고: 중국 전체 결과 고정 회귀, 형상·하중·단면 경계값 사례, 독립 수계산 및 외부 기준 결과 비교를 추가한다. 검증을 빌드와 별도 자동 품질 게이트로 묶는다.
 - 완료 기준: 국가별 동일 수준의 재현 가능한 기준 모델과 기대 결과를 보관하고, 계산식 변경 시 차이와 근거를 검토할 수 있다.
 - 주의: 상태 표시가 명확해진 것과 계산 검증이 완료된 것은 별개다.
@@ -632,7 +634,7 @@ v1.5.0의 한국·중국·대만 전체 프로세스 재검토 후, 사용자가
 
 ## 13. v1.7.0 대만 원문 반영 및 최적화 보완 (2026-10-17)
 
-사용자가 추가한 `TW/knowledge/cold-formed-steel-code`와 원본 PDF를 검토했다. 세부 조항·구현·한계는 [대만 원문 검토 기록](taiwan_cold_formed_review.md)에 정리했다. PDF 제작일을 규범 개정연도로 추정하지 않았다.
+사용자가 추가한 `TW/knowledge/cold-formed-steel-code`와 원본 PDF를 검토했다. 세부 조항·구현·한계는 [대만 원문 검토 기록](../../reference/taiwan_cold_formed_review.md)에 정리했다. PDF 제작일을 규범 개정연도로 추정하지 않았다.
 
 - 냉간성형 휨·압축 뒤틀림좌굴(6.2.3·7.3)을 추가하고 기존 단면·횡비틀림 강도와 작은 값을 적용한다. 대만 전용 함수로 분리해 한국 식은 유지했다.
 - 인장·휨에서 양쪽 연단의 8.2-3/4를 확인한다. 계산 결과에 실제 지배 조항을 남긴다.

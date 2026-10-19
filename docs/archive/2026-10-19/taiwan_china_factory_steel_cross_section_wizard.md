@@ -1,4 +1,6 @@
 # Taiwan & China Factory Steel Cross-Section Wizard
+
+> 아카이브 · 2026-10-19 정리. 과거 계획·구현·검증 기록입니다. 당시 미완료 항목이 모두 완료됐다는 뜻은 아닙니다. 현재 상태는 [현황](../../current-status.md), 남은 과제는 [로드맵](../../roadmap.md)을 우선 확인하세요.
 ## 개발 기획 문서
 
 ## 1. 목적
