@@ -61,6 +61,7 @@ export const zhTW: Dict = {
   ws_local_note: '輸入保留於此分頁，重新載入或關閉分頁即會重設。',
   ws_notice: '作業通知', ws_dismiss: '關閉通知', ws_model_sent: '模型輸入已鎖定，可重新開啟修改。',
   ws_help: '選擇建物類型並設定幾何、材料與載重。最終確認後建立模型，再依下方流程進行分析、設計檢核及輸出。返回開始畫面會保留輸入及目前步驟。',
+  section_detail_warn: '含注意事項',
   section_detail: '詳細', section_unit_weight: '單位重', section_sketch: '斷面圖', section_lip: '唇', section_sketch_gen: 'Gen NX DB 性質 · 圖形依尺寸示意', section_sketch_dim: '依尺寸計算之性質 · 圖形為示意',
   mw_title: '建模工作室', mw_process: '建模流程',
   mw_step: (n: number) => `STEP ${String(n).padStart(2, '0')}`,
@@ -539,6 +540,7 @@ export const zhTW: Dict = {
   g_help_2_cmd: '版本說明',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
   rn_v2_4_7_1: '橫斷面新增「單脊多跨（中間柱）」：全寬單一雙坡屋頂，中間柱為搖擺柱，風壓與積雪沿用雙坡規則。',
+  rn_v2_4_7_3: '斷面選擇的型錄、性質來源與冷軋型鋼說明移至斷面圖「詳細」內；含注意事項時於詳細旁顯示 !。',
   rn_v2_4_7_2: '具中間柱之型式（含多跨雙坡）選擇天車時將阻擋進行 — 全寬天車無法通過中間柱。',
   rn_v2_4_6_1: '臺灣：選擇縣市、鄉鎮後，基本設計風速 V10 依耐風規範 2.4 自動帶入並顯示來源。',
   rn_v2_4_6_2: '臺灣：近斷層鄉鎮輸入各斷層距離後，依耐震規範表 2-3 計算震區係數（未輸入不可繼續）。',

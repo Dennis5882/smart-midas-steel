@@ -11,6 +11,12 @@ export function SectionPicker({ id, spec, role, value, disabled, invalid, errorI
   const { material, options, selected, source, excluded, propertyReview, preliminary } = modelingSectionChoices(spec, role, value)
   const shapes = [...new Set(options.map((o) => o.shape))]
   const noteId = `${id}-catalog-note`
+  const notes = <div id={noteId} className="section-picker-note">
+    <small>{t('section_options_note', material, options.length)}</small>
+    <small className={excluded ? 'section-picker-warning' : undefined}>{excluded ? t('section_excluded_source') : source ? t('section_gen_source', source.db) : t('section_dimension_source')}</small>
+    {propertyReview && <small className="section-picker-warning">{t('section_property_review', (selected!.maxRelativeDifference * 100).toFixed(1))}</small>}
+    {preliminary && <small className="section-picker-warning">{t('section_preliminary_note')}</small>}
+  </div>
   return <div className="section-picker">
     <select id={id} className="mono" value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)}
       aria-invalid={invalid} aria-describedby={[noteId, errorId].filter(Boolean).join(' ')}>
@@ -21,14 +27,11 @@ export function SectionPicker({ id, spec, role, value, disabled, invalid, errorI
         </option>)}
       </optgroup>)}
     </select>
-    {value.trim() && <SectionSketch name={value} code={spec.code} material={spec.material} />}
-    <div id={noteId} className="section-picker-note">
-      <small>{t('section_options_note', material, options.length)}</small>
-      <small className={excluded ? 'section-picker-warning' : undefined}>{excluded ? t('section_excluded_source') : source ? t('section_gen_source', source.db) : t('section_dimension_source')}</small>
-      {!selected && <small className="section-picker-warning">{t(options.length ? 'section_outside' : 'section_no_options')}</small>}
-      {propertyReview && <small className="section-picker-warning">{t('section_property_review', (selected!.maxRelativeDifference * 100).toFixed(1))}</small>}
-      {preliminary && <small className="section-picker-warning">{t('section_preliminary_note')}</small>}
-    </div>
+    {/* 목록 밖 값은 입력 문제라 바로 보이게, 카탈로그·출처·적용 한계 안내는 상세 안에 */}
+    {!selected && <small className="section-picker-warning">{t(options.length ? 'section_outside' : 'section_no_options')}</small>}
+    {value.trim()
+      ? <SectionSketch name={value} code={spec.code} material={spec.material} warn={excluded || propertyReview || preliminary}>{notes}</SectionSketch>
+      : notes}
     <details className="section-picker-manual">
       <summary>{t('section_manual')}</summary>
       <label htmlFor={`${id}-manual`}>{t('section_manual_label')}</label>

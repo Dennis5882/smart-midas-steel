@@ -61,6 +61,7 @@ export const zhCN: Dict = {
   ws_local_note: '输入保留在此标签页，刷新或关闭标签页即会重置。',
   ws_notice: '任务通知', ws_dismiss: '关闭通知', ws_model_sent: '模型输入已锁定，可重新打开修改。',
   ws_help: '选择建筑类型并设置几何、材料与荷载。最终确认后创建模型，再按下方流程进行分析、设计校核和输出。返回开始页面会保留输入和当前步骤。',
+  section_detail_warn: '含注意事项',
   section_detail: '详细', section_unit_weight: '单位重', section_sketch: '截面图', section_lip: '卷边', section_sketch_gen: 'Gen NX DB 性质 · 图形按尺寸示意', section_sketch_dim: '按尺寸计算的性质 · 图形为示意',
   mw_title: '建模工作室', mw_process: '建模流程',
   mw_step: (n: number) => `STEP ${String(n).padStart(2, '0')}`,
@@ -539,6 +540,7 @@ export const zhCN: Dict = {
   g_help_2_cmd: '版本说明',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
   rn_v2_4_7_1: '横断面新增“单脊多跨（中柱）”：全宽单一双坡屋面，中柱为摇摆柱，风压与积雪沿用双坡规则。',
+  rn_v2_4_7_3: '截面选择的型录、特性来源与冷弯型钢说明移至截面图“详细”内；含注意事项时在详细旁显示 !。',
   rn_v2_4_7_2: '带中柱的形式（含多跨双坡）选择吊车时将阻止继续 — 全宽吊车无法通过中柱。',
   rn_v2_4_6_1: '台湾：选择县市、乡镇后，基本设计风速 V10 依耐风规范 2.4 自动带入并显示来源。',
   rn_v2_4_6_2: '台湾：近断层乡镇输入各断层距离后，依耐震规范表 2-3 计算震区系数（未输入不可继续）。',

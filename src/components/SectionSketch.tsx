@@ -1,17 +1,22 @@
 import type { CodeId } from '../codes/types'
 import { profileOf } from '../codes'
 import { sectionProps, type SectionProps } from '../domain/sections'
+import type { ReactNode } from 'react'
 import { t } from '../i18n'
 
 /** CC 립 길이는 성질 레코드에 없어서 이름에서 읽는다 ('CC 150x65x20/3.2', 'LC-150x65x20x3.2'). */
 const lipOf = (name: string) => Number(name.trim().match(/^(?:CC\s+|LC-)\d[\d.]*x\d[\d.]*x(\d[\d.]*)/)?.[1] ?? 0)
 
 /** Scaled outline with key dimensions, beside the properties used by the checks. Drawing only — not a fabrication detail. */
-export function SectionSketch({ name, code, material }: { name: string; code: CodeId; material: string }) {
+/** children = 카탈로그·출처 안내 (상세를 펼칠 때만 보임). warn = 상세 안에 주의 문구가 있음 → 요약에 표시 */
+export function SectionSketch({ name, code, material, children, warn = false }: { name: string; code: CodeId; material: string; children?: ReactNode; warn?: boolean }) {
+  const summary = <summary>{t('section_detail')}{warn && <span className="section-sketch-warn" aria-label={t('section_detail_warn')} title={t('section_detail_warn')}>!</span>}</summary>
+  /* 그림을 못 그리는 이름이면 안내만 접어서 */
+  const notesOnly = children ? <details className="section-sketch-info">{summary}{children}</details> : null
   let p: SectionProps
-  try { p = sectionProps(name, code) } catch { return null }
+  try { p = sectionProps(name, code) } catch { return notesOnly }
   // 입력 중인 이름('RH 400x200')은 오류 대신 NaN 치수가 된다 — 완전한 치수일 때만 그린다
-  if (![p.d, p.bf, p.tw, p.tf, p.A, p.Ix, p.Iy].every((v) => Number.isFinite(v) && v > 0) || (p.kind !== 'P' && p.d <= 2 * p.tf) || (p.kind === 'P' && p.d <= 2 * p.tw)) return null
+  if (![p.d, p.bf, p.tw, p.tf, p.A, p.Ix, p.Iy].every((v) => Number.isFinite(v) && v > 0) || (p.kind !== 'P' && p.d <= 2 * p.tf) || (p.kind === 'P' && p.d <= 2 * p.tw)) return notesOnly
   // 물량표(schedule)와 같은 단위중량: γ(kN/m³)·A → kg/m
   const gamma = profileOf(code).materials[material]?.gamma
   const W = 132, Hh = 132, pad = 22
@@ -51,10 +56,11 @@ export function SectionSketch({ name, code, material }: { name: string; code: Co
     </svg>
     {/* 대부분은 그림만 보면 된다 — 성질 표는 필요할 때 펼친다 */}
     <details className="section-sketch-info">
-      <summary>{t('section_detail')}</summary>
+      {summary}
       <small className="mono">{p.kind === 'H' ? `tw ${mm(p.tw)} · tf ${mm(p.tf)} mm` : p.kind === 'CC' ? `t ${mm(p.tw)} · ${t('section_lip')} ${mm(lipOf(name))} mm` : `t ${mm(p.tw)} mm`}</small>
       <dl>{rows.map(([k, v, u]) => <div key={k}><dt>{k}</dt><dd className="mono">{v} <small>{u}</small></dd></div>)}</dl>
       <small>{t(p.source === 'gen-db' ? 'section_sketch_gen' : 'section_sketch_dim')}</small>
+      {children}
     </details>
   </div>
 }

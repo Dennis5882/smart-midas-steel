@@ -70,6 +70,7 @@ export const en = {
   ws_local_note: 'Inputs remain in this tab. Reloading or closing the tab resets them.',
   ws_notice: 'Activity notice', ws_dismiss: 'Dismiss notice', ws_model_sent: 'Model inputs are locked. Reopen them to edit.',
   ws_help: 'Choose a building type and enter geometry, materials and loads. Create the model from the final review, then follow Analysis → Design check → Outputs below. Returning to Start retains your inputs and current step.',
+  section_detail_warn: 'Contains a caution',
   section_detail: 'Details', section_unit_weight: 'Unit weight', section_sketch: 'section drawing', section_lip: 'lip', section_sketch_gen: 'Gen NX DB properties · outline drawn from dimensions', section_sketch_dim: 'Properties computed from dimensions · outline only',
   mw_title: 'Modeling studio',
   mw_process: 'Modeling workflow',
@@ -553,6 +554,7 @@ export const en = {
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
   rn_v2_4_7_1: 'Added a "single ridge + interior columns" cross-section: one gable roof over the full width with leaning interior columns; wind and snow follow the gable rules.',
+  rn_v2_4_7_3: 'Section catalog, property-source and cold-formed notes moved into the section sketch details; a ! marks details that contain a caution.',
   rn_v2_4_7_2: 'Cranes are now blocked for frames with interior columns (including multi-span), as a full-width crane cannot pass interior columns.',
   rn_v2_4_6_1: 'Taiwan: selecting the county and township fills the basic wind speed V10 from wind code 2.4 and shows its source.',
   rn_v2_4_6_2: 'Taiwan: near-fault townships take the distance to each fault and use seismic code table 2-3 coefficients (required to continue).',
