@@ -3,6 +3,7 @@
    항목: [縣市, 鄉鎮市區, S_S^D, S_1^D, S_S^M, S_1^M, 비고] — 비고 = 鄰近斷層 / '里: …'(一般震區 里 목록) / 'basin T0=…'.
    臺北盆地 행은 工址 값(S_DS, S_D1 = S_DS·T0, S_MS, S_M1 = S_MS·T0)이며 地盤 放大 없음, 마지막 칸 'basin T0=…'.
    표2-1 은 縣市 병합 셀을 공식 鄉鎮 수로 배정·검증(불일치 0). */
+import { nearFaultCoef, nearFaultEntries } from './twNearFault'
 import { Fa, Fv } from './twLateral'
 
 export type SiteRow = [county: string, town: string, SsD: number, S1D: number, SsM: number, S1M: number, fault: string]
@@ -373,13 +374,23 @@ export const BASIN = '臺北盆地'
 export const counties = (): string[] => [...new Set(TW_SITES.map((r) => r[0]))]
 export const townsOf = (county: string): string[] => TW_SITES.filter((r) => r[0] === county).map((r) => r[1])
 
-export interface SiteCoef { SDS: number; SD1: number; SMS: number; SM1: number; basin: boolean; fault: string; note: string }
+export interface SiteCoef { SDS: number; SD1: number; SMS: number; SM1: number; basin: boolean; fault: string; note: string; nearFault?: { faults: string; r: number }[] }
 
-/** 2.5·2.6 工址 계수 — S_DS = Fa·S_S^D, S_D1 = Fv·S_1^D, S_MS = Fa·S_S^M, S_M1 = Fv·S_1^M (근단층 2.4 는 미적용 → fault 로 경고) */
-export function siteCoef(county: string, town: string, soil: 1 | 2 | 3): SiteCoef | null {
+/** 2.5·2.6 工址 계수 — S_DS = Fa·S_S^D, S_D1 = Fv·S_1^D, S_MS = Fa·S_S^M, S_M1 = Fv·S_1^M.
+    근단층 鄉鎮은 표2-3 거리 보간값(2.4, 여러 단층이면 계수마다 최댓값)으로 震區 계수를 바꾼다 — 단층 거리가 빠지면 표2-1 값 + fault 경고 */
+export function siteCoef(county: string, town: string, soil: 1 | 2 | 3, nearFault?: string): SiteCoef | null {
   const r = TW_SITES.find((x) => x[0] === county && x[1] === town)
   if (!r) return null
-  const [, , SsD, S1D, SsM, S1M, extra] = r
+  let [, , SsD, S1D, SsM, S1M, extra] = r
+  const nf = county === BASIN ? [] : nearFaultEntries(county, town, nearFault)
+  if (nf?.length) {
+    ;({ SsD, S1D, SsM, S1M } = nearFaultCoef(nf))
+    const r3 = (x: number) => Math.round(x * 1000) / 1000
+    return {
+      SDS: r3(Fa(soil, SsD) * SsD), SD1: r3(Fv(soil, S1D) * S1D), SMS: r3(Fa(soil, SsM) * SsM), SM1: r3(Fv(soil, S1M) * S1M),
+      basin: false, fault: '', note: '', nearFault: nf.map((e) => ({ faults: e.row.faults.join('·'), r: e.r })),
+    }
+  }
   const r3 = (x: number) => Math.round(x * 1000) / 1000
   if (county === BASIN) return { SDS: SsD, SD1: S1D, SMS: SsM, SM1: S1M, basin: true, fault: '', note: extra }
   const fault = extra.startsWith('里:') ? '' : extra
@@ -391,8 +402,8 @@ export function siteCoef(county: string, town: string, soil: 1 | 2 | 3): SiteCoe
 
 /** 지진 계수 출처 — 입력 SDS·SD1·SMS·SM1 이 工址 표값과 같으면 'table', 다르면 'user'(표값 함께), 표에 없으면 'none'. 계산서·화면 표시용 */
 export type SiteSource = { kind: 'table' } | { kind: 'user'; SDS: number; SD1: number } | { kind: 'none' }
-export function siteSource(s: { county: string; town: string; soil: 1 | 2 | 3; SDS: number; SD1: number; SMS: number; SM1: number }): SiteSource {
-  const c = siteCoef(s.county, s.town, s.soil)
+export function siteSource(s: { county: string; town: string; soil: 1 | 2 | 3; SDS: number; SD1: number; SMS: number; SM1: number; nearFault?: string }): SiteSource {
+  const c = siteCoef(s.county, s.town, s.soil, s.nearFault)
   if (!c) return { kind: 'none' }
   const same = (a: number, b: number) => Math.abs(a - b) < 5e-4
   return same(c.SDS, s.SDS) && same(c.SD1, s.SD1) && same(c.SMS, s.SMS) && same(c.SM1, s.SM1) ? { kind: 'table' } : { kind: 'user', SDS: c.SDS, SD1: c.SD1 }

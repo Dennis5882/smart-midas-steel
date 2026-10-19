@@ -13,7 +13,7 @@ import { LOSS, quantities } from '../domain/quantities'
 import { buildDrawingSvgs } from '../drawing/drawings'
 import { isoSvg, RATIO_BANDS, ratioColor, ROLE_COLOR } from '../drawing/iso'
 import { connGrade, GRADES, roleGrade, summarizeStatus, type Grade, type Graded } from '../domain/status'
-import { siteSourceText } from '../components/Status'
+import { siteSourceText, windSourceText } from '../components/Status'
 import { dimsText } from './dims'
 import { scopeMsg } from '../components/ScopeBox'
 import { checkScope } from '../domain/scope'
@@ -181,7 +181,7 @@ export function buildReport({ built, reactions, design, connections, opt }: Repo
   parts.push(`<h3>${L('rep_wind')}</h3>`)
   const wi = spec.wind
   if (spec.code === 'KR' && kr) parts.push(`<p>V<sub>0</sub> = ${spec.korea!.V0} m/s, K<sub>D</sub> = ${spec.korea!.KD}, K<sub>zr</sub> = ${f(kr.Kzr, 3)} (${L('f_exposure')} ${spec.korea!.exposure}), K<sub>zt</sub> = ${spec.korea!.Kzt}, I<sub>W</sub> = ${kr.Iw} → V<sub>H</sub> = ${f(kr.VH, 2)} m/s, q<sub>H</sub> = ½ρV<sub>H</sub>² = ${f(info.wind.qh, 3)} kN/m² (H = ${f(info.wind.hRef, 2)} m); G<sub>D</sub> X ${f(kr.GD.X, 3)} / Y ${f(kr.GD.Y, 3)} (5.6-2); G<sub>pe</sub> X ${f(kr.Gpe.X, 3)} / Y ${f(kr.Gpe.Y, 3)} (${kr.resonant.X ? '5.6-6' : '5.6-5'}, n<sub>R0</sub> ≈ ${f(kr.nR0, 2)} Hz); C<sub>pi</sub> ${kr.cpi.join(' / ')} (표 5.7-4)</p>`)
-  else parts.push(spec.code === 'CN' ? `<p>w<sub>0</sub> = ${spec.china!.w0} kN/m²; terrain ${spec.china!.terrain}; topography ${spec.china!.topography}; h = ${f(info.wind.hRef, 2)} m; μ<sub>z</sub>·w<sub>0</sub> = ${f(info.wind.qh, 3)} kN/m² (μ<sub>z</sub> at max(h, 10 m)); β = 1.1 (frame) / 1.5 (purlin·girt); 2a = ${f(info.cn?.endZone ?? 0, 2)} m (GB 51022 4.2)</p>` : `<p>V10 = ${wi.V10} m/s, I = ${wi.I}, ${L('f_exposure')} ${wi.exposure}, ${L(wi.enclosure === 'enclosed' ? 'encl_enclosed' : 'encl_partial')}, h = ${f(info.wind.hRef, 2)} m, q(h) = ${f(info.wind.qh, 3)} kN/m², G = ${prof.lateral.gust}</p>`)
+  else parts.push(spec.code === 'CN' ? `<p>w<sub>0</sub> = ${spec.china!.w0} kN/m²; terrain ${spec.china!.terrain}; topography ${spec.china!.topography}; h = ${f(info.wind.hRef, 2)} m; μ<sub>z</sub>·w<sub>0</sub> = ${f(info.wind.qh, 3)} kN/m² (μ<sub>z</sub> at max(h, 10 m)); β = 1.1 (frame) / 1.5 (purlin·girt); 2a = ${f(info.cn?.endZone ?? 0, 2)} m (GB 51022 4.2)</p>` : `<p>V10 = ${wi.V10} m/s (${esc(windSourceText(spec))}), I = ${wi.I}, ${L('f_exposure')} ${wi.exposure}, ${L(wi.enclosure === 'enclosed' ? 'encl_enclosed' : 'encl_partial')}, h = ${f(info.wind.hRef, 2)} m, q(h) = ${f(info.wind.qh, 3)} kN/m², G = ${prof.lateral.gust}</p>`)
   if (spec.code === 'CN') parts.push(table([t('res_lc'), 'X / Y', 'μw (2)', '±i'], info.wind.cases.map((c) => [c.name, c.dir, f(c.roofCp, 3), c.gcpi > 0 ? '+i' : '−i'])))
   else parts.push(table([t('res_lc'), 'X / Y', t('kv_cpRoof'), 'GCpi'], info.wind.cases.map((c) => [c.name, c.dir, f(c.roofCp, 3), f(c.gcpi, 3)])))
   const ac = info.wind.across

@@ -46,6 +46,7 @@ export function Workspace({ guideCollapsed, onOpenGuide, onOpenMapi }: { guideCo
       <section className="project-code" aria-labelledby="project-code-heading"><h3 id="project-code-heading" className="ws-section-label">{t('code_label')}</h3><select aria-label={t('code_label')} value={restrictedCode ? '' : s.code} disabled={s.busy || !!s.confirm} onChange={(e) => void setCode(e.target.value as CodeId)}>{restrictedCode && <option value="" disabled>{t('project_code_existing')}</option>}{availableCodes.map((id) => <option key={id} value={id}>{t(PROFILES[id].selectLabelKey ?? PROFILES[id].labelKey)}</option>)}</select>{restrictedCode && <p role="status">{t('project_code_existing_hint')}</p>}</section>
       {plan?.spec.code === s.code && <button className="ws-resume-card" disabled={s.busy} onClick={openCurrentModel}><FolderOpen size={20} /><span><strong>{t('ws_resume')}</strong><small>{t('ws_resume_hint')}</small></span><ArrowRight size={16} /></button>}
       <h3 className="ws-section-label">{t('ws_templates')}</h3>
+      <p className="ws-tpl-note">{t('ws_tpl_note')}</p>
       <div className="ws-template-grid">{TEMPLATE_KEYS.map((key) => {
         const geometry=TEMPLATES[key]
         return <button className="ws-template" key={key} disabled={s.busy || restrictedCode} onClick={() => void executeAction({ intent: 'new', mode: 'template', tpl: key, params: {} })}>

@@ -51,6 +51,31 @@ for(const lang of ['ko','en','zh-TW','zh-CN'] as const) {
     assumed.additions.crane!.manufacturer='Test Crane Co.'
     assert.ok(!checkScope(assumed).issues.some(i=>i.key==='craneAssumed'),'A named maker clears the assumption warning')
     assert.ok(!craneInputIssues(runway,false).some(e=>e.kind==='source'||e.kind==='confirm'),'Geometry preview does not require source confirmation')
+    // TW 工址: location-suggested site values stay an assumption until the engineer confirms them
+    {
+      const { DEFAULT_SPEC, defaultSpecFor } = await import('../src/domain/types')
+      const { toSpec, initVals } = await import('../src/components/planFields')
+      const tw = structuredClone(DEFAULT_SPEC)
+      assert.ok(checkScope(tw).issues.some(i=>i.key==='siteAssumed'&&i.level==='warn'),'TW site values default to an assumption')
+      assert.equal(toSpec(tw,initVals(tw),false).siteBasis,undefined,'Untouched site basis does not change the spec')
+      const confirmed = toSpec(tw,{...initVals(tw),siteBasis:'confirmed'},false)
+      assert.equal(confirmed.siteBasis,'confirmed')
+      assert.ok(!checkScope(confirmed).issues.some(i=>i.key==='siteAssumed'),'Confirmed site clears the warning')
+      for (const code of ['CN','KR'] as const) assert.ok(!checkScope(defaultSpecFor(code)).issues.some(i=>i.key==='siteAssumed'),`${code} has no TW site warning`)
+      // Near-fault township: one distance input per table 2-3 fault row; required before the field is valid
+      const { NearFaultInput } = await import('../src/components/NearFaultInput')
+      const { nearFaultRows } = await import('../src/codes/twNearFault')
+      const rows = nearFaultRows('臺中市','和平區')
+      const html = renderToStaticMarkup(createElement(NearFaultInput,{id:'nf',county:'臺中市',town:'和平區',value:'',disabled:false,invalid:true,onChange:()=>{}}))
+      assert.equal((html.match(/<input/g)??[]).length, rows.length, 'one distance input per fault row')
+      assert.ok(html.includes('車籠埔斷層全段'), 'fault names shown')
+      const { invalidFields, FIELDS } = await import('../src/components/planFields')
+      const nfField = FIELDS.find((f)=>f.path==='seismic.nearFault')!
+      const hp = {...tw, seismic:{...tw.seismic, county:'臺中市', town:'和平區'}}
+      assert.ok(invalidFields(hp,{...initVals(hp),'seismic.nearFault':''},false).includes(nfField), 'missing fault distance blocks the near-fault township')
+      assert.ok(!invalidFields(hp,{...initVals(hp),'seismic.nearFault':rows.map(r=>`${r.id}:5`).join(';')},false).includes(nfField), 'all distances given → valid')
+      assert.ok(!invalidFields(tw,initVals(tw),false).includes(nfField), 'non-fault township needs no distance')
+    }
     const invalidRunway=renderToStaticMarkup(createElement(StructureEditor,{...props,spec:runway,attempted:true}))
     assert.ok(invalidRunway.includes(t('crane_travel_summary',1,10,String(10*runway.baySpacing))))
     assert.ok(!invalidRunway.includes(t('add_invalid_crane')),'Specific crane errors replace the ambiguous generic warning')

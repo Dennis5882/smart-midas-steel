@@ -163,5 +163,48 @@ n += now.members.length - 1
 eq(now.summary, G.summary, 'summary (max ratio, NG, by role, serviceability, connections)')
 eq(now.conns, G.conns, 'connection dims and per-item ratios')
 
+/* 工址 위치 데이터 — 耐風規範(2014) 2.4 기본설계풍속 · 耐震規範(113) 2.4 표2-3 근단층 (원문 KB 에서 생성한 표와 대조) */
+{
+  const { windV10 } = await import('../src/codes/twWind')
+  const { TW_SITES, BASIN, siteCoef } = await import('../src/codes/twSites')
+  const { NEAR_FAULT, nearFaultRows, interpAt, nearFaultEntries } = await import('../src/codes/twNearFault')
+  const { Fa, Fv } = await import('../src/codes/twLateral')
+  // 모든 선택 가능한 鄉鎮에 V10 이 있음
+  for (const [c, town] of TW_SITES) assert.ok(windV10(c, town), `V10 for ${c} ${town}`)
+  for (const [c, town, v] of [['花蓮縣', '花蓮市', 47.5], ['基隆市', '七堵區', 42.5], ['臺北市', '文山區（一般震區 5里）', 42.5], ['桃園市', '中壢區', 37.5], ['臺中市', '烏日區', 27.5],
+    ['南投縣', '竹山鎮', 22.5], ['彰化縣', '員林市', 27.5], ['雲林縣', '二崙鄉', 27.5], ['臺東縣', '蘭嶼鄉', 65], ['屏東縣', '琉球鄉', 40], ['金門縣', '烈嶼鄉', 35], ['連江縣', '南竿鄉', 42], ['澎湖縣', '馬公市', 33]] as const) {
+    assert.equal(windV10(c, town)!.V10, v, `V10 ${c} ${town}`)
+  }
+  assert.deepEqual(windV10(BASIN, '臺北一區'), { V10: 42.5, note: 'basin' })
+  assert.equal(windV10('基隆市', '中正區')!.note, 'pengjia'); assert.equal(windV10('澎湖縣', '望安鄉')!.note, 'dongji')
+  n += 17
+  // 표2-1 鄰近斷層 鄉鎮 ↔ 표2-3 행: 서로 빠짐 없음, 먼 거리(r ≥ 14) 값은 표2-1 일반 값
+  const marked = TW_SITES.filter((r) => r[0] !== BASIN && r[6] && !r[6].startsWith('里:'))
+  for (const [c, town, SsD, S1D, SsM, S1M] of marked) {
+    const rows = nearFaultRows(c, town)
+    assert.ok(rows.length, `table 2-3 rows for ${c} ${town}`)
+    assert.equal(Math.max(...rows.map((r) => r.SsD[7])), SsD, `${c} ${town} far-field SsD = table 2-1`)
+    assert.equal(Math.max(...rows.map((r) => r.S1D[7])), S1D, `${c} ${town} far-field S1D`)
+    assert.equal(Math.max(...rows.map((r) => r.SsM[7])), SsM, `${c} ${town} far-field SsM`)
+    assert.equal(Math.max(...rows.map((r) => r.S1M[7])), S1M, `${c} ${town} far-field S1M`)
+    n += 5
+  }
+  for (const row of NEAR_FAULT) for (const [c, town] of row.towns) assert.ok(marked.some((m) => m[0] === c && m[1].replace(/（.*?）/g, '') === town), `${row.id} ${c} ${town} is marked near-fault in table 2-1`)
+  // 원문 해설 예: 臺中市和平區, 車籠埔斷層 13~14 km → 0.8 과 0.7 사이 보간
+  const chelungpu = nearFaultRows('臺中市', '和平區').find((r) => r.faults.includes('車籠埔斷層全段'))!
+  assert.equal(interpAt(chelungpu.SsD, 13.5), 0.75); assert.equal(interpAt(chelungpu.SsD, 0), chelungpu.SsD[0]); assert.equal(interpAt(chelungpu.SsD, 30), 0.7)
+  // 거리 입력 → 工址 계수 (여러 단층이면 계수마다 최댓값), 빠지면 표2-1 + 경고
+  const rows = nearFaultRows('臺中市', '和平區')
+  assert.equal(nearFaultEntries('臺中市', '和平區', `${rows[0].id}:2`), rows.length > 1 ? null : nearFaultEntries('臺中市', '和平區', `${rows[0].id}:2`))
+  const raw = rows.map((r, i) => `${r.id}:${i ? 20 : 2}`).join(';')
+  const sc = siteCoef('臺中市', '和平區', 2, raw)!, ss = Math.max(...rows.map((r, i) => interpAt(r.SsD, i ? 20 : 2)))
+  assert.equal(sc.fault, ''); assert.ok(sc.nearFault?.length === rows.length)
+  assert.equal(sc.SDS, Math.round(Fa(2, ss) * ss * 1000) / 1000, 'near-fault SDS = Fa·SsD(r)')
+  const s1 = Math.max(...rows.map((r, i) => interpAt(r.S1D, i ? 20 : 2)))
+  assert.equal(sc.SD1, Math.round(Fv(2, s1) * s1 * 1000) / 1000, 'near-fault SD1 = Fv·S1D(r)')
+  assert.ok(siteCoef('臺中市', '和平區', 2)!.fault, 'missing distances keep the near-fault warning')
+  n += 8
+}
+
 console.log(`TW verify: ${n} checks passed (hand ${nHand}, load balance ${nLoad}, golden ${n - nHand - nLoad} incl. ${now.members.length} members)`)
 console.log(`  fixture ${fx.captured.slice(0, 10)} · max ${G.summary.maxRatio} · NG ${G.summary.ng} · conns ${G.summary.conns.map((c) => `${c.type} ${c.ratio.toFixed(3)}`).join(', ')}`)

@@ -1,5 +1,6 @@
 /* 공장 스펙 입력 칸 정의·검증 (순수, JSX 없음) — PlanCard(기본 모델링 위저드·자유골조 편집) 공통.
    잘못된 칸이 하나라도 있으면 두 모드 모두 생성 불가 — 기존 값으로 조용히 대체해 전송하지 않는다. */
+import { nearFaultEntries } from '../codes/twNearFault'
 import { profileOf } from '../codes'
 import type { FigureKey } from './FigureRef'
 import { counties, townsOf } from '../codes/twSites'
@@ -86,8 +87,10 @@ export const GROUPS: Group[] = [
     { path: 'anchorFu', label: 'f_anchorFu', unit: 'MPa', kind: 'num' },
   ] },
   { title: 'sec_seismic', fields: [
+    { path: 'siteBasis', label: 'f_siteBasis', kind: 'select', fallback: 'assumed', options: () => (['assumed', 'confirmed'] as const).map((v) => ({ value: v, label: t(`site_basis_${v}`) })) },
     { path: 'seismic.county', label: 'f_county', kind: 'select', options: () => counties().map((c) => ({ value: c, label: c })) },
     { path: 'seismic.town', label: 'f_town', kind: 'select', options: (sp) => townsOf(sp.seismic.county).map((c) => ({ value: c, label: c })) },
+    { path: 'seismic.nearFault', label: 'f_nearFault', kind: 'text', fallback: '', full: true },
     { path: 'seismic.soil', label: 'f_soil', kind: 'select', numeric: true, options: () => ([1, 2, 3] as const).map((v) => ({ value: String(v), label: t(`soil_${v}`) })) },
     { path: 'seismic.SDS', label: 'f_SDS', unit: 'g', kind: 'num' },
     { path: 'seismic.SD1', label: 'f_SD1', unit: 'g', kind: 'num' },
@@ -187,7 +190,9 @@ export function toSpec(base: FactorySpec, vals: Record<Path, string>, free: bool
   const frame = (vals.frame || base.frame) as FrameType | undefined
   for (const f of groupsFor(base.code, free, frame, individual).flatMap((g) => g.fields)) {
     const raw = vals[f.path]
-    if (f.path.startsWith('restraints.') && raw === 'assumed' && getPath(base, f.path) === undefined) continue
+    if ((f.path.startsWith('restraints.') || f.path === 'siteBasis') && raw === 'assumed' && getPath(base, f.path) === undefined) continue
+    /* 근단층 거리는 鄉鎮이 바뀌면 비워진다 — 빈 값도 그대로 반영해 이전 鄉鎮 거리가 남지 않게 */
+    if (f.path === 'seismic.nearFault') { sp = setPath(sp, f.path, raw?.trim() ? raw.trim() : undefined); continue }
     if (f.kind === 'list') {
       const l = parseList(raw)
       if (!listError(raw, f.path === 'bayList' && individual && !free)) sp = setPath(sp, f.path, l)
@@ -214,6 +219,8 @@ export const listError = (raw: string, cells = false) => {
 }
 
 export function invalidField(f: Field, raw: string, spec: FactorySpec, individualCells = false): boolean {
+  /* 근단층 鄉鎮이면 표2-3 단층 행마다 거리(km ≥ 0) 필수, 아니면 칸 없음 */
+  if (f.path === 'seismic.nearFault') return nearFaultEntries(spec.seismic.county, spec.seismic.town, raw) === null
   if (!raw?.trim()) return true
   if (f.kind === 'list') return listError(raw, f.path === 'bayList' && individualCells)
   if (f.kind === 'select') return !f.options!(spec).some((o) => o.value === raw)

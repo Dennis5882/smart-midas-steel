@@ -7,7 +7,7 @@ import type { ConnResult } from '../domain/connections'
 import {isLengthService,type DesignResult} from '../domain/design'
 import type { OptSummary } from '../domain/optimize'
 import { connGrade, roleGrade } from '../domain/status'
-import { GradeChip, siteSourceText, StatusCard } from './Status'
+import { GradeChip, siteSourceText, StatusCard, windSourceText } from './Status'
 import { dimValue } from '../report/dims'
 import { StaleBanner } from './StaleBanner'
 import { selectTask } from '../state/ui'
@@ -98,6 +98,7 @@ export function ModelPanel() {
       <div className="scard"><h3>{t('sec_load')}</h3>
         <KV k={t('kv_roofLive')} v={`${f3(info.roofLive)} kN/m²`} />
         <KV k={t('kv_site_src')} v={siteSourceText(sp)} />
+        {sp.code === 'TW' && <KV k={t('kv_wind_src')} v={windSourceText(sp)} />}
         <KV k={t('kv_W')} v={`${f1(info.seismic.W)} kN`} />
         <KV k={t('kv_EX')} v={seis('X')} hi />
         <KV k={t('kv_EY')} v={seis('Y')} hi />

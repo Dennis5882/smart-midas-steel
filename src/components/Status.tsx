@@ -1,6 +1,7 @@
 /* 검토 상태 표시 — 등급 칩, 결과 탭 상단 요약 카드, 채팅 한 줄 요약. 등급 판정은 domain/status.ts (순수). */
 import { profileOf, type CodeId } from '../codes'
-import { siteSource } from '../codes/twSites'
+import { siteCoef, siteSource } from '../codes/twSites'
+import { windSource } from '../codes/twWind'
 import { checkScope } from '../domain/scope'
 import { scopeMsg } from './ScopeBox'
 import type { FactorySpec } from '../domain/types'
@@ -53,5 +54,15 @@ export function siteSourceText(spec: FactorySpec): string {
   if (spec.code === 'CN') return t('site_src_CN')
   if (spec.code === 'KR') { const k = spec.korea!; return t('site_src_KR', k.zone === '1' ? 'I' : 'II', k.S, k.site) }
   const s = siteSource(spec.seismic)
+  const nf = s.kind === 'table' ? siteCoef(spec.seismic.county, spec.seismic.town, spec.seismic.soil, spec.seismic.nearFault)?.nearFault : undefined
+  if (nf?.length) return t('site_src_nf', nf.map((e) => `${e.faults} r = ${e.r} km`).join('; '))
   return s.kind === 'table' ? t('site_src_table') : s.kind === 'user' ? t('site_src_user', s.SDS, s.SD1) : t('site_src_none')
+}
+
+/** TW 기본설계풍속 출처 — 耐風規範(2014) 2.4 鄉鎮 구역 */
+export function windSourceText(spec: FactorySpec): string {
+  const w = windSource(spec.wind.V10, spec.seismic.county, spec.seismic.town)
+  if (w.kind === 'none') return t('wind_src_none')
+  const base = w.kind === 'table' ? t('wind_src_table', w.V10) : t('wind_src_user', w.V10)
+  return w.note ? `${base} — ${t(`wind_note_${w.note}`)}` : base
 }

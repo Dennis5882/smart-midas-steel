@@ -18,7 +18,7 @@ export const zhTW: Dict = {
   bay_number: (n: number) => `第 ${n} 跨`,
   bay_remove: (n: number) => `刪除第 ${n} 跨`,
   bay_add: '新增跨',
-  bay_spacing_title: '柱距',
+  bay_spacing_title: '縱向柱距',
 
   mt_notes: '檢核備註',
   cn_gussetNet: '接合板淨有效斷面',
@@ -29,6 +29,8 @@ export const zhTW: Dict = {
   flow_invalid_design: '超出檢核方法適用限值。請調整模型或分析方法並重新檢核後輸出。',
   restraint_note: '側向支撐假定須按實際接合及傳力路徑核實。已確認表示設計者已檢查雙翼板支撐、勁度及錨定，程式不驗證構造詳圖。',
   restraint_flyBraces: '飛撐 / 翼板側向支撐', restraint_sagRods: '拉條側向支撐', restraint_braceCrossing: '交叉斜撐交點約束',
+  f_siteBasis: '工址條件依據', site_basis_assumed: '位置建議參數 — 待工程師確認', site_basis_confirmed: '工程師已確認（地質調查、地況、用途）',
+  sc_siteAssumed: '工址條件（地盤分類、地況、用途係數）為依位置之建議參數 — 請依地質調查資料及專案條件確認。',
   restraint_assumed: '假定 — 待確認', restraint_confirmed: '設計者已確認', restraint_none: '無 — 採全長',
   cn_blockTear: '接合板塊狀撕裂', cn_gussetStability: '接合板受壓穩定', q_excluded: '未計數量 / 支撐條件',
   flow_model: '建模', flow_model_hint: '設定幾何、材料及載重，再建立 Gen NX 模型。',
@@ -63,6 +65,7 @@ export const zhTW: Dict = {
   mw_title: '建模工作室', mw_process: '建模流程',
   mw_step: (n: number) => `STEP ${String(n).padStart(2, '0')}`,
   mw_scope: '開始', mw_frame: '橫斷面', mw_bays: '長度與跨間', mw_sections: '材料與斷面', mw_loads: '工址與載重', mw_review: '最終確認',
+  ws_tpl_note: '建議初始尺寸（可修改；非規範指定值）',
   mw_template_note: '範本僅設定幾何形狀，請於後續步驟確認專案材料及載重。',
   mw_plan: '構架配置示意圖', mw_next: '下一步', mw_back: '上一步', mw_to_review: '確認輸入', mw_build: '於 Gen NX 建立模型',
   mw_details: '展開輸入值', mw_ready: '輸入就緒，建立前請確認',
@@ -389,6 +392,16 @@ export const zhTW: Dict = {
   src_anal: '分析：Gen NX 線性靜力分析 — 反力、構材內力、位移',
   src_design_why: 'Gen NX 鋼構設計 API 不支援臺灣規範（僅 KDS），故未使用。',
   src_design_why_CN: 'Gen NX 公開設計 API 僅有 GB50017-03（舊版），故未使用。',
+  f_nearFault: '近斷層距離（表2-3）',
+  nf_hint: (n) => `本鄉鎮位於近斷層區域 — 請輸入工址至各斷層地表跡線之最短水平距離（km，依中央地質調查所公布之活動斷層位置）。不確定時輸入 0 最保守。${n > 1 ? '鄰近多條斷層時，分別計算並取各係數最大值（2.4）。' : ''}`,
+  site_src_nf: (list) => `近斷層表2-3（${list}）+ 表2-4 自動值`,
+  kv_wind_src: '基本設計風速來源',
+  wind_src_table: (v) => `表 2.4 本鄉鎮值 — ${v} m/s`,
+  wind_src_user: (v) => `使用者輸入 — 表 2.4 值 ${v} m/s`,
+  wind_src_none: '表 2.4 無此鄉鎮 — 使用者輸入',
+  wind_note_basin: '臺北盆地：臺北市 42.5、新北市三重/蘆洲/新莊/板橋/永和 37.5 m/s — 已採較大值 42.5，請依實際行政區確認。',
+  wind_note_pengjia: '彭佳嶼為 57 m/s（中正區其他地區 42.5）。',
+  wind_note_dongji: '東吉島為 45 m/s（望安鄉其他地區 33）。',
   kv_site_src: '地震係數來源',
   site_src_table: '建築物耐震設計規範（113 年）表 2-1、2-4 自動值',
   site_src_none: '表中無此工址 — 使用者輸入',
@@ -517,13 +530,16 @@ export const zhTW: Dict = {
   soil_3: '第三類（軟弱，Vs30 < 180）',
   f_SMS: 'S_MS',
   f_SM1: 'S_M1',
-  site_fault: (f) => `鄰近斷層之鄉鎮（${f}）— 未套用 2.4 節表 2-3 依距離之值，請確認後自行輸入 S_DS·S_D1。`,
+  site_fault: (f) => `近斷層鄉鎮（${f}）— 於上方輸入斷層距離即套用表2-3；輸入前為表2-1 值。`,
   site_basin: '臺北盆地微分區 — 採表 2-6(c) 工址值，Ra 依 (2-11)、V* 依 (2-13b)。',
   rn_title: '版本說明',
   rn_current: '目前',
   g_help_2: '版本說明',
   g_help_2_cmd: '版本說明',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_4_6_1: '臺灣：選擇縣市、鄉鎮後，基本設計風速 V10 依耐風規範 2.4 自動帶入並顯示來源。',
+  rn_v2_4_6_2: '臺灣：近斷層鄉鎮輸入各斷層距離後，依耐震規範表 2-3 計算震區係數（未輸入不可繼續）。',
+  rn_v2_4_6_3: '臺灣：新增工址條件確認狀態（未確認時須專業審查），用語改為橫向跨距、縱向開間數、縱向柱距，並註明範本為非規範指定尺寸。',
   rn_v2_4_5_1: '數量表可選擇 CSV 或 Excel（XLSX）下載；XLSX 數值為數字儲存格、標題加粗，可直接計算。',
   rn_v2_4_4_1: '工作選單的「分析」圖示改為計算機。',
   rn_v2_4_3_1: '產出畫面整理為計算書、圖說、數量三張卡片：選擇格式（計算書 PDF/Word/HTML、圖說 DXF/PDF、數量 CSV）後匯出，並記住所選格式。',
@@ -777,7 +793,7 @@ export const zhTW: Dict = {
     '傳送模型到 Gen NX 前，請先在 ⚙ 設定 MAPI-Key。',
   help_html:
     '<div class="help">' +
-    '<div class="hr"><div class="hk">模型</div><div class="hv"><div class="hc"><code>建立廠房</code><code>建立廠房 跨距 30 簷高 9 跨數 8 柱距 7.5</code></div><div class="hn">開啟規格卡。修改並以 3D 確認後執行，模型與載重會傳送到 Gen NX。</div></div></div>' +
+    '<div class="hr"><div class="hk">模型</div><div class="hv"><div class="hc"><code>建立廠房</code><code>建立廠房 跨距 30 簷高 9 開間數 8 柱距 7.5</code></div><div class="hn">開啟規格卡。修改並以 3D 確認後執行，模型與載重會傳送到 Gen NX。</div></div></div>' +
     '<div class="hr"><div class="hk">分析</div><div class="hv"><div class="hc"><code>分析</code></div><div class="hn">執行 Gen NX 分析。</div></div></div>' +
     '<div class="hr"><div class="hk">結果</div><div class="hv"><div class="hc"><code>反力</code></div><div class="hn">各載重工況之反力總和 — 確認載重是否依計算施加。</div></div></div>' +
     '<div class="hr"><div class="hk">其他</div><div class="hv"><div class="hc"><code>狀態</code><code>連線確認</code><code>清除</code></div></div></div>' +
@@ -853,9 +869,9 @@ export const zhTW: Dict = {
   f_fc: "基座混凝土 fc'",
   f_anchorFu: '錨栓 Fu',
   sec_dead: '裝修（靜載重）',
-  f_span: '跨距',
-  f_bays: '跨數',
-  f_baySpacing: '柱距',
+  f_span: '橫向跨距',
+  f_bays: '縱向開間數',
+  f_baySpacing: '縱向柱距',
   f_eave: '簷高',
   f_slope: '屋頂坡度',
   f_base: '柱腳',

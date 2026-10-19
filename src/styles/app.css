@@ -200,6 +200,8 @@ main.splitting .right,main.splitting .chat{pointer-events:none}
 .task-warning{font-size:.74rem;line-height:1.8;color:var(--amber);padding:12px;border-left:2px solid var(--amber);background:var(--tip-bg);margin:14px 0}
 .task-content>.scard{font-size:.8rem}.task-content>.btn{margin-top:10px;font-size:.72rem}
 .export-list{display:grid;gap:11px;margin:18px 0}
+.nf-input{display:grid;gap:6px;width:100%}.nf-row{display:grid;grid-template-columns:minmax(0,1fr) 110px auto;align-items:center;gap:8px;font-size:.78rem}.nf-input small{color:var(--muted);font-size:.7rem}
+.ws-tpl-note{margin:-4px 0 10px;font-size:.72rem;color:var(--muted)}
 .report-export{padding:16px 17px;border:1px solid var(--border);border-radius:10px;background:var(--panel)}
 .report-export-head{display:flex;align-items:center;gap:10px;color:var(--cyan)}.report-export-head strong{font-size:.84rem;font-weight:600;color:var(--txt-hi)}
 .report-export-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-top:14px}

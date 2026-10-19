@@ -58,6 +58,11 @@ Vite 8 + TypeScript + React 19 + Tailwind v4 + shadcn/ui(new-york) + **Vercel Fu
 - **다국어** `src/i18n/` — ko/en/zh-TW/zh-CN. 사전 `dict/en.ts`가 키 기준, 나머지는 `Dict` 타입이라 **키 누락·인자 불일치는 컴파일 오류**. UI 문구는 `t('key')`로만 (인라인 다국어 객체 금지). 언어 추가 = `types.ts` `LANG_DEFS` 한 줄 + 사전 파일.
 - 중국어 용어: zh-TW는 대만 규범 용어(屋樑·檁條·牆樑), zh-CN은 대륙 용어(屋面梁·檩条·墙梁). 참고 오라클은 story CLAUDE.md의 i18n 절.
 
+## 대만 工址 입력 (v2.4.6, 현지화 검토 반영)
+- `codes/twWind.ts` 耐風規範(2014) 2.4 鄉鎮별 V10(원문 KB 생성, 2014 지명→현행: 桃園縣→桃園市·員林鎮→員林市, 외도 金門 35·馬祖 42·澎湖 33·蘭嶼/綠島 65·琉球 40, 臺北盆地 = 보수 42.5 + note, 彭佳嶼·東吉島 note). 縣市·鄉鎮 변경 시 V10 자동, 출처 `windSourceText`(편집기·모델 탭·계산서).
+- `codes/twNearFault.ts` 耐震規範(113) 2.4 표2-3-1~4 근단층 24행(원문 KB 생성). 근단층 鄉鎮은 단층 행마다 거리 필수(`seismic.nearFault` = 'NF01:5;NF03:14', `NearFaultInput`) → r 선형 보간, 여러 단층이면 계수마다 최댓값 → Fa·Fv. 회귀(verify-tw): 표2-1 鄰近斷層 鄉鎮 ↔ 표2-3 행 상호 포함, 먼 거리 값 = 표2-1 값, 해설 예(和平區 13.5 km → 0.75).
+- `siteBasis`('assumed' 기본 = 위치 기반 제안값) — TW 결과는 확인 전 scope warn `siteAssumed`(전문가 검토). 번체 용어 橫向跨距·縱向開間數·縱向柱距, 시작 화면 템플릿 '非規範指定值' 안내.
+
 ## 원문·Gen NX 참조 자료
 - 국가 코드 원문 KB: `E:/MIDAS PROGRAM/COde/{TW,CN,KR,US}/knowledge/` (조항 단위 `chunks.jsonl`). 대만 강구조: `TW/knowledge/steel-design-technical-code`(ASD/LRFD), `steel-construction-code`(施工), `seismic-design-code`, `wind-load-2014`, `building-technical-rules-structure`(冷軋型鋼 포함).
 - 하중조합: LRFD 2.2 (2.2-1~2.2-6) 반영 완료.

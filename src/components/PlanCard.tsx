@@ -8,6 +8,9 @@ import type { FactoryAdditions } from '../domain/additionTypes'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { buildFactory } from '../actions/build'
 import { siteCoef, townsOf } from '../codes/twSites'
+import { windV10 } from '../codes/twWind'
+import { nearFaultRows } from '../codes/twNearFault'
+import { NearFaultInput } from './NearFaultInput'
 import { regionZoneKR, ZONE_Z } from '../codes/krLateral'
 import type { TemplateKey } from '../domain/templates'
 import { TEMPLATES, TEMPLATE_KEYS } from '../domain/templates'
@@ -19,7 +22,7 @@ import { BaySpacingEditor } from './BaySpacingEditor'
 import { NumericInput } from './NumericInput'
 import { SectionPicker } from './SectionPicker'
 import { FigureButton, FigureNote } from './FigureRef'
-import { siteSourceText } from './Status'
+import { siteSourceText, windSourceText } from './Status'
 import { ScopeBox } from './ScopeBox'
 import { checkScope, NO_FEATURES, type ScopeFeatures } from '../domain/scope'
 import { lengthText, type FactorySpec, type ElementRole } from '../domain/types'
@@ -125,10 +128,15 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
       if (!individual && (p === 'bays' || p === 'baySpacing') && Number.isInteger(+n.bays) && +n.bays > 0 && +n.bays <= 1000 && Number.isFinite(+n.baySpacing) && +n.baySpacing > 0) {
         n.bayList = Array.from({ length: +n.bays }, () => n.baySpacing).join(', ')
       }
-      /* 工址 선택 → 표2-1·2-4 로 SDS·SD1·SMS·SM1 채움 (군 변경 시 첫 鄉鎮) */
-      if (msg.spec.code === 'TW' && (p === 'seismic.county' || p === 'seismic.town' || p === 'seismic.soil')) {
+      /* 工址 선택 → 표2-1(근단층이면 표2-3 거리 보간)·2-4 로 SDS·SD1·SMS·SM1, 耐風規範 2.4 로 V10 채움 (군 변경 시 첫 鄉鎮) */
+      if (msg.spec.code === 'TW' && (p === 'seismic.county' || p === 'seismic.town' || p === 'seismic.soil' || p === 'seismic.nearFault')) {
         if (p === 'seismic.county') n['seismic.town'] = townsOf(v)[0] ?? ''
-        const c = siteCoef(n['seismic.county'], n['seismic.town'], (+n['seismic.soil'] || 1) as 1 | 2 | 3)
+        if (p === 'seismic.county' || p === 'seismic.town') {
+          n['seismic.nearFault'] = '' // 다른 鄉鎮의 단층 거리를 쓰지 않는다
+          const w = windV10(n['seismic.county'], n['seismic.town'])
+          if (w) n['wind.V10'] = String(w.V10)
+        }
+        const c = siteCoef(n['seismic.county'], n['seismic.town'], (+n['seismic.soil'] || 1) as 1 | 2 | 3, n['seismic.nearFault'])
         if (c) for (const k of ['SDS', 'SD1', 'SMS', 'SM1'] as const) n[`seismic.${k}`] = String(c[k])
       }
       /* KR 지진구역 → S = Z × 2.0 (KDS 41 17 00 3.2, Z 는 KDS 17 10 00 표 4.2-2 통상값) */
@@ -139,9 +147,9 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
       return n
     })
   }
-  const site = spec.code === 'TW' ? siteCoef(spec.seismic.county, spec.seismic.town, spec.seismic.soil) : null
+  const site = spec.code === 'TW' ? siteCoef(spec.seismic.county, spec.seismic.town, spec.seismic.soil, spec.seismic.nearFault) : null
 
-  const fields = (g: Group, readonly = false) => <div className="pe-grid">{g.fields.map((f) => {
+  const fields = (g: Group, readonly = false) => <div className="pe-grid">{g.fields.filter((f) => f.path !== 'seismic.nearFault' || nearFaultRows(spec.seismic.county, spec.seismic.town).length > 0).map((f) => {
     const id = `${formId}-${f.path}`
     const bad = invalid.some((x) => x.path === f.path)
     const conflict = bad ? undefined : conflicts.find((c) => c.field.path === f.path)
@@ -149,7 +157,9 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
     return <div key={f.path} className={`pe-f${f.kind === 'text' || f.full ? ' pe-full' : ''}`}>
       <label htmlFor={f.path === 'baseFixity' ? undefined : id}>{t(f.label)}</label>
       <div className="pe-in">
-        {f.path === 'baseFixity'
+        {f.path === 'seismic.nearFault'
+          ? <NearFaultInput id={id} county={spec.seismic.county} town={spec.seismic.town} value={vals[f.path] ?? ''} disabled={!live || s.busy || readonly} invalid={error} onChange={(v) => set(f.path, v)} />
+          : f.path === 'baseFixity'
           ? <BaseFixityPicker id={id} value={vals[f.path]} disabled={!live || s.busy || readonly} onChange={(v) => set(f.path, v)} />
           : f.path.startsWith('sections.')
           ? <SectionPicker id={id} spec={spec} role={f.path.slice('sections.'.length) as ElementRole} value={vals[f.path]}
@@ -229,7 +239,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
       const advanced = g.title === 'sec_conn' ? filtered.fields
         : step === 2 ? filtered.fields.filter((f) => !['bays', 'baySpacing'].includes(f.path))
         : step === 3 ? filtered.fields.filter((f) => !['sections.column', 'sections.rafter', 'material'].includes(f.path))
-        : step === LOADS_STEP && spec.code === 'TW' && g.title === 'sec_seismic' ? filtered.fields.filter((f) => !['seismic.county', 'seismic.town', 'seismic.soil'].includes(f.path))
+        : step === LOADS_STEP && spec.code === 'TW' && g.title === 'sec_seismic' ? filtered.fields.filter((f) => !['siteBasis', 'seismic.county', 'seismic.town', 'seismic.nearFault', 'seismic.soil'].includes(f.path))
         : step === LOADS_STEP && spec.code === 'KR' ? filtered.fields.filter((f) => ['korea.Kzt', 'korea.KD', 'korea.roofZeta', 'korea.S'].includes(f.path)) : []
       const basic = filtered.fields.filter((f) => !advanced.includes(f))
       return <section className="mw-group" key={g.title}>
@@ -241,6 +251,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
           {fields({ ...g, fields: advanced })}
         </details>}
         {g.title === 'sec_seismic' && <div className="pe-tip">{t('kv_site_src')}: {siteSourceText(spec)}</div>}
+        {g.title === 'sec_wind' && spec.code === 'TW' && <div className="pe-tip">{t('kv_wind_src')}: {windSourceText(spec)}</div>}
         {g.title === 'sec_seismic' && site && (site.fault || site.basin || site.note) && <div className="pe-tip">{site.fault ? t('site_fault', site.fault) : site.basin ? t('site_basin') : site.note}</div>}
       </section>
     })}
@@ -275,6 +286,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
             {g.title === 'sec_seismic' && (
               <div className="pe-tip" style={spec.code === 'TW' && !siteSourceText(spec).startsWith(t('site_src_table')) ? { color: 'var(--amber)' } : undefined}>{t('kv_site_src')}: {siteSourceText(spec)}</div>
             )}
+            {g.title === 'sec_wind' && spec.code === 'TW' && <div className="pe-tip">{t('kv_wind_src')}: {windSourceText(spec)}</div>}
             {g.title === 'sec_seismic' && site && (site.fault || site.basin || site.note) && (
               <div className="pe-tip" style={{ color: site.fault ? 'var(--amber)' : undefined }}>
                 {site.fault ? t('site_fault', site.fault) : site.basin ? t('site_basin') : site.note}
