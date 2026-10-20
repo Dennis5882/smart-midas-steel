@@ -194,19 +194,34 @@ export function proposeSections(spec: FactorySpec, model: FactoryModel, info: Lo
 
   /* ── 골조: 강도 통과 목록 × 추정 사용성 → 최소 강재량 쌍 ── */
   if (!truss && present.includes('column') && present.includes('rafter')) {
-    const passC = byArea('column').map((s) => ({ s, r: strength('column', s) })).filter((x) => x.r <= tgt('column', x.s))
-    const passR = byArea('rafter').map((s) => ({ s, r: strength('rafter', s) })).filter((x) => x.r <= tgt('rafter', x.s))
+    /* 강도 통과 여부는 필요할 때만 계산하고 기억한다 — 예전엔 카탈로그 전체(기둥·지붕보 각 ~150)를 먼저 검토해 반복마다 수 초.
+       조합 순서·조건(금지 → 무게 가지치기 → 강도 → 사용성 → 접합)은 그대로라 고르는 쌍과 svcLimited 는 같다 */
+    const passMemo = new Map<string, boolean>()
+    const passes = (r: 'column' | 'rafter', s: string) => {
+      const k = `${r}|${s}`
+      let v = passMemo.get(k)
+      if (v === undefined) { v = strength(r, s) <= tgt(r, s); passMemo.set(k, v) }
+      return v
+    }
+    const colCands = byArea('column').map((s) => ({ s })), rafCands = byArea('rafter').map((s) => ({ s }))
     const f0 = frameStiff(spec, cur.column, cur.rafter)
     const driftX = Math.max(svcRatio(sv, 'windDriftX'), svcRatio(sv, 'seisDriftX'))
     const defl = svcRatio(sv, 'rafterDefl')
-    let best: { c: (typeof passC)[0]; r: (typeof passR)[0]; t: number } | null = null
+    let best: { c: (typeof colCands)[0]; r: (typeof rafCands)[0]; t: number } | null = null
     let svcLimited = false
-    for (const c of passC) for (const r of passR) {
-      if (banned(c.s, r.s)) continue
+    for (const c of colCands) for (const r of rafCands) {
       const t = tons('column', c.s) + tons('rafter', r.s)
-      if (best && t >= best.t) continue
+      /* 지붕보는 면적(= 무게) 오름차순 → 이 뒤도 모두 무거움 */
+      if (best && t >= best.t) break
+      if (banned(c.s, r.s)) continue
+      /* 싼 강성 조건 먼저 — 탈락한 쌍은 강도를 볼 필요가 없고, 'service' 표시(svcLimited)에 필요할 때만 강도를 본다 */
       const f = frameStiff(spec, c.s, r.s)
-      if ((driftX * f0.k) / f.k > target || (defl * f.defl) / f0.defl > target) { svcLimited = true; continue }
+      if ((driftX * f0.k) / f.k > target || (defl * f.defl) / f0.defl > target) {
+        if (!svcLimited && passes('column', c.s) && passes('rafter', r.s)) svcLimited = true
+        continue
+      }
+      if (!passes('column', c.s)) break
+      if (!passes('rafter', r.s)) continue
       // Check the available connection layout while choosing the frame pair.
       // A stronger beam alone does not ensure an eight-bolt end plate can pass.
       const candidate = { ...spec, sections: { ...sections, column: c.s, rafter: r.s } }

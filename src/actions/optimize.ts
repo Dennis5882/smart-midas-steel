@@ -27,6 +27,8 @@ export async function runOptimize(): Promise<void> {
   if (!S.built) { addMsg('bot', lt('no_model')); return }
   if (!S.analyzed) { addMsg('bot', lt('need_anal')); return }
   if (!beginJob('opt')) return
+  /* 설계 검토에서 받은 결과는 현재 해석 그대로다(해석·재생성 때 비움, 아래 assertGenSync 가 Gen 동일성 확인) → 1회차는 다시 회수하지 않는다 */
+  const prior = S.results
   S.results = null; S.design = null; S.connections = null; S.opt = null; S.ratioView = false
   S.repairPlan = null; S.repairComparison = null
   notify()
@@ -43,7 +45,7 @@ export async function runOptimize(): Promise<void> {
     for (let it = 1; ; it++) {
       setIter(it, MAX_ITER)
       const b = S.built!
-      S.results = await fetchResults(b)
+      S.results = it === 1 && prior ? prior : await fetchResults(b)
       d = runDesign(b.spec, b.model, b.info, S.results)
       const svcMax = Math.max(0, ...d.service.map((s) => s.ratio))
       /* 접합부도 반복마다 산정 — 부재만 통과하고 접합이 NG 인 안을 최종안으로 고르지 않게 */

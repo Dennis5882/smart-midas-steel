@@ -610,6 +610,7 @@ export const en = {
   g_help_2: 'Release notes',
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_5_3_1: 'Section optimization is faster: the first round reuses the design-check results instead of fetching them again, and the column/rafter search does less work (same results)',
   rn_v2_5_2_1: '[Edit] in “To raise the status, check” now goes to the field that caused the item: the restraint that affected members, the axis with the special system, or the bay list for unequal bays',
   rn_v2_5_2_2: 'The result card shows confirmed / none restraint states again, out-of-scope models stay flagged in results and the report, and the duplicated restraint note in the report was removed',
   rn_v2_5_2_3: 'Keyboard focus stays inside the user guide and returns to the button that opened it',
