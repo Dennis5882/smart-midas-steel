@@ -17,7 +17,7 @@ import type { TemplateKey } from '../domain/templates'
 import { TEMPLATES, TEMPLATE_KEYS } from '../domain/templates'
 import { ModelWizard, WIZARD_STEPS } from './ModelWizard'
 import { StructureEditor, StructureSummary } from './StructureEditor'
-import { WindPreview } from './WindPreview'
+import { WindLoadInfo } from './WindPreview'
 import { ADDITIONS_STEP, LOADS_STEP, REVIEW_STEP, scopeIssueStep } from './modelingFlow'
 import { BaseFixityPicker, FrameTypePicker } from './FrameControls'
 import { BaySpacingEditor } from './BaySpacingEditor'
@@ -285,8 +285,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
         {g.title === 'sec_seismic' && <div className="pe-tip">{t('kv_site_src')}: {siteSourceText(spec)}</div>}
         {g.title === 'sec_seismic' && spec.code === 'TW' && <div className="pe-tip">{t('kv_r_src')}: {rSourceText(spec)}</div>}
         {g.title === 'sec_wind' && spec.code === 'TW' && <div className="pe-tip">{t('kv_wind_src')}: {windSourceText(spec)}</div>}
-        {g.title === 'sec_wind' && step === LOADS_STEP && spec.code !== 'CN' && <div className="pe-tip">{t('wp_opening_tip')}</div>}
-        {g.title === 'sec_wind' && step === LOADS_STEP && <WindPreview spec={spec} />}
+        {g.title === 'sec_wind' && step === LOADS_STEP && <WindLoadInfo spec={spec} />}
         {g.title === 'sec_seismic' && site && (site.fault || site.basin || site.note) && <div className="pe-tip">{site.fault ? t('site_fault', site.fault) : site.basin ? t('site_basin') : site.note}</div>}
       </section>
     })}
@@ -322,6 +321,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
               <div className="pe-tip" style={spec.code === 'TW' && !siteSourceText(spec).startsWith(t('site_src_table')) ? { color: 'var(--amber)' } : undefined}>{t('kv_site_src')}: {siteSourceText(spec)}</div>
             )}
             {g.title === 'sec_wind' && spec.code === 'TW' && <div className="pe-tip">{t('kv_wind_src')}: {windSourceText(spec)}</div>}
+            {g.title === 'sec_wind' && <WindLoadInfo spec={spec} />}
             {g.title === 'sec_seismic' && site && (site.fault || site.basin || site.note) && (
               <div className="pe-tip" style={{ color: site.fault ? 'var(--amber)' : undefined }}>
                 {site.fault ? t('site_fault', site.fault) : site.basin ? t('site_basin') : site.note}

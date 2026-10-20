@@ -75,10 +75,10 @@ export async function fetchReactions(): Promise<void> {
       LOAD_CASE_NAMES: S.built.cases.map((c) => `${c}(ST)`),
     },
   }, 'Reaction')
-  const tab = tableOf(r)
-  const sub = tab.SUB_TABLES?.[0]?.['SUMMATION OF REACTION FORCES PRINTOUT']?.DATA as string[][] | undefined
+  const table = tableOf(r)
+  const sub = table.SUB_TABLES?.[0]?.['SUMMATION OF REACTION FORCES PRINTOUT']?.DATA as string[][] | undefined
   S.reactions = (sub ?? []).map(([lc, fx, fy, fz]): ReactionSum => ({ lc, fx: +fx, fy: +fy, fz: +fz }))
-  S.baseReactions = parseBaseReactions(tab.DATA, new Set(bases), new Set(S.built.cases))
+  S.baseReactions = parseBaseReactions(table.DATA, new Set(bases), new Set(S.built.cases))
   notify()
 }
 

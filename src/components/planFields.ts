@@ -112,7 +112,9 @@ export const GROUPS: Group[] = [
     { path: 'wind.I', label: 'f_Iw', kind: 'num' },
     { path: 'wind.exposure', label: 'f_exposure', kind: 'select', options: () => ['A', 'B', 'C'].map((v) => ({ value: v, label: v })) },
     { path: 'wind.enclosure', label: 'f_enclosure_q', kind: 'select', full: true, options: () => [
-      { value: 'enclosed', label: t('encl_q_enclosed') }, { value: 'partial', label: t('encl_q_partial') }] },
+      /* 계수는 프로필(twLateral.gcpi)에서 — 하중 계산과 같은 값 */
+      { value: 'enclosed', label: t('encl_q_enclosed', String(profileOf('TW').lateral.gcpi('enclosed'))) },
+      { value: 'partial', label: t('encl_q_partial', String(profileOf('TW').lateral.gcpi('partial'))) }] },
   ] },
 ]
 export const CN_GROUPS: Group[] = [

@@ -10,7 +10,7 @@ import { assertGenSync } from './genSync'
 import { beginJob, checkCancel, endJob, failMsg, stage } from './job'
 import { sendModel } from './build'
 import { analyzeCore } from './analysis'
-import { fetchResults } from './results'
+import { fetchResults, markChecked } from './results'
 import { confirmAction } from '../components/ConfirmDialog'
 
 export const currentRepairPlan=(plan:RepairPlan|null):plan is RepairPlan=>!!plan&&plan.source===S.built&&plan.results===S.results&&plan.design===S.design&&plan.connections===S.connections
@@ -58,7 +58,7 @@ export async function applyRepairs(selection:Record<string,string>):Promise<void
     const b=S.built!
     S.results=await fetchResults(b)
     const design=runDesign(b.spec,b.model,b.info,S.results),connections=runConnections(b.spec,b.model,b.info,S.results)
-    S.design=design;S.connections=connections
+    S.design=design;S.connections=connections;markChecked(S.results)
     S.repairComparison={before,estimated:preview.metrics,after:repairMetrics(design,connections),changes:preview.changes,built:b,design}
     S.repairPlan=null
     S.buildEpoch++

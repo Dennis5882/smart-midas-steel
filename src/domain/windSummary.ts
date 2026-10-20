@@ -45,7 +45,7 @@ export function windSummary(model: FactoryModel, loads: LoadPayloads): WindSumma
     const v = axis === 'X' ? t.x : t.y
     return {
       name, kind, dir: kind === 'torsion' ? null : (`${v < 0 ? '-' : '+'}${axis}` as WindRow['dir']),
-      gcpi: c ? c.gcpi : null, roofCp: c && c.dir === 'X' ? c.roofCp : null,
+      gcpi: c ? c.gcpi : null, roofCp: c ? c.roofCp : null,
       horizontal: kind === 'torsion' ? 0 : Math.abs(v), uplift: t.z,
     }
   })

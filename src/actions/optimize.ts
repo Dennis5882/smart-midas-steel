@@ -13,7 +13,7 @@ import { S, notify } from '../state/store'
 import { addMsg, draw3D, log, tab } from '../state/ui'
 import { analyzeCore } from './analysis'
 import { sendModel } from './build'
-import { fetchResults, reusableResults } from './results'
+import { fetchResults, markChecked, reusableResults } from './results'
 import { assertGenSync } from './genSync'
 import { quantities } from '../domain/quantities'
 import { blockedMembers } from '../domain/validity'
@@ -53,6 +53,7 @@ export async function runOptimize(): Promise<void> {
       const svcMax = Math.max(0, ...d.service.map((s) => s.ratio))
       /* 접합부도 반복마다 산정 — 부재만 통과하고 접합이 NG 인 안을 최종안으로 고르지 않게 */
       const cs = runConnections(b.spec, b.model, b.info, S.results)
+      markChecked(S.results)
       const rec: OptIter = { it, sections: b.spec.sections, weight: steelWeight(b.spec, b.model), plateT: quantities(b.spec, b.model, cs).plateT,
         maxRatio: d.maxRatio, svcMax, ng: d.ng, invalid: blockedMembers(d), connMax: Math.max(0, ...cs.map((c) => c.ratio)), connNg: cs.filter((c) => c.ratio > 1).length }
       iters.push(rec)
@@ -93,6 +94,7 @@ export async function runOptimize(): Promise<void> {
     }
     const b = S.built!
     const connections = runConnections(b.spec, b.model, b.info, S.results!)
+    markChecked(S.results!)
     S.design = d!
     S.connections = connections
     S.draftSpec = b.spec

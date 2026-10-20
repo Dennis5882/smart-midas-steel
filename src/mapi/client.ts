@@ -8,10 +8,10 @@ import { jobCall } from '../actions/job'
 
 /* 요청별 대기 한도 (대기만 중단 — Gen 이 받은 작업은 취소되지 않는다, SDK 안내).
    해석·결과 표는 수 분 걸릴 수 있어 길게(TW 박공 BEAMFORCE 155 조합 ≈ 105 s), 문서 저장·열기는 중간,
-   나머지(db 조회·전송, 화면)는 짧게 — Gen 에 대화상자가 떠 /db 호출이 막히면 15분 대신 1분 안에 실패를 알린다 */
+   Gen 강재 설계(DESIGN/…/CODE-ANAL·post/STEELCODECHECK — KR --gen-check)도 수 분이라 길게, 나머지(db 조회·전송, 화면)는 짧게 — Gen 에 대화상자가 떠 /db 호출이 막히면 15분 대신 1분 안에 실패를 알린다 */
 export const TIMEOUTS = { long: 15 * 60 * 1000, doc: 3 * 60 * 1000, short: 60 * 1000 } as const
 export function timeoutFor(endpoint: string): number {
-  if (endpoint === '/doc/anal' || endpoint === '/post/TABLE') return TIMEOUTS.long
+  if (endpoint === '/doc/anal' || endpoint === '/post/TABLE' || endpoint === '/post/STEELCODECHECK' || endpoint.startsWith('/DESIGN/')) return TIMEOUTS.long
   if (endpoint.startsWith('/doc/')) return TIMEOUTS.doc
   return TIMEOUTS.short
 }

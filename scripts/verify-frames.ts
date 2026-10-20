@@ -307,6 +307,7 @@ for (const base of [DEFAULT_SPEC, CN_DEFAULT_SPEC]) {
   ok(['+X', '-X', '+Y', '-Y'].every((d) => cn.rows.filter((r) => r.dir === d).length === 2), 'wind preview CN: 4 directions × ±i')
   const kr = sumOf(KR_DEFAULT_SPEC).w
   ok(kr.rows.filter((r) => r.kind === 'main').length >= 8 && kr.rows.every((r) => r.kind === 'torsion' || r.horizontal > 0), 'wind preview KR: main cases with horizontal force')
+  ok([tw, { w: kr }].every(({ w }) => w.rows.filter((r) => r.kind === 'main' && r.dir!.endsWith('Y')).every((r) => r.roofCp !== null)), 'wind preview TW·KR: Y-direction cases show the applied roof Cp too')
 }
 
 console.log(`Frames: ${n} checks passed (mono-slope + multi-span + TW 表2.8: geometry, releases, loads, wind, snow, scope, quantities, inputs)`)
