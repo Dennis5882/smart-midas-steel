@@ -18,7 +18,7 @@ import { weldSchedule } from '../src/domain/twWelding'
 import { reviewItems } from '../src/domain/twReview'
 import { footingGroups } from '../src/domain/twFoundation'
 import { initVals, toSpec } from '../src/components/planFields'
-import { rSourceText } from '../src/components/Status'
+import { rSourceText, restraintRows } from '../src/components/Status'
 import { buildDxf } from '../src/drawing/drawings'
 import { krSynthetic } from './kr-synth'
 import { readFileSync } from 'node:fs'
@@ -126,5 +126,28 @@ const near = (a: number, b: number, tol: number, m: string) => ok(Math.abs(a - b
   ok(localDate(d0) === '2026-10-20' && clock(d0) === '07:05:09', 'local date/time (not UTC)')
   const tw = readFileSync(new URL('../src/i18n/dict/zh-TW.ts', import.meta.url), 'utf8').split('\n').filter((l) => !/^\s+rn_/.test(l)).join('\n')
   ok(!/屋面梁|牆梁|桁條|墙|檩/.test(tw), 'zh-TW dictionary: no mainland terms outside release notes')
+}
+/* 9. 코드 리뷰 반영 — 이동 칸·차단 이슈·재사용·횡지지 행 */
+{
+  const fx = JSON.parse(gunzipSync(readFileSync(fixtureFor('TW'))).toString())
+  const field = (spec: any, id: string) => actionItems(spec, null, null, checkScope(spec)).find((i) => i.id === id)?.field
+  const uneven = { ...structuredClone(DEFAULT_SPEC), bayList: [6, 6, 9.5, 6], bays: 4, baySpacing: 9.5 }
+  ok(field(uneven, 'scope:bayRatio') === 'bayList' && field(uneven, 'scope:baySpacing') === 'bayList', 'uneven bays jump to the bay list')
+  const even = { ...structuredClone(DEFAULT_SPEC), baySpacing: 9.5 }
+  ok(field(even, 'scope:baySpacing') === 'baySpacing', 'equal bays jump to the spacing field')
+  const sysY = { ...structuredClone(DEFAULT_SPEC), seismic: { ...DEFAULT_SPEC.seismic, systemX: 'IMF' as const, systemY: 'SCBF' as const } }
+  const sysX = { ...structuredClone(DEFAULT_SPEC), seismic: { ...DEFAULT_SPEC.seismic, systemX: 'SMF' as const } }
+  ok(field(sysY, 'scope:twSystemSpecial') === 'seismic.systemY' && field(sysX, 'scope:twSystemSpecial') === 'seismic.systemX', 'special system jumps to the axis that caused it')
+  const wide = { ...structuredClone(DEFAULT_SPEC), span: 70 }
+  const blk = actionItems(wide, null, null, checkScope(wide)).find((i) => i.scope?.level === 'block')
+  ok(blk?.group === 'limit' && !blk.field, 'block-level scope issues stay listed (limit, no jump)')
+  const spec = { ...structuredClone(fx.spec), restraints: { flyBraces: 'confirmed', sagRods: 'confirmed', braceCrossing: 'assumed' } }
+  const model = buildPortal(spec), info = buildLoadPayloads(spec, model).info, res = decodeResults(fx.results)
+  const d = runDesign(spec, model, info, res), cs = runConnections(spec, model, info, res), sc = checkScope(spec)
+  const items = actionItems(spec, d, cs, sc), r = items.find((i) => i.id === 'restraint')
+  ok(r?.field === 'restraints.braceCrossing', `restraint item jumps to the key that affected members (${r?.field})`)
+  ok(actionItems(spec, d, cs, checkScope(spec)) === items, 'same spec / results reuse the computed list')
+  const none = { ...spec, restraints: { flyBraces: 'none', sagRods: 'confirmed', braceCrossing: 'assumed' } }
+  ok(restraintRows(none, items).join() === 'flyBraces,sagRods' && restraintRows(none, []).length === 3, 'restraint rows: none/confirmed always shown, assumed only when not listed')
 }
 console.log(`TW localization: ${n} checks passed`)

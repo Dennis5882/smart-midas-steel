@@ -10,10 +10,9 @@ import type { ConnResult } from '../domain/connections'
 import type { DesignResult } from '../domain/design'
 import { GRADES, summarizeStatus, type Grade, type Reason, type StatusSummary } from '../domain/status'
 import { t, tc } from '../i18n'
-import { blockedMembers } from '../domain/validity'
+import { blockedMembers, restraintKeys, support } from '../domain/validity'
 import { ACTION_GROUPS, actionItems, type ActionItem } from '../domain/actionItems'
 import { actionText } from './ScopeBox'
-import { jumpToField } from '../agent/session'
 import { useStore } from '../state/store'
 
 export function GradeChip({ g, reasons }: { g: Grade; reasons?: Reason[] }) {
@@ -31,10 +30,12 @@ export function statusLine(sum: StatusSummary): string {
     (GRADES.some((g) => sum.conns[g]) ? ` / ${t('st_conns')} ${counts(sum.conns)}` : '')
 }
 
-export function StatusCard({ d, cs, spec }: { d: DesignResult | null; cs: ConnResult[] | null; spec: FactorySpec }) {
+/** onJump: 「확인할 것」 [수정] — 호출하는 화면이 넘긴다 (이 모듈은 계산서·작업 모듈도 쓰므로 agent/session 을 가져오지 않는다) */
+export function StatusCard({ d, cs, spec, onJump }: { d: DesignResult | null; cs: ConnResult[] | null; spec: FactorySpec; onJump?(field: string): void }) {
   const code: CodeId = spec.code
   const scope = checkScope(spec)
   const sum = summarizeStatus(d, cs, scope)
+  const items = actionItems(spec, d, cs, scope)
   const used = GRADES.filter((g) => sum.members[g] + sum.conns[g] > 0 || (g === 'fail' && sum.service.ng) || (g === 'expert' && sum.scopeWarn))
   return (
     <div className="scard"><h3>{t('res_status')} <GradeChip g={sum.overall} /></h3>
@@ -43,7 +44,8 @@ export function StatusCard({ d, cs, spec }: { d: DesignResult | null; cs: ConnRe
       {!!cs?.length && <div className="kv"><span className="k">{t('st_conns')} ({cs.length})</span><span className="v">{counts(sum.conns)}</span></div>}
       {!!blockedMembers(d) && <p className="mw-error" role="alert">{t('flow_invalid_design')}</p>}
       {d && [...new Set(d.members.flatMap((m) => (m.issues ?? []).filter((i) => i.level === 'blocked').map((i) => i.detail)))].map((text) => <p className="pe-tip" key={text}>{text}</p>)}
-      <ActionList items={actionItems(spec, d, cs, scope)} />
+      {restraintRows(spec, items).map((k) => <div className="kv" key={k}><span className="k">{t(`restraint_${k}`)}</span><span className="v">{t(`restraint_${support(spec, k)}`)}</span></div>)}
+      <ActionList items={items} onJump={onJump} />
       <div className="res-stat" style={{ marginTop: 8, marginBottom: 0 }}>
         {used.map((g) => <div key={g}><span className="grade" data-g={g} style={{ marginLeft: 0 }}>{t(`gr_${g}`)}</span> {t(`gr_${g}_d`)}</div>)}
         <div style={{ marginTop: 6 }}>· {t('src_anal')}<br />· {t('src_design', t(profileOf(code).checkLabelKey ?? profileOf(code).labelKey))} {tc(code, 'src_design_why')}</div>
@@ -52,8 +54,14 @@ export function StatusCard({ d, cs, spec }: { d: DesignResult | null; cs: ConnRe
   )
 }
 
+/** 횡지지 상태 행 — 확인·없음은 검토 근거라 항상, 가정은 「확인할 것」에 이미 있으면 생략 */
+export function restraintRows(spec: FactorySpec, items: ActionItem[]) {
+  const listed = items.some((a) => a.id === 'restraint')
+  return restraintKeys(spec).filter((k) => !(listed && support(spec, k) === 'assumed'))
+}
+
 /** 결과 카드 — 묶음별 목록, 입력으로 풀리는 항목은 [수정] 으로 그 칸으로 이동 */
-export function ActionList({ items }: { items: ActionItem[] }) {
+export function ActionList({ items, onJump }: { items: ActionItem[]; onJump?(field: string): void }) {
   const s = useStore()
   if (!items.length) return null
   return <div className="ai-list" role="list" aria-label={t('ai_title')}>
@@ -61,8 +69,8 @@ export function ActionList({ items }: { items: ActionItem[] }) {
     {ACTION_GROUPS.filter((g) => items.some((a) => a.group === g)).map((g) => <div key={g} className="ai-group" data-g={g}>
       <div className="ai-head">{t(`ai_${g}`)}</div>
       {items.filter((a) => a.group === g).map((a) => <div key={a.id} className="ai-row" role="listitem">
-        <span>{actionText(a)}</span>
-        {a.field && <button type="button" className="btn btn-ghost ai-go" disabled={s.busy} onClick={() => jumpToField(a.field!)}>{t('ai_go')}</button>}
+        <span>{a.scope?.level === 'block' ? '⛔ ' : ''}{actionText(a)}{a.id === 'restraint' && <small className="ai-note">{t('restraint_note')}</small>}</span>
+        {a.field && onJump && <button type="button" className="btn btn-ghost ai-go" disabled={s.busy} onClick={() => onJump(a.field!)}>{t('ai_go')}</button>}
       </div>)}
     </div>)}
   </div>

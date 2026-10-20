@@ -78,16 +78,19 @@ function ReleaseList() {
 
 export function HelpDialog({ tab }: { tab: HelpTab }) {
   useLang() // 언어 변경 시 다시 그림
+  const ref = useRef<HTMLDialogElement>(null)
+  /* 네이티브 모달 — 배경 inert·포커스 가두기·Esc. 닫히면 연 버튼으로 포커스 복귀 (Drawers·ConfirmDialog 와 같은 방식) */
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const el = ref.current
+    if (el && !el.open) el.showModal()
+    return () => { if (el?.open) el.close(); opener?.focus() }
   }, [])
   const tabs: [HelpTab, I18nKey][] = [['manual', 'man_tab_manual'], ['release', 'rn_title']]
   return (
     <>
-      <div className="scrim on" onClick={close} />
-      <div className="rn help" role="dialog" aria-modal="true" aria-label={t('man_title')}>
+      <dialog ref={ref} className="rn help" aria-label={t('man_title')}
+        onCancel={(e) => { e.preventDefault(); close() }} onClick={(e) => { if (e.target === e.currentTarget) close() }}>
         <div className="rn-hd">
           <b>{t('man_title')}</b>
           <span className="rn-sub">Smart MIDAS Steel v{APP_VERSION}</span>
@@ -97,7 +100,7 @@ export function HelpDialog({ tab }: { tab: HelpTab }) {
           {tabs.map(([id, k]) => <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => openHelp(id)}>{t(k)}</button>)}
         </div>
         {tab === 'manual' ? <Manual /> : <ReleaseList />}
-      </div>
+      </dialog>
     </>
   )
 }

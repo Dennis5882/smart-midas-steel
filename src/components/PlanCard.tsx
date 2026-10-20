@@ -106,21 +106,32 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
     if (live && !s.busy && !errors.length && !blocked) { S.draftSpec = spec; notify() }
   }, [spec, live, s.busy, errors.length, blocked])
 
-  /* 결과 화면 「확인할 것」 → 해당 단계·칸 (현재 편집기만) */
+  /* 결과 화면 「확인할 것」 → 해당 단계·칸 (현재 편집기만). 단계를 바꾼 뒤 렌더가 끝나면(아래 effect) 칸을 찾아 포커스 —
+     접힌 details 는 열고, 아직 없으면 몇 프레임 다시 찾는다 (타이머 추측 금지) */
+  const [jumpTarget, setJumpTarget] = useState<string | null>(null)
   useEffect(() => {
     const path = s.fieldJump
     if (!path || !live || s.busy) return
     S.fieldJump = null
     const target = fieldStep({ path })
-    setStep(target); setVisited((old) => Math.max(old, target))
-    setTimeout(() => {
-      const group = document.getElementById(`${formId}-${path}`)
-      const field = group?.matches('input, select, textarea') ? group : group?.querySelector<HTMLElement>('input, select, textarea') ?? group
-      const fold = field?.closest('details'); if (fold) fold.open = true
-      field?.scrollIntoView({ block: 'center' }); field?.focus()
-    }, 60)
+    setStep(target); setVisited((old) => Math.max(old, target)); setJumpTarget(path)
     notify()
   }, [s.fieldJump, live, s.busy])
+  useEffect(() => {
+    if (!jumpTarget) return
+    let frame = 0, raf = 0
+    const find = () => {
+      const group = document.getElementById(`${formId}-${jumpTarget}`) ?? document.getElementById(`${formId}-${jumpTarget}-0`)
+      const field = group?.matches('input, select, textarea') ? group : group?.querySelector<HTMLElement>('input, select, textarea') ?? group
+      if (field) {
+        const fold = field.closest('details'); if (fold) fold.open = true
+        field.scrollIntoView({ block: 'center' }); field.focus(); setJumpTarget(null)
+      } else if (++frame < 20) raf = requestAnimationFrame(find)
+      else setJumpTarget(null)
+    }
+    find()
+    return () => cancelAnimationFrame(raf)
+  }, [jumpTarget, step, formId])
 
   const closeEditor = () => {
     S.workspaceView = 'start'

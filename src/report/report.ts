@@ -49,7 +49,7 @@ const fig = (svg: string, cap: string) => `<figure>${svg}<figcaption>${esc(cap)}
 function actionsHtml(items: ActionItem[]): string {
   if (!items.length) return ''
   return `<div class="ai"><b>${esc(t('ai_title'))}</b>` + ACTION_GROUPS.filter((g) => items.some((a) => a.group === g)).map((g) =>
-    `<div><i>${esc(t(`ai_${g}`))}</i><ul>${items.filter((a) => a.group === g).map((a) => `<li>${esc(actionText(a))}</li>`).join('')}</ul></div>`).join('') + '</div>'
+    `<div><i>${esc(t(`ai_${g}`))}</i><ul>${items.filter((a) => a.group === g).map((a) => `<li>${a.scope?.level === 'block' ? `<span class="gr gr-fail">${esc(t('sec_scope'))}</span> ` : ''}${esc(actionText(a))}${a.id === 'restraint' ? `<br><span class="note">${esc(t('restraint_note'))}</span>` : ''}</li>`).join('')}</ul></div>`).join('') + '</div>'
 }
 
 export interface ReportInput {
@@ -234,7 +234,7 @@ export function buildReport({ built, reactions, design, connections, opt, footin
   h2('rep_s6')
   if (design) {
     if (blockedMembers(design)) parts.push(`<p class="note gr-fail">${L('flow_invalid_design')}</p>`)
-    const issues = [...new Set(design.members.flatMap((m) => (m.issues ?? []).map((i) => i.key === 'restraint' ? t('restraint_note') : `${t('rs_applicability')}: ${i.detail}`)))]
+    const issues = [...new Set(design.members.flatMap((m) => (m.issues ?? []).filter((i) => i.key !== 'restraint').map((i) => `${t('rs_applicability')}: ${i.detail}`)))]
     for (const issue of issues) parts.push(`<p class="note">${esc(issue)}</p>`)
     parts.push(`<p class="note">${L('restraint_lengths')} ${esc(tc(spec.code, 'rd_assump'))}</p>`)
     if (spec.code === 'TW') parts.push(`<p class="note keep" style="break-inside:avoid">${L('tw_note_distortion')}</p>`)

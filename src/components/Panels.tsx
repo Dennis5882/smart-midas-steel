@@ -1,4 +1,5 @@
 /* 우측 패널 — 활동 로그 · 모델 상태 · 해석 결과 */
+import { jumpToField } from '../agent/session'
 import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from 'react'
 import { profileOf } from '../codes'
 import { buildLoadPayloads, type LoadInfo } from '../domain/loads'
@@ -296,7 +297,7 @@ export function ResultsPanel() {
         </div>
       )}
       <SummaryCards />
-      {s.built && (s.design || !!s.connections?.length) && <StatusCard d={s.design} cs={s.connections} spec={s.built.spec} />}
+      {s.built && (s.design || !!s.connections?.length) && <StatusCard d={s.design} cs={s.connections} spec={s.built.spec} onJump={jumpToField} />}
       {s.opt && <OptTables o={s.opt} />}
       {s.design && <DesignTables d={s.design} />}
       {s.design && <MemberTable d={s.design} />}

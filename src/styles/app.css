@@ -257,6 +257,8 @@ main.splitting .right,main.splitting .chat{pointer-events:none}
 .ver-btn:hover{text-decoration-style:solid}
 .rn{position:fixed;z-index:41;top:50%;left:50%;transform:translate(-50%,-50%);width:min(760px,calc(100vw - 32px));height:min(80vh,820px);
   background:var(--panel);border:1px solid var(--border);border-radius:8px;box-shadow:0 18px 50px var(--shadow);display:flex;flex-direction:column;overflow:hidden}
+dialog.rn{margin:0;padding:0;right:auto;bottom:auto;max-width:none;max-height:none;color:inherit}
+dialog.rn::backdrop{background:var(--scrim);backdrop-filter:blur(2px)}
 .help-tabs{display:flex;gap:4px;padding:8px 18px 0;border-bottom:1px solid var(--border)}
 .help-tabs button{background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);padding:6px 12px;cursor:pointer;font:inherit;font-size:.82rem}
 .help-tabs button[aria-selected=true]{color:var(--cyan);border-bottom-color:var(--cyan);font-weight:700}
@@ -331,6 +333,7 @@ main.splitting .right,main.splitting .chat{pointer-events:none}
 .ai-head{color:var(--muted);font-size:.68rem;margin-bottom:2px}
 .ai-group[data-g=confirm] .ai-head{color:var(--amber)}
 .ai-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 0}
+.ai-note{display:block;color:var(--muted);font-size:.68rem;margin-top:2px}
 .ai-go{padding:2px 10px;font-size:.7rem;flex:none}
 .pe-tip{margin-top:10px;font-size:.72rem;color:var(--txt-hi);background:var(--tip-bg);border-left:2px solid var(--cyan);border-radius:6px;padding:7px 10px;font-family:var(--font-ui);line-height:1.55;display:flex;align-items:center;gap:5px}
 .pe-tip::before{content:"✎";color:var(--cyan)}

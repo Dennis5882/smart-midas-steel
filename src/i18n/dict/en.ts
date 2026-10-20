@@ -610,6 +610,9 @@ export const en = {
   g_help_2: 'Release notes',
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_5_2_1: '[Edit] in “To raise the status, check” now goes to the field that caused the item: the restraint that affected members, the axis with the special system, or the bay list for unequal bays',
+  rn_v2_5_2_2: 'The result card shows confirmed / none restraint states again, out-of-scope models stay flagged in results and the report, and the duplicated restraint note in the report was removed',
+  rn_v2_5_2_3: 'Keyboard focus stays inside the user guide and returns to the button that opened it',
   rn_v2_5_1_1: 'The user guide is now a popup with Manual and Release notes tabs. The manual covers setup, a beginner walkthrough, expert use, design codes and section databases, status grades, and scope and limits',
   rn_v2_5_1_2: 'Result cards and the report now list what to check to raise the status; [Edit] jumps to the input field',
   rn_v2_5_1_3: 'Taiwan permit checklist marks member design as partial while lateral restraints are assumed; the lateral-system choice moved into the seismic coefficient details',
