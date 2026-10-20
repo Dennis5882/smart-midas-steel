@@ -1,3 +1,4 @@
+import { localDate } from '../lib/date'
 import type { ReviewItem, ReviewKey } from '../domain/twReview'
 import { weldSchedule } from '../domain/twWelding'
 import type { FootingInput, FootingResult } from '../domain/twFoundation'
@@ -19,7 +20,8 @@ import { isoSvg, RATIO_BANDS, ratioColor, ROLE_COLOR } from '../drawing/iso'
 import { connGrade, GRADES, roleGrade, summarizeStatus, type Grade, type Graded } from '../domain/status'
 import { siteSourceText, windSourceText, rSourceText } from '../components/Status'
 import { dimsText } from './dims'
-import { scopeMsg } from '../components/ScopeBox'
+import { actionText } from '../components/ScopeBox'
+import { ACTION_GROUPS, actionItems, type ActionItem } from '../domain/actionItems'
 import { checkScope } from '../domain/scope'
 import { genSectionSource, sectionProps } from '../domain/sections'
 import { lengthText, ROLES, hasInteriorColumns } from '../domain/types'
@@ -43,6 +45,13 @@ const grade = (g: Graded) => {
 
 const fig = (svg: string, cap: string) => `<figure>${svg}<figcaption>${esc(cap)}</figcaption></figure>`
 
+/** 상태 상자 안 「확인할 것」 — 결과 카드와 같은 묶음 (버튼 없음) */
+function actionsHtml(items: ActionItem[]): string {
+  if (!items.length) return ''
+  return `<div class="ai"><b>${esc(t('ai_title'))}</b>` + ACTION_GROUPS.filter((g) => items.some((a) => a.group === g)).map((g) =>
+    `<div><i>${esc(t(`ai_${g}`))}</i><ul>${items.filter((a) => a.group === g).map((a) => `<li>${esc(actionText(a))}</li>`).join('')}</ul></div>`).join('') + '</div>'
+}
+
 export interface ReportInput {
   built: Built
   reactions: ReactionSum[] | null
@@ -61,7 +70,7 @@ export function buildReport({ built, reactions, design, connections, opt, footin
   const prof = profileOf(spec.code)
   const mat = prof.materials[spec.material]
   const G = portalGeometry(spec)
-  const today = new Date().toISOString().slice(0, 10)
+  const today = localDate()
   const L = (k: I18nKey) => esc(t(k))
   const parts: string[] = []
   const h2 = (k: I18nKey) => parts.push(`<h2>${esc(tc(spec.code, k))}</h2>`)
@@ -74,7 +83,7 @@ export function buildReport({ built, reactions, design, connections, opt, footin
   parts.push(`<div class="status"><b>${L('res_status')}</b> ${design ? grade({ grade: sum.overall, reasons: [] }) : L('check_unavailable')}
     ${design ? `<br>${L('st_members')} (${design.members.length}): ${cnt(sum.members)} · ${L('st_service')}: ${sum.service.ng ? `NG ${sum.service.ng}` : 'OK'}` : ''}
     ${connections?.length ? `<br>${L('st_conns')} (${connections.length}): ${cnt(sum.conns)}` : ''}
-    ${scope.issues.map((i) => `<br><span class="gr gr-expert">${L('sec_scope')}</span> ${esc(scopeMsg(i))}`).join('')}
+    ${actionsHtml(actionItems(spec, design, connections, scope))}
     <ul>${used.map((g) => `<li>${grade({ grade: g, reasons: [] })} ${L(`gr_${g}_d`)}</li>`).join('')}</ul>
     <div class="note">${L('src_anal')}<br>${esc(t('src_design', t(prof.checkLabelKey ?? prof.labelKey)))} ${esc(tc(spec.code, 'src_design_why'))}</div></div>`)
 
@@ -365,6 +374,7 @@ export function buildReport({ built, reactions, design, connections, opt, footin
   h3{font-size:13px;margin:14px 0 6px} table{border-collapse:collapse;width:100%;margin:6px 0 10px;font-size:11px}
   th,td{border:1px solid #c8ccd4;padding:3px 6px;text-align:left} th{background:#eef1f7}
   .status{border:1px solid #c8ccd4;border-radius:4px;padding:8px 12px;margin:10px 0;background:#f7f8fb}
+  .status .ai{margin-top:6px}.status .ai i{font-style:normal;color:#555}.status .ai ul{margin:2px 0 4px}
   .gr{display:inline-block;padding:0 6px;border:1px solid currentColor;border-radius:8px;font-size:10.5px;font-weight:600;white-space:nowrap}
   table.wide{font-size:9.5px} table.wide th,table.wide td{padding:2px 3px}
   .gr-fail{color:#c43030}.gr-expert{color:#5a45c6}.gr-prelim{color:#b56d00}.gr-reinforced{color:#2f55c9}.gr-pass{color:#1d8653}

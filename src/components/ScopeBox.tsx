@@ -1,6 +1,7 @@
 /* Read-only scope assessment. Geometry and additional-structure controls live in their own stages. */
 import { checkScope, type ScopeIssue } from '../domain/scope'
 import type { FactorySpec } from '../domain/types'
+import type { ActionItem } from '../domain/actionItems'
 import { t } from '../i18n'
 
 /** 판정 문구 (사전 sc_<key>, 인자 = issue.args) */
@@ -22,3 +23,11 @@ export function ScopeBox({ spec }: { spec: FactorySpec }) {
     </div>
   )
 }
+
+/** 「확인할 것」 한 줄 문구 — 계산서와 공유 */
+export function actionText(a: ActionItem): string {
+  if (a.scope) return scopeMsg(a.scope)
+  const n = a.members || a.conns
+  return t(`ai_${a.reason as 'restraint' | 'rotTest' | 'gbDetail' | 'coldFormed' | 'addition'}`, n)
+}
+

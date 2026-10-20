@@ -21,6 +21,12 @@ import { initVals, toSpec } from '../src/components/planFields'
 import { rSourceText } from '../src/components/Status'
 import { buildDxf } from '../src/drawing/drawings'
 import { krSynthetic } from './kr-synth'
+import { readFileSync } from 'node:fs'
+import { gunzipSync } from 'node:zlib'
+import { buildLoadPayloads } from '../src/domain/loads'
+import { actionItems } from '../src/domain/actionItems'
+import { localDate, clock } from '../src/lib/date'
+import { decodeResults, fixtureFor } from './tw-golden'
 let n = 0
 const ok = (c: unknown, m: string) => { assert.ok(c, m); n++ }
 const near = (a: number, b: number, tol: number, m: string) => ok(Math.abs(a - b) <= tol * Math.max(1, Math.abs(b)), `${m}: ${a} vs ${b}`)
@@ -97,5 +103,28 @@ const near = (a: number, b: number, tol: number, m: string) => ok(Math.abs(a - b
   ok([...footingGroups(model).values()].filter((x) => x === 'lean').length === spec.bays + 1, 'footing: interior group for rigid interior columns')
   const lean = buildPortal(normalizeSpans({ ...structuredClone(DEFAULT_SPEC), frame: 'multi' as const, spanList: [24, 24] }))
   ok(lean.elements.filter((e) => e.interior).every((e) => e.lean), 'default stays leaning')
+}
+/* 8. 실무 점검(2026-10-20) 정리 — 「확인할 것」 목록·簽證 사유·날짜·번체 용어 */
+{
+  const fx = JSON.parse(gunzipSync(readFileSync(fixtureFor('TW'))).toString())
+  const run = (mode: 'assumed' | 'confirmed') => {
+    const spec = { ...structuredClone(fx.spec), restraints: { flyBraces: mode, sagRods: mode, braceCrossing: mode } }
+    const model = buildPortal(spec), info = buildLoadPayloads(spec, model).info
+    const d = runDesign(spec, model, info, decodeResults(fx.results)), cs = runConnections(spec, model, info, decodeResults(fx.results))
+    return { spec, items: actionItems(spec, d, cs, checkScope(spec)) }
+  }
+  const a = run('assumed'), c = run('confirmed')
+  const r = a.items.find((i) => i.id === 'restraint')
+  ok(r?.group === 'confirm' && r.members === 392 && r.field === 'restraints.flyBraces', `restraint item: confirm, 392 members, field (${JSON.stringify(r)})`)
+  ok(!c.items.some((i) => i.id === 'restraint') && c.items.find((i) => i.id === 'coldFormed')?.members === 164, 'confirmed restraints: item gone, cold-formed limit 164 stays')
+  ok(a.items.some((i) => i.id === 'rotTest' && i.group === 'evidence' && i.conns > 0), 'knee rotation test basis listed as evidence')
+  const site = a.items.find((i) => i.scope?.key === 'siteAssumed')
+  ok(site?.group === 'confirm' && site.field === 'siteBasis', 'siteAssumed → confirm, jumps to siteBasis')
+  const rv = (m: number) => reviewItems({ spec: a.spec, issues: [], design: true, restraintMembers: m, connections: true, footing: false, coldFormed: true }).find((i) => i.key === 'member')!
+  ok(rv(392).status === 'partial' && rv(392).reason === 'restraintAssumed' && rv(0).status === 'included', 'review: member item partial while restraints are assumed')
+  const d0 = new Date(2026, 9, 20, 7, 5, 9)
+  ok(localDate(d0) === '2026-10-20' && clock(d0) === '07:05:09', 'local date/time (not UTC)')
+  const tw = readFileSync(new URL('../src/i18n/dict/zh-TW.ts', import.meta.url), 'utf8').split('\n').filter((l) => !/^\s+rn_/.test(l)).join('\n')
+  ok(!/屋面梁|牆梁|桁條|墙|檩/.test(tw), 'zh-TW dictionary: no mainland terms outside release notes')
 }
 console.log(`TW localization: ${n} checks passed`)

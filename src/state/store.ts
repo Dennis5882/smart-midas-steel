@@ -17,6 +17,7 @@ import type { TemplateKey } from '../domain/templates'
 import type { BuildMode } from '../agent/parse'
 import { DEFAULT_SPEC, type ElementRole, type FactoryModel, type FactorySpec } from '../domain/types'
 
+export type HelpTab = 'manual' | 'release'
 export const THEMES = ['navy', 'light', 'cyber'] as const
 export type Theme = (typeof THEMES)[number]
 export type PanelId = 'logP' | 'modelP' | 'viewP' | 'resP'
@@ -94,6 +95,8 @@ export function freshWorkState() {
     msgs: [] as ChatMsg[],
     activePlan: null as Extract<ChatMsg, { kind: 'plan' }> | null,
     draftSpec: null as FactorySpec | null,
+    /** 결과의 「확인할 것」 → 입력 칸 이동 요청 (PlanCard 가 단계 이동·포커스 후 비움) */
+    fieldJump: null as string | null,
     workspaceView: 'start' as 'start' | 'model',
     task: 'model' as TaskId,
     draftInvalid: false,
@@ -167,8 +170,8 @@ export const S = {
   /** 편집 중인 스펙 미리보기 (아직 Gen 에 보내지 않은 형상) */
   viewNonce: 0,
   /** 해석 결과 원자료 (설계 검토 입력) */
-  /** 릴리즈 노트 창 열림 */
-  rnOpen: false,
+  /** 사용안내 창 — Manual / 릴리즈 노트 탭 (null = 닫힘) */
+  help: null as HelpTab | null,
   /** 단면 자동 최적화 결과 */
   /** 마지막으로 쓴 스펙 — 새 계획 카드의 출발점 */
   lastSpec: DEFAULT_SPEC as FactorySpec,

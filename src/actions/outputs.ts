@@ -1,3 +1,4 @@
+import { clock, localDate } from '../lib/date'
 import { currentReview } from '../state/review'
 import { footingState } from '../state/footing'
 /* 산출물 (M5·M6) — 계산서(PDF 직접 다운로드 / HTML 새 창)·도면(DXF)·물량(CSV).
@@ -66,7 +67,7 @@ export async function downloadReportPdf(): Promise<void> {
     checkCancel()
     downloadBlob(name, blob)
     log(t('log_report'), 'ok')
-    addMsg('bot', lt('pdf_done', name, pages, (blob.size / 1024).toFixed(0), new Date().toLocaleString()))
+    addMsg('bot', lt('pdf_done', name, pages, (blob.size / 1024).toFixed(0), `${localDate()} ${clock()}`))
   } catch (e) {
     addMsg('bot', failMsg(e, (m) => t('pdf_failed', m)))
   } finally {

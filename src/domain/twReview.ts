@@ -6,13 +6,13 @@ import type { FactorySpec } from './types'
 
 export type ReviewKey = 'code' | 'system' | 'dead' | 'live' | 'wind' | 'seismic' | 'combo' | 'member' | 'drift' | 'connection' | 'foundation' | 'coldFormed' | 'seismicDetail' | 'welding'
 export type ReviewStatus = 'included' | 'partial' | 'omitted'
-export type ReviewReason = 'siteAssumed' | 'needDesign' | 'needConnections' | 'interiorJoints' | 'trussJoints' | 'foundationPrelim' | 'foundationSeparate' | 'coldFormedPrelim' | 'seismicDetail' | 'weldFabricator' | 'additionsLoads'
+export type ReviewReason = 'siteAssumed' | 'needDesign' | 'needConnections' | 'interiorJoints' | 'trussJoints' | 'foundationPrelim' | 'foundationSeparate' | 'coldFormedPrelim' | 'seismicDetail' | 'weldFabricator' | 'additionsLoads' | 'restraintAssumed'
 export interface ReviewItem { key: ReviewKey; section: 'rep_s1' | 'rep_s2' | 'rep_s3' | 'rep_s4' | 'rep_s6' | 'rep_s7' | 'rep_s8'; status: ReviewStatus; reason?: ReviewReason }
 export const REVIEW_KEYS: ReviewKey[] = ['code', 'system', 'dead', 'live', 'wind', 'seismic', 'combo', 'member', 'drift', 'connection', 'foundation', 'coldFormed', 'seismicDetail', 'welding']
 
-export interface ReviewInput { spec: FactorySpec; issues: ScopeIssue[]; design: boolean; connections: boolean; footing: boolean; coldFormed: boolean }
+export interface ReviewInput { spec: FactorySpec; issues: ScopeIssue[]; design: boolean; /** 횡지지 가정 때문에 전문가 검토인 부재 수 (actionItems) */ restraintMembers?: number; connections: boolean; footing: boolean; coldFormed: boolean }
 
-export function reviewItems({ spec, issues, design, connections, footing, coldFormed }: ReviewInput): ReviewItem[] {
+export function reviewItems({ spec, issues, design, restraintMembers = 0, connections, footing, coldFormed }: ReviewInput): ReviewItem[] {
   if (spec.code !== 'TW') return []
   const has = (k: string) => issues.some((i) => i.key === k)
   const interior = (spec.frame === 'multi' || spec.frame === 'gableCols')
@@ -24,7 +24,7 @@ export function reviewItems({ spec, issues, design, connections, footing, coldFo
     { key: 'wind', section: 'rep_s3', status: 'included' },
     { key: 'seismic', section: 'rep_s3', status: has('siteAssumed') ? 'partial' : 'included', ...(has('siteAssumed') ? { reason: 'siteAssumed' as const } : {}) },
     { key: 'combo', section: 'rep_s4', status: 'included' },
-    { key: 'member', section: 'rep_s6', status: design ? 'included' : 'omitted', ...(design ? {} : { reason: 'needDesign' as const }) },
+    { key: 'member', section: 'rep_s6', ...(!design ? { status: 'omitted' as const, reason: 'needDesign' as const } : restraintMembers ? { status: 'partial' as const, reason: 'restraintAssumed' as const } : { status: 'included' as const }) },
     { key: 'drift', section: 'rep_s7', status: design ? 'included' : 'omitted', ...(design ? {} : { reason: 'needDesign' as const }) },
     { key: 'connection', section: 'rep_s8', ...(!connections ? { status: 'omitted' as const, reason: 'needConnections' as const }
       : spec.frame === 'truss' ? { status: 'partial' as const, reason: 'trussJoints' as const }

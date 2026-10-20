@@ -4,13 +4,17 @@ import { profileOf, type CodeId } from '../codes'
 import { siteCoef, siteSource } from '../codes/twSites'
 import { windSource } from '../codes/twWind'
 import { checkScope } from '../domain/scope'
-import { scopeMsg } from './ScopeBox'
+
 import type { FactorySpec } from '../domain/types'
 import type { ConnResult } from '../domain/connections'
 import type { DesignResult } from '../domain/design'
 import { GRADES, summarizeStatus, type Grade, type Reason, type StatusSummary } from '../domain/status'
 import { t, tc } from '../i18n'
-import { blockedMembers, restraintKeys, support } from '../domain/validity'
+import { blockedMembers } from '../domain/validity'
+import { ACTION_GROUPS, actionItems, type ActionItem } from '../domain/actionItems'
+import { actionText } from './ScopeBox'
+import { jumpToField } from '../agent/session'
+import { useStore } from '../state/store'
 
 export function GradeChip({ g, reasons }: { g: Grade; reasons?: Reason[] }) {
   const why = (reasons ?? []).filter((r) => r !== 'ng').map((r) => t(`rs_${r}`)).join(' · ')
@@ -37,17 +41,31 @@ export function StatusCard({ d, cs, spec }: { d: DesignResult | null; cs: ConnRe
       {d && <div className="kv"><span className="k">{t('st_members')} ({d.members.length})</span><span className="v">{counts(sum.members)}</span></div>}
       {d && <div className="kv"><span className="k">{t('st_service')} ({sum.service.total})</span><span className="v">{sum.service.ng ? `NG ${sum.service.ng}` : 'OK'}</span></div>}
       {!!cs?.length && <div className="kv"><span className="k">{t('st_conns')} ({cs.length})</span><span className="v">{counts(sum.conns)}</span></div>}
-      {restraintKeys(spec).map((k) => <div className="kv" key={k}><span className="k">{t(`restraint_${k}`)}</span><span className="v">{t(`restraint_${support(spec, k)}`)}</span></div>)}
       {!!blockedMembers(d) && <p className="mw-error" role="alert">{t('flow_invalid_design')}</p>}
       {d && [...new Set(d.members.flatMap((m) => (m.issues ?? []).filter((i) => i.level === 'blocked').map((i) => i.detail)))].map((text) => <p className="pe-tip" key={text}>{text}</p>)}
-      {d?.members.some((m) => m.issues?.some((i) => i.key === 'restraint')) && <p className="pe-tip">{t('restraint_note')}</p>}
-      {scope.issues.map((i, n) => <div key={n} className="res-stat" style={{ color: 'var(--amber)', margin: '4px 0 0' }}>⚠ {t('sec_scope')}: {scopeMsg(i)}</div>)}
+      <ActionList items={actionItems(spec, d, cs, scope)} />
       <div className="res-stat" style={{ marginTop: 8, marginBottom: 0 }}>
         {used.map((g) => <div key={g}><span className="grade" data-g={g} style={{ marginLeft: 0 }}>{t(`gr_${g}`)}</span> {t(`gr_${g}_d`)}</div>)}
         <div style={{ marginTop: 6 }}>· {t('src_anal')}<br />· {t('src_design', t(profileOf(code).checkLabelKey ?? profileOf(code).labelKey))} {tc(code, 'src_design_why')}</div>
       </div>
     </div>
   )
+}
+
+/** 결과 카드 — 묶음별 목록, 입력으로 풀리는 항목은 [수정] 으로 그 칸으로 이동 */
+export function ActionList({ items }: { items: ActionItem[] }) {
+  const s = useStore()
+  if (!items.length) return null
+  return <div className="ai-list" role="list" aria-label={t('ai_title')}>
+    <div className="ai-title">{t('ai_title')}</div>
+    {ACTION_GROUPS.filter((g) => items.some((a) => a.group === g)).map((g) => <div key={g} className="ai-group" data-g={g}>
+      <div className="ai-head">{t(`ai_${g}`)}</div>
+      {items.filter((a) => a.group === g).map((a) => <div key={a.id} className="ai-row" role="listitem">
+        <span>{actionText(a)}</span>
+        {a.field && <button type="button" className="btn btn-ghost ai-go" disabled={s.busy} onClick={() => jumpToField(a.field!)}>{t('ai_go')}</button>}
+      </div>)}
+    </div>)}
+  </div>
 }
 
 /** 지진 계수 출처 문구 — TW: 표2-1·2-4 자동값 / 사용자 입력(표값) / 표에 없음, CN: 프로젝트 입력 */

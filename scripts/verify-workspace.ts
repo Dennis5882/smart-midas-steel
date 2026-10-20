@@ -131,12 +131,14 @@ setConfirmHandler(null)
 {
   {
     const { S } = await import('../src/state/store')
-    const openInfo = () => S.activity.filter((a) => a.source === 'notice' && a.level === 'info' && !a.acknowledged)
-    for (const a of S.activity) a.acknowledged = true
+    S.help = null
     await executeAction({ intent: 'help' }); await executeAction({ intent: 'help' }); await executeAction({ intent: 'help' })
-    assert.equal(openInfo().length, 1, 'help toggles: open, close, open — never stacks')
+    assert.equal(S.help, 'manual', 'help toggles the manual popup: open, close, open')
     await executeAction({ intent: 'help' })
-    assert.equal(openInfo().length, 0, 'help closes the open guide (× works too — no hidden duplicate behind it)')
+    assert.equal(S.help, null, 'help closes the popup')
+    await executeAction({ intent: 'release_notes' })
+    assert.equal(S.help, 'release', 'release notes open the same popup on the release tab')
+    S.help = null
   }
   const { codeForLang } = await import('../src/state/store')
   assert.equal(codeForLang('zh-CN', 'TW', 'TW', false), 'CN', 'zh-CN new work → CN only')

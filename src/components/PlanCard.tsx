@@ -106,6 +106,22 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
     if (live && !s.busy && !errors.length && !blocked) { S.draftSpec = spec; notify() }
   }, [spec, live, s.busy, errors.length, blocked])
 
+  /* 결과 화면 「확인할 것」 → 해당 단계·칸 (현재 편집기만) */
+  useEffect(() => {
+    const path = s.fieldJump
+    if (!path || !live || s.busy) return
+    S.fieldJump = null
+    const target = fieldStep({ path })
+    setStep(target); setVisited((old) => Math.max(old, target))
+    setTimeout(() => {
+      const group = document.getElementById(`${formId}-${path}`)
+      const field = group?.matches('input, select, textarea') ? group : group?.querySelector<HTMLElement>('input, select, textarea') ?? group
+      const fold = field?.closest('details'); if (fold) fold.open = true
+      field?.scrollIntoView({ block: 'center' }); field?.focus()
+    }, 60)
+    notify()
+  }, [s.fieldJump, live, s.busy])
+
   const closeEditor = () => {
     S.workspaceView = 'start'
     if (S.preview) draw3D()
@@ -243,7 +259,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
       const advanced = g.title === 'sec_conn' ? filtered.fields
         : step === 2 ? filtered.fields.filter((f) => !['bays', 'baySpacing'].includes(f.path))
         : step === 3 ? filtered.fields.filter((f) => !['sections.column', 'sections.rafter', 'material'].includes(f.path))
-        : step === LOADS_STEP && spec.code === 'TW' && g.title === 'sec_seismic' ? filtered.fields.filter((f) => !['siteBasis', 'siteEvidence', 'seismic.county', 'seismic.town', 'seismic.nearFault', 'seismic.soil', 'seismic.systemX', 'seismic.systemY'].includes(f.path))
+        : step === LOADS_STEP && spec.code === 'TW' && g.title === 'sec_seismic' ? filtered.fields.filter((f) => !['siteBasis', 'siteEvidence', 'seismic.county', 'seismic.town', 'seismic.nearFault', 'seismic.soil'].includes(f.path))
         : step === LOADS_STEP && spec.code === 'KR' ? filtered.fields.filter((f) => ['korea.Kzt', 'korea.KD', 'korea.roofZeta', 'korea.S'].includes(f.path)) : []
       const basic = filtered.fields.filter((f) => !advanced.includes(f))
       return <section className="mw-group" key={g.title}>

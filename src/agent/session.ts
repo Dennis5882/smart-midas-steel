@@ -7,7 +7,7 @@ import type { CodeId } from '../codes'
 import { portalGeometry } from '../domain/portal'
 import { TEMPLATES } from '../domain/templates'
 import { defaultSpecFor, normalizeBays, type FactorySpec } from '../domain/types'
-import { getLang, langUrl, t, lt, isLText } from '../i18n'
+import { getLang, langUrl, t, lt } from '../i18n'
 import { verifyConn } from '../mapi/client'
 import { S, freshWorkState, notify, saveCode, type Theme } from '../state/store'
 import { specChanged } from '../state/taskFlow'
@@ -39,13 +39,12 @@ export async function executeAction(c: Intent): Promise<void> {
   }
   try { switch (c.intent) {
     case 'help': {
-      /* 사용 안내 = 토글: 안내가 떠 있으면 닫기 */
-      const open = S.activity.find((a) => a.source === 'notice' && a.level === 'info' && !a.acknowledged && isLText(a.html) && a.html.k === 'ws_help')
-      if (open) { open.acknowledged = true; notify() } else addMsg('bot', lt('ws_help'))
+      /* 사용안내 창 = 토글 (Manual 탭) */
+      S.help = S.help === 'manual' ? null : 'manual'; notify()
       break
     }
     case 'clear': clearChat(); break
-    case 'release_notes': S.rnOpen = true; notify(); break
+    case 'release_notes': S.help = 'release'; notify(); break
     case 'copy_link': {
       const u = langUrl(getLang())
       try { await navigator.clipboard.writeText(u); addMsg('bot', lt('link_copied', escapeHtml(u))) }
@@ -104,6 +103,14 @@ export async function executeAction(c: Intent): Promise<void> {
 }
 
 /** Reopen the same editor. After Gen changed the model (build/optimization), start from its current specification. */
+/** 결과의 「확인할 것」 항목 → 편집기를 열고 그 입력 칸으로 (planFields path) */
+export function jumpToField(path: string): void {
+  if (S.busy || S.confirm) return
+  openCurrentModel()
+  S.fieldJump = path
+  notify()
+}
+
 export function openCurrentModel(): void {
   if (S.busy || S.confirm) return
   S.task = 'model'
