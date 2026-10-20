@@ -11,7 +11,7 @@ import { dbDifferences, diffText, isRecord } from '../domain/genSync'
 import { sectionSourceDifferences } from '../domain/genSectionSync'
 import { scopeMsg } from '../components/ScopeBox'
 import { t, lt } from '../i18n'
-import { mapi } from '../mapi/client'
+import { mapi, tableOf } from '../mapi/client'
 import { autoSave, autoSavePath } from './save'
 import { confirmAction } from '../components/ConfirmDialog'
 import { beginJob, Cancelled, endJob, failMsg, stage } from './job'
@@ -95,7 +95,7 @@ export async function sendModel(spec: FactorySpec, onReplaced?: (backup: string)
   const sectionTable = await mapi<any>('POST', '/post/TABLE', { Argument: {
     TABLE_NAME: 'SectionSource', TABLE_TYPE: 'SECTIONALL', UNIT: { FORCE:'KN', DIST:'MM', HEAT:'KJ', TEMP:'C' },
   } }, 'Gen section source')
-  const sourceDifferences = sectionSourceDifferences(spec.code, p.SECT, sectionTable?.SectionSource)
+  const sourceDifferences = sectionSourceDifferences(spec.code, p.SECT, tableOf(sectionTable))
   if (sourceDifferences.length) throw new Error(t('section_source_mismatch', sourceDifferences.slice(0,4).join(', ')))
   /* Gen 화면을 ISO 전체 보기로 (story 와 같은 각도, H 30·V 15). view/ANGLE 은 각도만 바꾸고 확대는 그대로라
      doc/new 직후 원점 근처가 크게 확대된 채 남는다. 맞춤(fit) 전용 API 는 없고, view/CAPTURE 의 ZOOM_LEVEL 100(Zoom Fit)이

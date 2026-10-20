@@ -13,7 +13,7 @@ import { nodeWeights } from './weights'
 import { BASIN } from '../codes/twSites'
 import { buildCnLoads } from './cnLoads'
 import { buildKrLoads, type KrLoadInfo } from './krLoads'
-import { additionErrors, factoryOnly, hasAdditions } from './additions'
+import { additionErrors, factoryOnly } from './additions'
 import { ASD_COMBOS } from '../codes/twAsd'
 import { buildAdditionLoads } from './additionLoads'
 import type { AdditionModel, AdditionFactors } from './additionTypes'
@@ -201,17 +201,17 @@ function buildFactoryLoads(spec: FactorySpec, model: FactoryModel): LoadPayloads
   const SIDE_CP = -0.7 // 표2.4 측풍면
   const ROOF_PARALLEL_CP = Math.max(hRef / span, hRef / length) <= 2.5 ? -0.7 : -0.8 // 표2.5 풍향 ∥ 용마루
 
-  /** from: X 풍이 불어오는 측벽. 대칭(박공)은 x0 만 — 반대 방향은 미러. 비대칭(편경사)은 xL 풍도 별도 케이스(WX5~8) */
+  /** from: X 풍이 불어오는 측벽 (없으면 x0), fromY: Y 풍이 불어오는 박공벽 (없으면 y0) */
+  /** 풍향 4방향(±X·±Y) × 내압 ± — 대칭 모델도 반대 방향을 거울상으로 생략하지 않는다(실무 방식, 사용자 결정 2026-10-20: Gen 과 앱이 같은 조합) */
   interface WindCase { name: string; dir: 'X' | 'Y'; s: 1 | -1; roofW: number; roofL: number; from?: 'xL'; fromY?: 'yL' }
   const windCases: WindCase[] = [
     { name: 'WX1', dir: 'X', s: 1, roofW: rc.high, roofL: rc.leeward }, { name: 'WX2', dir: 'X', s: -1, roofW: rc.high, roofL: rc.leeward },
     { name: 'WX3', dir: 'X', s: 1, roofW: rc.low, roofL: rc.leeward }, { name: 'WX4', dir: 'X', s: -1, roofW: rc.low, roofL: rc.leeward },
-    ...(G.symmetric && !hasAdditions(spec) ? [] : [
-      { name: 'WX5', dir: 'X', s: 1, roofW: rc.high, roofL: rc.leeward, from: 'xL' }, { name: 'WX6', dir: 'X', s: -1, roofW: rc.high, roofL: rc.leeward, from: 'xL' },
-      { name: 'WX7', dir: 'X', s: 1, roofW: rc.low, roofL: rc.leeward, from: 'xL' }, { name: 'WX8', dir: 'X', s: -1, roofW: rc.low, roofL: rc.leeward, from: 'xL' },
-    ] as WindCase[]),
+    /* 반대(−X) 방향 — x = 스팬 쪽에서 부는 바람 */
+    { name: 'WX5', dir: 'X', s: 1, roofW: rc.high, roofL: rc.leeward, from: 'xL' }, { name: 'WX6', dir: 'X', s: -1, roofW: rc.high, roofL: rc.leeward, from: 'xL' },
+    { name: 'WX7', dir: 'X', s: 1, roofW: rc.low, roofL: rc.leeward, from: 'xL' }, { name: 'WX8', dir: 'X', s: -1, roofW: rc.low, roofL: rc.leeward, from: 'xL' },
     { name: 'WY1', dir: 'Y', s: 1, roofW: ROOF_PARALLEL_CP, roofL: ROOF_PARALLEL_CP }, { name: 'WY2', dir: 'Y', s: -1, roofW: ROOF_PARALLEL_CP, roofL: ROOF_PARALLEL_CP },
-    ...(hasAdditions(spec) ? [{ name: 'WY3', dir: 'Y', s: 1, roofW: ROOF_PARALLEL_CP, roofL: ROOF_PARALLEL_CP, fromY: 'yL' }, { name: 'WY4', dir: 'Y', s: -1, roofW: ROOF_PARALLEL_CP, roofL: ROOF_PARALLEL_CP, fromY: 'yL' }] as WindCase[] : []),
+    { name: 'WY3', dir: 'Y', s: 1, roofW: ROOF_PARALLEL_CP, roofL: ROOF_PARALLEL_CP, fromY: 'yL' }, { name: 'WY4', dir: 'Y', s: -1, roofW: ROOF_PARALLEL_CP, roofL: ROOF_PARALLEL_CP, fromY: 'yL' },
   ]
   /** 表2.8 鋸齒狀屋頂 — 풍상 쪽부터 경사면 순서: D(첫 풍상면)·E(첫 풍하면)·D′·E′·D″ … 의 위치.
       첫 면이 풍을 마주보지 않으면(편경사 높은 쪽 풍) 그 면은 E 부터. 박공 = D·E 로 表2.5 와 같음 */
@@ -304,28 +304,27 @@ function buildFactoryLoads(spec: FactorySpec, model: FactoryModel): LoadPayloads
   torsionCouple('ETY', seismic.Y.Mt)
 
   /* ── 하중조합: 종류별 변형 전개 (E 는 ±, W 는 케이스 자체가 방향·내압 변형 + 2.12 조합 변형) ── */
-  const windVariants: (Variant & { dir: 'X' | 'Y' })[] = [
-    ...windCases.map((v) => ({ dir: v.dir, tag: ` ${v.name}`, parts: [{ lc: v.name, f: 1 }] })),
-    ...windCases.flatMap((v) => ([1, -1] as const).flatMap((ts) =>
-      /* 횡풍향 WLY(+X)는 비대칭(편경사)이면 −X 도 — WLX(+Y)는 길이 방향 대칭이라 미러 */
-      ((v.dir === 'Y' && !G.symmetric) || hasAdditions(spec) ? [1, -1] as const : [1] as const).map((ls) => ({
+  const variantsOf = (list: WindCase[]): (Variant & { dir: 'X' | 'Y' })[] => [
+    ...list.map((v) => ({ dir: v.dir, tag: ` ${v.name}`, parts: [{ lc: v.name, f: 1 }] })),
+    ...list.flatMap((v) => ([1, -1] as const).flatMap((ts) =>
+      /* 횡풍향은 풍향 직각 양쪽(±) */
+      ([1, -1] as const).map((ls) => ({
         dir: v.dir, tag: ` ${v.name}${ls > 0 ? '+' : '-'}L${ts > 0 ? '+' : '-'}T`,
         parts: [{ lc: v.name, f: kD }, { lc: v.dir === 'X' ? 'WLX' : 'WLY', f: 0.7 * ls }, { lc: 'WT', f: 0.7 * ts }],
       })))),
   ]
+  const windVariants = variantsOf(windCases)
   const variants: Record<LoadCaseType, Variant[]> = {
     S: [],
     D: [{ parts: [{ lc: 'D', f: 1 }], tag: '' }],
     L: [{ parts: [{ lc: 'LR', f: 1 }], tag: '' }],
     W: windVariants,
-    /* 지진 + 우발 비틀림(같은 부호) — 대칭 구조라 (±E, ∓ET) 는 미러로 포함. 비대칭(편경사)은 반대 부호도 */
+    /* 지진 + 우발 비틀림 — 질심 이동은 양쪽 모두라 (±E, ±ET) 네 조합 (대칭 모델도 생략하지 않음) */
     E: (['EX', 'EY'] as const).flatMap((n) => [
       { parts: [{ lc: n, f: 1 }, { lc: `ET${n[1]}`, f: 1 }], tag: ` +${n}` },
       { parts: [{ lc: n, f: -1 }, { lc: `ET${n[1]}`, f: -1 }], tag: ` -${n}` },
-      ...(G.symmetric && !hasAdditions(spec) ? [] : [
-        { parts: [{ lc: n, f: 1 }, { lc: `ET${n[1]}`, f: -1 }], tag: ` +${n}-T` },
-        { parts: [{ lc: n, f: -1 }, { lc: `ET${n[1]}`, f: 1 }], tag: ` -${n}+T` },
-      ]),
+      { parts: [{ lc: n, f: 1 }, { lc: `ET${n[1]}`, f: -1 }], tag: ` +${n}-T` },
+      { parts: [{ lc: n, f: -1 }, { lc: `ET${n[1]}`, f: 1 }], tag: ` -${n}+T` },
     ]),
   }
   const LCOM: Record<string, unknown> = {}
@@ -375,7 +374,7 @@ function buildFactoryLoads(spec: FactorySpec, model: FactoryModel): LoadPayloads
   const STLD: Record<string, unknown> = {}
   const cases: [string, string, string][] = [
     ['D', 'D', 'Dead'], ['LR', 'LR', 'Roof live'], ['EX', 'E', 'Seismic X'], ['EY', 'E', 'Seismic Y'],
-    ...windCases.map((v): [string, string, string] => [v.name, 'W', `Wind ${v.dir}`]),
+    ...windCases.map((v): [string, string, string] => [v.name, 'W', `Wind ${v.from || v.fromY ? '-' : '+'}${v.dir}`]),
     ['WLX', 'W', 'Across-wind (X wind)'], ['WLY', 'W', 'Across-wind (Y wind)'], ['WT', 'W', 'Wind torsion'],
     ['ETX', 'E', 'Accidental torsion X'], ['ETY', 'E', 'Accidental torsion Y'],
   ]

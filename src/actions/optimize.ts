@@ -27,8 +27,11 @@ export async function runOptimize(): Promise<void> {
   if (!S.built) { addMsg('bot', lt('no_model')); return }
   if (!S.analyzed) { addMsg('bot', lt('need_anal')); return }
   if (!beginJob('opt')) return
-  /* 직전 설계 검토 결과 — 검토 통과·같은 모델·같은 해석 회차이고 Gen 처마 변위 지문이 같을 때만 1회차에 재사용 (reusableResults) */
+  /* 직전 결과(설계 검토·이전 최적화·NG 보완) — 같은 모델·같은 해석 회차이고 Gen 처마 변위 지문이 같을 때만 1회차에 재사용 (reusableResults) */
   const prior = S.results
+  /* 실행 전 결과 — Gen 모델을 바꾸기 전(첫 재전송·재해석 전)에 멈추면(Gen 변경 감지·1회차 회수 실패·취소) 그대로 되돌린다.
+     재전송·재해석이 일어나면 S.built 또는 S.analysisRev 가 바뀌므로 되돌리지 않는다 */
+  const before = { built: S.built, rev: S.analysisRev, results: S.results, design: S.design, connections: S.connections, opt: S.opt, ratioView: S.ratioView, repairPlan: S.repairPlan, repairComparison: S.repairComparison }
   S.results = null; S.design = null; S.connections = null; S.opt = null; S.ratioView = false
   S.repairPlan = null; S.repairComparison = null
   notify()
@@ -111,6 +114,11 @@ export async function runOptimize(): Promise<void> {
     draw3D()
     tab('resP')
   } catch (e) {
+    if (S.built === before.built && S.analysisRev === before.rev && !S.design) {
+      S.results = before.results; S.design = before.design; S.connections = before.connections; S.opt = before.opt; S.ratioView = before.ratioView
+      S.repairPlan = before.repairPlan; S.repairComparison = before.repairComparison
+      notify()
+    }
     addMsg('bot', failMsg(e, (m) => t('opt_fail', m)))
   } finally {
     endJob()

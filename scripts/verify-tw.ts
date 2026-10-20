@@ -123,7 +123,9 @@ const nHand = n
 /* ── 2. 하중 평형 (기본 샘플) ─────────────────────── */
 const spec = structuredClone(DEFAULT_SPEC), model = buildPortal(spec), loads = buildLoadPayloads(spec, model)
 eq(model.nodes.length, 219, 'nodes 219'); eq(model.elements.length, 410, 'elements 410')
-eq(Object.keys(loads.STLD).length, 15, 'cases 15'); eq(Object.keys(loads['LCOM-GEN']).length, 55, 'combos 55')
+/* 대칭 축소 없음(실무 방식, 2026-10-20): 풍 4방향 × 내압 ± 12 + 횡풍향·비틀림 3 + D·LR·EX·EY·ETX·ETY = 21 케이스,
+   조합 = 2.2-1·2.2-2·13.6.1 + 풍 2 × 60 변형 + 지진 4 × 8 변형 = 155 */
+eq(Object.keys(loads.STLD).length, 21, 'cases 21'); eq(Object.keys(loads['LCOM-GEN']).length, 155, 'combos 155'); eq(Object.keys(loads.info.comboKind).length, 155, 'every Gen combo is a design combo')
 const node = new Map(model.nodes.map((x) => [x.id, x]))
 const totals: Record<string, number[]> = {}
 for (const [id, rec] of Object.entries(loads.BMLD)) {

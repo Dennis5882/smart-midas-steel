@@ -5,6 +5,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { gunzipSync } from 'node:zlib'
 import { decodeResults, FIXTURE } from './tw-golden'
+import { resultTable } from './fake-gen'
 import { buildPortal } from '../src/domain/portal'
 import { buildLoadPayloads } from '../src/domain/loads'
 import { CN_DEFAULT_SPEC, KR_DEFAULT_SPEC } from '../src/domain/types'
@@ -15,7 +16,7 @@ import type { Results } from '../src/actions/results'
 import type { Built } from '../src/state/store'
 
 ;(globalThis as any).document = { documentElement: { lang: 'ko', dataset: {} } }
-const { fetchResults, markChecked, reusableResults } = await import('../src/actions/results')
+const { fetchResults, reusableResults } = await import('../src/actions/results')
 const { S } = await import('../src/state/store')
 const { setConfirmHandler } = await import('../src/components/ConfirmDialog')
 setConfirmHandler(() => true) // 화면 없음 — 모델 교체 확인 자동 승인
@@ -77,34 +78,27 @@ for (const code of ['TW', 'CN', 'KR'] as const) {
   const { built, results } = source
   S.mapiKey = `offline-results-${code}`
   ;(globalThis as any).fetch = async (_url: string, init: RequestInit) => {
-    const a = JSON.parse(String(init.body)).Argument, type = a.TABLE_TYPE, name = a.TABLE_NAME
-    tableCalls.push(type)
-    const keys = a.NODE_ELEMS.KEYS as number[], loads = (a.LOAD_CASE_NAMES as string[]).map((c) => c.replace(/\((CB|ST)\)$/, ''))
+    const a = JSON.parse(String(init.body)).Argument
+    tableCalls.push(a.TABLE_TYPE)
     if (fault === 'unknown schema') return Response.json({})
-    let data: unknown[][] = []
-    if (type === 'BEAMFORCE') {
-      for (const id of keys) for (const c of loads) for (const [i, p] of results.beam.get(id)!.get(c)!.entries()) data.push(['0', String(id), c, ['I[1]', '1/4', '2/4', '3/4', 'J[2]'][i], p.P, p.Vy, p.Vz, p.My, p.Mz])
-      if (fault === 'dropped station') data.splice(1, 1)
-      if (fault === 'duplicate station') data[1] = data[0]
-      if (fault === 'blank force') data[0][4] = ''
-      if (fault === 'reversed stations') data.reverse()
-    } else if (type === 'TRUSSFORCE') {
-      for (const id of keys) for (const c of loads) data.push(['0', id, c, results.truss.get(id)!.get(c), results.truss.get(id)!.get(c)])
-      if (fault === 'dropped truss') data.pop()
-    } else if (type === 'REACTIONG') {
-      data = loads.map((c) => { const s = results.sway.get(c)!; return [c, s.X.sumH, s.Y.sumH, s.X.sumPu] })
-      if (fault === 'dropped reaction') data.pop()
-      return Response.json({ [name]: { SUB_TABLES: [{ 'SUMMATION OF REACTION FORCES PRINTOUT': { DATA: data } }] } })
-    } else if (name === 'U') {
-      for (const id of keys) for (const c of loads) { const s = results.sway.get(c)!; data.push(['0', id, c, s.X.drift + (fault === 'reanalyzed' ? 1e-4 : 0), s.Y.drift, 0]) }
-      if (fault === 'dropped sway node') data.pop()
-    } else {
-      for (const id of keys) for (const c of loads) { const v = results.disp.get(c)!.get(id)!; data.push(['0', id, c, v.dx, v.dy, v.dz]) }
-      if (fault === 'dropped service node') data.pop()
-    }
-    return Response.json({ [name]: { HEAD: [], DATA: data } })
+    const body = resultTable(results, a, (kind, data) => {
+      if (kind === 'BEAMFORCE') {
+        if (fault === 'dropped station') data.splice(1, 1)
+        if (fault === 'duplicate station') data[1] = data[0]
+        if (fault === 'blank force') data[0][4] = ''
+        if (fault === 'reversed stations') data.reverse()
+      }
+      if (kind === 'TRUSSFORCE' && fault === 'dropped truss') data.pop()
+      if (kind === 'REACTIONG' && fault === 'dropped reaction') data.pop()
+      if (kind === 'U' && fault === 'dropped sway node') data.pop()
+      if (kind === 'U' && fault === 'reanalyzed') for (const row of data) row[3] = Number(row[3]) + 1e-4
+      if (kind === 'S' && fault === 'dropped service node') data.pop()
+    })
+    /* 라이브 Gen 은 응답 최상위 키를 요청한 TABLE_NAME 대신 'Result Table'·'empty' 로 줄 때가 있다 (SDK unwrapTable) */
+    const renamed = fault === 'renamed key' ? 'Result Table' : fault === 'empty key' ? 'empty' : null
+    return Response.json(renamed && body ? { [renamed]: Object.values(body)[0] } : body)
   }
-  for (const f of ['', 'reversed stations']) {
+  for (const f of ['', 'reversed stations', 'renamed key', 'empty key']) {
     fault = f
     const parsed = await fetchResults(built)
     assert.deepEqual(parsed.beam, results.beam); passed++
@@ -113,12 +107,12 @@ for (const code of ['TW', 'CN', 'KR'] as const) {
     fault = f
     await assert.rejects(() => fetchResults(built), ResultValidationError, `${code} parser ${f}`); passed++
   }
-  /* 최적화 1회차 결과 재사용 — 검토 통과 표시·같은 모델·같은 해석 회차·Gen 처마 변위 지문이 모두 같을 때만 */
+  /* 최적화 1회차 결과 재사용 — fetchResults 가 기록한 출처(같은 모델·같은 해석 회차) + Gen 처마 변위 지문이 같을 때만 */
   {
     fault = ''
+    S.analysisRev = 1
     const parsed = await fetchResults(built)
-    assert.equal(await reusableResults(parsed, built, 1), null, `${code} unchecked results are not reused`)
-    markChecked(parsed, built, 1)
+    assert.equal(await reusableResults(results, built, 1), null, `${code} results not fetched from Gen are not reused`)
     tableCalls.length = 0
     assert.equal(await reusableResults(parsed, built, 1), parsed)
     assert.ok(tableCalls.length > 0 && tableCalls.every((c) => c === 'DISPLACEMENTG'), `${code} reuse check reads only the eave displacement table: ${tableCalls}`)
@@ -127,12 +121,16 @@ for (const code of ['TW', 'CN', 'KR'] as const) {
     assert.equal(await reusableResults(null, built, 1), null)
     fault = 'reanalyzed'
     assert.equal(await reusableResults(parsed, built, 1), null, `${code} Gen re-analyzed outside the app`)
+    for (const f of ['unknown schema', 'dropped sway node']) {
+      fault = f
+      assert.equal(await reusableResults(parsed, built, 1), null, `${code} unreadable eave table (${f}) → re-fetch instead of failing`)
+    }
     fault = ''
     S.built = built; S.analyzed = true; S.analysisRev = 7
     await runDesignCheck()
     assert.ok(S.results && S.design, `${code} design check ok`)
-    assert.equal(await reusableResults(S.results, built, 7), S.results, `${code} design check marks its results`)
-    passed += 8
+    assert.equal(await reusableResults(S.results, built, 7), S.results, `${code} design check results are reusable`)
+    passed += 10
   }
   // A failed re-check must not leave the previous successful design exportable.
   S.built = built; S.analyzed = true; S.design = design(); S.connections = []; S.opt = null
@@ -156,5 +154,25 @@ S.mapiKey = ''
   assert.ok(m.includes(t('rv_missing')) && m.includes('BEAMFORCE · ') && !/\bmissing\b/.test(m), m); passed++
   const q = failMsg(new QuantityError('knee.stiffener'), (x) => x)
   assert.ok(q === t('q_invalid', 'knee.stiffener') && !/Invalid connection/.test(q), q); passed++
+}
+/* 표 본문 찾기·요청별 대기 한도 (mapi/client) */
+{
+  const { tableOf, timeoutFor, TIMEOUTS } = await import('../src/mapi/client')
+  const tb = { HEAD: ['a'], DATA: [['1']] }
+  assert.deepEqual(tableOf({ F: tb }), tb); assert.deepEqual(tableOf({ 'Result Table': tb }), tb); assert.deepEqual(tableOf({ empty: tb }), tb)
+  const sumOnly = { SUB_TABLES: [{ 'SUMMATION OF REACTION FORCES PRINTOUT': { DATA: [] } }] }
+  assert.deepEqual(tableOf({ Reaction: sumOnly }), sumOnly); assert.deepEqual(tableOf({}), {}); assert.deepEqual(tableOf(null), {}); assert.deepEqual(tableOf({ message: 'x' }), {})
+  assert.equal(timeoutFor('/doc/anal'), TIMEOUTS.long); assert.equal(timeoutFor('/post/TABLE'), TIMEOUTS.long)
+  assert.equal(timeoutFor('/doc/saveas'), TIMEOUTS.doc); assert.equal(timeoutFor('/db/NODE'), TIMEOUTS.short); assert.equal(timeoutFor('/view/ANGLE'), TIMEOUTS.short)
+  assert.ok(TIMEOUTS.short <= 60_000 && TIMEOUTS.long >= 10 * 60_000)
+  /* 실제 SDK timeout(응답하지 않는 fetch, 50 ms) → '응답 없음' 안내 (cause 'Timed out after …' 모양 확인) */
+  const { MidasClient } = await import('midas-nx')
+  const { apiErrorMessage } = await import('../src/mapi/client')
+  const hang = (_u: unknown, init?: RequestInit) => new Promise<Response>((_, rej) => init?.signal?.addEventListener('abort', () => rej(init.signal!.reason)))
+  const c = new MidasClient({ mapiKey: 'offline', product: 'gen', timeout: 50, fetch: hang as typeof fetch })
+  const err = await c.request('GET', '/db/NODE').then(() => null, (e: unknown) => e)
+  const msg = apiErrorMessage(err, 'GET /db/NODE')
+  assert.equal(msg, t('gen_timeout', 0, 'GET /db/NODE'), msg)
+  passed += 4
 }
 console.log(`Result integrity: ${passed} checks passed`)

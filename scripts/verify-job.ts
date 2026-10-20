@@ -9,7 +9,7 @@ let dropNode = false
 let onCall: ((n: number, path: string) => void) | null = null
 let analDelay = 0
 let fault = ''
-const { genSectionRecord } = await import('../src/domain/sections')
+const { sectionAllTable } = await import('./fake-gen')
 
 const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200, headers: { 'content-type': 'application/json' } })
 ;(globalThis as any).fetch = async (url: string, init?: RequestInit) => {
@@ -26,14 +26,8 @@ const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200, head
   }
   if (path === '/doc/new') { db = {}; return json({}) }
   if (path === '/doc/anal') { if (analDelay) await new Promise((r) => setTimeout(r, analDelay)); return json({ message: 'ok' }) }
-  if (path === '/post/TABLE' && body.Argument?.TABLE_TYPE === 'SECTIONALL') {
-    const records=Object.entries(db.SECT ?? {}).map(([id,s]:[string,any])=>{
-      const name=s.SECT_BEFORE.SECT_I.SECT_NAME,code=name.startsWith('RH')||name.startsWith('CC')?'TW':'CN'
-      const r=genSectionRecord(name,code)??genSectionRecord(name,'TW')!
-      return [id,String(r.A+(fault==='section-source'?1:0)),String(r.Ix),String(r.Iy),String(r.J)]
-    })
-    return json({SectionSource:{DIST:'MM',HEAD:['ID','Area','Iyy','Izz','Ixx'],DATA:records}})
-  }
+  if (path === '/post/TABLE' && body.Argument?.TABLE_TYPE === 'SECTIONALL')
+    return json(sectionAllTable(db.SECT as Record<string, any>, body.Argument.TABLE_NAME, (n) => (n.startsWith('RH') || n.startsWith('CC') ? 'TW' : 'CN'), fault === 'section-source' ? 1 : 0))
   if (path.startsWith('/doc/') || path.startsWith('/post/')) return json({})
   const name = path.replace('/db/', '')
   if (method === 'PUT') {

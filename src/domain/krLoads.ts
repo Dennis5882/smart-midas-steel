@@ -19,7 +19,6 @@ import type { LoadInfo, LoadPayloads } from './loads'
 import { portalGeometry } from './portal'
 import { sectionProps } from './sections'
 import { nodeWeights } from './weights'
-import { hasAdditions } from './additions'
 import { baySpans, columnSpans, frameSpans, type Face, type FactoryModel, type FactorySpec, type Node } from './types'
 
 /** 계산서·결과 탭 표시용 KDS 중간값 */
@@ -191,14 +190,12 @@ export function buildKrLoads(spec: FactorySpec, model: FactoryModel): LoadPayloa
   const enclosed = !isPartialKR(k.cpi)
   const ka = areaKa(bay * 0.5 * H)
 
+  /** 풍향 4방향(x0·xL·y0·yL) × 지붕 Cp 2값 × 내압 2값 — 대칭 모델도 거울상으로 생략하지 않는다(실무 방식, 사용자 결정 2026-10-20) */
   interface WindCase { name: string; dir: 'X' | 'Y'; from: 'x0' | 'xL' | 'y0' | 'yL'; r: 0 | 1; ci: 0 | 1 }
   const windCases: WindCase[] = []
-  const froms: ('x0' | 'xL')[] = G.symmetric && !hasAdditions(spec) ? ['x0'] : ['x0', 'xL']
-  for (const from of froms) for (const r of [0, 1] as const) for (const ci of [0, 1] as const)
+  for (const from of ['x0', 'xL'] as const) for (const r of [0, 1] as const) for (const ci of [0, 1] as const)
     windCases.push({ name: `WX${windCases.filter((w) => w.dir === 'X').length + 1}`, dir: 'X', from, r, ci })
-  /* Y 풍: 길이 대칭이면 y0 쪽만 (yL 쪽은 거울) */
-  const bl0 = baySpans(spec), ySym0 = !hasAdditions(spec) && bl0.every((v, i) => Math.abs(v - bl0[bl0.length - 1 - i]) < 1e-9)
-  for (const from of ySym0 ? ['y0'] as const : ['y0', 'yL'] as const) for (const r of [0, 1] as const) for (const ci of [0, 1] as const)
+  for (const from of ['y0', 'yL'] as const) for (const r of [0, 1] as const) for (const ci of [0, 1] as const)
     windCases.push({ name: `WY${windCases.filter((w) => w.dir === 'Y').length + 1}`, dir: 'Y', from, r, ci })
   /** 풍상측부터 지붕면 순서 — 0 = 첫 풍상면(바람을 마주볼 때) */
   const faceOrder = (plane: number, from: 'x0' | 'xL') => {
@@ -289,11 +286,7 @@ export function buildKrLoads(spec: FactorySpec, model: FactoryModel): LoadPayloa
     }
   }
 
-  /* ── 하중조합 (KDS 41 12 00 1.7.1) ──
-     대칭 축소: 좌우 대칭(xSym, x → 스팬 − x)·길이 대칭(ySym, 베이 간격 회문)이면 거울상 조합은 거울 위치 부재의 결과와 같다 →
-     각 궤도에서 하나만 (모든 부재를 검토하므로 최댓값 동일). 거울: x → (EX, ET 부호 반전) · y → (EY, ET 부호 반전) */
-  const xSym = G.symmetric && !hasAdditions(spec)
-  const ySym = ySym0
+  /* ── 하중조합 (KDS 41 12 00 1.7.1) — 대칭 축소 없음: 지진 부호·풍직각 ±·가상하중 방향을 모두 전개 (실무 방식, 사용자 결정 2026-10-20) ── */
   const orth30 = sdc === 'D' // 8.1.3.3 범주 D: 직교 100% + 30%
   const eVariants: { parts: Part[]; tag: string }[] = []
   for (const [m, o] of [['X', 'Y'], ['Y', 'X']] as const) {
@@ -301,23 +294,20 @@ export function buildKrLoads(spec: FactorySpec, model: FactoryModel): LoadPayloa
     for (const s1 of [1, -1]) for (const s3 of [1, -1]) for (const s2 of orth30 ? [1, -1] : [0]) {
       /* (sEX·sEY 성분, sET) — m 방향 주, o 방향 30% */
       const sx = m === 'X' ? s1 : s2, sy = m === 'X' ? s2 : s1
-      const orbit = [[sx, sy, s3]]
-      if (xSym) orbit.push(...orbit.map(([a, b, c]) => [-a, b, -c]))
-      if (ySym) orbit.push(...orbit.map(([a, b, c]) => [a, -b, -c]))
-      if (orbit.some((v) => seen.has(v.join()))) continue
+      if (seen.has([sx, sy, s3].join())) continue
       seen.add([sx, sy, s3].join())
       const parts: Part[] = [{ lc: `E${m}`, f: s1 }, { lc: `ET${m}`, f: s3 }]
       if (s2) parts.push({ lc: `E${o}`, f: 0.3 * s2 })
       eVariants.push({ parts, tag: ` ${s1 > 0 ? '+' : '-'}E${m}${s3 > 0 ? '+' : '-'}T${s2 ? `${s2 > 0 ? '+' : '-'}0.3E${o}` : ''}` })
     }
   }
-  /* 풍직각 ±: X 풍(+Y 방향 WLX)은 길이 대칭이면 거울, Y 풍(+X 방향 WLY)은 좌우 대칭이면 거울 */
+  /* 풍직각 ± (양쪽) */
   const wVariants: { parts: Part[]; tag: string; dir: 'X' | 'Y' }[] = windCases.flatMap((c) => (enclosed
-    ? ((c.dir === 'X' ? ySym : xSym) ? [1] as const : [1, -1] as const).map((sg) => ({ dir: c.dir, tag: ` ${c.name}${sg > 0 ? '+' : '-'}L`, parts: [{ lc: c.name, f: 1 }, { lc: c.dir === 'X' ? 'WLX' : 'WLY', f: sg }] }))
+    ? ([1, -1] as const).map((sg) => ({ dir: c.dir, tag: ` ${c.name}${sg > 0 ? '+' : '-'}L`, parts: [{ lc: c.name, f: 1 }, { lc: c.dir === 'X' ? 'WLX' : 'WLY', f: sg }] }))
     : [{ dir: c.dir, tag: ` ${c.name}`, parts: [{ lc: c.name, f: 1 }] }]))
   const sVariants = snowCases.map((lc) => ({ parts: [{ lc, f: 1 }], tag: lc === 'SN' ? '' : ` ${lc}` }))
-  /* 가상하중 방향 — 대칭이면 + 만 (거울) */
-  const nDirs: { d: 'X' | 'Y'; s: number }[] = [{ d: 'X', s: 1 }, ...(xSym ? [] : [{ d: 'X' as const, s: -1 }]), { d: 'Y', s: 1 }, ...(ySym ? [] : [{ d: 'Y' as const, s: -1 }])]
+  /* 가상하중 방향 — ±X·±Y */
+  const nDirs: { d: 'X' | 'Y'; s: number }[] = [{ d: 'X', s: 1 }, { d: 'X', s: -1 }, { d: 'Y', s: 1 }, { d: 'Y', s: -1 }]
   const LCOM: Record<string, unknown> = {}, comboKind: Record<string, ComboKind> = {}
   let no = 0
   const emit = (ref: string, tag: string, parts: Part[]) => {

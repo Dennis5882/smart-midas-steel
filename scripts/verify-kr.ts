@@ -78,7 +78,9 @@ const sum = (spec: FactorySpec) => {
   return { m, l, s }
 }
 const g = sum(defaultSpecFor('KR'))
-ok(Object.keys(g.l.STLD).length === 23 && Object.keys(g.l['LCOM-GEN']).length === 54, `gable cases/combos ${Object.keys(g.l.STLD).length}/${Object.keys(g.l['LCOM-GEN']).length}`)
+/* 대칭 축소 없음(실무 방식, 2026-10-20): 풍 4방향 16 케이스, 조합 204 */
+ok(Object.keys(g.l.STLD).length === 31 && Object.keys(g.l['LCOM-GEN']).length === 204 && Object.keys(g.l.info.comboKind).length === 204, `gable cases/combos ${Object.keys(g.l.STLD).length}/${Object.keys(g.l['LCOM-GEN']).length}`)
+ok(Math.abs(g.s.WX5[0] + g.s.WX1[0]) < 1e-6 && Math.abs(g.s.WY5[1] + g.s.WY1[1]) < 1e-6, 'opposite wind (WX5·WY5) = reflection of WX1·WY1 (symmetric gable)')
 near(g.s.LR[2], -1.0 * 24 * 36, 1e-6, 'LR = 1.0 × 24 × 36'); near(g.s.SN[2], -1.0 * 24 * 36, 1e-6, 'snow min 1.0 × B × L')
 const W = g.l.info.seismic.W
 near(g.s.EX[0], sp.SDS / 3 * W, 1e-6, 'V = Cs·W'); near(g.s.EY[1], sp.SDS / 3 * W, 1e-6)
@@ -87,7 +89,7 @@ near(g.s.NXL[0], 0.002 * 864, 1e-6)
 near(g.l.info.wind.qh, 0.5 * 1.225 * (28 * 0.95) ** 2 / 1000, 1e-12, 'q_H')
 near(g.l.info.wind.across.WLX, Math.max(0.35 * 24 / 36, 0.2) * g.l.info.wind.across.WDx, 1e-9, 'W_LC = γ·W_D')
 ok(g.l.info.kr!.sdc === 'D' && g.l.info.kr!.orth30, 'SDC D → 100% + 30%')
-ok(Object.values<any>(g.l['LCOM-GEN']).filter((c) => /1\.7-[57]/.test(c.NAME)).length === 8, 'symmetric: 2 seismic variants per direction × 2 directions × 2 combos')
+ok(Object.values<any>(g.l['LCOM-GEN']).filter((c) => /1\.7-[57]/.test(c.NAME)).length === 32, 'no symmetry omission: (±E, ±ET, ±0.3E) 8 variants per direction × 2 directions × 2 combos')
 const steep = sum({ ...defaultSpecFor('KR'), roofSlope: 0.5 }) // 26.6° → 불균형
 ok(['SN1', 'SN2'].every((c) => c in steep.s), 'unbalanced snow cases for θ > 15°')
 const Ss = steep.l.info.snow!

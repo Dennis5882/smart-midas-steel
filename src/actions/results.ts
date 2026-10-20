@@ -5,9 +5,10 @@
    - DISPLACEMENTG 사용 하중(ST): 풍·지진 층간변위각, 지붕 활하중 처짐 */
 import { isAxialRole } from '../domain/types'
 import type { Built } from '../state/store'
-import { mapi } from '../mapi/client'
+import { mapi, tableOf } from '../mapi/client'
 import { stage } from './job'
-import { requireResult, resultNumber, serviceNodes, validateDesignResults } from '../domain/resultValidation'
+import { requireResult, resultNumber, ResultValidationError, serviceNodes, validateDesignResults } from '../domain/resultValidation'
+import { S } from '../state/store'
 import { lateralSwayKr } from '../domain/krSway'
 
 export interface ForcePt { P: number; Vy: number; Vz: number; My: number; Mz: number }
@@ -35,7 +36,7 @@ async function table(type: string, name: string, keys: number[], loads: string[]
       NODE_ELEMS: { KEYS: keys }, LOAD_CASE_NAMES: loads, ...extra,
     },
   }, `${type} · ${keys.length} × ${loads.length}`)
-  const out = j?.[name]
+  const out = tableOf(j)
   requireResult(out && typeof out === 'object' && (Array.isArray(out.DATA) || Array.isArray(out.SUB_TABLES)), type, 'invalid', name)
   return out as { HEAD: string[]; DATA: string[][]; SUB_TABLES?: any[] }
 }
@@ -71,21 +72,25 @@ async function eaveDisplacements(ids: number[], cb: string[], comboSet: Set<stri
 
 const fingerprint = (combos: string[], dsum: Map<string, number[]>) => combos.map((c) => (dsum.get(c) ?? []).join(',')).join(';')
 
-/* 검증을 마친 결과의 출처 — 같은 모델(S.built)·같은 해석 회차에서만 재사용 (결과를 비우지 않는 새 경로가 생겨도 안전) */
-const checked = new WeakMap<Results, { built: Built; rev: number }>()
-/** 설계·접합 검토까지 통과한 결과로 표시 */
-export function markChecked(r: Results, built: Built, rev: number): void { checked.set(r, { built, rev }) }
+/* 결과의 출처 — fetchResults 가 전체 검증을 통과한 결과에 기록(어느 경로에서 회수했든 같음). 같은 모델(S.built)·같은 해석 회차에서만 재사용 */
+const origin = new WeakMap<Results, { built: Built; rev: number }>()
 
-/** 이전 결과를 다시 써도 되는지 — 검토 통과·같은 모델·같은 해석 회차 + Gen 의 처마 변위 지문이 같음
-    (해석 제어·P-Δ 처럼 Gen 동일성 검사 밖의 설정을 바꿔 Gen 에서 다시 해석했으면 지문이 달라진다; 작은 표 하나) */
+/** 이전 결과를 다시 써도 되는지 — 같은 모델·같은 해석 회차 + Gen 의 처마 변위 지문이 같음
+    (해석 제어·P-Δ 처럼 Gen 동일성 검사 밖의 설정을 바꿔 Gen 에서 다시 해석했으면 지문이 달라진다; 작은 표 하나).
+    표를 못 읽거나 형식이 다르면(Gen 결과 삭제 등) 재사용하지 않고 새로 회수하게 null — 취소·통신 오류는 그대로 전달 */
 export async function reusableResults(r: Results | null, b: Built, rev: number): Promise<Results | null> {
-  const src = r && checked.get(r)
+  const src = r && origin.get(r)
   if (!r?.fingerprint || !src || src.built !== b || src.rev !== rev) return null
   const cb = r.combos.map((c) => `${c}(CB)`)
   const { eaves } = serviceNodes(b.spec, b.model)
   stage('st_results', Math.ceil(cb.length / caseBatchSize(eaves.map((n) => n.id))))
-  const { dsum } = await eaveDisplacements(eaves.map((n) => n.id), cb, new Set(r.combos))
-  return fingerprint(r.combos, dsum) === r.fingerprint ? r : null
+  try {
+    const { dsum } = await eaveDisplacements(eaves.map((n) => n.id), cb, new Set(r.combos))
+    return fingerprint(r.combos, dsum) === r.fingerprint ? r : null
+  } catch (e) {
+    if (e instanceof ResultValidationError) return null
+    throw e
+  }
 }
 
 export async function fetchResults(b: Built): Promise<Results> {
@@ -96,7 +101,7 @@ export async function fetchResults(b: Built): Promise<Results> {
   const beamIds = model.elements.filter((e) => !isAxialRole(e.role)).map((e) => e.id)
   const trussIds = model.elements.filter((e) => isAxialRole(e.role)).map((e) => e.id)
   const { eaves: eaveNodes, tops: columnTops, nodes: svcNodes } = serviceNodes(spec, model)
-  const svcCases = b.cases.filter((c) => spec.code === 'CN' || !!b.info.additions || c !== 'D')
+  const svcCases = b.cases.filter((c) => (spec.code === 'CN' || !!b.info.additions || c !== 'D'))
   /* 행 검증은 Set 조회 — 배열 includes 는 11만 행 × 410 요소로 화면 스레드에서 수천만 번 비교 */
   const comboSet = new Set(combos), beamSet = new Set(beamIds), trussSet = new Set(trussIds)
 
@@ -167,5 +172,6 @@ export async function fetchResults(b: Built): Promise<Results> {
   const results: Results = { beam, truss, sway, disp, combos, fingerprint: fingerprint(combos, dsum) }
   if (spec.code === 'KR') lateralSwayKr(results, columnTops.map((n) => n.id), b.info.seismic)
   validateDesignResults(spec, model, b.info, results)
+  origin.set(results, { built: b, rev: S.analysisRev })
   return results
 }

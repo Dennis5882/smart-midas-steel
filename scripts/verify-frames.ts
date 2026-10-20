@@ -73,7 +73,18 @@ for (const base of [DEFAULT_SPEC, CN_DEFAULT_SPEC]) {
     const names = Object.values(loads['LCOM-GEN']).map((c: any) => c.NAME as string)
     ok(names.some((x) => x.includes('+EX-T')) && names.some((x) => x.includes('WY1-L')), 'TW mono: opposite-sign torsion and −X across-wind combinations')
     const gable = buildLoadPayloads(DEFAULT_SPEC, buildPortal(DEFAULT_SPEC))
-    ok(!Object.values(gable.STLD).some((c: any) => c.NAME === 'WX5'), 'TW gable: unchanged (no WX5)')
+    ok(['WX5', 'WY3'].every((c) => Object.values(gable.STLD).some((x: any) => x.NAME === c)) && 'LRFD 2.2-3 WX5' in gable.info.comboKind && 'LRFD 2.2-4 +EX-T' in gable.info.comboKind, 'TW gable: −X/−Y wind and (±E, ∓ET) are design combos (no symmetry omission)')
+    {
+      /* 거울상 하중 = 원래 하중의 x 대칭: 수평 합력 부호 반대·크기 같음, 상향력 같음 */
+      const tg: Record<string, number[]> = {}
+      const nd = new Map(buildPortal(DEFAULT_SPEC).nodes.map((n) => [n.id, n])), el = buildPortal(DEFAULT_SPEC).elements
+      for (const [id, rec] of Object.entries(gable.BMLD) as [string, any][]) for (const it of rec.ITEMS) {
+        const e = el[+id - 1], a = nd.get(e.n1)!, b = nd.get(e.n2)!, L = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z)
+        const v = (tg[it.LCNAME] ??= [0, 0, 0]); v[{ GX: 0, GY: 1, GZ: 2 }[it.DIRECTION as 'GX']] += it.P[0] * L
+      }
+      const close = (a: number, b: number) => Math.abs(a - b) < 1e-6 * Math.max(1, Math.abs(a))
+      ok(close(tg.WX5[0], -tg.WX1[0]) && close(tg.WX5[2], tg.WX1[2]) && close(tg.WY3[1], -tg.WY1[1]) && close(tg.WY3[2], tg.WY1[2]), 'TW gable: opposite-direction loads are the reflection of the originals')
+    }
   } else {
     /* GB 51022 표 4.3.2 항 1: 단坡는 균일(+ 반경간 4.3.5) — 불균형 SN1/SN2 없음 */
     const steep = { ...spec, span: 12, eaveHeight: 6, roofSlope: 0.5, china: { ...spec.china!, snow: 0.5 } } // 높은 처마 12 m
@@ -124,7 +135,7 @@ for (const base of [DEFAULT_SPEC, CN_DEFAULT_SPEC]) {
     near(sm, loads.info.seismic[lc === 'EX' ? 'X' : 'Y'].V, 1e-9, `${code} multi: ${lc} nodal sum = V`)
   }
   const cases = Object.values(loads.STLD).map((c: any) => c.NAME)
-  ok(!cases.includes('WX5'), `${code} multi equal spans: symmetric → no mirrored wind`)
+  ok(code === 'CN' ? !cases.includes('WX5') : cases.includes('WX5'), `${code} multi: ${code === 'CN' ? 'GB cases WX1–4 cover ±X' : '−X wind WX5–8 checked'}`)
   const uneq = normalizeSpans({ ...spec, spanList: [24, 18] })
   const uc = Object.values(buildLoadPayloads(uneq, buildPortal(uneq)).STLD).map((c: any) => c.NAME)
   ok(code === 'CN' || uc.includes('WX5'), `${code} multi unequal spans: mirrored X wind (TW)`)
@@ -278,6 +289,24 @@ for (const base of [DEFAULT_SPEC, CN_DEFAULT_SPEC]) {
   ok(checkScope({ ...spec, trussDepth: spec.eaveHeight - 1 }).issues.some((i) => i.key === 'trussDepth'), 'scope: truss depth too large blocked')
   const sp2 = toSpec(DEFAULT_SPEC, { ...initVals(DEFAULT_SPEC), frame: 'truss' }, false)
   ok(sp2.frame === 'truss' && !!sp2.sections.chord && !!sp2.sections.web && sp2.trussDepth === defaultTrussDepth(DEFAULT_SPEC.span), 'card → truss with default chord/web/depth')
+}
+
+/* 풍하중 미리보기 (하중 단계 표) — 실제 페이로드 합산: TW 수평 합력 = W_D, 부분 개방이면 내압 케이스 상향력 증가, KR·CN 케이스 수·방향 */
+{
+  const { windSummary } = await import('../src/domain/windSummary')
+  const { KR_DEFAULT_SPEC } = await import('../src/domain/types')
+  const sumOf = (spec: typeof DEFAULT_SPEC) => { const m = buildPortal(spec), L = buildLoadPayloads(spec, m); return { w: windSummary(m, L), L } }
+  const tw = sumOf(DEFAULT_SPEC)
+  const wx = tw.w.rows.filter((r) => r.kind === 'main' && r.dir === '+X')
+  ok(wx.length === 4 && Math.abs(Math.max(...wx.map((r) => r.horizontal)) - tw.L.info.wind.across.WDx) < 1e-6, 'wind preview TW: +X horizontal = W_D')
+  ok(tw.w.rows.some((r) => r.kind === 'torsion') && tw.w.rows.filter((r) => r.kind === 'across').length === 2, 'wind preview TW: across-wind ×2 + torsion')
+  ok(wx.every((r) => r.uplift > 0) && wx[0].gcpi! > 0 && wx[1].gcpi! < 0 && wx[0].uplift > wx[1].uplift, 'wind preview TW: +internal case has larger uplift')
+  const part = sumOf({ ...DEFAULT_SPEC, wind: { ...DEFAULT_SPEC.wind, enclosure: 'partial' } }).w.rows.find((r) => r.name === 'WX1')!
+  ok(part.gcpi! > 1 && part.uplift > wx[0].uplift * 1.3, `wind preview TW: partially enclosed raises uplift (${wx[0].uplift.toFixed(0)} → ${part.uplift.toFixed(0)} kN)`)
+  const cn = sumOf(CN_DEFAULT_SPEC).w
+  ok(['+X', '-X', '+Y', '-Y'].every((d) => cn.rows.filter((r) => r.dir === d).length === 2), 'wind preview CN: 4 directions × ±i')
+  const kr = sumOf(KR_DEFAULT_SPEC).w
+  ok(kr.rows.filter((r) => r.kind === 'main').length >= 8 && kr.rows.every((r) => r.kind === 'torsion' || r.horizontal > 0), 'wind preview KR: main cases with horizontal force')
 }
 
 console.log(`Frames: ${n} checks passed (mono-slope + multi-span + TW 表2.8: geometry, releases, loads, wind, snow, scope, quantities, inputs)`)

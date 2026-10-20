@@ -111,8 +111,8 @@ export const GROUPS: Group[] = [
     { path: 'wind.V10', label: 'f_V10', unit: 'm/s', kind: 'num' },
     { path: 'wind.I', label: 'f_Iw', kind: 'num' },
     { path: 'wind.exposure', label: 'f_exposure', kind: 'select', options: () => ['A', 'B', 'C'].map((v) => ({ value: v, label: v })) },
-    { path: 'wind.enclosure', label: 'f_enclosure', kind: 'select', options: () => [
-      { value: 'enclosed', label: t('encl_enclosed') }, { value: 'partial', label: t('encl_partial') }] },
+    { path: 'wind.enclosure', label: 'f_enclosure_q', kind: 'select', full: true, options: () => [
+      { value: 'enclosed', label: t('encl_q_enclosed') }, { value: 'partial', label: t('encl_q_partial') }] },
   ] },
 ]
 export const CN_GROUPS: Group[] = [

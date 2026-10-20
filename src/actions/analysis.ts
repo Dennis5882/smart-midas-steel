@@ -1,7 +1,7 @@
 /* 해석 실행 · 결과 회수 */
 import type { BaseReactions } from '../domain/twFoundation'
 import { t, lt } from '../i18n'
-import { mapi } from '../mapi/client'
+import { mapi, tableOf } from '../mapi/client'
 import { S, notify, type ReactionSum } from '../state/store'
 import { addMsg, log, tab } from '../state/ui'
 import { autoSave } from './save'
@@ -75,9 +75,10 @@ export async function fetchReactions(): Promise<void> {
       LOAD_CASE_NAMES: S.built.cases.map((c) => `${c}(ST)`),
     },
   }, 'Reaction')
-  const sub = r?.Reaction?.SUB_TABLES?.[0]?.['SUMMATION OF REACTION FORCES PRINTOUT']?.DATA as string[][] | undefined
+  const tab = tableOf(r)
+  const sub = tab.SUB_TABLES?.[0]?.['SUMMATION OF REACTION FORCES PRINTOUT']?.DATA as string[][] | undefined
   S.reactions = (sub ?? []).map(([lc, fx, fy, fz]): ReactionSum => ({ lc, fx: +fx, fy: +fy, fz: +fz }))
-  S.baseReactions = parseBaseReactions(r?.Reaction?.DATA, new Set(bases), new Set(S.built.cases))
+  S.baseReactions = parseBaseReactions(tab.DATA, new Set(bases), new Set(S.built.cases))
   notify()
 }
 

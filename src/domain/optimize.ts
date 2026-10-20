@@ -129,8 +129,44 @@ export interface OptControl {
   amp?: Partial<Record<ElementRole, number>>
   floors?: Partial<Record<ElementRole, number>>
   bans?: { column: string; rafter: string }[]
-  /** 골조 쌍을 전수 탐색 (회귀 비교용 참조 — 실행 경로는 가지치기 탐색) */
-  exhaustive?: boolean
+}
+
+/** 골조 쌍 탐색에 필요한 판정 — 모두 순수(같은 인자면 같은 값) */
+export interface FramePairOps {
+  /** 쌍의 강재량 — 후보 목록 순서대로 단조 증가해야 한다(기둥·지붕보 각각) */
+  tons: (c: string, r: string) => number
+  banned: (c: string, r: string) => boolean
+  stiffFails: (c: string, r: string) => boolean
+  colPasses: (c: string) => boolean
+  rafPasses: (r: string) => boolean
+  connOK: (c: string, r: string) => boolean
+}
+
+/** 강도·강성·접합 통과 + 금지 아님 중 최경량 쌍 (같으면 먼저 나온 쌍), svcLimited = 강도는 통과했는데 강성으로 탈락한 쌍이 그보다 가벼운 범위에 있었는지.
+    후보는 무게 오름차순 — 무거워지면 break 로 가지치고, 비싼 강도는 강성을 통과했거나 svcLimited 판정에 필요할 때만 묻는다.
+    전수 탐색(이중 루프)과 결과가 같다 — verify-opt-search 가 무작위 사례로 비교 */
+export function searchFramePair(colCands: readonly string[], rafCands: readonly string[], ops: FramePairOps): { best: { c: string; r: string; t: number } | null; svcLimited: boolean } {
+  let best: { c: string; r: string; t: number } | null = null
+  let svcLimited = false
+  for (const c of colCands) {
+    /* 가장 가벼운 지붕보와 합쳐도 무거우면 이후 기둥은 모두 탈락 */
+    if (best && rafCands.length && ops.tons(c, rafCands[0]) >= best.t) break
+    for (const r of rafCands) {
+      const t = ops.tons(c, r)
+      if (best && t >= best.t) break // 이 뒤 지붕보는 모두 더 무거움
+      if (ops.banned(c, r)) continue
+      /* 싼 강성 조건 먼저 — 탈락한 쌍은 강도를 볼 필요가 없고, svcLimited 판정에 필요할 때만 강도를 본다 */
+      if (ops.stiffFails(c, r)) {
+        if (!svcLimited && ops.colPasses(c) && ops.rafPasses(r)) svcLimited = true
+        continue
+      }
+      if (!ops.colPasses(c)) break
+      if (!ops.rafPasses(r)) continue
+      if (!ops.connOK(c, r)) continue
+      best = { c, r, t }
+    }
+  }
+  return { best, svcLimited }
 }
 
 export function proposeSections(spec: FactorySpec, model: FactoryModel, info: LoadInfo, res: Results, design: DesignResult, ctl: OptControl = {}): OptProposal {
@@ -198,8 +234,7 @@ export function proposeSections(spec: FactorySpec, model: FactoryModel, info: Lo
   if (!truss && present.includes('column') && present.includes('rafter')) {
     /* 강도 통과 여부는 필요할 때만 계산하고 기억한다 — 예전엔 카탈로그 전체(기둥·지붕보 각 ~150)를 먼저 검토해 반복마다 수 초.
        검사 순서: 무게 가지치기(break) → 금지 → 강성 → 강도(기둥 실패면 break, 지붕보 실패면 다음) → 접합.
-       무게 가지치기는 후보가 무게 오름차순일 때만 맞다 — byArea 가 tons 와 같은 A(sectionProps)로 정렬하고 길이는 역할마다 하나라 A 순 = 무게 순.
-       고르는 쌍·svcLimited 는 전수 탐색(ctl.exhaustive, verify-opt-search 회귀)과 같다 */
+       무게 가지치기는 후보가 무게 오름차순일 때만 맞다 — byArea 가 tons 와 같은 A(sectionProps)로 정렬하고 길이는 역할마다 하나라 A 순 = 무게 순 */
     const passMemo = new Map<string, boolean>()
     const passes = (r: 'column' | 'rafter', s: string) => {
       const k = `${r}|${s}`
@@ -221,41 +256,11 @@ export function proposeSections(spec: FactorySpec, model: FactoryModel, info: Lo
       const candidateModel = { ...model, elements: model.elements.map((e) => ({ ...e, section: e.addition ? e.section : candidate.sections[e.role] ?? e.section })) }
       return !runConnections(candidate, candidateModel, info, res).some((x) => x.type !== 'brace' && x.ratio > 1)
     }
-    let best: { c: string; r: string; t: number } | null = null
-    let svcLimited = false
-    if (ctl.exhaustive) {
-      /* 참조 — 예전 전수 탐색 그대로 (회귀 비교 전용) */
-      const passC = colCands.filter((c) => passes('column', c)), passR = rafCands.filter((r) => passes('rafter', r))
-      for (const c of passC) for (const r of passR) {
-        if (banned(c, r)) continue
-        const t = tons('column', c) + tons('rafter', r)
-        if (best && t >= best.t) continue
-        if (stiffFails(c, r)) { svcLimited = true; continue }
-        if (!connOK(c, r)) continue
-        best = { c, r, t }
-      }
-    } else {
-      for (const c of colCands) {
-        /* 기둥도 무게 오름차순 → 가장 가벼운 지붕보와 합쳐도 무거우면 이후 기둥은 모두 탈락 */
-        if (best && tons('column', c) + tons('rafter', rafCands[0]) >= best.t) break
-        /* svcLimited 가 이미 정해졌으면 기둥 강도를 먼저 본다 — 실패 기둥은 아래에서 쌍을 하나도 만들지 못한다 */
-        if (svcLimited && !passes('column', c)) continue
-        for (const r of rafCands) {
-          const t = tons('column', c) + tons('rafter', r)
-          if (best && t >= best.t) break // 이 뒤 지붕보는 모두 더 무거움
-          if (banned(c, r)) continue
-          /* 싼 강성 조건 먼저 — 탈락한 쌍은 강도를 볼 필요가 없고, 'service' 표시(svcLimited)에 필요할 때만 강도를 본다 */
-          if (stiffFails(c, r)) {
-            if (!svcLimited && passes('column', c) && passes('rafter', r)) svcLimited = true
-            continue
-          }
-          if (!passes('column', c)) break
-          if (!passes('rafter', r)) continue
-          if (!connOK(c, r)) continue
-          best = { c, r, t }
-        }
-      }
-    }
+    const { best, svcLimited } = searchFramePair(colCands, rafCands, {
+      tons: (c, r) => tons('column', c) + tons('rafter', r),
+      banned, stiffFails, connOK,
+      colPasses: (c) => passes('column', c), rafPasses: (r) => passes('rafter', r),
+    })
     if (best) {
       /* 서로 K(정렬도)에 영향 → 짝 단면 기준으로 강도비 재평가해 표시 */
       const gov = (x: number) => (svcLimited && x < target * 0.9 ? 'service' : 'strength')

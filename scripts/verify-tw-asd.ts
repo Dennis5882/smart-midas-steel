@@ -61,8 +61,9 @@ const Fy = 235 / 98.0665, E = 200000 / 98.0665
   const base = structuredClone(DEFAULT_SPEC), on = { ...base, asd: true }
   const m = buildPortal(on), lp = buildLoadPayloads(on, m), off = buildLoadPayloads(base, buildPortal(base))
   const asd = Object.values(lp['LCOM-GEN'] as Record<string, any>).filter((c) => c.NAME.startsWith('ASD '))
-  const nW = lp.info.wind.variants.length, nE = 4
-  ok(asd.length === 1 + 2 * (nW + nE), `ASD combos ${asd.length} = 1 + 2(${nW} W + ${nE} E)`)
+  const nW = lp.info.wind.variants.length
+  const nE8 = 8 // (±E, ±ET) × 2 방향
+  ok(asd.length === 1 + 2 * (nW + nE8), `ASD combos ${asd.length} = 1 + 2(${nW} W + ${nE8} E)`)
   ok(Object.keys(off.info.comboKind).every((k) => !k.startsWith('ASD')) && Object.keys(lp['LCOM-GEN']).length === Object.keys(off['LCOM-GEN']).length + asd.length, 'LRFD set unchanged; ASD only when enabled')
   ok(asd.every((c) => c.NAME.length <= 20 && lp.info.comboKind[c.NAME] === 'asd'), 'names ≤ 20 chars, kind asd')
   const c22 = asd.find((c) => c.NAME.startsWith('ASD 2.2-2 WX1'))!

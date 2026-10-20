@@ -31,6 +31,7 @@ const SUITES = [
   ['Task flow / history', 'verify-task-flow.ts'],
   ['Optimization pick', 'verify-opt.ts'],
   ['Frame pair search', 'verify-opt-search.ts'],
+  ['Optimizer result reuse', 'verify-opt-reuse.ts'],
   ['3D solid sections', 'verify-solid.ts'],
   ['Cross-section types', 'verify-frames.ts'],
   ['Quantities', 'verify-quantities.ts'],
