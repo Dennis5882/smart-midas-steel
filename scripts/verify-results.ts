@@ -15,7 +15,7 @@ import type { Results } from '../src/actions/results'
 import type { Built } from '../src/state/store'
 
 ;(globalThis as any).document = { documentElement: { lang: 'ko', dataset: {} } }
-const { fetchResults } = await import('../src/actions/results')
+const { fetchResults, markChecked, reusableResults } = await import('../src/actions/results')
 const { S } = await import('../src/state/store')
 const { setConfirmHandler } = await import('../src/components/ConfirmDialog')
 setConfirmHandler(() => true) // 화면 없음 — 모델 교체 확인 자동 승인
@@ -25,6 +25,7 @@ const { t } = await import('../src/i18n')
 const { buildReport } = await import('../src/report/report')
 const tw = JSON.parse(gunzipSync(readFileSync(FIXTURE)).toString())
 let passed = 0, fault = ''
+const tableCalls: string[] = []
 const zero = () => ({ P: 0, Vy: 0, Vz: 0, My: 0, Mz: 0 })
 
 function input(code: 'TW' | 'CN' | 'KR'): { built: Built; results: Results } {
@@ -77,6 +78,7 @@ for (const code of ['TW', 'CN', 'KR'] as const) {
   S.mapiKey = `offline-results-${code}`
   ;(globalThis as any).fetch = async (_url: string, init: RequestInit) => {
     const a = JSON.parse(String(init.body)).Argument, type = a.TABLE_TYPE, name = a.TABLE_NAME
+    tableCalls.push(type)
     const keys = a.NODE_ELEMS.KEYS as number[], loads = (a.LOAD_CASE_NAMES as string[]).map((c) => c.replace(/\((CB|ST)\)$/, ''))
     if (fault === 'unknown schema') return Response.json({})
     let data: unknown[][] = []
@@ -94,7 +96,7 @@ for (const code of ['TW', 'CN', 'KR'] as const) {
       if (fault === 'dropped reaction') data.pop()
       return Response.json({ [name]: { SUB_TABLES: [{ 'SUMMATION OF REACTION FORCES PRINTOUT': { DATA: data } }] } })
     } else if (name === 'U') {
-      for (const id of keys) for (const c of loads) { const s = results.sway.get(c)!; data.push(['0', id, c, s.X.drift, s.Y.drift, 0]) }
+      for (const id of keys) for (const c of loads) { const s = results.sway.get(c)!; data.push(['0', id, c, s.X.drift + (fault === 'reanalyzed' ? 1e-4 : 0), s.Y.drift, 0]) }
       if (fault === 'dropped sway node') data.pop()
     } else {
       for (const id of keys) for (const c of loads) { const v = results.disp.get(c)!.get(id)!; data.push(['0', id, c, v.dx, v.dy, v.dz]) }
@@ -110,6 +112,27 @@ for (const code of ['TW', 'CN', 'KR'] as const) {
   for (const f of ['unknown schema', 'dropped station', 'duplicate station', 'blank force', 'dropped truss', 'dropped reaction', 'dropped sway node', 'dropped service node']) {
     fault = f
     await assert.rejects(() => fetchResults(built), ResultValidationError, `${code} parser ${f}`); passed++
+  }
+  /* 최적화 1회차 결과 재사용 — 검토 통과 표시·같은 모델·같은 해석 회차·Gen 처마 변위 지문이 모두 같을 때만 */
+  {
+    fault = ''
+    const parsed = await fetchResults(built)
+    assert.equal(await reusableResults(parsed, built, 1), null, `${code} unchecked results are not reused`)
+    markChecked(parsed, built, 1)
+    tableCalls.length = 0
+    assert.equal(await reusableResults(parsed, built, 1), parsed)
+    assert.ok(tableCalls.length > 0 && tableCalls.every((c) => c === 'DISPLACEMENTG'), `${code} reuse check reads only the eave displacement table: ${tableCalls}`)
+    assert.equal(await reusableResults(parsed, built, 2), null, `${code} other analysis run`)
+    assert.equal(await reusableResults(parsed, { ...built }, 1), null, `${code} other model`)
+    assert.equal(await reusableResults(null, built, 1), null)
+    fault = 'reanalyzed'
+    assert.equal(await reusableResults(parsed, built, 1), null, `${code} Gen re-analyzed outside the app`)
+    fault = ''
+    S.built = built; S.analyzed = true; S.analysisRev = 7
+    await runDesignCheck()
+    assert.ok(S.results && S.design, `${code} design check ok`)
+    assert.equal(await reusableResults(S.results, built, 7), S.results, `${code} design check marks its results`)
+    passed += 8
   }
   // A failed re-check must not leave the previous successful design exportable.
   S.built = built; S.analyzed = true; S.design = design(); S.connections = []; S.opt = null

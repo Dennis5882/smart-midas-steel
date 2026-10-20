@@ -41,6 +41,7 @@ export async function analyzeCore(): Promise<void> {
   const res = await mapi<{ message?: string }>('POST', '/doc/anal', {})
   if (NOT_ALLOWED.test(String(res?.message ?? ''))) throw new Error(String(res?.message))
   S.analyzed = true
+  S.analysisRev++
   log(t('log_anal'), 'ok')
   await fetchReactions()
 }

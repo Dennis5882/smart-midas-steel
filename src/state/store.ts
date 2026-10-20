@@ -104,6 +104,8 @@ export function freshWorkState() {
     preview: null as FactorySpec | null,
     built: null as Built | null,
     analyzed: false,
+    /** 해석 회차 — 앱이 해석을 마칠 때마다 1 증가 (결과 재사용 출처 확인) */
+    analysisRev: 0,
     reactions: null as ReactionSum[] | null,
     /** 지점별 케이스 반력 — 기초 예비검토 (TW) */
     baseReactions: null as import('../domain/twFoundation').BaseReactions | null,

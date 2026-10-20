@@ -7,7 +7,7 @@ import { statusLine } from '../components/Status'
 import { t, lt, ltc } from '../i18n'
 import { S, notify } from '../state/store'
 import { addMsg, log, tab } from '../state/ui'
-import { fetchResults } from './results'
+import { fetchResults, markChecked } from './results'
 import { assertGenSync } from './genSync'
 import { beginJob, endJob, failMsg, stage } from './job'
 
@@ -29,6 +29,7 @@ export async function runDesignCheck(): Promise<void> {
     const d = runDesign(b.spec, b.model, b.info, S.results)
     const connections = runConnections(b.spec, b.model, b.info, S.results)
     S.design = d; S.connections = connections
+    markChecked(S.results, b, S.analysisRev) // 부재·접합 검토까지 통과한 결과만 최적화 1회차에서 재사용
     log(t('log_design', d.members.length, d.ng), d.ng ? 'warn' : 'ok')
     S.ratioView = true
     addMsg('bot', lt('design_done', d.members.length, d.maxRatio.toFixed(2), statusLine(summarizeStatus(d, S.connections, checkScope(S.built!.spec)))))

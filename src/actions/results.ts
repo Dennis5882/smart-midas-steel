@@ -21,6 +21,8 @@ export interface Results {
   /** 사용 하중 케이스 → 절점 → 변위 (m) */
   disp: Map<string, Map<number, { dx: number; dy: number; dz: number }>>
   combos: string[]
+  /** 처마 절점 조합 변위 합(원시값) — 같은 해석의 결과인지 다시 확인할 때 비교 (KR 은 sway 를 고쳐 쓰므로 따로 보관) */
+  fingerprint?: string
 }
 
 const num = (s: unknown) => resultNumber(s, 'TABLE')
@@ -49,6 +51,41 @@ async function* tableRows(type:string,name:string,keys:number[],loads:string[],c
     requireResult(Array.isArray(data.DATA),type,'missing')
     for(const row of data.DATA)yield row
   }
+}
+
+/** 처마 절점 조합 변위 — B2 입력이자 결과 지문 */
+async function eaveDisplacements(ids: number[], cb: string[], comboSet: Set<string>) {
+  const dsum = new Map<string, number[]>()
+  const seenU = new Set<string>()
+  const eaveSet = new Set(ids)
+  for await (const [, nd, lc, dx, dy, dz] of tableRows('DISPLACEMENTG','U',ids,cb,['Node', 'Load', 'DX', 'DY', 'DZ'])) {
+    const key = `${lc}:${nd}`
+    requireResult(eaveSet.has(+nd) && comboSet.has(lc) && !seenU.has(key), 'DISPLACEMENTG', seenU.has(key) ? 'duplicate' : 'unexpected', `${nd} · ${lc}`)
+    seenU.add(key)
+    const a = dsum.get(lc) ?? [0, 0, 0, 0]
+    a[0] += num(dx); a[1] += num(dy); a[3] += num(dz); a[2]++
+    dsum.set(lc, a)
+  }
+  return { dsum, seenU }
+}
+
+const fingerprint = (combos: string[], dsum: Map<string, number[]>) => combos.map((c) => (dsum.get(c) ?? []).join(',')).join(';')
+
+/* 검증을 마친 결과의 출처 — 같은 모델(S.built)·같은 해석 회차에서만 재사용 (결과를 비우지 않는 새 경로가 생겨도 안전) */
+const checked = new WeakMap<Results, { built: Built; rev: number }>()
+/** 설계·접합 검토까지 통과한 결과로 표시 */
+export function markChecked(r: Results, built: Built, rev: number): void { checked.set(r, { built, rev }) }
+
+/** 이전 결과를 다시 써도 되는지 — 검토 통과·같은 모델·같은 해석 회차 + Gen 의 처마 변위 지문이 같음
+    (해석 제어·P-Δ 처럼 Gen 동일성 검사 밖의 설정을 바꿔 Gen 에서 다시 해석했으면 지문이 달라진다; 작은 표 하나) */
+export async function reusableResults(r: Results | null, b: Built, rev: number): Promise<Results | null> {
+  const src = r && checked.get(r)
+  if (!r?.fingerprint || !src || src.built !== b || src.rev !== rev) return null
+  const cb = r.combos.map((c) => `${c}(CB)`)
+  const { eaves } = serviceNodes(b.spec, b.model)
+  stage('st_results', Math.ceil(cb.length / caseBatchSize(eaves.map((n) => n.id))))
+  const { dsum } = await eaveDisplacements(eaves.map((n) => n.id), cb, new Set(r.combos))
+  return fingerprint(r.combos, dsum) === r.fingerprint ? r : null
 }
 
 export async function fetchResults(b: Built): Promise<Results> {
@@ -106,17 +143,7 @@ export async function fetchResults(b: Built): Promise<Results> {
     requireResult(comboSet.has(lc) && !sums.has(lc), 'REACTIONG', sums.has(lc) ? 'duplicate' : 'unexpected', lc)
     sums.set(lc, [num(fx), num(fy), num(fz)])
   }
-  const dsum = new Map<string, number[]>()
-  const seenU = new Set<string>()
-  const eaveSet = new Set(eaveNodes.map((n) => n.id))
-  for await (const [, nd, lc, dx, dy, dz] of tableRows('DISPLACEMENTG','U',eaveNodes.map(n=>n.id),cb,['Node', 'Load', 'DX', 'DY', 'DZ'])) {
-    const key = `${lc}:${nd}`
-    requireResult(eaveSet.has(+nd) && comboSet.has(lc) && !seenU.has(key), 'DISPLACEMENTG', seenU.has(key) ? 'duplicate' : 'unexpected', `${nd} · ${lc}`)
-    seenU.add(key); num(dz)
-    const a = dsum.get(lc) ?? [0, 0, 0]
-    a[0] += num(dx); a[1] += num(dy); a[2]++
-    dsum.set(lc, a)
-  }
+  const { dsum, seenU } = await eaveDisplacements(eaveNodes.map((n) => n.id), cb, comboSet)
   const sway = new Map<string, Record<'X' | 'Y', { sumPu: number; drift: number; sumH: number }>>()
   for (const c of combos) {
     const s = sums.get(c), d = dsum.get(c)
@@ -137,7 +164,7 @@ export async function fetchResults(b: Built): Promise<Results> {
     m.set(+nd, { dx: num(dx), dy: num(dy), dz: num(dz) })
   }
   for (const c of svcCases) for (const n of svcNodes) requireResult(disp.get(c)?.has(n.id), 'DISPLACEMENTG', 'missing', `${n.id} · ${c}`)
-  const results = { beam, truss, sway, disp, combos }
+  const results: Results = { beam, truss, sway, disp, combos, fingerprint: fingerprint(combos, dsum) }
   if (spec.code === 'KR') lateralSwayKr(results, columnTops.map((n) => n.id), b.info.seismic)
   validateDesignResults(spec, model, b.info, results)
   return results
