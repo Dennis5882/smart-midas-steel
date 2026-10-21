@@ -1,4 +1,5 @@
 /* 해석 실행 · 결과 회수 */
+import { unavailable } from '../state/taskFlow'
 import type { BaseReactions } from '../domain/twFoundation'
 import { supportIds } from '../domain/types'
 import { t, lt } from '../i18n'
@@ -15,8 +16,9 @@ const NOT_ALLOWED = /not allowed|not permitted|허용되지|許可/i
 export async function runAnalysis(): Promise<void> {
   if (S.busy) { addMsg('bot', lt('busy')); return }
   if (!S.built) { addMsg('bot', lt('no_model')); return }
-  /* [모델 + 자중만] 은 하중·조합이 없어 해석·검토 불가 — 화면 흐름(taskFlow)만이 아니라 진입점에서도 막는다 */
-  if (S.built.modelOnly) { addMsg('bot', lt('flow_model_only')); return }
+  /* 화면 버튼과 같은 규칙(taskFlow.unavailable — [모델 + 자중만]·입력 변경·연결 등)을 진입점에서도 — 직접 호출도 같은 조건으로 막는다 */
+  const blocked = unavailable(S, 'analysis')
+  if (blocked) { addMsg('bot', lt(blocked)); return }
   if (!beginJob('anal')) return
   addMsg('bot', lt('anal_start'))
   try {

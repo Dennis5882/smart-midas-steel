@@ -73,7 +73,7 @@ Vite 8 + TypeScript + React 19 + Tailwind v4(화면은 `src/styles/app.css` 클�
 
 ## 진행 중·계획 (2026-10-22)
 
-- **Gen 전송 내용 선택**: 7단계 `GenContentPicker` — 정상 / 모델 + 자중만(`selfWeightOnly` → STLD·BODF 만, 해석·검토·최적화 `flow_model_only` 차단, 산출물 허용). 라이브 확인 2026-10-22(기본·RC 받침 모두 통과). 차단은 화면 흐름과 `runAnalysis`·`runDesignCheck`·`runOptimize` 진입점 양쪽, 모델 탭 `model_only_tag`·계산서 3·4장 안내, 선택은 `S.activePlan.modelOnly`(불변 갱신). 3D 시점: 사용자가 단계를 옮기면(오류 단계로 되돌아감 포함) `STEP_CAM`, 새 편집기는 첫 단계 시점, 재개·결과 [수정] 이동은 보던 시점 유지.
+- **Gen 전송 내용 선택**: 7단계 `GenContentPicker` — 정상 / 모델 + 자중만(`selfWeightOnly` → STLD·BODF 만, 해석·검토·최적화 `flow_model_only` 차단, 산출물 허용). 라이브 확인 2026-10-22(기본·RC 받침 모두 통과). `runAnalysis`·`runDesignCheck`·`runOptimize` 진입점은 화면 버튼과 같은 `taskFlow.unavailable` 을 호출(규칙 출처 하나), 하중 페이로드·자중 케이스는 `buildEpoch` 올리기 전에 확인(실패해도 편집기 안 잠김), 모델 탭 `model_only_tag`(미리보기 중엔 `model_only_preview_tag`)·계산서 3·4장 안내, 선택은 편집기 메시지 + `S.activePlan.modelOnly`. 3D 시점: 사용자가 단계를 옮기면(오류 단계로 되돌아감 포함) `STEP_CAM`, 새 편집기는 첫 단계 시점, 재개·결과 [수정] 이동은 보던 시점 유지.
 - **Gen 엔지니어 하중 읽어 오기**: 계획만(`docs/reference/gen-readback-scope.md`, 대만 공유 번체 Word `output/taiwan/Gen讀回工程師載重_流程說明.docx`). 사용자 요청 없이 구현 시작하지 않는다.
 - 보류(사용자 결정): 케이스 결과만 회수해 앱에서 조합(속도), 동일성 검사 대상 확대(회의 F2 와 함께), RC 받침 + 추가 구조, Kzt 표 2.3 자동, FBLA 면 하중 옵션.
 

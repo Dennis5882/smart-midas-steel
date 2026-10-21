@@ -94,7 +94,8 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
   const [modelOnly, updateModelOnly] = useState(() => !!msg.modelOnly)
   const setModelOnly = (v: boolean) => {
     updateModelOnly(v)
-    if (S.activePlan?.id === msg.id) { S.activePlan = { ...S.activePlan, modelOnly: v }; notify() }
+    msg.modelOnly = v // 이 카드의 메시지 — 활성 편집기가 아니어도 다시 마운트할 때 선택 유지
+    if (S.activePlan?.id === msg.id) { S.activePlan = { ...S.activePlan, modelOnly: v }; notify() } // 모델 탭 미리보기 표시도 갱신
   }
   const dirty = useRef(false)
   const [additions, setAdditions] = useState<FactoryAdditions | undefined>(()=>initializeAdditions(msg.spec))

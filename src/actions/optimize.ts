@@ -1,5 +1,6 @@
 /* 단면 자동 최적화 실행 — 검토 → 단면 제안 → 재전송 → 재해석 반복 (골조 부재력 재분배를 Gen 해석으로 확인).
    종료: 제안 = 현재(수렴) / 이미 거친 단면 조합(진동) / 최대 반복. 최종 = 거친 상태 중 OK 이고 가장 가벼운 것(현재가 아니면 그 단면으로 다시 전송·해석). */
+import { unavailable } from '../state/taskFlow'
 import type { ConnResult } from '../domain/connections'
 import { summarizeStatus } from '../domain/status'
 import { checkScope } from '../domain/scope'
@@ -25,8 +26,9 @@ const key = (s: Sections) => ROLES.map((r) => s[r]).join('|')
 export async function runOptimize(): Promise<void> {
   if (S.busy) { addMsg('bot', lt('busy')); return }
   if (!S.built) { addMsg('bot', lt('no_model')); return }
-  /* [모델 + 자중만] 은 하중·조합이 없어 해석·검토 불가 — 화면 흐름(taskFlow)만이 아니라 진입점에서도 막는다 */
-  if (S.built.modelOnly) { addMsg('bot', lt('flow_model_only')); return }
+  /* 화면 버튼과 같은 규칙(taskFlow.unavailable — [모델 + 자중만]·입력 변경·연결 등)을 진입점에서도 — 직접 호출도 같은 조건으로 막는다 */
+  const blocked = unavailable(S, 'optimize')
+  if (blocked) { addMsg('bot', lt(blocked)); return }
   if (!S.analyzed) { addMsg('bot', lt('need_anal')); return }
   if (!beginJob('opt')) return
   /* 직전 결과(설계 검토·이전 최적화·NG 보완) — 같은 모델·같은 해석 회차이고 Gen 처마 변위 지문이 같을 때만 1회차에 재사용 (reusableResults) */

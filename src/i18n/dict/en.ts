@@ -655,6 +655,12 @@ export const en = {
   g_help_2: 'Release notes',
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_5_6_1: 'Crane runway shear: wheel positions just inside each support were added so the peak shear is captured (checked against a Gen moving-load analysis)',
+  rn_v2_5_6_2: 'Taiwan wind: a table of wind pressure q(z) at girt, eave and ridge heights is shown in the preview and the report',
+  rn_v2_5_6_3: 'Taiwan topographic factor Kzt can now be entered (default 1, applied to the wind pressure at every height)',
+  rn_v2_5_6_4: 'Taiwan RC pedestals: steel columns can stand on 0.6–1.1 m RC pedestals above the footing. Pedestals are modelled in Gen as elastic RC beams and the pedestal-top forces are listed in the report',
+  rn_v2_5_6_5: 'The 3D view follows the modelling step: front for steps 1–2, side for steps 3–4, ISO for step 5',
+  rn_v2_5_6_6: 'At the final check you can choose what is sent to Gen: the full model with loads, or the model + self weight only (for engineers who enter loads in Gen themselves)',
   rn_v2_5_5_1: 'The free-frame editor now shows the wind load preview and the opening tip too',
   rn_v2_5_5_2: 'The wind load preview explains why when it cannot be built, and shows the roof Cp for Y-direction cases',
   rn_v2_5_5_3: 'The Korean opening tip now points to the actual internal-pressure options (partially enclosed)',
@@ -1144,6 +1150,7 @@ export const en = {
   rep_model_only_combo: 'No load combinations were sent to Gen NX (model + self-weight only). The engineer defines combinations in Gen.',
   sw_missing: 'The self-weight load case was not found — the model cannot be sent as model + self-weight only.',
   model_only_tag: '[Model + self-weight only] — Gen received the model and self weight (D) only. The loads below (live, wind, seismic) are the app’s reference values and were not sent to Gen.',
+  model_only_preview_tag: '[Model + self-weight only] selected — only the model and self weight (D) will be sent to Gen. The loads below (live, wind, seismic) are the app’s reference values.',
   build_done: (n: number, e: number, cases: number, combos: number) =>
     `Model sent — <b>${n}</b> nodes · <b>${e}</b> elements · <b>${cases}</b> load cases · <b>${combos}</b> combinations. Next: <code>analyze</code>.`,
   build_fail: (msg: string) => `Sending failed: ${msg}`,

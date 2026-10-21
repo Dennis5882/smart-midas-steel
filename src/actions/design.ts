@@ -1,4 +1,5 @@
 /* 설계 검토 실행 (M3) — 결과 회수(M2) → 대만 LRFD 부재·사용성 검토 */
+import { unavailable } from '../state/taskFlow'
 import { summarizeStatus } from '../domain/status'
 import { checkScope } from '../domain/scope'
 import { statusLine } from '../components/Status'
@@ -12,8 +13,9 @@ import { beginJob, endJob, failMsg, stage } from './job'
 export async function runDesignCheck(): Promise<void> {
   if (S.busy) { addMsg('bot', lt('busy')); return }
   if (!S.built) { addMsg('bot', lt('no_model')); return }
-  /* [모델 + 자중만] 은 하중·조합이 없어 해석·검토 불가 — 화면 흐름(taskFlow)만이 아니라 진입점에서도 막는다 */
-  if (S.built.modelOnly) { addMsg('bot', lt('flow_model_only')); return }
+  /* 화면 버튼과 같은 규칙(taskFlow.unavailable — [모델 + 자중만]·입력 변경·연결 등)을 진입점에서도 — 직접 호출도 같은 조건으로 막는다 */
+  const blocked = unavailable(S, 'design')
+  if (blocked) { addMsg('bot', lt(blocked)); return }
   if (!S.analyzed) { addMsg('bot', lt('need_anal')); return }
   if (!beginJob('design')) return
   S.results = null; S.design = null; S.connections = null; S.opt = null; S.ratioView = false

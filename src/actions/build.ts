@@ -25,6 +25,11 @@ export async function buildFactory(spec: FactorySpec, opts: { modelOnly?: boolea
   const scope = checkScope(spec)
   if (scope.blocked) { addMsg('bot', `${t('sc_blocked')}<br>${scope.issues.filter((i) => i.level === 'block').map((i) => `⛔ ${scopeMsg(i)}`).join('<br>')}`); return }
   /* Gen 문서 교체 확인 (AlertDialog) — 열린 문서는 자동 백업, 생성 후 [이전 모델로 복원] 가능 */
+  /* 하중 페이로드(자중 케이스 포함)를 작업 시작·편집기 잠금(buildEpoch) 전에 확인 — Gen 을 건드리지 않은 실패로 편집기가 잠기지 않게 */
+  try {
+    const l = buildLoadPayloads(spec, buildPortal(spec))
+    if (opts.modelOnly) selfWeightOnly(l)
+  } catch (e) { addMsg('bot', failMsg(e, (m) => t('build_fail', m))); return }
   if (!await confirmAction({ title: t('cfm_build_title'), body: t('cfm_build_body', escapeHtml(S.saveDir || 'C:/temp')), ok: t('cfm_build_ok'), skipKey: 'build' })) return
   if (!beginJob('build')) return
   S.buildEpoch++ // 이전 카드 버튼 잠금

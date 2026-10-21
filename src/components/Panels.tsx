@@ -50,7 +50,8 @@ function shownOf(s: AppState): Shown | null {
     try {
       const model = buildPortal(s.preview)
       const l = buildLoadPayloads(s.preview, model)
-      return { spec: s.preview, model, info: l.info, cases: Object.keys(l.STLD).length, combos: Object.keys(l['LCOM-GEN']).length, preview: true }
+      /* 편집기에서 [모델 + 자중만] 을 골랐으면 미리보기에도 '참고값' 안내 (Gen 에는 자중만 보냄) */
+      return { spec: s.preview, model, info: l.info, cases: Object.keys(l.STLD).length, combos: Object.keys(l['LCOM-GEN']).length, preview: true, modelOnly: s.activePlan?.modelOnly }
     } catch { /* 아래로 */ }
   }
   const b = s.built
@@ -71,7 +72,7 @@ export function ModelPanel() {
   return (
     <div>
       {sh.preview && <div className="res-stat">{t('preview_tag')}</div>}
-      {sh.modelOnly && <div className="res-stat">{t('model_only_tag')}</div>}
+      {sh.modelOnly && <div className="res-stat">{t(sh.preview ? 'model_only_preview_tag' : 'model_only_tag')}</div>}
       <div className="statgrid">
         <div className="stat"><div className="n">{m.nodes.length}</div><div className="l">{t('st_node')}</div></div>
         <div className="stat"><div className="n">{m.elements.length}</div><div className="l">{t('st_elem')}</div></div>
