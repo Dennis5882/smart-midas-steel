@@ -630,6 +630,10 @@ export const en = {
   g_help_2: 'Release notes',
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_5_5_1: 'The free-frame editor now shows the wind load preview and the opening tip too',
+  rn_v2_5_5_2: 'The wind load preview explains why when it cannot be built, and shows the roof Cp for Y-direction cases',
+  rn_v2_5_5_3: 'The Korean opening tip now points to the actual internal-pressure options (partially enclosed)',
+  rn_v2_5_5_4: 'The wind load preview stays responsive when moving between steps or changing values continuously; Gen steel-design wait limits adjusted',
   rn_v2_5_4_1: 'Wind load preview — the loads step shows, per wind case sent to Gen, direction, internal pressure, roof coefficient, horizontal resultant and roof uplift',
   rn_v2_5_4_2: 'Opening question — if large shutters may open in a storm, Taiwan checks partially enclosed internal pressure; Korea shows a coefficient tip',
   rn_v2_5_4_3: 'Symmetric frames now check all four wind directions, across-wind ± and accidental torsion ± (no mirror omission, as in practice) — design check takes longer',
