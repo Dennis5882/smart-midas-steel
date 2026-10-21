@@ -1,5 +1,6 @@
 /* 해석 실행 · 결과 회수 */
 import type { BaseReactions } from '../domain/twFoundation'
+import { isBaseNode } from '../domain/types'
 import { t, lt } from '../i18n'
 import { mapi, tableOf } from '../mapi/client'
 import { S, notify, type ReactionSum } from '../state/store'
@@ -65,7 +66,7 @@ export async function showReactionsInGen(): Promise<void> {
 export async function fetchReactions(): Promise<void> {
   if (!S.built) return
   /* 모든 지점의 케이스별 반력도 같은 표에서 — 기초 예비검토(twFoundation)용. 합계 표는 지점 지정과 무관하게 전체 합 */
-  const bases = S.built.model.nodes.filter((n) => n.z === 0).map((n) => n.id)
+  const bases = S.built.model.nodes.filter((n) => isBaseNode(S.built!.model, n)).map((n) => n.id)
   const r = await mapi<any>('POST', '/post/TABLE', {
     Argument: {
       TABLE_NAME: 'Reaction', TABLE_TYPE: 'REACTIONG',

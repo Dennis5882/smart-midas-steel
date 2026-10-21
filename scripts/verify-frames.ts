@@ -307,6 +307,22 @@ for (const base of [DEFAULT_SPEC, CN_DEFAULT_SPEC]) {
   ok(['+X', '-X', '+Y', '-Y'].every((d) => cn.rows.filter((r) => r.dir === d).length === 2), 'wind preview CN: 4 directions × ±i')
   const kr = sumOf(KR_DEFAULT_SPEC).w
   ok(kr.rows.filter((r) => r.kind === 'main').length >= 8 && kr.rows.every((r) => r.kind === 'torsion' || r.horizontal > 0), 'wind preview KR: main cases with horizontal force')
+  /* 높이별 풍압 표 — 풍상벽은 q(z) 로 높이에 따라 증가, 기준 높이 h 의 q = q(h), 나머지 면은 q(h)·G·Cp */
+  const pf = tw.w.profile!
+  ok(!!pf && pf.rows.length >= 3 && pf.rows.every((r, i) => i === 0 || r.qz >= pf.rows[i - 1].qz) && pf.rows.every((r) => Math.abs(r.windward - r.qz * pf.gust * pf.windwardCp) < 1e-9), 'wind profile TW: windward q(z)·G·Cp grows with height')
+  ok(pf.rows.some((r) => Math.abs(r.z - tw.w.hRef) < 1e-6 && Math.abs(r.qz - tw.w.qh) < 1e-9) && Math.abs(pf.side - tw.w.qh * pf.gust * -0.7) < 1e-9 && pf.internal > 0, 'wind profile TW: q(h) at the reference height, side wall −0.7·q(h)·G')
+  ok(!sumOf(CN_DEFAULT_SPEC).w.profile && !kr.profile, 'wind profile: TW only for now')
+  /* 지형계수 Kzt (2.6) — 기본 1 은 스펙에 쓰지 않고 결과 그대로, 1.3 이면 모든 풍하중(풍상·풍하·측벽·지붕·내압·횡풍향·비틀림)이 정확히 1.3배 */
+  {
+    const k = sumOf({ ...DEFAULT_SPEC, wind: { ...DEFAULT_SPEC.wind, Kzt: 1.3 } })
+    const base = tw.w.rows, kr13 = k.w.rows
+    ok(base.length === kr13.length && base.every((r, i) => Math.abs(kr13[i].horizontal - 1.3 * r.horizontal) < 1e-6 * Math.max(1, r.horizontal) && Math.abs(kr13[i].uplift - 1.3 * r.uplift) < 1e-6 * Math.max(1, Math.abs(r.uplift))), 'Kzt 1.3 scales every wind case by 1.3')
+    ok(Math.abs(k.L.info.wind.qh - 1.3 * tw.L.info.wind.qh) < 1e-12 && k.w.profile!.kzt === 1.3 && pf.kzt === 1, 'Kzt in q(h) (C&C uses it too) and in the height table')
+    ok(Math.abs(k.L.info.wind.across.MT - 1.3 * tw.L.info.wind.across.MT) < 1e-6, 'Kzt also scales torsion M_T')
+    const { toSpec, initVals } = await import('../src/components/planFields')
+    const v = initVals(DEFAULT_SPEC)
+    ok(v['wind.Kzt'] === '1' && toSpec(DEFAULT_SPEC, v, false).wind.Kzt === undefined && toSpec(DEFAULT_SPEC, { ...v, 'wind.Kzt': '1.2' }, false).wind.Kzt === 1.2, 'Kzt field: shows 1, default not written to the spec, user value kept')
+  }
   ok([tw, { w: kr }].every(({ w }) => w.rows.filter((r) => r.kind === 'main' && r.dir!.endsWith('Y')).every((r) => r.roofCp !== null)), 'wind preview TW·KR: Y-direction cases show the applied roof Cp too')
 }
 

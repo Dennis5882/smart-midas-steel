@@ -18,6 +18,14 @@ const near=(a:number,b:number,label:string)=>ok(Math.abs(a-b)<1e-7*Math.max(1,Ma
 const sum=(a:number[])=>a.reduce((p,v)=>p+v,0)
 const samples=cranePositions([0,5,12],3,true)
 ok(samples.includes(2.5) && samples.includes(1) && samples.includes(7),'interior and paired-wheel moment samples')
+/* 주행보 끝 전단 — 바퀴가 지점 절점 위면 기둥으로 바로 가므로 '지점 바로 안쪽' 위치가 있어야 함 (Gen 이동하중 비교 2026-10-21) */
+ok([0.025,1.975,5.035,8.965].every((v)=>samples.some((x)=>Math.abs(x-v)<1e-7)),'runway shear samples just inside each support')
+{
+  /* 단순 경간 [0,L] 왼쪽 지점 바로 오른쪽 전단 = 경간 안(0 < x ≤ L) 바퀴의 P(L−x)/L 합 → 해석해 P(1+(L−s)/L) 의 99% 이상 */
+  const L=5,s=3,shear=(pos:number)=>[pos,pos+s].filter((x)=>x>1e-9&&x<=L).reduce((v,x)=>v+(L-x)/L,0)
+  const best=Math.max(...cranePositions([0,L,12],s,true).map(shear)),exact=1+(L-s)/L
+  ok(best>=.99*exact&&best<=exact,`runway end shear from samples ${best.toFixed(4)} ≥ 99% of exact ${exact}`)
+}
 for(const base of [DEFAULT_SPEC,CN_DEFAULT_SPEC,KR_DEFAULT_SPEC]) {
   const s=structuredClone(base);s.bays=4;s.bayList=[5,7,6,4];s.baySpacing=7
   s.features={crane:false,mezzanine:false,multiSpan:false,opening:true};s.additions=defaultAdditions(s)

@@ -14,7 +14,7 @@ import { columnSpans, defaultTrussDepth, hasInteriorColumns, type FactorySpec } 
 
 export type ScopeKey =
   | 'additionInput' | 'additionReview' | 'craneAssumed' | 'siteAssumed' | 'crane' | 'mezzanine' | 'multiSpan' | 'opening' | 'openingCN'
-  | 'span' | 'eave' | 'eaveHigh' | 'slope' | 'bayRatio' | 'baySpacing' | 'length' | 'hnR' | 'cn' | 'monoTW' | 'multi' | 'gableCols' | 'craneInterior' | 'multiTW' | 'kr' | 'multiKR' | 'twMatSS' | 'twMatImported' | 'twZPurlin' | 'twAsd' | 'twAsdAdditions' | 'truss' | 'trussCode' | 'trussDepth' | 'twSystemSpecial' | 'interiorRigid' | 'interiorRigidCode' | 'siteEvidence'
+  | 'span' | 'eave' | 'eaveHigh' | 'slope' | 'bayRatio' | 'baySpacing' | 'length' | 'hnR' | 'cn' | 'monoTW' | 'multi' | 'gableCols' | 'craneInterior' | 'multiTW' | 'kr' | 'multiKR' | 'twMatSS' | 'twMatImported' | 'twZPurlin' | 'twAsd' | 'twAsdAdditions' | 'truss' | 'trussCode' | 'trussDepth' | 'twSystemSpecial' | 'interiorRigid' | 'interiorRigidCode' | 'siteEvidence' | 'pedestal' | 'pedestalCode' | 'pedestalAdditions' | 'pedestalHigh'
 export interface ScopeIssue { key: ScopeKey; level: 'block' | 'warn'; args: (string | number)[] }
 export interface ScopeResult { issues: ScopeIssue[]; blocked: boolean }
 
@@ -43,6 +43,15 @@ export function checkScope(spec: FactorySpec, f: ScopeFeatures = spec.features ?
   if (spec.code === 'TW' && (spec.siteBasis !== 'confirmed' || !spec.siteEvidence?.trim())) warn('siteAssumed')
   /* 13.2.1 내진 부재 강재 목록 밖 — SS(용접 주구조 부적합, 3.2 해설), ASTM(3.1.2 검사·동등성) */
   if (spec.code === 'TW' && spec.material === 'SS400') warn('twMatSS')
+  /* RC 받침(1단계): 받침 윗면을 지점으로 — RC 받침·벽·기초 설계는 범위 밖(전문가 검토). 추가 구조(크레인 브래킷·플랫폼 기둥 높이)와는 아직 함께 못 씀 */
+  if ((spec.pedestal?.height ?? 0) > 0) {
+    if (spec.code !== 'TW') block('pedestalCode')
+    else {
+      warn('pedestal', spec.pedestal!.height)
+      if (hasAdditions({ ...spec, features: f })) block('pedestalAdditions')
+      if (!(spec.pedestal!.height <= spec.eaveHeight - 2)) block('pedestalHigh', r2(spec.eaveHeight - 2))
+    }
+  }
   if (spec.code === 'TW' && spec.asd) { warn('twAsd'); if (hasAdditions({ ...spec, features: f })) block('twAsdAdditions') }
   if (spec.code === 'TW' && [spec.sections.purlin, spec.sections.girt].some((n) => n.trim().startsWith('Z '))) warn('twZPurlin')
   if (spec.code === 'TW' && profileOf('TW').materials[spec.material]?.gen.standard.startsWith('ASTM')) warn('twMatImported', spec.material)

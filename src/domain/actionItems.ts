@@ -33,7 +33,7 @@ export interface ActionItem {
 const SCOPE_FIELD: Partial<Record<ScopeKey, string | ((s: FactorySpec) => string)>> = {
   siteAssumed: 'siteBasis', siteEvidence: 'siteEvidence', craneAssumed: 'additions.crane',
   twMatSS: 'material', twMatImported: 'material', twZPurlin: 'sections.purlin', twAsd: 'asd',
-  interiorRigid: 'interiorColumns',
+  interiorRigid: 'interiorColumns', pedestal: 'pedestal.height', pedestalHigh: 'pedestal.height', pedestalAdditions: 'pedestal.height',
   /* X 가 특수(SMF)면 X, 아니면 Y(SCBF) 가 원인 */
   twSystemSpecial: (s) => systemXOf(s.seismic) === 'SMF' ? 'seismic.systemX' : 'seismic.systemY',
   /* 불균등 베이(개별 간격·자유골조)면 간격 목록, 등간격이면 간격 칸 */

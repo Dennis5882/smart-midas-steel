@@ -23,7 +23,7 @@ import { portalGeometry } from './portal'
 import { genSectionRecord, sectionProps } from './sections'
 import { blockedMembers } from './validity'
 import { runConnections } from './connections'
-import { ROLES, type ElementRole, type FactoryModel, type FactorySpec } from './types'
+import { ROLES, type ElementRole, type FactoryModel, type FactorySpec, steelHeight } from './types'
 
 /** 목표 강도비·추정 사용성비 — 1.0 미만으로 두어 재해석 후 재분배·추정 오차 여유 */
 export const OPT_TARGET = 0.95
@@ -109,7 +109,7 @@ export const steelWeight = (spec: FactorySpec, model: FactoryModel, sections: Se
 /** 문형 라멘 횡강성(상대값)·지붕보 처짐 계수(상대값) */
 export function frameStiff(spec: FactorySpec, col: string, raf: string) {
   const G = portalGeometry(spec)
-  const h = spec.eaveHeight, Lr = G.rafterLen
+  const h = steelHeight(spec), Lr = G.rafterLen
   const Ic = sectionProps(col, spec.code).Ix, Ir = sectionProps(raf, spec.code).Ix
   const fixed = spec.baseFixity === 'fixed'
   let k: number

@@ -1,7 +1,7 @@
 /* 형상 모델 → Gen NX MAPI 페이로드 (순수 함수). 단위 m, kN (Gen 모델 단위계는 전송 전 db/UNIT 으로 맞춘다). */
 import { profileOf } from '../codes'
 import type { ElementRole, FactoryModel, FactorySpec } from './types'
-import { isAxialRole } from './types'
+import { isAxialRole, isBaseNode } from './types'
 
 export interface GenPayloads {
   UNIT: Record<string, unknown>
@@ -88,7 +88,7 @@ export function buildGenPayloads(spec: FactorySpec, model: FactoryModel): GenPay
   const CONS: Record<string, unknown> = {}
   for (const n of model.nodes) {
     /* GROUP_NAME 은 미리 정의된 경계 그룹만 허용(없는 이름이면 Unknown Error, 라이브 확인) → 생략 */
-    if (n.z === 0) CONS[n.id] = { ITEMS: [{ ID: n.id, CONSTRAINT: model.additions?.fixedBases.includes(n.id) ? '1111111' : leanBase.has(n.id) ? '1110000' : code }] }
+    if (isBaseNode(model, n)) CONS[n.id] = { ITEMS: [{ ID: n.id, CONSTRAINT: model.additions?.fixedBases.includes(n.id) ? '1111111' : leanBase.has(n.id) ? '1110000' : code }] }
   }
 
   const material = (name: string) => {

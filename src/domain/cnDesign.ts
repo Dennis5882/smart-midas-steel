@@ -2,6 +2,7 @@
    while all resistance factors, equations, lengths and limits live here.
    Portal-frame rules from GB 51022-2015: 3.3 deformation limits, 3.4.2 slenderness, A.0.6 leaning-column η. */
 import { cnCapacity, cnCheck, cnK } from '../codes/cnSteel'
+import { isBaseNode } from './types'
 import { cnStrength } from '../codes/cn'
 import { DRIFT_CN, GIRT_DEFL_CN, POST_DEFL_CN, BETA_FRAME_CN, ccWallCN, edgeACN, effAreaCN, isSeismicCN, leanEtaCN, mwLongCN, slenderLimitCN } from '../codes/cnPortal'
 import type { Results } from '../actions/results'
@@ -45,7 +46,7 @@ export function runCnDesign(spec: FactorySpec, model: FactoryModel, info: LoadIn
   /* 기둥 열마다 높이 = 그 열 처마 높이 (편경사 좌우 다름) */
   const Kat = new Map(G.eaveXs.map((x) => [x, cnK((col.Ix / G.zAt(x)) / (raf.Ix / G.rafterLen), spec.baseFixity === 'fixed')]))
   /* 부록 A.0.6 — 흔들림 기둥이 있으면 조합별 η = √(1 + Σ(N/h)흔들림 / (1.1·Σ(P/H)강접)), 기초 쪽 기둥 요소 축력 */
-  const baseCols = model.elements.filter((e) => e.role === 'column' && (nodes.get(e.n1)!.z === 0 || nodes.get(e.n2)!.z === 0))
+  const baseCols = model.elements.filter((e) => e.role === 'column' && (isBaseNode(model, nodes.get(e.n1)!) || isBaseNode(model, nodes.get(e.n2)!)))
   const etaCache = new Map<string, number>()
   const etaOf = (combo: string) => {
     if (!G.leanXs.length) return 1

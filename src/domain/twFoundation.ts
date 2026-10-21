@@ -6,6 +6,7 @@
    수평: 4.6.1 표4.6-1 FS 장기 1.5·단기 1.2, 4.6.2 R_f = N tanδ (부착력 c_a·前側 수동저항 4.6.3 은 보수적으로 무시).
    범위 밖(전문가 검토): 地下水 浮力(2.6)·침하(4.4)·기초판 RC 설계(휨·뚫림전단)·앵커 콘크리트 정착·지중보·액상화. */
 import type { FactoryModel, FactorySpec } from './types'
+import { isBaseNode } from './types'
 
 export interface FootingInput {
   /** 장기 허용 지지력 qa (kN/m², 지반조사 보고서) */
@@ -76,7 +77,7 @@ export function serviceCombos(cases: string[], windVariants: { tag: string; part
 /** 주각 절점 분류 — 바깥 기둥 열 / 내부 흔들림 기둥 / 박공 풍주 */
 export function footingGroups(model: FactoryModel): Map<number, FootingGroup> {
   const out = new Map<number, FootingGroup>()
-  const base = new Set(model.nodes.filter((n) => n.z === 0).map((n) => n.id))
+  const base = new Set(model.nodes.filter((n) => isBaseNode(model, n)).map((n) => n.id))
   for (const e of model.elements) {
     if (!base.has(e.n1) || out.has(e.n1)) continue
     if (e.role === 'post') out.set(e.n1, 'post')

@@ -11,7 +11,7 @@ import {activeFloorOpening,linkReview} from '../domain/phase6'
 import { ZONE_Z } from '../codes/krLateral'
 import { profileOf } from '../codes'
 import type { ConnResult } from '../domain/connections'
-import {isLengthService,type DesignResult} from '../domain/design'
+import {isLengthService,isRatioService,type DesignResult} from '../domain/design'
 import type { OptSummary } from '../domain/optimize'
 import { portalGeometry } from '../domain/portal'
 import { LOSS, quantities } from '../domain/quantities'
@@ -210,9 +210,15 @@ export function buildReport({ built, reactions, design, connections, opt, footin
   parts.push(`<h3>${L('rep_wind')}</h3>`)
   const wi = spec.wind
   if (spec.code === 'KR' && kr) parts.push(`<p>V<sub>0</sub> = ${spec.korea!.V0} m/s, K<sub>D</sub> = ${spec.korea!.KD}, K<sub>zr</sub> = ${f(kr.Kzr, 3)} (${L('f_exposure')} ${spec.korea!.exposure}), K<sub>zt</sub> = ${spec.korea!.Kzt}, I<sub>W</sub> = ${kr.Iw} → V<sub>H</sub> = ${f(kr.VH, 2)} m/s, q<sub>H</sub> = ½ρV<sub>H</sub>² = ${f(info.wind.qh, 3)} kN/m² (H = ${f(info.wind.hRef, 2)} m); G<sub>D</sub> X ${f(kr.GD.X, 3)} / Y ${f(kr.GD.Y, 3)} (5.6-2); G<sub>pe</sub> X ${f(kr.Gpe.X, 3)} / Y ${f(kr.Gpe.Y, 3)} (${kr.resonant.X ? '5.6-6' : '5.6-5'}, n<sub>R0</sub> ≈ ${f(kr.nR0, 2)} Hz); C<sub>pi</sub> ${kr.cpi.join(' / ')} (표 5.7-4)</p>`)
-  else parts.push(spec.code === 'CN' ? `<p>w<sub>0</sub> = ${spec.china!.w0} kN/m²; terrain ${spec.china!.terrain}; topography ${spec.china!.topography}; h = ${f(info.wind.hRef, 2)} m; μ<sub>z</sub>·w<sub>0</sub> = ${f(info.wind.qh, 3)} kN/m² (μ<sub>z</sub> at max(h, 10 m)); β = 1.1 (frame) / 1.5 (purlin·girt); 2a = ${f(info.cn?.endZone ?? 0, 2)} m (GB 51022 4.2)</p>` : `<p>V10 = ${wi.V10} m/s (${esc(windSourceText(spec))}), I = ${wi.I}, ${L('f_exposure')} ${wi.exposure}, ${L(wi.enclosure === 'enclosed' ? 'encl_enclosed' : 'encl_partial')}, h = ${f(info.wind.hRef, 2)} m, q(h) = ${f(info.wind.qh, 3)} kN/m², G = ${prof.lateral.gust}</p>`)
+  else parts.push(spec.code === 'CN' ? `<p>w<sub>0</sub> = ${spec.china!.w0} kN/m²; terrain ${spec.china!.terrain}; topography ${spec.china!.topography}; h = ${f(info.wind.hRef, 2)} m; μ<sub>z</sub>·w<sub>0</sub> = ${f(info.wind.qh, 3)} kN/m² (μ<sub>z</sub> at max(h, 10 m)); β = 1.1 (frame) / 1.5 (purlin·girt); 2a = ${f(info.cn?.endZone ?? 0, 2)} m (GB 51022 4.2)</p>` : `<p>V10 = ${wi.V10} m/s (${esc(windSourceText(spec))}), I = ${wi.I}, ${L('f_exposure')} ${wi.exposure}, ${L(wi.enclosure === 'enclosed' ? 'encl_enclosed' : 'encl_partial')}, K<sub>zt</sub> = ${wi.Kzt ?? 1} (${esc(t((wi.Kzt ?? 1) === 1 ? 'wp_kzt_flat' : 'wp_kzt_user', String(wi.Kzt ?? 1)))}), h = ${f(info.wind.hRef, 2)} m, q(h) = ${f(info.wind.qh, 3)} kN/m², G = ${prof.lateral.gust}</p>`)
   if (spec.code === 'CN') parts.push(table([t('res_lc'), 'X / Y', 'μw (2)', '±i'], info.wind.cases.map((c) => [c.name, c.dir, f(c.roofCp, 3), c.gcpi > 0 ? '+i' : '−i'])))
   else parts.push(table([t('res_lc'), 'X / Y', t('kv_cpRoof'), 'GCpi'], info.wind.cases.map((c) => [c.name, c.dir, f(c.roofCp, 3), f(c.gcpi, 3)])))
+  const pr = info.wind.profile
+  if (pr && spec.code === 'TW') {
+    parts.push(`<p><b>${t('wp_prof_title')}</b></p>`)
+    parts.push(table([t('wp_prof_z'), t('wp_prof_qz'), t('wp_prof_ww', f(pr.gust, 3), f(pr.windwardCp, 2))], [...pr.rows].reverse().map((r) => [f(r.z, 2), f(r.qz, 3), f(r.windward, 3)])))
+    parts.push(`<p>${esc(t('wp_prof_const', f(pr.leewardX, 3), f(pr.leewardY, 3), f(pr.side, 3), f(pr.internal, 3)))}</p><p class="note">${esc(t('wp_prof_note'))}</p>`)
+  }
   const ac = info.wind.across
   if (ac && spec.code === 'KR' && kr) parts.push(`<p><b>${esc(tc(spec.code, 'kv_across'))}</b>: W<sub>D,X</sub> = ${f(ac.WDx, 1)} kN, W<sub>D,Y</sub> = ${f(ac.WDy, 1)} kN; γ = 0.35·D/B ≥ 0.2 → ${f(kr.gammaL.X, 3)} / ${f(kr.gammaL.Y, 3)}; W<sub>LC</sub> = ${f(ac.WLX, 1)} / ${f(ac.WLY, 1)} kN</p>`)
   if (ac && spec.code === 'TW') parts.push(`<p><b>${L('kv_across')}</b>: W<sub>D,X</sub> = ${f(ac.WDx, 1)} kN, W<sub>D,Y</sub> = ${f(ac.WDy, 1)} kN; W<sub>L</sub> = 0.87(L/B)W<sub>D</sub> → W<sub>L,X</sub> = ${f(ac.WLX, 1)} kN, W<sub>L,Y</sub> = ${f(ac.WLY, 1)} kN; M<sub>T</sub> = 0.28·max(B·W<sub>D</sub>) = ${f(ac.MT, 1)} kN·m; W = ${f(ac.kD, 3)}·W<sub>D</sub> + 0.7(W<sub>L</sub> ± W<sub>T</sub>) (2.12)</p>`)
@@ -276,8 +282,20 @@ export function buildReport({ built, reactions, design, connections, opt, footin
     /* 7. 사용성 */
     h2('rep_s7')
     parts.push(table([t('sv_item'), t('sv_value'), t('sv_limit'), t('rd_ratio'), t('sv_clause'), t('res_lc')], design.service.map((s) => [
-      L(`sv_${s.key}`), isLengthService(s.key) ? `${f(s.value * 1000, 1)} mm` : `1/${Math.round(1 / Math.max(s.value, 1e-9))}`,
-      isLengthService(s.key) ? `${f(s.limit * 1000, 1)} mm` : `1/${Math.round(1 / s.limit)}`, ok(s.ratio), esc(s.clause), esc(s.case)])))
+      L(`sv_${s.key}`), isLengthService(s.key) ? `${f(s.value * 1000, 1)} mm` : isRatioService(s.key) ? f(s.value, 3) : `1/${Math.round(1 / Math.max(s.value, 1e-9))}`,
+      isLengthService(s.key) ? `${f(s.limit * 1000, 1)} mm` : isRatioService(s.key) ? f(s.limit, 2) : `1/${Math.round(1 / s.limit)}`, ok(s.ratio), esc(s.clause), esc(s.case)])))
+    /* RC 받침 (TW 1단계) — 강성 확인 근거 + RC 받침·기초 설계용 받침 윗면 힘 */
+    const pd = design.pedestal
+    if (pd) {
+      parts.push(`<h3>${L('rep_pedestal')}</h3>`)
+      parts.push(`<p>${esc(t('rep_pedestal_txt', String(pd.b), String(pd.d), f(pd.h, 2), f(pd.fc, 1), f(pd.Ec / 1000, 0)))}</p>`)
+      const fl = (['X', 'Y'] as const).map((dir) => pd.flex[dir] ? t('rep_ped_flex', dir, f(pd.flex[dir]!.ratio, 3), pd.flex[dir]!.combo) : null).filter(Boolean)
+      if (fl.length) parts.push(`<p>${esc(fl.join(' · '))}</p>`)
+      parts.push(`<p class="note">${esc(t('rep_pedestal_rows'))}</p>`)
+      parts.push(table([t('sv_item'), 'P (kN)', 'M<sub>x</sub> (kN·m)', 'V<sub>x</sub> (kN)', 'M<sub>y</sub> (kN·m)', 'V<sub>y</sub> (kN)', `M<sub>x,base</sub> (kN·m)`, t('rep_ped_case')],
+        pd.rows.map((r) => [L(`rep_ped_${r.key}`), f(r.f.P, 1), f(r.f.Mx, 1), f(r.f.Vx, 1), f(r.f.My, 1), f(r.f.Vy, 1), f(r.f.Mbase, 1), `${esc(r.f.combo)} · ${L('rd_elem')} ${r.f.elem}`])))
+      parts.push(`<p class="note">${esc(t('rep_pedestal_note'))}</p>`)
+    }
   } else parts.push(`<p>${L('need_design')}</p>`)
 
   /* 8. 접합부 */

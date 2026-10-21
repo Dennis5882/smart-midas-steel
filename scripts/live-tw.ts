@@ -29,6 +29,9 @@ const sec = () => `${((Date.now() - t0) / 1000).toFixed(0)}s`
 try {
   const fr = arg('--frame')
   const spec = withTrussDefaults(normalizeSpans({ ...structuredClone(DEFAULT_SPEC), ...(process.argv.includes('--span') ? { span: +process.argv[process.argv.indexOf('--span') + 1] } : {}), ...(fr === 'truss' ? { frame: 'truss' as const } : fr === 'mono' ? { frame: 'mono' as const } : fr === 'multi' || fr === 'gableCols' ? { frame: fr as 'multi' | 'gableCols', spanList: process.argv.includes('--spans') ? process.argv[process.argv.indexOf('--spans') + 1].split(',').map(Number) : [24, 24] } : {}) }))
+  /* --pedestal h[,b,d] — RC 받침(1단계): 받침 윗면 지점 */
+  const pa = arg('--pedestal')
+  if (pa) { const [ph, pb = 600, pd = 600] = pa.split(',').map(Number); spec.pedestal = { height: ph, b: pb, d: pd } }
   if (checkScope(spec).blocked) throw new Error('sample spec is out of scope')
   await sendModel(spec)
   console.log(`[${sec()}] TW model sent: nodes ${S.built!.model.nodes.length}, elems ${S.built!.model.elements.length}, cases ${S.built!.cases.length}, combos ${S.built!.combos}`)
@@ -56,6 +59,10 @@ try {
   S.results = await fetchResults(S.built!)
   ;({ design: S.design, connections: S.connections } = checkResults(S.built!, S.results)) // 앱과 같이 — 최적화 1회차 재사용 대상
   const st = () => summarizeStatus(S.design, S.connections, checkScope(S.built!.spec))
+  if (S.design.pedestal) {
+    const p = S.design.pedestal
+    console.log(`[${sec()}] pedestal ${p.b}x${p.d} h ${p.h}: stiffness ${(['X', 'Y'] as const).map((d) => `${d} ${p.flex[d]?.ratio.toFixed(4)} (${p.flex[d]?.combo}: ${((p.flex[d]?.delta ?? 0) * 1000).toFixed(2)} / ${((p.flex[d]?.frame ?? 0) * 1000).toFixed(2)} mm)`).join(', ')}; ` + p.rows.map((r) => `${r.key} P ${r.f.P.toFixed(1)} Mx ${r.f.Mx.toFixed(1)} Vx ${r.f.Vx.toFixed(1)} Mbase ${r.f.Mbase.toFixed(1)}`).join(' | '))
+  }
   console.log(`[${sec()}] baseline: max ${S.design.maxRatio.toFixed(3)} NG ${S.design.ng} status ${st().overall}; conns ${S.connections.map((c) => `${c.type} ${c.ratio.toFixed(3)}`).join(', ')}`)
   if (process.argv.includes('--optimize')) {
     await runOptimize()

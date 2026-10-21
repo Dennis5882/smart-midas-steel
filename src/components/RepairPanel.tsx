@@ -5,7 +5,7 @@ import { unavailable } from '../state/taskFlow'
 import { currentRepairPlan, prepareRepairs, applyRepairs } from '../actions/remediation'
 import { diagnoseRepairs, previewRepair, repairMetrics, sectionAt, type SectionTarget, type RepairMetrics, type RepairPreview, type RepairProblem, type RepairDiagnosis, type RepairCandidate, type RepairPlan } from '../domain/remediation'
 import { t, type I18nKey } from '../i18n'
-import { isLengthService } from '../domain/design'
+import { isLengthService, isRatioService } from '../domain/design'
 
 const targetKey=(target:SectionTarget):I18nKey=>({platformBeam:'add_platformBeam',platformColumn:'add_platformColumn',runway:'add_runway',header:'add_header',roofTrimmer:'p6_roofBeam'} as Partial<Record<SectionTarget,I18nKey>>)[target]??`role_${target}` as I18nKey
 const ratio=(r:number)=>Number.isFinite(r)?r.toFixed(3):'—'
@@ -49,7 +49,7 @@ export function RepairPanel() {
   }
   const evidence=(p:RepairProblem)=>{
     if(p.member){const m=p.member;return <><small>{t('cn_demand')}: |P| {Math.abs(m.forces.P).toFixed(1)} kN · Mx {m.forces.Mx.toFixed(1)} / My {m.forces.My.toFixed(1)} kN·m</small><small>{t('cn_capacity')}: P {(m.forces.P<0?m.cap.phiPnc:m.cap.phiPnt).toFixed(1)} kN · Mx {m.cap.phiMnx.toFixed(1)} / My {m.cap.phiMny.toFixed(1)} kN·m · {m.cap.mxMode}</small><small className="mono">KLx {(m.lengths.KLx/1000).toFixed(2)} / KLy {(m.lengths.KLy/1000).toFixed(2)} / Lb {(m.lengths.Lb/1000).toFixed(2)} m</small></>}
-    if(p.service){const v=p.service,format=(n:number)=>isLengthService(v.key)?`${(n*1000).toFixed(1)} mm`:`${(n*100).toFixed(3)}%`;return <small>{t('sv_value')} {format(v.value)} / {t('sv_limit')} {format(v.limit)}</small>}
+    if(p.service){const v=p.service,format=(n:number)=>isLengthService(v.key)?`${(n*1000).toFixed(1)} mm`:isRatioService(v.key)?n.toFixed(3):`${(n*100).toFixed(3)}%`;return <small>{t('sv_value')} {format(v.value)} / {t('sv_limit')} {format(v.limit)}</small>}
     if(p.connection){const c=p.connection,k=c.checks.find((v)=>Math.abs(v.ratio-c.ratio)<1e-6);return k?<small>{t(`cn_${k.item}` as I18nKey)} · {t('cn_demand')} {k.demand.toFixed(1)} / {t('cn_capacity')} {k.capacity.toFixed(1)} {k.unit} · {k.clause}</small>:null}
     return null
   }

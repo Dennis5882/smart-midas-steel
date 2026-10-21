@@ -64,13 +64,16 @@ export interface FactorySpec {
   seismic: { county: string; town: string; soil: 1 | 2 | 3; SDS: number; SD1: number; SMS: number; SM1: number; I: number; Rx: number; Ry: number; nearFault?: string
     /** 표1-3 횡력저항시스템 (codes/twSystems) — 없으면 IMF·OCBF */ systemX?: import('../codes/twSystems').TwSystemX; systemY?: import('../codes/twSystems').TwSystemY }
   /** 풍 입력 — V10: 기본설계풍속(m/s), I: 풍 용도계수, exposure: 지표조도 A/B/C, enclosure: 封閉/部分封閉 */
-  wind: { V10: number; I: number; exposure: 'A' | 'B' | 'C'; enclosure: 'enclosed' | 'partial' }
+  /** Kzt: TW 地形係數 (耐風規範 2.6, 없으면 1 = 평탄 지형) — 입력값 하나를 모든 높이의 q(z) 에 곱함(표 2.3 계산값의 최댓값을 넣으면 보수적) */
+  wind: { V10: number; I: number; exposure: 'A' | 'B' | 'C'; enclosure: 'enclosed' | 'partial'; Kzt?: number }
   /** 지붕 마감 고정하중 — 경사면 면적 기준 (kN/m²) */
   roofDead: number
   /** 벽 마감 고정하중 (kN/m²) */
   wallDead: number
   /** 기초 콘크리트 fc' (MPa) — 주각 지압 */
   fc: number
+  /** RC 받침(TW, 1단계): 높이 h (m)·단면 b (X)·d (Y) (mm) — 받침 윗면을 지점으로, 강성 확인·받침 윗면 반력 제공 (RC 설계는 범위 밖) */
+  pedestal?: { height: number; b: number; d: number }
   /** 앵커볼트 인장강도 Fu (MPa) */
   anchorFu: number
   sections: { column: string; rafter: string; purlin: string; girt: string; strut: string; post: string; brace: string; /** 트러스 하현재·웨브 (frame 'truss') */ chord?: string; web?: string }
@@ -150,7 +153,15 @@ export interface Element { id: number; n1: number; n2: number; role: ElementRole
 }
 
 /** 전역: X = 스팬 방향, Y = 길이 방향, Z = 높이 */
-export interface FactoryModel { nodes: Node[]; elements: Element[]; additions?: AdditionModel }
+/** baseZ: 강철 기둥 하단(지점) 높이 — RC 받침이 있으면 받침 윗면 (없으면 0) */
+export interface FactoryModel { nodes: Node[]; elements: Element[]; additions?: AdditionModel; baseZ?: number }
+
+/** RC 받침(墩柱) 높이 (m) — TW 만, 없으면 0. 강철 기둥·지점은 받침 윗면부터, 그 아래 벽(RC 牆裙)은 강철에 하중을 주지 않는다 */
+export const pedestalHeight = (s: FactorySpec): number => (s.code === 'TW' ? Math.max(0, s.pedestal?.height ?? 0) : 0)
+/** 강철 골조 높이 = 처마 − 받침 (변위각·B2·지진 hn 의 기준 높이) */
+export const steelHeight = (s: FactorySpec): number => s.eaveHeight - pedestalHeight(s)
+/** 지점 절점 (기둥 하단) */
+export const isBaseNode = (m: Pick<FactoryModel, 'baseZ'>, n: { z: number }): boolean => Math.abs(n.z - (m.baseZ ?? 0)) < 1e-9
 
 export const DEFAULT_SPEC: FactorySpec = {
   code: 'TW',

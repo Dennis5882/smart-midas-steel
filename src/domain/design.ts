@@ -1,4 +1,5 @@
-import { columnSpans } from './types'
+import { pedestalCheck, type PedestalSummary } from './pedestal'
+import { columnSpans, steelHeight } from './types'
 import { additionDesign } from './additionDesign'
 import { factoryOnly } from './additions'
 /* 부재 설계 검토 (M3) — 해석 결과 + 기준 프로필 강도식 → 부재별 강도비, 사용성.
@@ -56,7 +57,7 @@ export interface MemberCheck {
 }
 
 export interface ServiceCheck {
-  key: 'roofOpeningDefl' | 'linkGap' | 'linkSeat' | 'platformDefl' | 'craneDefl' | 'runwayDefl' | 'windDriftX' | 'windDriftY' | 'seisDriftX' | 'seisDriftY' | 'rafterDefl' | 'purlinDefl' | 'girtDefl' | 'postDefl'
+  key: 'pedestalX' | 'pedestalY' | 'roofOpeningDefl' | 'linkGap' | 'linkSeat' | 'platformDefl' | 'craneDefl' | 'runwayDefl' | 'windDriftX' | 'windDriftY' | 'seisDriftX' | 'seisDriftY' | 'rafterDefl' | 'purlinDefl' | 'girtDefl' | 'postDefl'
   value: number
   limit: number
   ratio: number
@@ -64,6 +65,8 @@ export interface ServiceCheck {
   clause: string
 }
 export const isLengthService=(key:ServiceCheck['key'])=>key.endsWith('Defl')||key==='linkGap'||key==='linkSeat'
+/** 비율 항목(값이 1/n 변위각이 아닌 무차원 비) — RC 받침 강성 */
+export const isRatioService=(key:ServiceCheck['key'])=>key==='pedestalX'||key==='pedestalY'
 
 /** LRFD 13.4.1 기둥 축력 — 휨 무시, 1.2PD + 0.5PL ± 1.4Fu·PE ≤ φPn. 일반 조합 Pu/φcPn ≤ 0.4 이면 면제 */
 export interface ColumnAxial13 { elem: number; puRatio: number; exempt: boolean; ratio: number; combo: string; P: number; phiPn: number }
@@ -79,6 +82,8 @@ export interface DesignResult {
   col13?: ColumnAxial13 | null
   members: MemberCheck[]
   service: ServiceCheck[]
+  /** RC 받침 윗면 반력·강성 확인 (TW, 받침이 있을 때) */
+  pedestal?: PedestalSummary
   /** 역할별 최대 강도비 부재 */
   byRole: Partial<Record<ElementRole, MemberCheck>>
   maxRatio: number
@@ -110,7 +115,11 @@ export const purlinLimitDiv = (code: FactorySpec['code']) => (code === 'CN' ? 15
 /** roles 를 주면 그 역할 부재만 검토하고 사용성은 생략 (단면 최적화 후보 평가용) */
 export function runDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo, res: Results, roles?: readonly ElementRole[]): DesignResult {
   validateDesignResults(spec, model, info, res, roles)
-  return additionDesign(spec, model, info, res, runFactoryDesign(spec, factoryOnly(model), info, res, roles), roles)
+  const d = additionDesign(spec, model, info, res, runFactoryDesign(spec, factoryOnly(model), info, res, roles), roles)
+  /* RC 받침(TW 1단계) — 강성 확인(사용성 항목)·받침 윗면 반력. 후보 단면 검토(roles)에는 필요 없음 */
+  const ped = roles ? null : pedestalCheck(spec, model, info, res)
+  if (ped) { d.service.push(...ped.service); d.pedestal = ped.summary }
+  return d
 }
 
 function runFactoryDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo, res: Results, roles?: readonly ElementRole[]): DesignResult {
@@ -312,7 +321,7 @@ function runFactoryDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
         if (frame) {
           const d = comboDir(combo)
           const sw = res.sway.get(combo)
-          const b2 = (dir: 'X' | 'Y') => (sw ? b2Of(sw[dir].sumPu, sw[dir].drift, sw[dir].sumH, spec.eaveHeight) : 1)
+          const b2 = (dir: 'X' | 'Y') => (sw ? b2Of(sw[dir].sumPu, sw[dir].drift, sw[dir].sumH, steelHeight(spec)) : 1)
           B = Math.max(B1, d ? b2(d) : Math.max(b2('X'), b2('Y')))
         }
         /* 퍼린·거트 약축: 해석 모델에 새그로드가 없어 베이 전체 경간으로 계산됨 → 경간 L/(n+1) 기준으로 1/(n+1)² 축소 */
@@ -370,7 +379,7 @@ function runFactoryDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
       const d = Math.abs(w.parts.reduce((s, p) => s + p.f * (res.disp.get(p.lc)?.get(id)?.[comp] ?? 0), 0))
       if (d > v) { v = d; at = w.tag }
     }
-    service.push({ key, value: v / spec.eaveHeight, limit: 0.005, ratio: v / spec.eaveHeight / 0.005, case: at, clause: '風力規範 4.2·2.12' })
+    service.push({ key, value: v / steelHeight(spec), limit: 0.005, ratio: v / steelHeight(spec) / 0.005, case: at, clause: '風力規範 4.2·2.12' })
   }
   /* 耐震規範 2.16.1: V* (I = 1) 지진력 아래 층간변위각 ≤ 0.005 — EX/EY 변위 × cStar/c */
   for (const [key, comp, lc, d] of [['seisDriftX', 'dx', 'EX', 'X'], ['seisDriftY', 'dy', 'EY', 'Y']] as const) {
@@ -382,7 +391,7 @@ function runFactoryDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
       const x = Math.abs((dE?.get(id)?.[comp] ?? 0) + sg * (dT?.get(id)?.[comp] ?? 0)) * (s.cStar / s.c)
       if (x > v) v = x
     }
-    service.push({ key, value: v / spec.eaveHeight, limit: 0.005, ratio: v / spec.eaveHeight / 0.005, case: `${lc} × V*/V`, clause: '耐震規範 2.16.1' })
+    service.push({ key, value: v / steelHeight(spec), limit: 0.005, ratio: v / steelHeight(spec) / 0.005, case: `${lc} × V*/V`, clause: '耐震規範 2.16.1' })
   }
   /* LRFD 11.5.3: 활하중 처짐 ≤ 스팬/360 — 지붕보: 마루 − 처마 평균 (LR), 퍼린: 단순보 5wL⁴/384EI */
   const lr = res.disp.get('LR')

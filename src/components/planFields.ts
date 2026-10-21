@@ -89,6 +89,10 @@ export const GROUPS: Group[] = [
   { title: 'sec_conn', fields: [
     { path: 'fc', label: 'f_fc', unit: 'MPa', kind: 'num' },
     { path: 'anchorFu', label: 'f_anchorFu', unit: 'MPa', kind: 'num' },
+    /* RC 받침(墩柱) — 0 이면 없음(지금과 같음). 높이가 있으면 강철 기둥은 받침 윗면부터 */
+    { path: 'pedestal.height', label: 'f_pedestal_h', unit: 'm', kind: 'num', min: 0, fallback: '0' },
+    { path: 'pedestal.b', label: 'f_pedestal_b', unit: 'mm', kind: 'num', fallback: '600' },
+    { path: 'pedestal.d', label: 'f_pedestal_d', unit: 'mm', kind: 'num', fallback: '600' },
   ] },
   { title: 'sec_seismic', fields: [
     { path: 'siteBasis', label: 'f_siteBasis', kind: 'select', fallback: 'assumed', options: () => (['assumed', 'confirmed'] as const).map((v) => ({ value: v, label: t(`site_basis_${v}`) })) },
@@ -111,6 +115,7 @@ export const GROUPS: Group[] = [
     { path: 'wind.V10', label: 'f_V10', unit: 'm/s', kind: 'num' },
     { path: 'wind.I', label: 'f_Iw', kind: 'num' },
     { path: 'wind.exposure', label: 'f_exposure', kind: 'select', options: () => ['A', 'B', 'C'].map((v) => ({ value: v, label: v })) },
+    { path: 'wind.Kzt', label: 'f_Kzt_tw', kind: 'num', min: 1, fallback: '1' },
     { path: 'wind.enclosure', label: 'f_enclosure_q', kind: 'select', full: true, options: () => [
       /* 계수는 프로필(twLateral.gcpi)에서 — 하중 계산과 같은 값 */
       { value: 'enclosed', label: t('encl_q_enclosed', String(profileOf('TW').lateral.gcpi('enclosed'))) },
@@ -207,11 +212,18 @@ export function toSpec(base: FactorySpec, vals: Record<Path, string>, free: bool
     const raw = vals[f.path]
     if ((f.path.startsWith('restraints.') || f.path === 'siteBasis') && raw === 'assumed' && getPath(base, f.path) === undefined) continue
     /* 기본값(표시만)은 스펙에 쓰지 않는다 — 기존 스펙·정답 세트와 같게 */
-    if (((f.path === 'seismic.systemX' && raw === 'IMF') || (f.path === 'seismic.systemY' && raw === 'OCBF') || (f.path === 'interiorColumns' && raw === 'lean')) && getPath(base, f.path) === undefined) continue
+    if (((f.path === 'wind.Kzt' && +raw === 1) || (f.path === 'seismic.systemX' && raw === 'IMF') || (f.path === 'seismic.systemY' && raw === 'OCBF') || (f.path === 'interiorColumns' && raw === 'lean')) && getPath(base, f.path) === undefined) continue
     if (f.path === 'secondaryMaterial' || f.path === 'siteEvidence' || f.path === 'interiorColumns') { sp = setPath(sp, f.path, raw?.trim() ? raw.trim() : undefined); continue }
     /* 근단층 거리는 鄉鎮이 바뀌면 비워진다 — 빈 값도 그대로 반영해 이전 鄉鎮 거리가 남지 않게 */
     if (f.path === 'seismic.nearFault') { sp = setPath(sp, f.path, raw?.trim() ? raw.trim() : undefined); continue }
     if (f.path === 'asd') { sp = setPath(sp, f.path, raw === 'true' ? true : undefined); continue }
+    /* RC 받침: 높이 0(기본)이면 스펙에 쓰지 않음 — 높이가 있을 때만 {height, b, d} */
+    if (f.path.startsWith('pedestal.')) {
+      if (f.path !== 'pedestal.height') continue
+      const h = +raw, b = +vals['pedestal.b'], d = +vals['pedestal.d']
+      sp = Number.isFinite(h) && h > 0 && b > 0 && d > 0 ? { ...sp, pedestal: { height: h, b, d } } : { ...sp, pedestal: undefined }
+      continue
+    }
     if (f.kind === 'list') {
       const l = parseList(raw)
       if (!listError(raw, f.path === 'bayList' && individual && !free)) sp = setPath(sp, f.path, l)
@@ -261,7 +273,7 @@ export function invalidField(f: Field, raw: string, spec: FactorySpec, individua
 
 export const fieldStep = (f: Pick<Field,'path'>) => f.path.startsWith('additions.') ? ADDITIONS_STEP : f.path.startsWith('restraints.') ? 2 : ['frame', 'span', 'spanList', 'interiorColumns', 'trussDepth', 'eaveHeight', 'roofSlope', 'baseFixity'].includes(f.path) ? 1
   : ['bayList', 'bays', 'baySpacing', 'purlinSpacing', 'girtSpacing', 'postSpacing', 'sagRods'].includes(f.path) ? 2
-  : f.path.startsWith('sections.') || ['material', 'secondaryMaterial', 'asd'].includes(f.path) || ['fc', 'anchorFu', 'china.concreteBearing', 'china.anchorFt'].includes(f.path) ? 3 : LOADS_STEP
+  : f.path.startsWith('sections.') || ['material', 'secondaryMaterial', 'asd'].includes(f.path) || ['fc', 'anchorFu', 'china.concreteBearing', 'china.anchorFt', 'pedestal.height', 'pedestal.b', 'pedestal.d'].includes(f.path) ? 3 : LOADS_STEP
 
 /** 잘못된 입력 칸 — 기본 모델링·자유골조 공통 (자유골조는 베이 수·간격 대신 베이 목록) */
 export const invalidFields = (spec: FactorySpec, vals: Record<Path, string>, free: boolean, individual = free): Field[] =>

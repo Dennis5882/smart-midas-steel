@@ -38,9 +38,18 @@ export interface LoadInfo {
     qh: number; hRef: number; cases: { name: string; dir: 'X' | 'Y'; roofCp: number; gcpi: number }[]; windwardRoofCp: { low: number; high: number }
     /** 2.10~2.12: 순풍향 합력 W_D (kN), 횡풍향 W_L (kN), 비틀림 M_T (kN·m), 순풍향 계수 kD */
     across: { WDx: number; WDy: number; WLX: number; WLY: number; MT: number; kD: number }
+    /** 높이별 풍압 표 (TW — 표시·계산서용) */
+    profile?: WindProfile
     /** 풍 변형 — 조합·변위각 계산용 (케이스 × 계수) */
     variants: { tag: string; dir: 'X' | 'Y'; parts: { lc: string; f: number }[] }[]
   }
+}
+
+/** 높이별 풍압 (kN/m²) — rows: 높이 z 의 속도압 q(z)·풍상벽 외압 q(z)·G·Cp, 나머지 면은 q(h) 기준 외압, internal = q(h)·GCpi (±) */
+export interface WindProfile {
+  gust: number; windwardCp: number; kzt: number
+  rows: { z: number; qz: number; windward: number }[]
+  leewardX: number; leewardY: number; side: number; internal: number
 }
 
 export interface LoadPayloads {
@@ -160,12 +169,13 @@ function buildFactoryLoads(spec: FactorySpec, model: FactoryModel): LoadPayloads
   /* ── 지진: 절점 무게 × 높이 분배 (2.11), 단일 층이므로 Ft 는 T > 0.7s 일 때만 ── */
   const W = nodeWeights(spec, model, (id) => deadLine.get(id) ?? 0)
   const Wtot = [...W.values()].reduce((x, y) => x + y, 0)
-  const hn = G.hMean // 기면~평균 지붕면
+  /* 기면~평균 지붕면 — RC 받침이 있으면 받침 윗면(강철 골조 기면)부터, 높이 분배도 받침 윗면 기준 */
+  const hn = G.hMean - G.baseZ
   const si = spec.seismic
   const CNLD: Record<string, { ITEMS: unknown[] }> = {}
   const seismic = { W: Wtot } as LoadInfo['seismic']
   let denom = 0
-  for (const n of model.nodes) denom += (W.get(n.id) ?? 0) * n.z
+  for (const n of model.nodes) denom += (W.get(n.id) ?? 0) * (n.z - G.baseZ)
   const zTop = Math.max(...model.nodes.map((n) => n.z))
   const topW = model.nodes.filter((n) => n.z === zTop).reduce((x, n) => x + (W.get(n.id) ?? 0), 0)
   for (const dir of ['X', 'Y'] as const) {
@@ -176,7 +186,7 @@ function buildFactoryLoads(spec: FactorySpec, model: FactoryModel): LoadPayloads
     const Ft = T > 0.7 ? Math.min(0.07 * T * V, 0.25 * V) : 0
     for (const n of model.nodes) {
       const w = W.get(n.id) ?? 0
-      let F = denom > 0 ? ((V - Ft) * w * n.z) / denom : 0
+      let F = denom > 0 ? ((V - Ft) * w * (n.z - G.baseZ)) / denom : 0
       if (Ft > 0 && n.z === zTop && topW > 0) F += (Ft * w) / topW
       if (F === 0) continue
       const items = (CNLD[n.id] ??= { ITEMS: [] }).ITEMS
@@ -193,12 +203,25 @@ function buildFactoryLoads(spec: FactorySpec, model: FactoryModel): LoadPayloads
   const wi = spec.wind
   /* 風力規範 符號 h — θ < 10° 이면 처마 높이. 편경사는 처마가 둘이라 평균 지붕 높이(높은 쪽 쪽으로 보수적) */
   const hRef = theta < (10 * Math.PI) / 180 && G.symmetric ? eaveHeight : G.hMean
-  const qOf = (z: number) => lat.windQ(z, { V10: wi.V10, I: wi.I, exposure: wi.exposure })
+  /* 2.6 q(z) = 0.06·K(z)·Kzt·[I·V10]² — Kzt 는 입력값 하나(기본 1) */
+  const Kzt = wi.Kzt ?? 1
+  const qOf = (z: number) => Kzt * lat.windQ(z, { V10: wi.V10, I: wi.I, exposure: wi.exposure })
   const qh = qOf(hRef)
   const Gf = lat.gust
   const gpi = lat.gcpi(wi.enclosure)
   const rc = lat.roofCp({ thetaDeg: (theta * 180) / Math.PI, hOverL: hRef / span })
   const SIDE_CP = -0.7 // 표2.4 측풍면
+  /** 높이별 풍압 (표시용, kN/m², + = 면을 누름) — 풍상벽만 q(z) 로 높이에 따라 변하고, 풍하벽·측벽·내압은 q(h) 하나 (表2.4·2.17).
+      실제 하중은 아래 wallP 와 같은 식 — 엔지니어가 '높이별 편차가 반영되는지' 확인할 수 있게 */
+  const windProfile = (): WindProfile => {
+    const zs = [...new Set([...G.girtZsAt(0), ...G.girtZsAt(span), ...G.endGirtZs, eaveHeight, G.ridgeZ].map((z) => +z.toFixed(3)))].filter((z) => z > G.baseZ).sort((a, b) => a - b)
+    return {
+      gust: Gf, windwardCp: lat.wallCp.windward, kzt: Kzt,
+      rows: zs.map((z) => ({ z, qz: qOf(z), windward: qOf(z) * Gf * lat.wallCp.windward })),
+      leewardX: qh * Gf * lat.wallCp.leeward(span / length), leewardY: qh * Gf * lat.wallCp.leeward(length / span),
+      side: qh * Gf * SIDE_CP, internal: qh * gpi,
+    }
+  }
   const ROOF_PARALLEL_CP = Math.max(hRef / span, hRef / length) <= 2.5 ? -0.7 : -0.8 // 표2.5 풍향 ∥ 용마루
 
   /** from: X 풍이 불어오는 측벽 (없으면 x0), fromY: Y 풍이 불어오는 박공벽 (없으면 y0) */
@@ -391,6 +414,7 @@ function buildFactoryLoads(spec: FactorySpec, model: FactoryModel): LoadPayloads
       wind: {
         qh, hRef, cases: windCases.map((v) => ({ name: v.name, dir: v.dir, roofCp: v.roofW, gcpi: v.s * gpi })), windwardRoofCp: { low: rc.low, high: rc.high },
         across: { WDx, WDy, WLX, WLY, MT, kD },
+        profile: windProfile(),
         variants: windVariants.map((v) => ({ tag: v.tag.trim(), dir: v.dir, parts: v.parts })),
       },
     },

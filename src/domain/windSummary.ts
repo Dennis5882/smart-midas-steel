@@ -1,7 +1,7 @@
 /* 풍하중 미리보기 (순수) — 하중 입력 단계에서 '실제로 Gen 에 넣는 풍하중'을 보여 준다.
    케이스마다 풍향·내압·수평 합력·지붕 상향력을 실제 페이로드(BMLD·CNLD)에서 합산 — 기준(TW·KR·CN)과 무관하게 같은 방식.
    엔지니어가 기본 입력 칸(V10·지표면 조도)만 보고 '기본 풍하중만 넣는다'고 오해하던 문제(2026-10-20 현지 피드백) */
-import type { LoadPayloads } from './loads'
+import type { LoadPayloads, WindProfile } from './loads'
 import type { FactoryModel } from './types'
 
 export type WindRowKind = 'main' | 'across' | 'torsion'
@@ -19,7 +19,8 @@ export interface WindRow {
   /** 지붕 상향력 합 (kN, + = 위) */
   uplift: number
 }
-export interface WindSummary { rows: WindRow[]; qh: number; hRef: number }
+/** profile: 높이별 풍압 (TW — 풍상벽 q(z)) */
+export interface WindSummary { rows: WindRow[]; qh: number; hRef: number; profile?: WindProfile }
 
 export function windSummary(model: FactoryModel, loads: LoadPayloads): WindSummary {
   const nodes = new Map(model.nodes.map((n) => [n.id, n]))
@@ -49,5 +50,5 @@ export function windSummary(model: FactoryModel, loads: LoadPayloads): WindSumma
       horizontal: kind === 'torsion' ? 0 : Math.abs(v), uplift: t.z,
     }
   })
-  return { rows, qh: loads.info.wind.qh, hRef: loads.info.wind.hRef }
+  return { rows, qh: loads.info.wind.qh, hRef: loads.info.wind.hRef, profile: loads.info.wind.profile }
 }

@@ -3,7 +3,7 @@
    - TRUSSFORCE: 가새 축력
    - REACTIONG 합계 + DISPLACEMENTG 처마 절점: 조합별 B2 (8.2-5) 산정
    - DISPLACEMENTG 사용 하중(ST): 풍·지진 층간변위각, 지붕 활하중 처짐 */
-import { isAxialRole } from '../domain/types'
+import { isAxialRole, isBaseNode } from '../domain/types'
 import type { Built } from '../state/store'
 import { mapi, tableOf } from '../mapi/client'
 import { stage } from './job'
@@ -152,7 +152,7 @@ export async function fetchResults(b: Built): Promise<Results> {
   }
 
   /* B2 입력 — 조합별 반력 합(ΣPu = ΣFZ, ΣH = |ΣFX|·|ΣFY|), 처마 절점(기둥 상단) 평균 변위 */
-  const base = model.nodes.find((n) => n.z === 0)!
+  const base = model.nodes.find((n) => isBaseNode(model, n))!
   const rx = await table('REACTIONG', 'R', [base.id], cb, {}, ['Node', 'Load', 'FX', 'FY', 'FZ'])
   const sums = new Map<string, number[]>()
   const reactionRows = rx.SUB_TABLES?.[0]?.['SUMMATION OF REACTION FORCES PRINTOUT']?.DATA

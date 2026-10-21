@@ -1,6 +1,7 @@
 /* 계산서용 3D 모델 그림 — 정투상 등각 SVG (3D 탭 'iso' 카메라와 같은 방향). Plotly·화면 캡처 없이 모델 좌표에서 바로 그린다.
    색 = 부재 종류(roleColor) 또는 강도비 구간(ratioColor, View3D BANDS 와 같은 경계). 흰 종이 기준 색. */
 import type { ElementRole, FactoryModel } from '../domain/types'
+import { isBaseNode } from '../domain/types'
 
 export const ROLE_COLOR: Record<ElementRole, string> = {
   column: '#0b6e99', rafter: '#1d8653', purlin: '#5b6fd6', girt: '#c98a12', strut: '#c43030', post: '#2a9bc4', brace: '#c2399b', chord: '#1d8653', web: '#c98a12',
@@ -47,7 +48,7 @@ export function isoSvg(model: FactoryModel, o: IsoOptions): string {
     return `<line x1="${k(ax)}" y1="${k(ay)}" x2="${k(bx)}" y2="${k(by)}" stroke="${c}" stroke-width="${ROLE_WIDTH[e.role]}" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`
   }).join('')
   /* 지점 (z = 0) */
-  const sup = model.nodes.filter((p) => p.z === 0).map((p) => { const [x, y] = P(p); return `<rect x="${k(x - pad * 0.12)}" y="${k(y)}" width="${k(pad * 0.24)}" height="${k(pad * 0.12)}" fill="#c43030"/>` }).join('')
+  const sup = model.nodes.filter((p) => isBaseNode(model, p)).map((p) => { const [x, y] = P(p); return `<rect x="${k(x - pad * 0.12)}" y="${k(y)}" width="${k(pad * 0.24)}" height="${k(pad * 0.12)}" fill="#c43030"/>` }).join('')
   const legend = o.legend.map(([c, s], i) =>
     `<g transform="translate(${8 + (i % 4) * 150} ${12 + Math.floor(i / 4) * 16})"><rect width="18" height="4" y="-4" fill="${c}"/><text x="24" y="0" font-size="11" fill="#333">${s.replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[ch]!)}</text></g>`).join('')
   const lh = Math.ceil(o.legend.length / 4) * 16 + 10

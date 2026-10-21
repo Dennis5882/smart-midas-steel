@@ -2,6 +2,7 @@
    S1 지붕 골조 평면 · S2 대표 프레임 입면 · S3 측벽 입면(x = 0) · S4 박공벽 입면(y = 0) · S5 부재·접합부 일람 + 표제란.
    좌표: 모델 m → mm. 그리드: 프레임선 1..n+1 (Y), 기둥열 A·B (X). */
 import { localDate } from '../lib/date'
+import { isBaseNode } from '../domain/types'
 import type { ConnResult } from '../domain/connections'
 import { profileOf } from '../codes'
 import { restraintKeys, support } from '../domain/validity'
@@ -81,7 +82,7 @@ function drawSheets({ spec, model, connections, title }: DrawingInput): Dxf {
       d.line(LAYER_OF[e.role], x1, y1, x2, y2)
     }
     /* 풍주 위치 (박공 프레임) */
-    for (const e of model.elements) if (!e.addition && e.role === 'post' && nodes.get(e.n1)!.z === 0) { const n = nodes.get(e.n1)!; const [x, y] = P(n.y, n.x); d.circle('POST', x, y, 200) }
+    for (const e of model.elements) if (!e.addition && e.role === 'post' && isBaseNode(model, nodes.get(e.n1)!)) { const n = nodes.get(e.n1)!; const [x, y] = P(n.y, n.x); d.circle('POST', x, y, 200) }
     d.dim('DIM', ox, 0, ox + W, 0, 2500, TXT, spec.bayList?.length ? `${G.spans.map(mm).join(' + ')} = ${mm(G.length)}` : `${spec.bays} @ ${mm(spec.baySpacing)} = ${mm(G.length)}`)
     d.dim('DIM', ox + W, 0, ox + W, H, -2500, TXT, String(mm(spec.span)))
     d.text('TEXT', ox, -3200, TXT, `Purlin ${spec.sections.purlin} @ ${Math.round(mm(G.sRoof))}  Strut ${spec.sections.strut}  Roof brace ${spec.sections.brace}`)

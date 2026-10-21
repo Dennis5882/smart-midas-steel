@@ -1,4 +1,4 @@
-import { baySpans, columnSpans, defaultTrussDepth, frameSpans, isTruss, withTrussDefaults, type Element, type ElementRole, type Face, type FactoryModel, type FactorySpec, type FrameType, type Node } from './types'
+import { baySpans, columnSpans, defaultTrussDepth, frameSpans, isTruss, pedestalHeight, withTrussDefaults, type Element, type ElementRole, type Face, type FactoryModel, type FactorySpec, type FrameType, type Node } from './types'
 import { applyAdditions } from './additions'
 
 /** 지붕면 하나 (횡단면, x 증가 방향). rising = x 가 커질수록 높아짐 — 법선 (∓sinθ, 0, cosθ) 방향과 풍상·풍하 판정에 쓴다 */
@@ -19,7 +19,9 @@ export function portalGeometry(spec: FactorySpec): Geometry {
   const rise = run * roofSlope
   const slopeLen = Math.hypot(run, rise)
   const nPurlin = Math.max(1, Math.round(slopeLen / purlinSpacing))
-  const nGirtOf = (h: number) => Math.max(1, Math.round(h / girtSpacing))
+  /* RC 받침이 있으면 강철 기둥·거트는 받침 윗면 z0 부터 (그 아래 벽은 RC) */
+  const z0 = pedestalHeight(spec)
+  const nGirtOf = (h: number) => Math.max(1, Math.round((h - z0) / girtSpacing))
   const nGirt = nGirtOf(eaveHeight)
   const rafterXs = Array.from({ length: nPurlin + 1 }, (_, i) => run * (i / nPurlin))
   /** 지붕보 절점 x (박공: 처마 → 마루 → 처마 / 편경사: 낮은 처마 → 높은 처마) */
@@ -31,15 +33,15 @@ export function portalGeometry(spec: FactorySpec): Geometry {
   const xs = inner.length ? [...xs0, ...inner.filter((c) => !xs0.some((x) => Math.abs(x - c) < 1e-6))].sort((a, b) => a - b) : xs0
   const zAt = mono ? (x: number) => eaveHeight + x * roofSlope : (x: number) => eaveHeight + Math.min(x, span - x) * roofSlope
   /** 거트 높이 (기초·처마 제외) — x0 측벽(낮은 쪽). 높이가 다른 벽은 girtZsAt */
-  const levels = (h: number) => { const n = nGirtOf(h); return Array.from({ length: n - 1 }, (_, g) => (h * (g + 1)) / n) }
+  const levels = (h: number) => { const n = nGirtOf(h); return Array.from({ length: n - 1 }, (_, g) => z0 + ((h - z0) * (g + 1)) / n) }
   const girtZs = levels(eaveHeight)
   /** 기둥 열 x 의 벽 거트 높이·간격 (박공은 양쪽 같음) */
   const girtZsAt = (x: number) => (Math.abs(zAt(x) - eaveHeight) < 1e-9 ? girtZs : levels(zAt(x)))
-  const gWallAt = (x: number) => zAt(x) / nGirtOf(zAt(x))
+  const gWallAt = (x: number) => (zAt(x) - z0) / nGirtOf(zAt(x))
   /** 박공벽(y0·yL) 거트 높이·간격 — 가장 높은 기둥 열 기준 (편경사는 높은 쪽), 지붕선 아래만 */
   const hEnd = Math.max(zAt(0), zAt(span))
   const endGirtZs = Math.abs(hEnd - eaveHeight) < 1e-9 ? girtZs : levels(hEnd)
-  const gEnd = hEnd / nGirtOf(hEnd)
+  const gEnd = (hEnd - z0) / nGirtOf(hEnd)
   /** 박공벽 풍주 x — 목표 간격으로 등분한 뒤 가장 가까운 지붕보 절점에 맞춤 */
   /* 내부 기둥이 있으면 기둥 사이 경간마다 등분 (기둥 위치는 제외) */
   const postXs = [...new Set(cols.flatMap((w, i) => {
@@ -97,8 +99,8 @@ export function portalGeometry(spec: FactorySpec): Geometry {
   const isDeflNode = (n: { x: number; z: number }) => deflXs.some((x) => near(n.x, x)) && Math.abs(n.z - zAt(n.x)) < 1e-9
   return {
     rise, slopeLen, nPurlin, nGirt, xs, zAt, girtZs, postXs,
-    sRoof, gWall: eaveHeight / nGirt, length: spans.reduce((a, b) => a + b, 0), spans,
-    theta: Math.atan(roofSlope), ridgeZ,
+    sRoof, gWall: (eaveHeight - z0) / nGirt, length: spans.reduce((a, b) => a + b, 0), spans,
+    theta: Math.atan(roofSlope), ridgeZ, baseZ: z0,
     frame: (mono ? 'mono' : inner.length ? 'gableCols' : 'gable') as FrameType,
     ...(isTruss(spec) && !mono && !inner.length ? { truss: { depth: spec.trussDepth ?? defaultTrussDepth(span), zb: eaveHeight - (spec.trussDepth ?? defaultTrussDepth(span)) } } : {}),
     /** 흔들림 기둥 열 x (다경간 내부) */
@@ -119,7 +121,7 @@ export function portalGeometry(spec: FactorySpec): Geometry {
 /** 횡단면 형상 — 박공·편경사·다경간 공통 키 */
 export interface Geometry {
   rise: number; slopeLen: number; nPurlin: number; nGirt: number; xs: number[]; zAt: (x: number) => number; girtZs: number[]; postXs: number[]
-  sRoof: number; gWall: number; length: number; spans: number[]; theta: number; ridgeZ: number; frame: FrameType; leanXs: number[]; valleys: number[]
+  sRoof: number; gWall: number; length: number; spans: number[]; theta: number; ridgeZ: number; /** 기둥 하단(지점) 높이 — RC 받침 윗면, 없으면 0 */ baseZ: number; frame: FrameType; leanXs: number[]; valleys: number[]
   /** 트러스 지붕: 하현재 높이 zb (m) — 없으면 일반 지붕보 */
   truss?: { zb: number; depth: number }
   symmetric: boolean; eaveXs: number[]; ridges: number[]; planes: RoofPlane[]; eaveSide: (x: number) => 'x0' | 'xL' | null; isRidge: (x: number) => boolean
@@ -159,9 +161,10 @@ function multiGeometry(spec: FactorySpec): Geometry {
   const ridges = widths.map((w, i) => colXs[i] + w / 2)
   const valleys = colXs.slice(1, -1)
   const riseMax = Math.max(...widths.map((w) => (w / 2) * roofSlope))
-  const nGirt = Math.max(1, Math.round(eaveHeight / girtSpacing))
-  const girtZs = Array.from({ length: nGirt - 1 }, (_, g) => (eaveHeight * (g + 1)) / nGirt)
-  const gWall = eaveHeight / nGirt
+  const z0 = pedestalHeight(spec)
+  const nGirt = Math.max(1, Math.round((eaveHeight - z0) / girtSpacing))
+  const girtZs = Array.from({ length: nGirt - 1 }, (_, g) => z0 + ((eaveHeight - z0) * (g + 1)) / nGirt)
+  const gWall = (eaveHeight - z0) / nGirt
   /* 박공벽 풍주: 기둥(바깥·내부) 사이를 목표 간격으로 — 각 경간에서 등분해 지붕보 절점에 맞춤 */
   const postXs = widths.flatMap((w, i) => {
     const n = Math.max(1, Math.round(w / Math.max(spec.postSpacing, 1)))
@@ -183,7 +186,7 @@ function multiGeometry(spec: FactorySpec): Geometry {
   return {
     rise: riseMax, slopeLen: slopeMax, nPurlin: nMax, nGirt, xs, zAt, girtZs, postXs,
     sRoof: sMax, gWall, length: spans.reduce((a, b) => a + b, 0), spans,
-    theta: Math.atan(roofSlope), ridgeZ: eaveHeight + riseMax,
+    theta: Math.atan(roofSlope), ridgeZ: eaveHeight + riseMax, baseZ: z0,
     frame: 'multi', leanXs: valleys, valleys, symmetric,
     eaveXs, ridges, planes, eaveSide, isRidge, roofTrib,
     nearEave: (x, a, eps = 0) => x <= a + eps || x >= W - a - eps,
@@ -231,7 +234,7 @@ export function buildPortal(spec0: FactorySpec): FactoryModel {
       const zs0 = gable ? [...new Set([...G.girtZsAt(x), ...G.endGirtZs.filter((z) => z < G.zAt(x) - 1e-6)])].sort((p, q) => p - q) : G.girtZsAt(x)
       /* 트러스 프레임(박공 제외): 하현재가 기둥에 닿는 높이 zb 에 절점 */
       const zs = G.truss && !gable ? [...new Set([...zs0, G.truss.zb])].sort((p, q) => p - q) : zs0
-      let prev = node(x, y, 0)
+      let prev = node(x, y, G.baseZ)
       for (const z of [...zs, G.zAt(x)]) {
         const cur = node(x, y, z)
         elem(prev, cur, 'column', sec.column)
@@ -241,7 +244,7 @@ export function buildPortal(spec0: FactorySpec): FactoryModel {
     /* 다경간 내부 기둥(흔들림 기둥): 기초 → 골. 박공 프레임은 박공벽 거트 높이에 절점.
        크레인을 받는 기둥이면 흔들림 기둥 불가(강접) — 현재 크레인은 적용범위에서 막혀 있음(scope.ts) */
     for (const x of G.leanXs) {
-      let prev = node(x, y, 0)
+      let prev = node(x, y, G.baseZ)
       for (const z of [...(gable ? G.endGirtZs.filter((z) => z < G.zAt(x) - 1e-6) : []), G.zAt(x)]) {
         const cur = node(x, y, z)
         elem(prev, cur, 'column', sec.column, undefined, spec.interiorColumns === 'rigid' ? undefined : true)
@@ -252,7 +255,7 @@ export function buildPortal(spec0: FactorySpec): FactoryModel {
     /* 박공벽 풍주: 기초 → 지붕보 절점, 거트 높이마다 절점 */
     if (gable) {
       for (const x of G.postXs) {
-        let prev = node(x, y, 0)
+        let prev = node(x, y, G.baseZ)
         for (const z of [...G.endGirtZs.filter((z) => z < G.zAt(x) - 1e-6), G.zAt(x)]) {
           const cur = node(x, y, z)
           elem(prev, cur, 'post', sec.post, gable)
@@ -312,8 +315,8 @@ export function buildPortal(spec0: FactorySpec): FactoryModel {
     const y0 = yOf(b), y1 = yOf(b + 1)
     for (const x of G.eaveXs) {
       const f: Face = G.eaveSide(x)!
-      elem(node(x, y0, 0), node(x, y1, G.zAt(x)), 'brace', sec.brace, f)
-      elem(node(x, y1, 0), node(x, y0, G.zAt(x)), 'brace', sec.brace, f)
+      elem(node(x, y0, G.baseZ), node(x, y1, G.zAt(x)), 'brace', sec.brace, f)
+      elem(node(x, y1, G.baseZ), node(x, y0, G.zAt(x)), 'brace', sec.brace, f)
     }
   }
   for (const b of roofBays) {
@@ -332,5 +335,5 @@ export function buildPortal(spec0: FactorySpec): FactoryModel {
       }
     }
   }
-  return applyAdditions(spec, { nodes, elements })
+  return applyAdditions(spec, { nodes, elements, ...(G.baseZ ? { baseZ: G.baseZ } : {}) })
 }

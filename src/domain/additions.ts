@@ -23,15 +23,20 @@ export function defaultOpening(s: FactorySpec): WallOpeningOptions {
   const zs = portalGeometry(s).girtZsAt(0).filter((z)=>z>0 && z<s.eaveHeight)
   return {id:'door-1',face:'x0',bay:openingBayOptions(s).find((v)=>!v.braced)?.bay??0,height:zs[Math.min(1,zs.length-1)] ?? 3,headerSection:s.sections.rafter,source:'',confirmed:false}
 }
-/** All wheel/support alignments plus moment-oriented positions within each actual bay. */
+/** Runway shear stations: a wheel this fraction of the span inside a support (both wheels shift, so the end shear is ≤ 2 × 0.5% = 1% low) (a wheel exactly on the support node goes straight into the column). */
+export const RUNWAY_SHEAR_OFFSET = 0.005
+/** All wheel/support alignments plus moment-oriented positions within each actual bay.
+    With a runway beam, also the wheel just inside each support — the maximum end shear (Gen moving-load comparison 2026-10-21:
+    without it the runway shear was one wheel × element length / span too small, 61.9 vs 74.3 kN at the support). */
 export function cranePositions(stations: number[], spacing: number, detailed: boolean): number[] {
   if(stations.length<2||!Number.isFinite(spacing)||spacing<=0)return []
   const start=stations[0]
   const limit=stations.at(-1)!-spacing
   const candidates=[start,limit,...stations.flatMap((y)=>[y,y-spacing])]
   if(detailed) for(let i=0;i<stations.length-1;i++) {
-    const mid=(stations[i]+stations[i+1])/2
+    const mid=(stations[i]+stations[i+1])/2, d=RUNWAY_SHEAR_OFFSET*(stations[i+1]-stations[i])
     candidates.push(mid,mid-spacing,mid-spacing/2,mid-spacing/4,mid-3*spacing/4)
+    candidates.push(stations[i]+d,stations[i+1]-d-spacing)
   }
   return [...new Set(candidates.filter((v)=>v>=start && v<=limit).map((v)=>+v.toFixed(7)))].sort((a,b)=>a-b)
 }

@@ -30,7 +30,7 @@ export interface RepairComparison { before:RepairMetrics; estimated:RepairMetric
 
 const usageGroups:Record<AdditionUsage,RepairGroup>={'platform-beam':'platformBeam','floor-trimmer':'platformBeam','platform-column':'platformColumn','runway-beam':'runway','opening-header':'header','roof-trimmer':'roofTrimmer'}
 export const memberRepairGroup=(m:MemberCheck):RepairGroup=>m.addition?usageGroups[m.addition]:m.role==='column'||m.role==='rafter'?'frame':m.role==='strut'||m.role==='brace'?'longitudinal':m.role==='chord'||m.role==='web'?'frame':m.role
-const serviceGroup:Record<ServiceCheck['key'],RepairGroup>={windDriftX:'frame',seisDriftX:'frame',rafterDefl:'frame',windDriftY:'longitudinal',seisDriftY:'longitudinal',purlinDefl:'purlin',girtDefl:'girt',postDefl:'post',platformDefl:'platformBeam',runwayDefl:'runway',craneDefl:'frame',roofOpeningDefl:'roofTrimmer',linkGap:'link',linkSeat:'link'}
+const serviceGroup:Record<ServiceCheck['key'],RepairGroup>={windDriftX:'frame',seisDriftX:'frame',rafterDefl:'frame',windDriftY:'longitudinal',seisDriftY:'longitudinal',purlinDefl:'purlin',girtDefl:'girt',postDefl:'post',platformDefl:'platformBeam',runwayDefl:'runway',craneDefl:'frame',roofOpeningDefl:'roofTrimmer',linkGap:'link',linkSeat:'link',pedestalX:'frame',pedestalY:'longitudinal'}
 const connGroup=(c:ConnResult):RepairGroup=>c.type==='brace'?'longitudinal':'frame'
 const connGroups:readonly RepairGroup[]=['frame','longitudinal']
 const isBlocked=(m:MemberCheck)=>!!m.issues?.some((i)=>i.level==='blocked')

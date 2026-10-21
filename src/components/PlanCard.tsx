@@ -270,6 +270,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
       const advanced = g.title === 'sec_conn' ? filtered.fields
         : step === 2 ? filtered.fields.filter((f) => !['bays', 'baySpacing'].includes(f.path))
         : step === 3 ? filtered.fields.filter((f) => !['sections.column', 'sections.rafter', 'material'].includes(f.path))
+        : step === LOADS_STEP && spec.code === 'TW' && g.title === 'sec_wind' ? filtered.fields.filter((f) => f.path === 'wind.Kzt')
         : step === LOADS_STEP && spec.code === 'TW' && g.title === 'sec_seismic' ? filtered.fields.filter((f) => !['siteBasis', 'siteEvidence', 'seismic.county', 'seismic.town', 'seismic.nearFault', 'seismic.soil'].includes(f.path))
         : step === LOADS_STEP && spec.code === 'KR' ? filtered.fields.filter((f) => ['korea.Kzt', 'korea.KD', 'korea.roofZeta', 'korea.S'].includes(f.path)) : []
       const basic = filtered.fields.filter((f) => !advanced.includes(f))

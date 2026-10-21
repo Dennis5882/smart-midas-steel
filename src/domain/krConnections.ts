@@ -12,6 +12,7 @@
    - Y 보통중심가새골조 4.7.3: 볼트 미끄럼 = 증폭 안 한 조합, 그 밖 한계상태 = min(RyFyAg, 증폭지진 조합)
    콘크리트 정착(KDS 14 20 54: 콘크리트 파괴·뽑힘·측면파열)은 기초 설계 범위 → 메모 'krFoundation' (전문가 검토). */
 import { fyKR, KR } from '../codes/kr'
+import { isBaseNode } from './types'
 import {
   anchorKR, areaKR, boltKR, bearingKR, concreteBearingKR, fexxKR, filletKR, flangeBendKR, holeKR, minFilletKR, panelKR, pickPlateKR, slipKR, webYieldKR,
 } from '../codes/krConnection'
@@ -198,7 +199,7 @@ export function runKrConnections(spec: FactorySpec, model: FactoryModel, info: L
   const out: ConnResult[] = []
 
   /* 주각 — 기초 절점 기둥 I 단. 내진상세 계통이면 4.1.5 (증폭 조합, 상한 min(1.1RyFyZ, 2RyFyZx/H)) */
-  const baseEls = model.elements.filter((e) => e.role === 'column' && at(e.n1).z === 0)
+  const baseEls = model.elements.filter((e) => e.role === 'column' && isBaseNode(model, at(e.n1)))
   const baseF = baseEls.flatMap((e) => endForces(res, e.id, 0, basic))
   if (omf || ocbf) {
     const FyC = fyKR(spec.material, Math.max(col.tf, col.tw))

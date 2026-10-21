@@ -15,7 +15,7 @@ import { profileOf } from '../codes'
 import { runCnConnections } from './cnConnections'
 import { runKrConnections } from './krConnections'
 import { validateDesignResults } from './resultValidation'
-import { ROLES } from './types'
+import { ROLES, isBaseNode, steelHeight, pedestalHeight } from './types'
 import type { Results } from '../actions/results'
 import type { LoadInfo } from './loads'
 import { portalGeometry } from './portal'
@@ -94,7 +94,9 @@ function baseFor(spec: FactorySpec, forces: EndForce[], anchorD: number, nSide: 
   const edge = 50 // 앵커 연단 (mm)
   const N = col.d + 2 * 100
   const B = Math.max(col.bf + 2 * 100, (nSide - 1) * Math.max(3 * anchorD, 100) + 2 * 60)
-  const A1 = B * N, A2 = (B + 300) * (N + 300) // 기초대: 판 + 150 mm 사방 (가정)
+  /* 기초대: RC 받침이 있으면 받침 단면(판보다 작으면 판), 없으면 판 + 150 mm 사방 (가정) */
+  const ped = pedestalHeight(spec) > 0 ? spec.pedestal : undefined
+  const A1 = B * N, A2 = ped ? Math.max(A1, ped.b * ped.d) : (B + 300) * (N + 300)
   const fpMax = concreteBearing(spec.fc, A1, A2) // MPa
   const qMax = fpMax * B // N/mm
   const f = N / 2 - edge
@@ -151,7 +153,7 @@ function baseFor(spec: FactorySpec, forces: EndForce[], anchorD: number, nSide: 
   best.checks.push(chk('weldWeb', Vmax, lw * filletPerMm(w, FEXX), 'kN', 'LRFD 表10.2-5'))
   return {
     ratio: worst(best.checks), F: best.F, checks: best.checks,
-    dims: { plate: `PL ${B}×${N}×${tp}`, anchors: `${nTot}-M${anchorD} (Fu ${spec.anchorFu} MPa)`, anchorLayout: `${nSide} / side, ${edge} mm edge`, weld: `web fillet ${w} mm, flanges CJP`, pedestal: `${B + 300}×${N + 300}`, fc: `${spec.fc} MPa` },
+    dims: { plate: `PL ${B}×${N}×${tp}`, anchors: `${nTot}-M${anchorD} (Fu ${spec.anchorFu} MPa)`, anchorLayout: `${nSide} / side, ${edge} mm edge`, weld: `web fillet ${w} mm, flanges CJP`, pedestal: ped ? `${ped.b}×${ped.d} (h ${ped.height} m)` : `${B + 300}×${N + 300}`, fc: `${spec.fc} MPa` },
     parts: { plates: [{ part: 'plate', width: B, length: N, thickness: tp, count: 1, estimated: false }], fasteners: [{ kind: 'anchor', diameter: anchorD, count: nTot }] } satisfies ConnectionParts,
   }
 }
@@ -242,7 +244,7 @@ export function runConnections(spec: FactorySpec, model: FactoryModel, info: Loa
   const at = (id: number) => nodes.get(id)!
 
   /* 주각: 기초 절점에서 시작하는 기둥 요소의 I 단 */
-  const baseF = model.elements.filter((e) => e.role === 'column' && at(e.n1).z === 0).flatMap((e) => endForces(res, e.id, 0, withAmp)) // 13.4.5
+  const baseF = model.elements.filter((e) => e.role === 'column' && isBaseNode(model, at(e.n1))).flatMap((e) => endForces(res, e.id, 0, withAmp)) // 13.4.5
   /* 처마: 처마 절점에 닿는 지붕보 끝 (I 단이 처마면 I, 아니면 J) */
   const G = portalGeometry(spec)
   /* 트러스 지붕: 처마·마루는 트러스 절점(거셋) — 단부판 접합 대상 아님 (scope truss, 범위 밖) */
@@ -266,7 +268,7 @@ export function runConnections(spec: FactorySpec, model: FactoryModel, info: Loa
     /* 13.7.2-3a 소요 소성 회전각: min(0.01, 1.1(R − 1)θE), θE = 설계 지진 EX 처마 변위각 */
     const ex = res.disp.get('EX')
     const eave = model.nodes.filter(G.isEaveNode)
-    const thetaE = ex ? Math.max(0, ...eave.map((n) => Math.abs(ex.get(n.id)?.dx ?? 0))) / spec.eaveHeight : 0
+    const thetaE = ex ? Math.max(0, ...eave.map((n) => Math.abs(ex.get(n.id)?.dx ?? 0))) / steelHeight(spec) : 0
     const thetaP = Math.min(0.01, 1.1 * (info.seismic.X.R - 1) * thetaE)
     kneeDims.Mu = `Mp = ${Mp.toFixed(1)} kN·m, Vu = ${Vu.toFixed(1)} kN (13.6.1)`
     kneeDims.thetaP = `θp,req = ${thetaP.toFixed(4)} rad (13.7.2-3a, θE = ${thetaE.toFixed(5)})`

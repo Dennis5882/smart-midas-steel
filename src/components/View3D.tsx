@@ -7,7 +7,7 @@ import { additionLabelKey } from '../domain/additionTypes'
 import { useEffect, useMemo, useRef } from 'react'
 import { solidMeshes } from '../drawing/solid'
 import { buildPortal, portalGeometry, risingAt } from '../domain/portal'
-import { ROLES, type ElementRole, type FactoryModel, type FactorySpec } from '../domain/types'
+import { ROLES, type ElementRole, type FactoryModel, type FactorySpec, isBaseNode } from '../domain/types'
 import { t, useLang, type I18nKey } from '../i18n'
 import { S, notify, useStore, type CamId, type Vis3D } from '../state/store'
 
@@ -106,7 +106,7 @@ function traces(m: FactoryModel, spec: FactorySpec, P: Pal, ratio: Map<number, n
       if (x.length) out.push({ type: 'scatter3d', mode: 'lines', name: g.name, x, y, z, visible: g.visible, line: { color: g.color, width: g.width }, hoverinfo: 'skip' })
     }
   }
-  const sup = m.nodes.filter((n) => n.z === 0), free = m.nodes.filter((n) => n.z !== 0)
+  const sup = m.nodes.filter((n) => isBaseNode(m, n)), free = m.nodes.filter((n) => !isBaseNode(m, n))
   out.push({ type: 'scatter3d', mode: 'markers', name: t('support'), visible: vis.support,
     x: sup.map((n) => n.x), y: sup.map((n) => n.y), z: sup.map((n) => n.z),
     text: sup.map((n) => `N${n.id}  (${n.x}, ${n.y}, 0) m`), hovertemplate: '%{text}<extra></extra>',

@@ -28,6 +28,7 @@ export function additionPartForPath(path: string): AdditionPart {
 export function scopeIssueStep(key: ScopeKey): number {
   if (['additionInput','additionReview','openingCN','opening','crane','mezzanine'].includes(key)) return ADDITIONS_STEP
   if (key === 'cn' || key === 'kr') return LOADS_STEP
+  if (key.startsWith('pedestal')) return SECTIONS_STEP
   if (key === 'baySpacing' || key === 'bayRatio' || key === 'length') return 2
   return 1
 }

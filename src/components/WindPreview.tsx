@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { buildLoadPayloads } from '../domain/loads'
 import { buildPortal } from '../domain/portal'
 import type { FactorySpec } from '../domain/types'
+import type { WindProfile } from '../domain/loads'
 import { windSummary, type WindRow, type WindSummary } from '../domain/windSummary'
 import { t } from '../i18n'
 import { PREVIEW_DEBOUNCE_MS } from './modelingFlow'
@@ -21,6 +22,19 @@ export function WindLoadInfo({ spec }: { spec: FactorySpec }) {
 }
 
 /** 계산 결과와 그 계산에 쓴 스펙 — 표 형식(CN ±i 등)은 계산한 스펙 기준 */
+/** 높이별 풍압 — 풍상벽은 높이마다 q(z), 나머지 면은 q(h) 하나 ('높이별 편차가 반영되나' 현지 질문, 2026-10-21) */
+function WindProfileTable({ p }: { p: WindProfile }) {
+  return <>
+    <h5 className="wp-sub">{t('wp_prof_title')}</h5>
+    <table className="wp-table">
+      <thead><tr><th>{t('wp_prof_z')}</th><th>{t('wp_prof_qz')}</th><th>{t('wp_prof_ww', +p.gust.toFixed(3) + '', +p.windwardCp.toFixed(2) + '')}</th></tr></thead>
+      <tbody>{[...p.rows].reverse().map((r) => <tr key={r.z}><td className="mono">{r.z.toFixed(2)}</td><td className="mono">{r.qz.toFixed(3)}</td><td className="mono">{fmt(r.windward, 3)}</td></tr>)}</tbody>
+    </table>
+    <p className="mw-note mono">{t('wp_prof_const', fmt(p.leewardX, 3), fmt(p.leewardY, 3), fmt(p.side, 3), p.internal.toFixed(3))}</p>
+    <p className="mw-note">{t('wp_prof_note')} {t(p.kzt === 1 ? 'wp_kzt_flat' : 'wp_kzt_user', +p.kzt.toFixed(3) + '')}</p>
+  </>
+}
+
 type Computed = { spec: FactorySpec; sum: WindSummary | null }
 const compute = (spec: FactorySpec): Computed => {
   try { const model = buildPortal(spec); return { spec, sum: windSummary(model, buildLoadPayloads(spec, model)) } }
@@ -72,5 +86,6 @@ export function WindPreview({ spec }: { spec: FactorySpec }) {
       </tr>)}</tbody>
     </table>
     <p className="mw-note">{t('wp_axes')}</p>
+    {sum.profile && <WindProfileTable p={sum.profile} />}
   </details>
 }

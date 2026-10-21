@@ -6,6 +6,7 @@
    Foundation breakout, anchor development and rotation qualification remain
    explicit detailing checks, not calculated resistance in these results. */
 import { cnStrength } from '../codes/cn'
+import { isBaseNode } from './types'
 import type { Results } from '../actions/results'
 import type { FactorySpec, FactoryModel } from './types'
 import type { ConnCheck, ConnResult, ConnectionParts } from './connections'
@@ -30,7 +31,7 @@ export function runCnConnections(spec: FactorySpec, model: FactoryModel, res: Re
   const col = sectionProps(spec.sections.column, spec.code), raf = sectionProps(spec.sections.rafter, spec.code)
   const plateF = (t: number) => cnStrength(spec.material, t).f
   const weldF = spec.material === 'Q235B' ? 160 : 200 // E43 / E50, GB table 4.4.5
-  const baseForces = model.elements.filter((e) => e.role === 'column' && nodes.get(e.n1)!.z === 0).flatMap((e) => endpoints(res, e.id, 0))
+  const baseForces = model.elements.filter((e) => e.role === 'column' && isBaseNode(model, nodes.get(e.n1)!)).flatMap((e) => endpoints(res, e.id, 0))
   if (!baseForces.length) throw new Error('GB connections: no column-base forces')
   let selected: ConnResult | undefined
   for (const d of [24, 30, 36, 42, 48, 56, 64]) {
