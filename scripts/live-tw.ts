@@ -61,8 +61,9 @@ try {
   const st = () => summarizeStatus(S.design, S.connections, checkScope(S.built!.spec))
   if (S.design.pedestal) {
     const p = S.design.pedestal
-    console.log(`[${sec()}] pedestal ${p.b}x${p.d} h ${p.h}: stiffness ${(['X', 'Y'] as const).map((d) => `${d} ${p.flex[d]?.ratio.toFixed(4)} (${p.flex[d]?.combo}: ${((p.flex[d]?.delta ?? 0) * 1000).toFixed(2)} / ${((p.flex[d]?.frame ?? 0) * 1000).toFixed(2)} mm)`).join(', ')}; ` + p.rows.map((r) => `${r.key} P ${r.f.P.toFixed(1)} Mx ${r.f.Mx.toFixed(1)} Vx ${r.f.Vx.toFixed(1)} Mbase ${r.f.Mbase.toFixed(1)}`).join(' | '))
+    console.log(`[${sec()}] pedestal ${p.b}x${p.d} h ${p.h}${p.modeled ? ' (modelled in Gen)' : ''}: stiffness ${(['X', 'Y'] as const).map((d) => `${d} ${p.flex[d]?.ratio.toFixed(4)} (${p.flex[d]?.combo}: ${((p.flex[d]?.delta ?? 0) * 1000).toFixed(2)} / ${((p.flex[d]?.frame ?? 0) * 1000).toFixed(2)} mm)`).join(', ')}; ` + p.rows.map((r) => `${r.key} P ${r.f.P.toFixed(1)} Mx ${r.f.Mx.toFixed(1)} Vx ${r.f.Vx.toFixed(1)} Mbase ${r.f.Mbase.toFixed(1)}`).join(' | '))
   }
+  console.log(`[${sec()}] drift: ` + S.design.service.filter((v) => /Drift/.test(v.key)).map((v) => `${v.key} 1/${Math.round(1 / v.value)} (${v.case})`).join(', ') + `; column max ${S.design.byRole.column?.ratio.toFixed(3)} (${S.design.byRole.column?.combo})`)
   console.log(`[${sec()}] baseline: max ${S.design.maxRatio.toFixed(3)} NG ${S.design.ng} status ${st().overall}; conns ${S.connections.map((c) => `${c.type} ${c.ratio.toFixed(3)}`).join(', ')}`)
   if (process.argv.includes('--optimize')) {
     await runOptimize()

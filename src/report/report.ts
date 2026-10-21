@@ -288,7 +288,7 @@ export function buildReport({ built, reactions, design, connections, opt, footin
     const pd = design.pedestal
     if (pd) {
       parts.push(`<h3>${L('rep_pedestal')}</h3>`)
-      parts.push(`<p>${esc(t('rep_pedestal_txt', String(pd.b), String(pd.d), f(pd.h, 2), f(pd.fc, 1), f(pd.Ec / 1000, 0)))}</p>`)
+      parts.push(`<p>${esc(t(pd.modeled ? 'rep_pedestal_model' : 'rep_pedestal_txt', String(pd.b), String(pd.d), f(pd.h, 2), f(pd.fc, 1), f(pd.Ec / 1000, 0)))}</p>`)
       const fl = (['X', 'Y'] as const).map((dir) => pd.flex[dir] ? t('rep_ped_flex', dir, f(pd.flex[dir]!.ratio, 3), pd.flex[dir]!.combo) : null).filter(Boolean)
       if (fl.length) parts.push(`<p>${esc(fl.join(' · '))}</p>`)
       parts.push(`<p class="note">${esc(t('rep_pedestal_rows'))}</p>`)

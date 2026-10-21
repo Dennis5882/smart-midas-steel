@@ -16,6 +16,8 @@ export const PEDESTAL_CRACKED = 0.7
 export interface PedestalForce { combo: string; elem: number; P: number; Mx: number; Vx: number; My: number; Vy: number; Mbase: number }
 export interface PedestalSummary {
   h: number; b: number; d: number; fc: number; Ec: number
+  /** 받침을 Gen 탄성 보로 모델링(2단계) — 받침 변형이 해석에 들어가 강성 확인 불필요 */
+  modeled: boolean
   /** 지배 조합 — 처마 변위 대비 받침 변형 비율 (방향별) */
   flex: Record<'X' | 'Y', { ratio: number; combo: string; delta: number; frame: number } | null>
   /** 받침 설계용 대표 힘 (최대 압축·최대 인장·최대 면내 모멘트·최대 면내 전단·최대 면외 모멘트) */
@@ -47,7 +49,8 @@ export function pedestalCheck(spec: FactorySpec, model: FactoryModel, info: Load
      (라이브 2026-10-21: 방향 구분 없이 보면 X 비율이 Y 풍 조합 WY2-L+T 에서 3.2 로 과대) */
   const dirOf = (combo: string): 'X' | 'Y' | null => /W([XY])\d|E([XY])/.exec(combo)?.slice(1).find(Boolean) as 'X' | 'Y' | undefined ?? null
   const flex: PedestalSummary['flex'] = { X: null, Y: null }
-  for (const dir of ['X', 'Y'] as const) {
+  const modeled = !!model.pedestals?.length
+  for (const dir of modeled ? [] : ['X', 'Y'] as const) {
     const byCombo = new Map<string, number>()
     for (const f of forces) {
       if (info.comboKind[f.combo] !== 'basic' || dirOf(f.combo) !== dir) continue
@@ -71,5 +74,5 @@ export function pedestalCheck(spec: FactorySpec, model: FactoryModel, info: Load
     return v ? [{ key: dir === 'X' ? 'pedestalX' as const : 'pedestalY' as const, value: v.ratio, limit: PEDESTAL_FLEX_LIMIT, ratio: v.ratio / PEDESTAL_FLEX_LIMIT, case: v.combo,
       clause: `RC pedestal ${b}×${d} mm, h ${h} m, 0.7·Ig, Ec 4700√fc′; pedestal-induced eave drift / frame eave drift ≤ ${PEDESTAL_FLEX_LIMIT}` }] : []
   })
-  return { summary: { h, b, d, fc, Ec, flex, rows }, service }
+  return { summary: { h, b, d, fc, Ec, modeled, flex, rows }, service }
 }

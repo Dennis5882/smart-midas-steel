@@ -25,8 +25,14 @@ for (const frame of [undefined, 'mono', 'multi', 'gableCols', 'truss'] as const)
   ok(m.baseZ === h && G.baseZ === h && m0.baseZ === undefined, `${tag}: model/geometry base at pedestal top`)
   const bases = m.nodes.filter((x) => isBaseNode(m, x)), bases0 = m0.nodes.filter((x) => isBaseNode(m0, x))
   ok(bases.length === bases0.length && bases.every((x) => near(x.z, h)) && !m.nodes.some((x) => x.z < h - 1e-9), `${tag}: same supports, nothing below the pedestal top`)
-  const cons = Object.keys(buildGenPayloads(s, m).CONS).map(Number).sort((a, b) => a - b)
-  ok(JSON.stringify(cons) === JSON.stringify(bases.map((x) => x.id).sort((a, b) => a - b)), `${tag}: Gen supports (CONS) = pedestal-top nodes`)
+  /* 2단계: 받침 = Gen RC 탄성 보 (기초 z = 0 → 받침 윗면), 지점은 받침 바닥 고정 */
+  const g = buildGenPayloads(s, m), peds = m.pedestals ?? []
+  const cons = Object.keys(g.CONS).map(Number).sort((a, b) => a - b)
+  ok(peds.length === bases.length && peds.every((p) => bases.some((x) => x.id === p.top) && p.bottom.z === 0 && near(p.bottom.x, m.nodes[p.top - 1].x) && near(p.bottom.y, m.nodes[p.top - 1].y)), `${tag}: one pedestal under every column/post base`)
+  ok(JSON.stringify(cons) === JSON.stringify(peds.map((p) => p.bottom.id).sort((a, b) => a - b)) && peds.every((p) => (g.CONS as any)[p.bottom.id].ITEMS[0].CONSTRAINT === '1111111'), `${tag}: Gen supports = pedestal bottoms, fixed`)
+  const pm = (g.ELEM as any)[peds[0].elem]
+  ok(peds.every((p) => (g.ELEM as any)[p.elem]?.NODE.join() === `${p.bottom.id},${p.top}` && (g.NODE as any)[p.bottom.id]) && (g.MATL as any)[pm.MATL].TYPE === 'USER' && (g.SECT as any)[pm.SECT].SECT_BEFORE.SHAPE === 'SB', `${tag}: pedestal elements (user elastic RC, rectangular SB) in the Gen payload`)
+  ok(!m.elements.some((e) => e.id >= peds[0].elem) && m.nodes.every((x) => x.z >= h - 1e-9), `${tag}: pedestals stay out of the app steel model (design/quantities)`)
   ok(G.girtZsAt(0).every((z) => z > h) && G.endGirtZs.every((z) => z > h) && near(G.gWall, (s.eaveHeight - h) / G.nGirt), `${tag}: girts only above the pedestal, spacing from the pedestal top`)
   ok(m.elements.filter((e) => e.role === 'brace' && e.face !== 'roof').every((e) => [e.n1, e.n2].some((id) => near(m.nodes[id - 1].z, h))), `${tag}: wall braces land on the pedestal top`)
 }
@@ -47,6 +53,15 @@ for (const frame of [undefined, 'mono', 'multi', 'gableCols', 'truss'] as const)
   ok(L.info.seismic.W < L0.info.seismic.W, `seismic: W ${L0.info.seismic.W.toFixed(1)} → ${L.info.seismic.W.toFixed(1)} kN (no steel wall below the pedestal)`)
   ok(near(L.info.seismic.X.T, 0.085 * (G0.hMean - h) ** 0.75), 'seismic: period from steel height hn = hMean − pedestal')
   ok(near(steelHeight(ped), DEFAULT_SPEC.eaveHeight - h) && steelHeight(DEFAULT_SPEC) === DEFAULT_SPEC.eaveHeight, 'steel height = eave − pedestal')
+}
+/* 핀 주각 + 받침: 지점 대신 강철 기둥·풍주 하단 회전 해제 */
+{
+  const sp = { ...ped, baseFixity: 'pinned' as const }, m = buildPortal(sp), g: any = buildGenPayloads(sp, m)
+  const tops = new Set(m.pedestals!.map((p) => p.top))
+  const baseEls = m.elements.filter((e) => (e.role === 'column' || e.role === 'post') && tops.has(e.n1))
+  ok(baseEls.every((e) => g.FRLS[e.id]?.ITEMS[0].FLAG_I === '0000110'), 'pinned base on pedestal: column/post bottom rotations released')
+  const gf: any = buildGenPayloads(ped, buildPortal(ped))
+  ok(baseEls.every((e) => e.role !== 'column' || !gf.FRLS[e.id]), 'fixed base on pedestal: columns rigidly connected (no release)')
 }
 /* 입력 — 기본 0 은 스펙에 안 씀, 높이가 있으면 {height, b, d} */
 {
@@ -78,9 +93,11 @@ for (const frame of [undefined, 'mono', 'multi', 'gableCols', 'truss'] as const)
   const combo = Object.keys(L.info.comboKind).find((c) => L.info.comboKind[c] === 'basic' && c.includes('WX1'))!
   const pt = { P: -50, Vy: 2, Vz: V, My: M, Mz: 3 }
   const res: any = { beam: new Map(baseCols.map((e) => [e.id, new Map([[combo, [pt, pt, pt, pt, pt]]])])), sway: new Map([[combo, { X: { sumPu: 0, drift: 0.02, sumH: 0 }, Y: { sumPu: 0, drift: 0.001, sumH: 0 } }]]) }
-  const r = pedestalCheck(ped, m, L.info, res)!
+  const r = pedestalCheck(ped, { ...m, pedestals: undefined }, L.info, res)! // 1단계 식 (받침 미모델링)
   ok(r && near(r.summary.flex.X!.ratio, hand / 0.02) && r.service[0].key === 'pedestalX' && near(r.service[0].ratio, hand / 0.02 / 0.1), `stiffness: ratio X = ${(hand / 0.02).toFixed(4)} (limit 0.10)`)
   ok(r.summary.rows.find((x) => x.key === 'Mx')!.f.Mbase === M + V * hp && r.summary.rows.find((x) => x.key === 'Pc')!.f.P === -50, 'pedestal-top forces: bottom moment M + V·h, P + = tension')
   ok(pedestalCheck(DEFAULT_SPEC, buildPortal(DEFAULT_SPEC), L.info, res) === null, 'no pedestal → no check')
+  const rm = pedestalCheck(ped, m, L.info, res)!
+  ok(rm.summary.modeled && !rm.service.length && !rm.summary.flex.X && rm.summary.rows.length === 5, 'modeled pedestal (step 2): no stiffness check, pedestal-top forces kept')
 }
 console.log(`Pedestal: ${n} checks passed (geometry, supports, girts, wind, seismic height, input, scope, stiffness)`)

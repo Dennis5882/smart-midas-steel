@@ -335,5 +335,8 @@ export function buildPortal(spec0: FactorySpec): FactoryModel {
       }
     }
   }
-  return applyAdditions(spec, { nodes, elements, ...(G.baseZ ? { baseZ: G.baseZ } : {}) })
+  /* RC 받침 (2단계): 강철 기둥·풍주 하단마다 기초(z = 0) → 받침 윗면 RC 탄성 보 — Gen 에만 보낸다(앱 강재 모델 밖) */
+  const pedestals = G.baseZ > 0 ? [...new Set(elements.filter((e) => (e.role === 'column' || e.role === 'post') && Math.abs(nodes[e.n1 - 1].z - G.baseZ) < 1e-9).map((e) => e.n1))]
+    .map((top, i) => ({ top, bottom: { id: nodes.length + i + 1, x: nodes[top - 1].x, y: nodes[top - 1].y, z: 0 }, elem: elements.length + i + 1 })) : []
+  return applyAdditions(spec, { nodes, elements, ...(G.baseZ ? { baseZ: G.baseZ } : {}), ...(pedestals.length ? { pedestals } : {}) })
 }

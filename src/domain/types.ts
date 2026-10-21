@@ -154,7 +154,13 @@ export interface Element { id: number; n1: number; n2: number; role: ElementRole
 
 /** 전역: X = 스팬 방향, Y = 길이 방향, Z = 높이 */
 /** baseZ: 강철 기둥 하단(지점) 높이 — RC 받침이 있으면 받침 윗면 (없으면 0) */
-export interface FactoryModel { nodes: Node[]; elements: Element[]; additions?: AdditionModel; baseZ?: number }
+/** RC 받침 요소 (2단계) — 강철 기둥·풍주 하단(top, 받침 윗면 절점)과 기초 절점(bottom, z = 0)을 잇는 Gen 탄성 보. 앱 강재 설계·물량에는 넣지 않는다 */
+export interface PedestalElem { top: number; bottom: Node; elem: number }
+export interface FactoryModel { nodes: Node[]; elements: Element[]; additions?: AdditionModel; baseZ?: number; pedestals?: PedestalElem[] }
+/** Gen 지점 절점 — RC 받침이 있으면 받침 바닥, 없으면 강철 기둥 하단 */
+export const supportIds = (m: FactoryModel): number[] => m.pedestals?.length ? m.pedestals.map((p) => p.bottom.id) : m.nodes.filter((n) => Math.abs(n.z - (m.baseZ ?? 0)) < 1e-9).map((n) => n.id)
+/** 균열 고려 RC 받침 탄성계수 (kN/m²) — Ec = 4700√fc′ MPa × 0.7 (기둥 유효 강성) */
+export const pedestalElastic = (fc: number) => 0.7 * 4700 * Math.sqrt(fc) * 1000
 
 /** RC 받침(墩柱) 높이 (m) — TW 만, 없으면 0. 강철 기둥·지점은 받침 윗면부터, 그 아래 벽(RC 牆裙)은 강철에 하중을 주지 않는다 */
 export const pedestalHeight = (s: FactorySpec): number => (s.code === 'TW' ? Math.max(0, s.pedestal?.height ?? 0) : 0)

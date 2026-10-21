@@ -1,6 +1,6 @@
 /* 해석 실행 · 결과 회수 */
 import type { BaseReactions } from '../domain/twFoundation'
-import { isBaseNode } from '../domain/types'
+import { supportIds } from '../domain/types'
 import { t, lt } from '../i18n'
 import { mapi, tableOf } from '../mapi/client'
 import { S, notify, type ReactionSum } from '../state/store'
@@ -66,7 +66,8 @@ export async function showReactionsInGen(): Promise<void> {
 export async function fetchReactions(): Promise<void> {
   if (!S.built) return
   /* 모든 지점의 케이스별 반력도 같은 표에서 — 기초 예비검토(twFoundation)용. 합계 표는 지점 지정과 무관하게 전체 합 */
-  const bases = S.built.model.nodes.filter((n) => isBaseNode(S.built!.model, n)).map((n) => n.id)
+  /* 지점 = 받침이 있으면 받침 바닥(기초 고정) — 기초 검토용 반력은 받침 바닥 값(받침 자중·V·h 포함)을 강철 기둥 하단 절점 번호로 옮긴다 */
+  const bases = supportIds(S.built.model)
   const r = await mapi<any>('POST', '/post/TABLE', {
     Argument: {
       TABLE_NAME: 'Reaction', TABLE_TYPE: 'REACTIONG',
@@ -79,7 +80,9 @@ export async function fetchReactions(): Promise<void> {
   const table = tableOf(r)
   const sub = table.SUB_TABLES?.[0]?.['SUMMATION OF REACTION FORCES PRINTOUT']?.DATA as string[][] | undefined
   S.reactions = (sub ?? []).map(([lc, fx, fy, fz]): ReactionSum => ({ lc, fx: +fx, fy: +fy, fz: +fz }))
-  S.baseReactions = parseBaseReactions(table.DATA, new Set(bases), new Set(S.built.cases))
+  const parsed = parseBaseReactions(table.DATA, new Set(bases), new Set(S.built.cases))
+  const peds = S.built.model.pedestals
+  S.baseReactions = peds?.length ? new Map(peds.flatMap((p) => parsed.has(p.bottom.id) ? [[p.top, parsed.get(p.bottom.id)!] as const] : [])) : parsed
   notify()
 }
 
