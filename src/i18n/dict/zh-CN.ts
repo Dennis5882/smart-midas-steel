@@ -1122,6 +1122,8 @@ export const zhCN: Dict = {
   gc_model: '仅模型 + 自重', gc_model_d: '几何、材料、截面、支座、端部释放 + 自重（工况 D）。供工程师在 Gen 中自行输入荷载 — 程序不进行分析与设计验算。',
   rep_model_only: 'Gen NX 仅发送模型与自重（工况 D）。本章荷载为程序计算值（参考），未发送到 Gen。',
   rep_model_only_combo: '未将荷载组合发送至 Gen NX（仅模型＋自重）。荷载组合由工程师在 Gen 中定义。',
+  sw_missing: '未找到自重荷载工况 — 无法以“仅模型＋自重”发送。',
+  model_only_tag: '【仅模型＋自重】— Gen 仅发送模型与自重（D）。下列荷载（活荷载、风荷载、地震作用）为程序计算值（参考），未发送到 Gen。',
   build_done: (n, e, cases, combos) =>
     `模型已发送 — 节点 <b>${n}</b> · 单元 <b>${e}</b> · 荷载工况 <b>${cases}</b> · 荷载组合 <b>${combos}</b>。下一步：<code>分析</code>。`,
   build_fail: (msg) => `发送失败：${msg}`,

@@ -61,11 +61,16 @@ export interface LoadPayloads {
   info: LoadInfo
 }
 
+/** 자중 케이스를 찾지 못함 — 화면 문구는 job.failText 가 현재 언어로(sw_missing) */
+export class SelfWeightError extends Error {
+  constructor() { super('Self-weight load case not found'); this.name = 'SelfWeightError' }
+}
+
 /** [모델 + 자중만] — 자중(BODF)과 그 케이스만 남긴다 (마감 BMLD·절점 하중·조합 없음). 케이스는 이름이 아니라 BODF 가 가리키는 것으로 찾는다 */
 export function selfWeightOnly(l: LoadPayloads): Pick<LoadPayloads, 'STLD' | 'BODF'> {
   const names = new Set(Object.values(l.BODF).map((b) => (b as { LCNAME: string }).LCNAME))
   const STLD = Object.fromEntries(Object.entries(l.STLD).filter(([, c]) => names.has((c as { NAME: string }).NAME)))
-  if (!names.size || Object.keys(STLD).length !== names.size) throw new Error('Self-weight load case not found')
+  if (!names.size || Object.keys(STLD).length !== names.size) throw new SelfWeightError()
   return { STLD, BODF: l.BODF }
 }
 

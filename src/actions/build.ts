@@ -109,7 +109,7 @@ export async function sendModel(spec: FactorySpec, onReplaced?: (backup: string)
   } catch (e) { if (e instanceof Cancelled) throw e }
 
   const cases = Object.values(loads.STLD).map((c) => (c as { NAME: string }).NAME)
-  const comboNames = Object.values(('LCOM-GEN' in loads ? loads['LCOM-GEN'] : undefined) ?? {}).map((c) => (c as { NAME: string }).NAME)
+  const comboNames = opts.modelOnly ? [] : Object.values(l['LCOM-GEN']).map((c) => (c as { NAME: string }).NAME)
   const combos = comboNames.length
   const sent: Record<string, Record<string, unknown>> = Object.fromEntries(steps)
   if (designCode) sent.DSTL = { 1: { DGNCODE: designCode } }

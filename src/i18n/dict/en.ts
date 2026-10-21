@@ -1142,6 +1142,8 @@ export const en = {
   gc_model: 'Model + self-weight only', gc_model_d: 'Geometry, materials, sections, supports, end releases + self weight (case D). For engineers entering their own loads in Gen — the app does not analyse or check this model.',
   rep_model_only: 'Gen NX received the model and self weight only (case D). The loads in this chapter are the app’s calculated values for reference and were not sent to Gen.',
   rep_model_only_combo: 'No load combinations were sent to Gen NX (model + self-weight only). The engineer defines combinations in Gen.',
+  sw_missing: 'The self-weight load case was not found — the model cannot be sent as model + self-weight only.',
+  model_only_tag: '[Model + self-weight only] — Gen received the model and self weight (D) only. The loads below (live, wind, seismic) are the app’s reference values and were not sent to Gen.',
   build_done: (n: number, e: number, cases: number, combos: number) =>
     `Model sent — <b>${n}</b> nodes · <b>${e}</b> elements · <b>${cases}</b> load cases · <b>${combos}</b> combinations. Next: <code>analyze</code>.`,
   build_fail: (msg: string) => `Sending failed: ${msg}`,

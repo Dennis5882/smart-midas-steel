@@ -1122,6 +1122,8 @@ export const zhTW: Dict = {
   gc_model: '僅模型 + 自重', gc_model_d: '幾何、材料、斷面、支承、端部釋放 + 自重（工況 D）。供工程師於 Gen 自行輸入載重 — 程式不進行分析與設計檢核。',
   rep_model_only: 'Gen NX 僅送入模型與自重（工況 D）。本章載重為程式計算值（參考），並未送入 Gen。',
   rep_model_only_combo: '未將載重組合送至 Gen NX（僅模型＋自重）。載重組合由工程師於 Gen 中定義。',
+  sw_missing: '找不到自重載重工況 — 無法以「僅模型＋自重」送出。',
+  model_only_tag: '【僅模型＋自重】— Gen 僅送入模型與自重（D）。下列載重（活載重、風力、地震力）為程式計算值（參考），並未送入 Gen。',
   build_done: (n, e, cases, combos) =>
     `模型已傳送 — 節點 <b>${n}</b> · 單元 <b>${e}</b> · 載重工況 <b>${cases}</b> · 載重組合 <b>${combos}</b>。下一步：<code>分析</code>。`,
   build_fail: (msg) => `傳送失敗：${msg}`,

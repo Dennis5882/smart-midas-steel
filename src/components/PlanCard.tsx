@@ -92,7 +92,10 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
   /* Gen 으로 보낼 내용 — 정상 모델링(하중·조합) / 모델 + 자중만 (현지 요청 2026-10-21: 엔지니어가 Gen 에서 하중을 직접 넣는 경우) */
   /* 편집기 메시지(S.activePlan)에 같이 기억 — 시작 화면에 다녀와 편집기가 다시 마운트돼도 선택 유지 */
   const [modelOnly, updateModelOnly] = useState(() => !!msg.modelOnly)
-  const setModelOnly = (v: boolean) => { msg.modelOnly = v; updateModelOnly(v) }
+  const setModelOnly = (v: boolean) => {
+    updateModelOnly(v)
+    if (S.activePlan?.id === msg.id) { S.activePlan = { ...S.activePlan, modelOnly: v }; notify() }
+  }
   const dirty = useRef(false)
   const [additions, setAdditions] = useState<FactoryAdditions | undefined>(()=>initializeAdditions(msg.spec))
   const [feat, updateFeat] = useState<ScopeFeatures>(() => msg.spec.features ?? NO_FEATURES)
@@ -234,7 +237,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
     if (target > step) {
       const first = errors.filter((f) => fieldStep(f) < target).sort((a,b)=>fieldStep(a)-fieldStep(b))[0]
       if (first) {
-        setAttempted(true); setStep(fieldStep(first))
+        setAttempted(true); goStep(fieldStep(first))
         /* 오류 칸으로 포커스 — 스크롤 아래·접힌 고급 칸이어도 문구가 보이게 (단계 전환·펼침 렌더 뒤) */
         const focusId = first.path.startsWith('additions.') ? `${formId}-additions.${first.path.slice('additions.'.length)}`
           : `${formId}-${first.path === 'bayList' && !free ? 'bayList-0' : first.path}`
@@ -246,14 +249,18 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
         return
       }
       const issue = checkScope(spec).issues.find((i)=>i.level==='block' && scopeIssueStep(i.key)<target)
-      if (issue) { setAttempted(true); setStep(scopeIssueStep(issue.key)); return }
+      if (issue) { setAttempted(true); goStep(scopeIssueStep(issue.key)); return }
     }
     setAttempted(false)
-    setStep(target)
+    goStep(target)
     setVisited((old) => Math.max(old, target))
-    /* 사용자가 단계를 옮길 때만 그 단계의 3D 시점 (STEP_CAM) — 돌려 놓은 시점도 다시 맞춤(camReset).
-       처음 열 때·결과 화면 [수정] 이동·오류 칸 이동·6·7 단계는 보던 시점을 그대로 둔다 */
+  }
+
+  /* 사용자가 단계를 옮기면(오류 단계로 되돌아가는 것 포함) 그 단계의 3D 시점 (STEP_CAM) — 돌려 놓은 시점도 다시 맞춤(camReset).
+     새 편집기는 session 이 첫 단계 시점으로 연다. 편집기 재개·결과 화면 [수정] 이동·6·7 단계는 보던 시점을 그대로 둔다 */
+  function goStep(target: number) {
     const cam = target !== step ? STEP_CAM[target] : undefined
+    setStep(target)
     if (cam) { S.cam = cam; S.camReset++; notify() }
   }
 

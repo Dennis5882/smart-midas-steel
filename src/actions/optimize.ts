@@ -25,6 +25,8 @@ const key = (s: Sections) => ROLES.map((r) => s[r]).join('|')
 export async function runOptimize(): Promise<void> {
   if (S.busy) { addMsg('bot', lt('busy')); return }
   if (!S.built) { addMsg('bot', lt('no_model')); return }
+  /* [모델 + 자중만] 은 하중·조합이 없어 해석·검토 불가 — 화면 흐름(taskFlow)만이 아니라 진입점에서도 막는다 */
+  if (S.built.modelOnly) { addMsg('bot', lt('flow_model_only')); return }
   if (!S.analyzed) { addMsg('bot', lt('need_anal')); return }
   if (!beginJob('opt')) return
   /* 직전 결과(설계 검토·이전 최적화·NG 보완) — 같은 모델·같은 해석 회차이고 Gen 처마 변위 지문이 같을 때만 1회차에 재사용 (reusableResults) */

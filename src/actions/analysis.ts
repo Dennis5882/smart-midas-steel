@@ -15,6 +15,8 @@ const NOT_ALLOWED = /not allowed|not permitted|허용되지|許可/i
 export async function runAnalysis(): Promise<void> {
   if (S.busy) { addMsg('bot', lt('busy')); return }
   if (!S.built) { addMsg('bot', lt('no_model')); return }
+  /* [모델 + 자중만] 은 하중·조합이 없어 해석·검토 불가 — 화면 흐름(taskFlow)만이 아니라 진입점에서도 막는다 */
+  if (S.built.modelOnly) { addMsg('bot', lt('flow_model_only')); return }
   if (!beginJob('anal')) return
   addMsg('bot', lt('anal_start'))
   try {

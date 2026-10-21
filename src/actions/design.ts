@@ -12,6 +12,8 @@ import { beginJob, endJob, failMsg, stage } from './job'
 export async function runDesignCheck(): Promise<void> {
   if (S.busy) { addMsg('bot', lt('busy')); return }
   if (!S.built) { addMsg('bot', lt('no_model')); return }
+  /* [모델 + 자중만] 은 하중·조합이 없어 해석·검토 불가 — 화면 흐름(taskFlow)만이 아니라 진입점에서도 막는다 */
+  if (S.built.modelOnly) { addMsg('bot', lt('flow_model_only')); return }
   if (!S.analyzed) { addMsg('bot', lt('need_anal')); return }
   if (!beginJob('design')) return
   S.results = null; S.design = null; S.connections = null; S.opt = null; S.ratioView = false

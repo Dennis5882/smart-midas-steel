@@ -1124,6 +1124,8 @@ export const ko: Dict = {
   gc_model: '모델 + 자중만', gc_model_d: '형상·재료·단면·지점·단부 해제 + 자중(케이스 D). 엔지니어가 Gen 에서 하중을 직접 넣는 용도 — 앱 해석·설계 검토는 하지 않습니다.',
   rep_model_only: 'Gen NX 에는 모델과 자중(케이스 D)만 보냈습니다. 이 장의 하중은 앱 계산값(참고)이며 Gen 에는 들어가지 않았습니다.',
   rep_model_only_combo: '하중조합은 Gen NX 에 보내지 않았습니다(모델 + 자중만). 조합은 엔지니어가 Gen 에서 정의합니다.',
+  sw_missing: '자중 하중 케이스를 찾지 못했습니다 — [모델 + 자중만] 으로 보낼 수 없습니다.',
+  model_only_tag: '[모델 + 자중만] — Gen 에는 모델과 자중(D)만 보냈습니다. 아래 하중(활하중·풍·지진)은 앱 계산값(참고)이며 Gen 에 들어가지 않았습니다.',
   build_done: (n, e, cases, combos) =>
     `모델 전송 완료 — 절점 <b>${n}</b> · 요소 <b>${e}</b> · 하중 케이스 <b>${cases}</b> · 하중조합 <b>${combos}</b>. 다음: <code>해석</code>.`,
   build_fail: (msg) => `전송 실패: ${msg}`,

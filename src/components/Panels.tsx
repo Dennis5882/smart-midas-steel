@@ -41,7 +41,7 @@ function KV({ k, v, hi, style }: { k: string; v: ReactNode; hi?: boolean; style?
   return <div className="kv"><span className="k">{k}</span><span className={`v${hi ? ' hi' : ''}`} style={style}>{v}</span></div>
 }
 
-interface Shown { spec: FactorySpec; model: FactoryModel; info: LoadInfo; cases: number; combos: number; preview: boolean }
+interface Shown { spec: FactorySpec; model: FactoryModel; info: LoadInfo; cases: number; combos: number; preview: boolean; modelOnly?: boolean }
 
 /** 표시 대상 — 편집 중 미리보기(오프라인 계산) 우선, 없으면 Gen 에 보낸 모델 */
 function shownOf(s: AppState): Shown | null {
@@ -54,7 +54,7 @@ function shownOf(s: AppState): Shown | null {
     } catch { /* 아래로 */ }
   }
   const b = s.built
-  return b ? { spec: b.spec, model: b.model, info: b.info, cases: b.cases.length, combos: b.combos, preview: false } : null
+  return b ? { spec: b.spec, model: b.model, info: b.info, cases: b.cases.length, combos: b.combos, preview: false, modelOnly: b.modelOnly } : null
 }
 
 const f1 = (x: number) => x.toFixed(1)
@@ -71,6 +71,7 @@ export function ModelPanel() {
   return (
     <div>
       {sh.preview && <div className="res-stat">{t('preview_tag')}</div>}
+      {sh.modelOnly && <div className="res-stat">{t('model_only_tag')}</div>}
       <div className="statgrid">
         <div className="stat"><div className="n">{m.nodes.length}</div><div className="l">{t('st_node')}</div></div>
         <div className="stat"><div className="n">{m.elements.length}</div><div className="l">{t('st_elem')}</div></div>

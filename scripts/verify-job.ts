@@ -148,10 +148,20 @@ reset(); await buildFactory(spec(), { modelOnly: true })
   const puts = calls.filter((c) => c.startsWith('PUT')).map((c) => c.split('/').pop())
   ok(!!S.built?.modelOnly && S.built.cases.join() === 'D' && S.built.combos === 0, `model only: built with case D only (${S.built?.cases.join()})`)
   ok(puts.includes('STLD') && puts.includes('BODF') && !puts.some((n) => n === 'BMLD' || n === 'CNLD' || n === 'LCOM-GEN'), `model only: no BMLD/CNLD/LCOM sent (${puts.join(',')})`)
-  ok(lastBot().includes(String(S.built?.model.nodes.length)) && S.job === null, 'model only: done message, job cleared')
+  ok(lastBot().includes(String(S.built?.model.nodes.length)) && S.job === null, 'model only: done message, job cleared')
   const gets = calls.filter((c) => c.startsWith('GET')).map((c) => c.split('/').pop())
   ok(!gets.some((n) => n === 'BMLD' || n === 'CNLD' || n === 'LCOM-GEN'), `model only: unsent tables are not read back (${gets.join(',')})`)
   ok(S.task === 'outputs', `model only: moves to outputs, not the blocked analysis stage (${S.task})`)
+  /* 진입점 자체 차단 — 화면 흐름을 거치지 않고 불러도 doc/anal 을 보내지 않음 */
+  const before = calls.length
+  await runAnalysis()
+  ok(calls.length === before && lastBot() === t('flow_model_only'), 'model only: runAnalysis blocked at the entry point (no Gen call)')
+  /* 자중 케이스가 없으면 현재 언어 문구로 실패 */
+  const { selfWeightOnly, SelfWeightError } = await import('../src/domain/loads')
+  const { failMsg } = await import('../src/actions/job')
+  let err: unknown
+  try { selfWeightOnly({ STLD: { 1: { NAME: 'LR' } }, BODF: { 1: { LCNAME: 'D' } } } as any) } catch (e) { err = e }
+  ok(err instanceof SelfWeightError && failMsg(err, (m) => m) === t('sw_missing'), 'model only: missing self-weight case → translated sw_missing')
 }
 reset(); await buildFactory(spec())
 {

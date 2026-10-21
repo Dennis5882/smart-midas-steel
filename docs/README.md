@@ -29,6 +29,8 @@
 | [추가 구조 6단계](reference/factory-additions-phase-6.md) | 닫힌 지붕 보강·바닥 개구부·건물 연결부 인터페이스 |
 | [NG 단면 보완](reference/ng-section-remediation.md) | 원인 진단·후보 선택·Gen 재해석·전후 비교 |
 | [크레인 운행 구간](reference/crane-travel-range.md) | 전체/일부 구간, 결과 분할 회수 |
+| [Gen 하중 읽어 오기 계획](reference/gen-readback-scope.md) | 엔지니어가 Gen 에서 넣은 하중의 인식 범위·해석 후 동작·단계 계획 (미구현) |
+| [구현·라이브 검증 기록](reference/implementation-log.md) | 2026-10-22 까지 CLAUDE.md 에 있던 날짜별 구현·라이브 수치 원문 (시점 값) |
 | [사용자 제공 구조 확장 원안](reference/gen_nx_factory_structural_modifier_architecture.md) | Structural Modifier 설계 원안. 원문 내용은 변경하지 않았으며 현 구현 상태표는 아님 |
 
 기술 참고 문서에도 과거 시험 수치가 있다. 최신 fixture·지원 상태와 다른 부분은 현황 문서 및 실제 코드가 우선한다.
