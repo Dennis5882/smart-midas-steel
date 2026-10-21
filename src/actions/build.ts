@@ -3,7 +3,7 @@
    → 개수 확인(GET, 보낸 개수와 다르면 실패). */
 import { profileOf } from '../codes'
 import { buildGenPayloads } from '../domain/gen'
-import { buildLoadPayloads } from '../domain/loads'
+import { buildLoadPayloads, selfWeightOnly } from '../domain/loads'
 import { buildPortal } from '../domain/portal'
 import type { FactorySpec } from '../domain/types'
 import { checkScope } from '../domain/scope'
@@ -18,7 +18,8 @@ import { beginJob, Cancelled, endJob, failMsg, stage } from './job'
 import { S, notify } from '../state/store'
 import { addMsg, draw3D, escapeHtml, log, tab } from '../state/ui'
 
-export async function buildFactory(spec: FactorySpec): Promise<void> {
+/** opts.modelOnly — [모델 + 자중만]: 형상·재료·단면·지점·단부 해제 + 자중(D) 만 Gen 에 (엔지니어가 하중을 직접 넣는 용도) */
+export async function buildFactory(spec: FactorySpec, opts: { modelOnly?: boolean } = {}): Promise<void> {
   if (S.busy) { addMsg('bot', lt('busy')); return }
   if (!S.mapiKey.trim()) { addMsg('bot', lt('need_key')); return }
   const scope = checkScope(spec)
@@ -32,10 +33,11 @@ export async function buildFactory(spec: FactorySpec): Promise<void> {
   tab('logP')
   try {
     /* 복원 지점은 doc/new 가 사용자 문서를 지운 순간 기록 — 이후 전송 실패·취소에도 실패 카드에서 복원 가능 */
-    const model = await sendModel(spec, (backup) => { S.restorePoint = backup; notify() })
+    const model = await sendModel(spec, (backup) => { S.restorePoint = backup; notify() }, opts)
     const b = S.built!
-    addMsg('bot', lt('build_done', model.nodes.length, model.elements.length, b.cases.length, b.combos))
-    S.task = 'analysis'
+    addMsg('bot', opts.modelOnly ? lt('build_done_model_only', model.nodes.length, model.elements.length) : lt('build_done', model.nodes.length, model.elements.length, b.cases.length, b.combos))
+    /* 모델 + 자중만은 해석·검토가 막히므로 산출물(도면·물량·계산서)로 */
+    S.task = opts.modelOnly ? 'outputs' : 'analysis'
     /* 생성 직후 3D 탭에서 ISO 전체 보기 — 미리보기에서 돌리거나 다른 시점이었어도 다시 맞춘다 (Gen 화면도 위에서 ISO) */
     S.cam = 'iso'; S.camReset++
     draw3D()
@@ -72,14 +74,14 @@ export async function restoreBackup(): Promise<void> {
 
 /** 전송 본체 (busy·메시지 없음) — 단면 최적화 반복에서도 사용. 성공하면 S.built 갱신, 이전 결과 초기화.
     onReplaced: doc/new 직후 백업 경로 — [공장 생성]만 복원 지점으로 쓴다(최적화 반복의 백업은 앱이 만든 모델) */
-export async function sendModel(spec: FactorySpec, onReplaced?: (backup: string) => void) {
+export async function sendModel(spec: FactorySpec, onReplaced?: (backup: string) => void, opts: { modelOnly?: boolean } = {}) {
   const model = buildPortal(spec)
   const p = buildGenPayloads(spec, model)
   const l = buildLoadPayloads(spec, model)
-  const steps: [string, Record<string, unknown>][] = [
-    ['UNIT', p.UNIT], ['MATL', p.MATL], ['SECT', p.SECT], ['NODE', p.NODE], ['ELEM', p.ELEM], ['FRLS', p.FRLS], ['CONS', p.CONS],
-    ['STLD', l.STLD], ['BODF', l.BODF], ['BMLD', l.BMLD], ['CNLD', l.CNLD], ['LCOM-GEN', l['LCOM-GEN']],
-  ]
+  /* 모델 + 자중만: 자중 케이스와 BODF 만 — 마감 하중(BMLD)·절점 하중·조합 표는 보내지도 확인하지도 않는다.
+     정상 모델링은 빈 표도 예전처럼 PUT·확인한다 */
+  const loads = opts.modelOnly ? selfWeightOnly(l) : { STLD: l.STLD, BODF: l.BODF, BMLD: l.BMLD, CNLD: l.CNLD, 'LCOM-GEN': l['LCOM-GEN'] }
+  const steps = Object.entries({ UNIT: p.UNIT, MATL: p.MATL, SECT: p.SECT, NODE: p.NODE, ELEM: p.ELEM, FRLS: p.FRLS, CONS: p.CONS, ...loads }) as [string, Record<string, unknown>][]
   const designCode = profileOf(spec.code).gen.designCode
   stage('st_send', 2 + steps.length + (designCode ? 1 : 0))
   /* 열린 문서를 먼저 임시 저장 → doc/new 가 "저장할까요?" 창을 띄우지 않게 (사용자 원본 파일은 건드리지 않음) */
@@ -106,12 +108,12 @@ export async function sendModel(spec: FactorySpec, onReplaced?: (backup: string)
     await mapi('POST', '/view/CAPTURE', { Argument: { EXPORT_PATH: autoSavePath('view').replace(/\.mgbx$/, '.png'), WIDTH: 400, HEIGHT: 300, ZOOM_LEVEL: 100 } }, 'zoom fit')
   } catch (e) { if (e instanceof Cancelled) throw e }
 
-  const cases = Object.values(l.STLD).map((c) => (c as { NAME: string }).NAME)
-  const comboNames = Object.values(l['LCOM-GEN']).map((c) => (c as { NAME: string }).NAME)
+  const cases = Object.values(loads.STLD).map((c) => (c as { NAME: string }).NAME)
+  const comboNames = Object.values(('LCOM-GEN' in loads ? loads['LCOM-GEN'] : undefined) ?? {}).map((c) => (c as { NAME: string }).NAME)
   const combos = comboNames.length
   const sent: Record<string, Record<string, unknown>> = Object.fromEntries(steps)
   if (designCode) sent.DSTL = { 1: { DGNCODE: designCode } }
-  S.built = { spec, model, info: l.info, cases, combos, comboNames, sent }
+  S.built = { spec, model, info: l.info, cases, combos, comboNames, sent, ...(opts.modelOnly ? { modelOnly: true } : {}) }
   S.lastSpec = spec
   S.draftSpec = spec
   S.draftInvalid = false
@@ -140,15 +142,17 @@ function clearBuilt(): void {
 const VERIFY = ['MATL', 'SECT', 'NODE', 'ELEM', 'FRLS', 'CONS', 'STLD', 'LCOM-GEN', 'BODF', 'BMLD', 'CNLD'] as const
 
 async function verifyCounts(sent: Record<string, Record<string, unknown>>): Promise<void> {
-  stage('st_verify', VERIFY.length + 1) // DB readback plus the Gen property source table.
+  /* 보내지 않은 표(모델 + 자중만의 하중·조합)는 읽지 않는다 — 새 문서에 없는 표를 Gen 이 오류로 답할 수 있음 */
+  const names = VERIFY.filter((name) => name in sent)
+  stage('st_verify', names.length + 1) // DB readback plus the Gen property source table.
   const bad: string[] = []
-  for (const name of VERIFY) {
-    const want = Object.keys(sent[name] ?? {}).length
+  for (const name of names) {
+    const want = Object.keys(sent[name]).length
     const r = await mapi<Record<string, unknown>>('GET', name, undefined, String(want))
     const got = r?.[name]
     if (!isRecord(got)) throw new Error(t('verify_fail', `${name}: ${t('gen_bad_response')}`))
     for (const d of dbDifferences(name, sent[name] ?? {}, got, 3)) bad.push(diffText(d))
   }
   if (bad.length) throw new Error(t('verify_fail', bad.join(', ')))
-  log(t('log_verify_ok', VERIFY.length), 'ok')
+  log(t('log_verify_ok', names.length), 'ok')
 }

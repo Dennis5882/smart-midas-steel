@@ -16,6 +16,7 @@ import { unavailable } from '../state/taskFlow'
 import type { TaskId } from '../state/store'
 import { parseCommand, type Intent } from './parse'
 import { confirmAction } from '../components/ConfirmDialog'
+import { STEP_CAM } from '../components/modelingFlow'
 
 const BUSY_BLOCKED = new Set<string>(['new', 'analyze', 'design', 'optimize', 'report', 'drawings', 'drawings_pdf', 'pdf', 'docx', 'quantities', 'quantities_xlsx', 'reactions', 'conn'])
 
@@ -61,6 +62,8 @@ export async function executeAction(c: Intent): Promise<void> {
       const geo = c.mode === 'template' ? { ...TEMPLATES[c.tpl ?? 'general'], bayList: undefined } : {}
       const spec = normalizeBays({ ...base, ...geo, ...c.params, code: S.code })
       addPlanMsg(spec, c.mode, c.tpl, c.mode === 'template' && !!c.tpl)
+      /* 새 기본 모델링 편집기 = 첫 단계의 3D 시점 (STEP_CAM, 이후는 사용자가 단계를 옮길 때 PlanCard 가) */
+      if (c.mode === 'template') { S.cam = STEP_CAM[c.tpl ? 1 : 0]; S.camReset++ }
       tab('viewP')
       previewSpec(spec)
       break

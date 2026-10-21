@@ -127,4 +127,11 @@ for(const lang of ['ko','en','zh-TW','zh-CN'] as const) {
   assert.equal(advancedTitleKey('sec_cn_snow', LOADS_STEP), 'mw_snow_coefficients')
   assert.equal(advancedTitleKey('sec_dead', LOADS_STEP), 'mw_more_settings')
 }
+/* 단계별 3D 시점 — 1·2 정면, 3·4 측면, 5 ISO, 6·7 지정 없음(사용자 자유) */
+{
+  const { STEP_CAM, SECTIONS_STEP, BAYS_STEP } = await import('../src/components/modelingFlow')
+  assert.deepEqual([...STEP_CAM], ['front', 'front', 'side', 'side', 'iso'])
+  assert.equal(STEP_CAM[BAYS_STEP], 'side'); assert.equal(STEP_CAM[SECTIONS_STEP], 'side'); assert.equal(STEP_CAM[ADDITIONS_STEP], 'iso')
+  assert.equal(STEP_CAM[LOADS_STEP], undefined); assert.equal(STEP_CAM[REVIEW_STEP], undefined)
+}
 console.log('Modeling flow: 7 stages, 4 languages × 3 codes, distinct frame/interfaces, optional parts, error routes, unique targets and read-only summaries passed.')

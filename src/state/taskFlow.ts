@@ -32,6 +32,8 @@ export function unavailable(s: FlowState, task: TaskId): I18nKey | null {
   if (specChanged(s.draftSpec, s.built.spec)) return 'wf_stale_edited'
   /* 산출물은 모델만 있으면 가능 — 계산서는 부분판(검토 전 표시), 도면·물량은 접합 없이 부재만 */
   if (task === 'outputs') return blockedMembers(s.design) ? 'flow_invalid_design' : null
+  /* [모델 + 자중만] 으로 만든 모델은 하중·조합이 없어 앱 해석·검토·최적화를 하지 않는다 */
+  if (s.built.modelOnly) return 'flow_model_only'
   if (task !== 'analysis' && !s.analyzed) return 'need_anal'
   if (task === 'optimize' && (!s.design || !s.connections)) return 'flow_need_design'
   if (!s.mapiKey.trim()) return 'flow_need_connection'

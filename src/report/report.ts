@@ -158,6 +158,7 @@ export function buildReport({ built, reactions, design, connections, opt, footin
 
   /* 3. 하중 */
   h2('rep_s3')
+  if (built.modelOnly) parts.push(`<p class="note">${esc(L('rep_model_only'))}</p>`)
   parts.push(`<h3>${L('rep_dead')}</h3><p>${esc(t('rep_dead_txt', spec.roofDead, spec.wallDead))}</p>`)
   parts.push(`<h3>${L('rep_live')}</h3><p>${spec.code === 'CN' ? `GB 55001-2021 4.2.8 / GB 50009-2012 5.3: ${f(info.roofLive, 3)} kN/m²` : esc(tc(spec.code, 'rep_live_txt', f(info.roofLive, 3)))}</p>`)
   const kr = info.kr
@@ -226,10 +227,12 @@ export function buildReport({ built, reactions, design, connections, opt, footin
 
   /* 4. 하중조합 */
   h2('rep_s4')
-  parts.push(info.additions
+  /* 모델 + 자중만은 조합을 보내지 않음 — 빈 표 대신 안내 */
+  if (built.modelOnly) parts.push(`<p class="note">${esc(L('rep_model_only_combo'))}</p>`)
+  else parts.push(info.additions
     ? table(['#',t('rd_combo'),t('add_source')],built.comboNames.map((n,i)=>[i+1,esc(n),esc(info.additions!.combinationBasis?.[n]??'')]))
     : table(['#', t('rd_combo')], built.comboNames.map((n, i) => [i + 1, esc(n)])))
-  parts.push(`<p class="note">${esc(tc(spec.code, 'rep_combo_txt'))}</p>`)
+  if (!built.modelOnly) parts.push(`<p class="note">${esc(tc(spec.code, 'rep_combo_txt'))}</p>`)
 
   /* 5. 해석 결과 */
   h2('rep_s5')

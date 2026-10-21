@@ -39,12 +39,13 @@ export interface LogEntry { id: number; ts: string; type: LogType; html: string 
 export type ChatMsg = { ts?: string } & (
   | { id: number; role: 'user' | 'bot'; kind: 'html'; html: string | LText }
   | { id: number; role: 'bot'; kind: 'thinking' }
-  | { id: number; role: 'bot'; kind: 'plan'; spec: FactorySpec; epoch: number; mode: BuildMode; tpl?: TemplateKey; modelRevision?: number; fromStart?: true }
+  | { id: number; role: 'bot'; kind: 'plan'; spec: FactorySpec; epoch: number; mode: BuildMode; tpl?: TemplateKey; modelRevision?: number; fromStart?: true; modelOnly?: boolean }
 )
 
 /** Gen 에 보낸 모델 — 스펙·형상·하중 요약 */
 /** sent = Gen 에 보낸 페이로드(DB → Assign) — 해석·검토 직전 Gen 동일성 비교(actions/genSync) */
-export interface Built { spec: FactorySpec; model: FactoryModel; info: LoadInfo; cases: string[]; combos: number; comboNames: string[]; sent?: Record<string, Record<string, unknown>> }
+/** modelOnly: [모델 + 자중만] 으로 생성 — Gen 에 하중 케이스 D(자중 BODF)만, 마감·활·풍·지진 하중과 조합 없음 → 앱 해석·검토·최적화 불가(엔지니어가 Gen 에서 하중 입력) */
+export interface Built { spec: FactorySpec; model: FactoryModel; info: LoadInfo; cases: string[]; combos: number; comboNames: string[]; sent?: Record<string, Record<string, unknown>>; modelOnly?: boolean }
 
 /** 진행 중 작업 — stage = 문구 키, step/total = 이 단계 MAPI 호출 수, iter = 최적화 반복 [n, 최대] */
 export type JobKind = 'build' | 'anal' | 'design' | 'opt' | 'pdf' | 'docx' | 'dwgpdf' | 'restore'

@@ -142,5 +142,21 @@ cancelJob()
 await p
 ok(!!S.built && lastBot() === t('job_cancelled') && !calls.some((c) => c.includes('TABLE')), 'cancel during analysis: waits, then stops; model kept')
 
+/* [모델 + 자중만] — 하중 케이스 D·자중만 보내고 마감·풍·지진 하중과 조합은 보내지 않음, 확인은 빈 표를 통과 */
+reset(); await buildFactory(spec(), { modelOnly: true })
+{
+  const puts = calls.filter((c) => c.startsWith('PUT')).map((c) => c.split('/').pop())
+  ok(!!S.built?.modelOnly && S.built.cases.join() === 'D' && S.built.combos === 0, `model only: built with case D only (${S.built?.cases.join()})`)
+  ok(puts.includes('STLD') && puts.includes('BODF') && !puts.some((n) => n === 'BMLD' || n === 'CNLD' || n === 'LCOM-GEN'), `model only: no BMLD/CNLD/LCOM sent (${puts.join(',')})`)
+  ok(lastBot().includes(String(S.built?.model.nodes.length)) && S.job === null, 'model only: done message, job cleared')
+  const gets = calls.filter((c) => c.startsWith('GET')).map((c) => c.split('/').pop())
+  ok(!gets.some((n) => n === 'BMLD' || n === 'CNLD' || n === 'LCOM-GEN'), `model only: unsent tables are not read back (${gets.join(',')})`)
+  ok(S.task === 'outputs', `model only: moves to outputs, not the blocked analysis stage (${S.task})`)
+}
+reset(); await buildFactory(spec())
+{
+  const puts = calls.filter((c) => c.startsWith('PUT')).map((c) => c.split('/').pop())
+  ok(['STLD', 'BODF', 'BMLD', 'CNLD', 'LCOM-GEN'].every((n) => puts.includes(n)) && S.task === 'analysis', `full build: all load tables sent, moves to analysis (${puts.join(',')})`)
+}
 console.log(fails ? `\n${fails} failed` : '\nall passed')
 process.exit(fails ? 1 : 0)

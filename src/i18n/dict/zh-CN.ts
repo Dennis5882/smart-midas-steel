@@ -1115,6 +1115,13 @@ export const zhCN: Dict = {
   job_elapsed: (s) => `${s} 秒`,
   need_key: '请先在右上角 ⚙ 中设置 MAPI-Key。',
   build_start: '正在将模型发送到 Gen NX…',
+  build_done_model_only: (n: number, e: number) => `已在 Gen NX 建立模型 — 仅模型 + 自重：节点 ${n}、单元 ${e}，荷载工况 D（自重）。未含装修、活荷载、风、地震荷载及荷载组合 — 请在 Gen 中输入荷载。此模型无法使用本程序的分析、设计验算及优化。`,
+  flow_model_only: '此模型以“仅模型 + 自重”发送（无荷载与组合）。分析、设计验算及优化仅适用于荷载完整的模型 — 请以“正常建模”重新建立。',
+  mw_gen_content: '发送到 Gen NX 的内容',
+  gc_full: '正常建模（含荷载与组合）', gc_full_d: '几何、截面、支座 + 自重、装修、屋面活荷载、风、地震荷载及设计组合 — 之后可在程序中分析与设计验算。',
+  gc_model: '仅模型 + 自重', gc_model_d: '几何、材料、截面、支座、端部释放 + 自重（工况 D）。供工程师在 Gen 中自行输入荷载 — 程序不进行分析与设计验算。',
+  rep_model_only: 'Gen NX 仅发送模型与自重（工况 D）。本章荷载为程序计算值（参考），未发送到 Gen。',
+  rep_model_only_combo: '未将荷载组合发送至 Gen NX（仅模型＋自重）。荷载组合由工程师在 Gen 中定义。',
   build_done: (n, e, cases, combos) =>
     `模型已发送 — 节点 <b>${n}</b> · 单元 <b>${e}</b> · 荷载工况 <b>${cases}</b> · 荷载组合 <b>${combos}</b>。下一步：<code>分析</code>。`,
   build_fail: (msg) => `发送失败：${msg}`,

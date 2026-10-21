@@ -18,7 +18,7 @@ import { TEMPLATES, TEMPLATE_KEYS } from '../domain/templates'
 import { ModelWizard, WIZARD_STEPS } from './ModelWizard'
 import { StructureEditor, StructureSummary } from './StructureEditor'
 import { WindLoadInfo } from './WindPreview'
-import { ADDITIONS_STEP, LOADS_STEP, PREVIEW_DEBOUNCE_MS, REVIEW_STEP, scopeIssueStep } from './modelingFlow'
+import { ADDITIONS_STEP, LOADS_STEP, PREVIEW_DEBOUNCE_MS, REVIEW_STEP, STEP_CAM, scopeIssueStep } from './modelingFlow'
 import { BaseFixityPicker, FrameTypePicker } from './FrameControls'
 import { BaySpacingEditor } from './BaySpacingEditor'
 import { NumericInput } from './NumericInput'
@@ -67,6 +67,16 @@ function Summary({ spec, tpl }: { spec: FactorySpec; tpl?: TemplateKey }) {
   )
 }
 
+/** Gen 으로 보낼 내용 선택 (라디오 2개) */
+function GenContentPicker({ name, value, onChange, disabled }: { name: string; value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+  return <fieldset className="mw-group gen-content" disabled={disabled}>
+    <legend>{t('mw_gen_content')}</legend>
+    {([[false, 'gc_full', 'gc_full_d'], [true, 'gc_model', 'gc_model_d']] as const).map(([v, k, d]) => (
+      <label key={k} className="gc-opt"><input type="radio" name={name} checked={value === v} onChange={() => onChange(v)} /> <b>{t(k)}</b><span className="mw-note">{t(d)}</span></label>
+    ))}
+  </fieldset>
+}
+
 export function PlanCard({ msg }: { msg: PlanMsg }) {
   const s = useStore()
   const free = msg.mode === 'free'
@@ -79,6 +89,10 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
   const formId = useId()
   const [vals, setVals] = useState(() => initVals(msg.spec))
   const [individual, setIndividual] = useState(free || !!msg.spec.bayList?.length)
+  /* Gen 으로 보낼 내용 — 정상 모델링(하중·조합) / 모델 + 자중만 (현지 요청 2026-10-21: 엔지니어가 Gen 에서 하중을 직접 넣는 경우) */
+  /* 편집기 메시지(S.activePlan)에 같이 기억 — 시작 화면에 다녀와 편집기가 다시 마운트돼도 선택 유지 */
+  const [modelOnly, updateModelOnly] = useState(() => !!msg.modelOnly)
+  const setModelOnly = (v: boolean) => { msg.modelOnly = v; updateModelOnly(v) }
   const dirty = useRef(false)
   const [additions, setAdditions] = useState<FactoryAdditions | undefined>(()=>initializeAdditions(msg.spec))
   const [feat, updateFeat] = useState<ScopeFeatures>(() => msg.spec.features ?? NO_FEATURES)
@@ -237,11 +251,15 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
     setAttempted(false)
     setStep(target)
     setVisited((old) => Math.max(old, target))
+    /* 사용자가 단계를 옮길 때만 그 단계의 3D 시점 (STEP_CAM) — 돌려 놓은 시점도 다시 맞춤(camReset).
+       처음 열 때·결과 화면 [수정] 이동·오류 칸 이동·6·7 단계는 보던 시점을 그대로 둔다 */
+    const cam = target !== step ? STEP_CAM[target] : undefined
+    if (cam) { S.cam = cam; S.camReset++; notify() }
   }
 
   if (!free) return <ModelWizard spec={spec} step={step} visited={visited} disabled={!live || s.busy}
     onStep={navigate} blocked={checkScope(spec).issues.some((i)=>i.level==='block' && i.key!=='additionInput')} invalid={errors.length > 0} attempted={attempted}
-    onBuild={() => { if (errors.length || blocked) { setAttempted(true); return }; void buildFactory(spec) }}
+    onBuild={() => { if (errors.length || blocked) { setAttempted(true); return }; void buildFactory(spec, { modelOnly }) }}
     onCancel={closeEditor} onChangeCode={closeEditor} codeLocked={s.busy || !!s.confirm}>
     {step === 0 && <>
       <div className="mw-templates">{TEMPLATE_KEYS.map((key) => <button type="button" key={key} aria-pressed={selectedTpl === key}
@@ -302,7 +320,8 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
         <button className="btn btn-ghost" disabled={!live || s.busy} onClick={() => navigate(index + 1)}>{t('edit_btn')}</button>
         {groups.map((g) => { const subset = { ...g, fields: g.fields.filter((f) => fieldStep(f) === index + 1) }; return subset.fields.length ? <section className="mw-group" key={g.title}><h4>{t(g.title)}</h4>{fields(subset, true)}</section> : null })}
       </details>)}
-      <p className="mw-note">{t('mw_build_note')}</p>
+      <GenContentPicker name={`${formId}-gen-content`} value={modelOnly} onChange={setModelOnly} disabled={!live || s.busy} />
+      {!modelOnly && <p className="mw-note">{t('mw_build_note')}</p>}
     </>}
   </ModelWizard>
 
@@ -333,11 +352,12 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
         <div className="pe-tip">{tc(spec.code, 'plan_tip')}</div>
       </div>
       <StructureEditor idPrefix={`${formId}-additions`} spec={spec} onFeaturesChange={setFeat} onChange={(v)=>{dirty.current=true;setAdditions(v)}} disabled={!live || s.busy} attempted={showErrors}/>
+      {live && <GenContentPicker name={`${formId}-gen-content`} value={modelOnly} onChange={setModelOnly} disabled={s.busy} />}
       {live && errors.length > 0 && <p className="mw-error mw-alert" role="alert">{t('mw_invalid')}</p>}
       {live && (
         <div className="confirm-row">
           <button className="btn btn-c" disabled={s.busy || blocked || errors.length > 0} title={blocked ? t('sc_blocked') : errors.length ? t('mw_invalid') : undefined}
-            onClick={() => { if (errors.length || blocked) return; void buildFactory(spec) }}>{t('exec')}</button>
+            onClick={() => { if (errors.length || blocked) return; void buildFactory(spec, { modelOnly }) }}>{t('exec')}</button>
           <button className="btn btn-ghost" disabled={s.busy} onClick={closeEditor}>{t('ws_home')}</button>
         </div>
       )}

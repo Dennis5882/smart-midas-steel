@@ -1115,6 +1115,13 @@ export const zhTW: Dict = {
   job_elapsed: (s) => `${s} 秒`,
   need_key: '請先在右上角 ⚙ 設定 MAPI-Key。',
   build_start: '正在傳送模型到 Gen NX…',
+  build_done_model_only: (n: number, e: number) => `已於 Gen NX 建立模型 — 僅模型 + 自重：節點 ${n}、元素 ${e}，載重工況 D（自重）。未含裝修、活載重、風力、地震力及載重組合 — 請於 Gen 輸入載重。此模型無法使用本程式之分析、設計檢核及最佳化。`,
+  flow_model_only: '此模型以「僅模型 + 自重」送出（無載重與組合）。分析、設計檢核及最佳化僅適用於含完整載重之模型 — 請以「正常建模」重新建立。',
+  mw_gen_content: '送至 Gen NX 的內容',
+  gc_full: '正常建模（含載重與組合）', gc_full_d: '幾何、斷面、支承 + 自重、裝修、屋頂活載重、風力、地震力及設計組合 — 之後可於程式中分析與設計檢核。',
+  gc_model: '僅模型 + 自重', gc_model_d: '幾何、材料、斷面、支承、端部釋放 + 自重（工況 D）。供工程師於 Gen 自行輸入載重 — 程式不進行分析與設計檢核。',
+  rep_model_only: 'Gen NX 僅送入模型與自重（工況 D）。本章載重為程式計算值（參考），並未送入 Gen。',
+  rep_model_only_combo: '未將載重組合送至 Gen NX（僅模型＋自重）。載重組合由工程師於 Gen 中定義。',
   build_done: (n, e, cases, combos) =>
     `模型已傳送 — 節點 <b>${n}</b> · 單元 <b>${e}</b> · 載重工況 <b>${cases}</b> · 載重組合 <b>${combos}</b>。下一步：<code>分析</code>。`,
   build_fail: (msg) => `傳送失敗：${msg}`,

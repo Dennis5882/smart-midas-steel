@@ -423,6 +423,7 @@ dialog.rn::backdrop{background:var(--scrim);backdrop-filter:blur(2px)}
 .mw-metrics>span+span{border-left:1px solid var(--border)}
 .mw-metrics b{font-family:var(--font-mono);font-size:1rem;color:var(--txt-hi);font-weight:500}.mw-metrics small{font-size:.65rem;color:var(--muted)}
 .mw-group{margin:15px 0}.mw-group h4{font-size:.74rem;font-weight:600;color:var(--txt-2);margin-bottom:11px;padding-bottom:7px;border-bottom:1px solid var(--line2)}
+.gen-content{border:0;padding:0}.gen-content legend{font-size:.74rem;font-weight:600;color:var(--txt-2);margin-bottom:8px}.gen-content .gc-opt{display:block;padding:7px 9px;margin:5px 0;border:1px solid var(--line2);border-radius:6px;cursor:pointer;font-size:.74rem}.gen-content .gc-opt:has(input:checked){border-color:var(--acc)}.gen-content .gc-opt .mw-note{display:block;margin:3px 0 0 20px}
 .model-wizard .pe-grid{gap:12px 14px}.model-wizard .pe-f label{color:var(--muted);font:inherit;font-size:.8rem;letter-spacing:0}
 .model-wizard .pe-in input,.model-wizard .pe-in select{font-size:.78rem;padding:8px;border-radius:6px;min-height:36px}
 .model-wizard .pe-u{font-size:.58rem}.model-wizard [aria-invalid=true]{border-color:var(--red)!important}

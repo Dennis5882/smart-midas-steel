@@ -1117,6 +1117,13 @@ export const ko: Dict = {
   job_elapsed: (s) => `${s}초`,
   need_key: '오른쪽 위 ⚙에서 MAPI-Key를 먼저 설정하세요.',
   build_start: 'Gen NX로 모델을 보내는 중…',
+  build_done_model_only: (n: number, e: number) => `Gen NX 모델 생성 완료 — 모델 + 자중만: 절점 ${n} · 요소 ${e}, 하중 케이스 D(자중). 마감·활·풍·지진 하중과 조합은 없습니다 — Gen 에서 하중을 입력하세요. 이 모델은 앱의 해석·설계 검토·최적화를 쓸 수 없습니다.`,
+  flow_model_only: '[모델 + 자중만] 으로 보낸 모델입니다(하중·조합 없음). 해석·설계 검토·최적화는 하중이 모두 들어간 모델에서만 — [정상 모델링] 으로 다시 생성하세요.',
+  mw_gen_content: 'Gen NX 로 보낼 내용',
+  gc_full: '정상 모델링 (하중·조합 포함)', gc_full_d: '형상·단면·지점 + 자중·마감·지붕 활하중·풍·지진 하중과 설계 조합 — 이후 앱에서 해석·설계 검토 가능.',
+  gc_model: '모델 + 자중만', gc_model_d: '형상·재료·단면·지점·단부 해제 + 자중(케이스 D). 엔지니어가 Gen 에서 하중을 직접 넣는 용도 — 앱 해석·설계 검토는 하지 않습니다.',
+  rep_model_only: 'Gen NX 에는 모델과 자중(케이스 D)만 보냈습니다. 이 장의 하중은 앱 계산값(참고)이며 Gen 에는 들어가지 않았습니다.',
+  rep_model_only_combo: '하중조합은 Gen NX 에 보내지 않았습니다(모델 + 자중만). 조합은 엔지니어가 Gen 에서 정의합니다.',
   build_done: (n, e, cases, combos) =>
     `모델 전송 완료 — 절점 <b>${n}</b> · 요소 <b>${e}</b> · 하중 케이스 <b>${cases}</b> · 하중조합 <b>${combos}</b>. 다음: <code>해석</code>.`,
   build_fail: (msg) => `전송 실패: ${msg}`,

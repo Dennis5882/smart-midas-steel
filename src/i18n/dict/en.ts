@@ -1135,6 +1135,13 @@ export const en = {
   job_elapsed: (s: number) => `${s} s`,
   need_key: 'Set the MAPI-Key in ⚙ (top right) first.',
   build_start: 'Sending the model to Gen NX…',
+  build_done_model_only: (n: number, e: number) => `Model built in Gen NX — model + self-weight only: ${n} nodes, ${e} elements, load case D (self weight). No finishes, live, wind or seismic loads and no combinations — enter loads in Gen. Analysis, design check and optimization in this app are not available for this model.`,
+  flow_model_only: 'The model was sent as “model + self-weight only” (no loads or combinations). Analysis, design check and optimization run only on a fully loaded model — rebuild with “full model”.',
+  mw_gen_content: 'Contents sent to Gen NX',
+  gc_full: 'Full model (loads and combinations)', gc_full_d: 'Geometry, sections, supports + self weight, finishes, roof live, wind, seismic loads and design combinations — the app can then analyse and check.',
+  gc_model: 'Model + self-weight only', gc_model_d: 'Geometry, materials, sections, supports, end releases + self weight (case D). For engineers entering their own loads in Gen — the app does not analyse or check this model.',
+  rep_model_only: 'Gen NX received the model and self weight only (case D). The loads in this chapter are the app’s calculated values for reference and were not sent to Gen.',
+  rep_model_only_combo: 'No load combinations were sent to Gen NX (model + self-weight only). The engineer defines combinations in Gen.',
   build_done: (n: number, e: number, cases: number, combos: number) =>
     `Model sent — <b>${n}</b> nodes · <b>${e}</b> elements · <b>${cases}</b> load cases · <b>${combos}</b> combinations. Next: <code>analyze</code>.`,
   build_fail: (msg: string) => `Sending failed: ${msg}`,

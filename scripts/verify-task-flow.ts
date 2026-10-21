@@ -79,4 +79,20 @@ eq(beginJob('anal'), true)
 const cancelId = S.job!.activityId
 addMsg('bot', failMsg(new Cancelled(), (m) => m)); endJob()
 eq(S.activity.find((a) => a.id === cancelId)?.status, 'cancelled')
+/* [모델 + 자중만] — 해석·검토·최적화 막음, 산출물(도면·물량·계산서 참고판)은 가능 */
+{
+  ready()
+  const spec = defaultSpecFor('TW'), model = buildPortal(spec), load = buildLoadPayloads(spec, model)
+  S.built = { spec, model, info: load.info, cases: ['D'], combos: 0, comboNames: [], modelOnly: true }; S.draftSpec = spec; S.design = null; S.connections = null; S.analyzed = false; S.mapiKey = 'k'
+  eq(unavailable(S, 'analysis'), 'flow_model_only'); eq(unavailable(S, 'design'), 'flow_model_only'); eq(unavailable(S, 'optimize'), 'flow_model_only')
+  eq(unavailable(S, 'outputs'), null)
+  /* 계산서 4장 — 빈 조합 표 대신 '조합은 Gen 에서 정의' 안내 */
+  const { buildReport } = await import('../src/report/report')
+  const { t } = await import('../src/i18n')
+  const html = buildReport({ built: S.built } as any)
+  assert.ok(html.includes(t('rep_model_only_combo')) && !html.includes(t('rep_combo_txt'))); n++
+  S.built = { ...S.built, modelOnly: undefined }
+  eq(unavailable(S, 'analysis'), null)
+  S.built = null; S.mapiKey = ''
+}
 console.log(`Task flow: ${n} checks passed (TW/CN prerequisites, stale output guards, revisions, persistent issues, failure/cancel history)`)

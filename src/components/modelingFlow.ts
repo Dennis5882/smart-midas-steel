@@ -5,6 +5,8 @@ export const MODEL_STEPS = ['mw_scope','mw_frame','mw_bays','mw_sections','mw_ad
 export const ADDITIONS_STEP = 4, LOADS_STEP = 5, REVIEW_STEP = MODEL_STEPS.length - 1
 /** 입력 변경 → 3D·풍하중 미리보기 재계산 지연 (모델·하중을 다시 만드는 미리보기 공통) */
 export const PREVIEW_DEBOUNCE_MS = 250
+/** 마법사 단계별 3D 시점 (현지 요청 2026-10-21) — 1 시작·2 횡단면 = 정면, 3 길이·베이·4 재료·단면 = 측면, 5 추가 구조 = ISO, 6·7 은 바꾸지 않음(사용자 자유) */
+export const STEP_CAM: readonly ('front' | 'side' | 'iso')[] = ['front', 'front', 'side', 'side', 'iso']
 export const BAYS_STEP = MODEL_STEPS.indexOf('mw_bays'), SECTIONS_STEP = MODEL_STEPS.indexOf('mw_sections')
 export const ADDITION_PARTS = ['crane','platform','opening','link','equipment'] as const
 export type AdditionPart = typeof ADDITION_PARTS[number] | 'factors'
