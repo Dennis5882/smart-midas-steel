@@ -17,9 +17,7 @@ const { S } = await import('../src/state/store')
 const { KR_DEFAULT_SPEC } = await import('../src/domain/types')
 const { sendModel } = await import('../src/actions/build')
 const { analyzeCore } = await import('../src/actions/analysis')
-const { fetchResults } = await import('../src/actions/results')
-const { runDesign } = await import('../src/domain/design')
-const { runConnections } = await import('../src/domain/connections')
+const { checkResults, fetchResults } = await import('../src/actions/results')
 const { runOptimize } = await import('../src/actions/optimize')
 const { buildReport } = await import('../src/report/report')
 const { buildDxf } = await import('../src/drawing/drawings')
@@ -62,8 +60,7 @@ try {
     console.log(`KR equilibrium worst ${(worst * 100).toFixed(3)}% over ${(S.reactions ?? []).length - 1} cases`)
   }
   S.results = await fetchResults(S.built!)
-  S.design = runDesign(S.built!.spec, S.built!.model, S.built!.info, S.results)
-  S.connections = runConnections(S.built!.spec, S.built!.model, S.built!.info, S.results)
+  ;({ design: S.design, connections: S.connections } = checkResults(S.built!, S.results)) // 앱과 같이 — 최적화 1회차 재사용 대상
   console.log(JSON.stringify({ phase: 'baseline', members: S.design.members.length, max: S.design.maxRatio, ng: S.design.ng, roles: Object.fromEntries(Object.entries(S.design.byRole).map(([r, m]) => [r, { ratio: m!.ratio, equation: m!.eq }])), service: S.design.service, connections: S.connections.map((x) => ({ type: x.type, ratio: x.ratio })) }, null, 2))
   if (process.argv.includes('--optimize')) {
     console.log('KR optimization started.')

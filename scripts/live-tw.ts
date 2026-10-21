@@ -14,9 +14,7 @@ const { S } = await import('../src/state/store')
 const { DEFAULT_SPEC, normalizeSpans, withTrussDefaults } = await import('../src/domain/types')
 const { sendModel } = await import('../src/actions/build')
 const { analyzeCore } = await import('../src/actions/analysis')
-const { fetchResults } = await import('../src/actions/results')
-const { runDesign } = await import('../src/domain/design')
-const { runConnections } = await import('../src/domain/connections')
+const { checkResults, fetchResults } = await import('../src/actions/results')
 const { runOptimize } = await import('../src/actions/optimize')
 const { buildReport } = await import('../src/report/report')
 const { buildDxf } = await import('../src/drawing/drawings')
@@ -56,8 +54,7 @@ try {
     console.log(`[${sec()}] equilibrium (applied + reactions): worst ${(worst * 100).toFixed(3)}% (${worstLc}) over ${(S.reactions ?? []).length - 1} cases`)
   }
   S.results = await fetchResults(S.built!)
-  S.design = runDesign(S.built!.spec, S.built!.model, S.built!.info, S.results)
-  S.connections = runConnections(S.built!.spec, S.built!.model, S.built!.info, S.results)
+  ;({ design: S.design, connections: S.connections } = checkResults(S.built!, S.results)) // 앱과 같이 — 최적화 1회차 재사용 대상
   const st = () => summarizeStatus(S.design, S.connections, checkScope(S.built!.spec))
   console.log(`[${sec()}] baseline: max ${S.design.maxRatio.toFixed(3)} NG ${S.design.ng} status ${st().overall}; conns ${S.connections.map((c) => `${c.type} ${c.ratio.toFixed(3)}`).join(', ')}`)
   if (process.argv.includes('--optimize')) {

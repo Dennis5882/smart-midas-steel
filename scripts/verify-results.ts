@@ -16,7 +16,7 @@ import type { Results } from '../src/actions/results'
 import type { Built } from '../src/state/store'
 
 ;(globalThis as any).document = { documentElement: { lang: 'ko', dataset: {} } }
-const { fetchResults, markChecked, reusableResults } = await import('../src/actions/results')
+const { checkResults, fetchResults, reusableResults } = await import('../src/actions/results')
 const { S } = await import('../src/state/store')
 const { setConfirmHandler } = await import('../src/components/ConfirmDialog')
 setConfirmHandler(() => true) // 화면 없음 — 모델 교체 확인 자동 승인
@@ -114,7 +114,7 @@ for (const code of ['TW', 'CN', 'KR'] as const) {
     const parsed = await fetchResults(built)
     assert.equal(await reusableResults(results, built, 1), null, `${code} results not fetched from Gen are not reused`)
     assert.equal(await reusableResults(parsed, built, 1), null, `${code} fetched but not yet checked (design/connections did not finish) → not reused`)
-    markChecked(parsed)
+    checkResults(built, parsed)
     tableCalls.length = 0
     assert.equal(await reusableResults(parsed, built, 1), parsed)
     assert.ok(tableCalls.length > 0 && tableCalls.every((c) => c === 'DISPLACEMENTG'), `${code} reuse check reads only the eave displacement table: ${tableCalls}`)
@@ -167,6 +167,9 @@ S.mapiKey = ''
   assert.equal(timeoutFor('/doc/anal'), TIMEOUTS.long); assert.equal(timeoutFor('/post/TABLE'), TIMEOUTS.long)
   assert.equal(timeoutFor('/doc/saveas'), TIMEOUTS.doc); assert.equal(timeoutFor('/db/NODE'), TIMEOUTS.short); assert.equal(timeoutFor('/view/ANGLE'), TIMEOUTS.short)
   assert.equal(timeoutFor('/post/STEELCODECHECK'), TIMEOUTS.long); assert.equal(timeoutFor('/DESIGN/STEEL/KDS-41-30-2022/CODE-ANAL'), TIMEOUTS.long)
+  assert.equal(timeoutFor('/DESIGN/STEEL/KDS-41-30-2022/CODE-TABLE'), TIMEOUTS.long); assert.equal(timeoutFor('/DESIGN/STEEL/DSTL'), TIMEOUTS.doc); assert.equal(timeoutFor('/DESIGN/STEEL/KDS-41-30-2022/LENG'), TIMEOUTS.doc)
+  assert.equal(timeoutFor('/DESIGN/STEEL/KDS-41-30-2022/CODE-ANAL/'), TIMEOUTS.long); assert.equal(timeoutFor('/post/table?x=1'), TIMEOUTS.long) // 끝 '/'·쿼리
+  assert.equal(timeoutFor('/doc/ANAL'), TIMEOUTS.long); assert.equal(timeoutFor('/post/table'), TIMEOUTS.long); assert.equal(timeoutFor('/DOC/SAVEAS'), TIMEOUTS.doc) // 대소문자 무관
   assert.ok(TIMEOUTS.short <= 60_000 && TIMEOUTS.long >= 10 * 60_000)
   /* 실제 SDK timeout(응답하지 않는 fetch, 50 ms) → '응답 없음' 안내 (cause 'Timed out after …' 모양 확인) */
   const { MidasClient } = await import('midas-nx')

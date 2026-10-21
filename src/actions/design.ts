@@ -1,13 +1,11 @@
 /* 설계 검토 실행 (M3) — 결과 회수(M2) → 대만 LRFD 부재·사용성 검토 */
-import { runConnections } from '../domain/connections'
-import { runDesign } from '../domain/design'
 import { summarizeStatus } from '../domain/status'
 import { checkScope } from '../domain/scope'
 import { statusLine } from '../components/Status'
 import { t, lt, ltc } from '../i18n'
 import { S, notify } from '../state/store'
 import { addMsg, log, tab } from '../state/ui'
-import { fetchResults, markChecked } from './results'
+import { checkResults, fetchResults } from './results'
 import { assertGenSync } from './genSync'
 import { beginJob, endJob, failMsg, stage } from './job'
 
@@ -26,10 +24,8 @@ export async function runDesignCheck(): Promise<void> {
     S.results = await fetchResults(b)
     log(t('log_results'), 'ok')
     stage('st_check')
-    const d = runDesign(b.spec, b.model, b.info, S.results)
-    const connections = runConnections(b.spec, b.model, b.info, S.results)
+    const { design: d, connections } = checkResults(b, S.results)
     S.design = d; S.connections = connections
-    markChecked(S.results)
     log(t('log_design', d.members.length, d.ng), d.ng ? 'warn' : 'ok')
     S.ratioView = true
     addMsg('bot', lt('design_done', d.members.length, d.maxRatio.toFixed(2), statusLine(summarizeStatus(d, S.connections, checkScope(S.built!.spec)))))

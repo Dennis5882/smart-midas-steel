@@ -488,6 +488,7 @@ export const en = {
   wp_opening_tip: "If large doors or shutters may be open in a storm, choose the partially enclosed option. Internal pressure grows and roof uplift rises sharply — the table below updates at once.",
   wp_opening_tip_KR: (field: string, a: string, b: string) => `If large doors or shutters may be open in a storm, choose “${a}” or “${b}” under “${field}”. Internal pressure grows and roof uplift rises sharply — the table below updates at once.`,
   wp_unavailable: 'The wind load preview cannot be built from the current input — fix the input errors shown (including addition source confirmation) first. Wind loads are computed for every direction and internal-pressure case when the model is built.',
+  wp_calculating: 'Calculating the wind load preview…',
   wind_src_table: (v: number) => `Table 2.4 for this township — ${v} m/s`,
   wind_src_user: (v: number) => `User input — table 2.4 value ${v} m/s`,
   wind_src_none: 'Township not in table 2.4 — user input',

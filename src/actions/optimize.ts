@@ -1,10 +1,10 @@
 /* 단면 자동 최적화 실행 — 검토 → 단면 제안 → 재전송 → 재해석 반복 (골조 부재력 재분배를 Gen 해석으로 확인).
    종료: 제안 = 현재(수렴) / 이미 거친 단면 조합(진동) / 최대 반복. 최종 = 거친 상태 중 OK 이고 가장 가벼운 것(현재가 아니면 그 단면으로 다시 전송·해석). */
-import { runConnections } from '../domain/connections'
+import type { ConnResult } from '../domain/connections'
 import { summarizeStatus } from '../domain/status'
 import { checkScope } from '../domain/scope'
 import { statusLine } from '../components/Status'
-import { runDesign, type DesignResult } from '../domain/design'
+import type { DesignResult } from '../domain/design'
 import { pickBest, proposeSections, roleTons, steelWeight, type OptControl, type OptIter, type OptRow, type Sections } from '../domain/optimize'
 import { sectionProps } from '../domain/sections'
 import { ROLES } from '../domain/types'
@@ -13,7 +13,7 @@ import { S, notify } from '../state/store'
 import { addMsg, draw3D, log, tab } from '../state/ui'
 import { analyzeCore } from './analysis'
 import { sendModel } from './build'
-import { fetchResults, markChecked, reusableResults } from './results'
+import { checkResults, fetchResults, reusableResults } from './results'
 import { assertGenSync } from './genSync'
 import { quantities } from '../domain/quantities'
 import { blockedMembers } from '../domain/validity'
@@ -45,15 +45,14 @@ export async function runOptimize(): Promise<void> {
   try {
     await assertGenSync() // 시작 모델이 앱이 보낸 것과 같은지 (반복 중 재전송분은 sendModel 이 확인)
     let d: DesignResult
+    let cs: ConnResult[] = []
     for (let it = 1; ; it++) {
       setIter(it, MAX_ITER)
       const b = S.built!
       S.results = (it === 1 ? await reusableResults(prior, b, S.analysisRev) : null) ?? await fetchResults(b)
-      d = runDesign(b.spec, b.model, b.info, S.results)
+      ;({ design: d, connections: cs } = checkResults(b, S.results))
       const svcMax = Math.max(0, ...d.service.map((s) => s.ratio))
-      /* 접합부도 반복마다 산정 — 부재만 통과하고 접합이 NG 인 안을 최종안으로 고르지 않게 */
-      const cs = runConnections(b.spec, b.model, b.info, S.results)
-      markChecked(S.results)
+      /* 접합부도 반복마다 산정(checkResults) — 부재만 통과하고 접합이 NG 인 안을 최종안으로 고르지 않게 */
       const rec: OptIter = { it, sections: b.spec.sections, weight: steelWeight(b.spec, b.model), plateT: quantities(b.spec, b.model, cs).plateT,
         maxRatio: d.maxRatio, svcMax, ng: d.ng, invalid: blockedMembers(d), connMax: Math.max(0, ...cs.map((c) => c.ratio)), connNg: cs.filter((c) => c.ratio > 1).length }
       iters.push(rec)
@@ -90,11 +89,11 @@ export async function runOptimize(): Promise<void> {
       await sendModel({ ...start, sections: best.sections })
       await analyzeCore()
       S.results = await fetchResults(S.built!)
-      d = runDesign(S.built!.spec, S.built!.model, S.built!.info, S.results)
+      ;({ design: d, connections: cs } = checkResults(S.built!, S.results))
     }
+    /* 최종안이 마지막 반복이면 그 반복의 검토 결과를 그대로 (다시 계산하지 않음) */
     const b = S.built!
-    const connections = runConnections(b.spec, b.model, b.info, S.results!)
-    markChecked(S.results!)
+    const connections = cs
     S.design = d!
     S.connections = connections
     S.draftSpec = b.spec

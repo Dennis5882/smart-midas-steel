@@ -3,14 +3,12 @@ import { unavailable } from '../state/taskFlow'
 import { addMsg, addPlanMsg, draw3D, tab } from '../state/ui'
 import { t, lt, type I18nKey } from '../i18n'
 import { createRepairPlan, previewRepair, repairMetrics, type RepairPlan } from '../domain/remediation'
-import { runDesign } from '../domain/design'
-import { runConnections } from '../domain/connections'
 import { checkScope } from '../domain/scope'
 import { assertGenSync } from './genSync'
 import { beginJob, checkCancel, endJob, failMsg, stage } from './job'
 import { sendModel } from './build'
 import { analyzeCore } from './analysis'
-import { fetchResults, markChecked } from './results'
+import { checkResults, fetchResults } from './results'
 import { confirmAction } from '../components/ConfirmDialog'
 
 export const currentRepairPlan=(plan:RepairPlan|null):plan is RepairPlan=>!!plan&&plan.source===S.built&&plan.results===S.results&&plan.design===S.design&&plan.connections===S.connections
@@ -57,8 +55,8 @@ export async function applyRepairs(selection:Record<string,string>):Promise<void
     await analyzeCore()
     const b=S.built!
     S.results=await fetchResults(b)
-    const design=runDesign(b.spec,b.model,b.info,S.results),connections=runConnections(b.spec,b.model,b.info,S.results)
-    S.design=design;S.connections=connections;markChecked(S.results)
+    const {design,connections}=checkResults(b,S.results)
+    S.design=design;S.connections=connections
     S.repairComparison={before,estimated:preview.metrics,after:repairMetrics(design,connections),changes:preview.changes,built:b,design}
     S.repairPlan=null
     S.buildEpoch++

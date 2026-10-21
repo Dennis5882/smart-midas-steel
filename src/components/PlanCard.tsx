@@ -18,7 +18,7 @@ import { TEMPLATES, TEMPLATE_KEYS } from '../domain/templates'
 import { ModelWizard, WIZARD_STEPS } from './ModelWizard'
 import { StructureEditor, StructureSummary } from './StructureEditor'
 import { WindLoadInfo } from './WindPreview'
-import { ADDITIONS_STEP, LOADS_STEP, REVIEW_STEP, scopeIssueStep } from './modelingFlow'
+import { ADDITIONS_STEP, LOADS_STEP, PREVIEW_DEBOUNCE_MS, REVIEW_STEP, scopeIssueStep } from './modelingFlow'
 import { BaseFixityPicker, FrameTypePicker } from './FrameControls'
 import { BaySpacingEditor } from './BaySpacingEditor'
 import { NumericInput } from './NumericInput'
@@ -36,7 +36,6 @@ import { draw3D, previewSpec, tab } from '../state/ui'
 
 type PlanMsg = Extract<ChatMsg, { kind: 'plan' }>
 
-const PREVIEW_DEBOUNCE_MS = 250
 
 /** 최종 확인의 형상·단면·지역 요약. */
 function Summary({ spec, tpl }: { spec: FactorySpec; tpl?: TemplateKey }) {

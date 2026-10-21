@@ -10,6 +10,8 @@ import { stage } from './job'
 import { requireResult, resultNumber, ResultValidationError, serviceNodes, validateDesignResults } from '../domain/resultValidation'
 import { S } from '../state/store'
 import { lateralSwayKr } from '../domain/krSway'
+import { runDesign, type DesignResult } from '../domain/design'
+import { runConnections, type ConnResult } from '../domain/connections'
 
 export interface ForcePt { P: number; Vy: number; Vz: number; My: number; Mz: number }
 export interface Results {
@@ -72,14 +74,18 @@ async function eaveDisplacements(ids: number[], cb: string[], comboSet: Set<stri
 
 const fingerprint = (combos: string[], dsum: Map<string, number[]>) => combos.map((c) => (dsum.get(c) ?? []).join(',')).join(';')
 
-/* 결과의 출처 — fetchResults 가 전체 검증을 통과한 결과에 기록(어느 경로에서 회수했든 같음), 부재·접합 검토까지 끝나면
-   markChecked 가 재사용 가능 목록으로 옮긴다(검토 중 예외로 멈춘 결과는 재사용하지 않음). 같은 모델(S.built)·같은 해석 회차에서만 재사용 */
-const fetched = new WeakMap<Results, { built: Built; rev: number }>()
-const origin = new WeakMap<Results, { built: Built; rev: number }>()
-/** 부재·접합 검토가 이 결과로 끝까지 실행됨 — 이후 최적화 1회차 재사용 후보 */
-export function markChecked(r: Results): void {
-  const src = fetched.get(r)
-  if (src) origin.set(r, src)
+/* 결과의 출처 — fetchResults 가 전체 검증을 통과한 결과에 기록(어느 경로에서 회수했든 같음, checked: false).
+   checkResults 가 부재·접합 검토를 끝내면 checked = true (검토 중 예외로 멈춘 결과는 재사용하지 않음). 같은 모델(S.built)·같은 해석 회차에서만 재사용 */
+const origin = new WeakMap<Results, { built: Built; rev: number; checked: boolean }>()
+
+/** 회수한 결과로 부재·접합 검토 — 둘 다 끝나면 이 결과를 최적화 1회차 재사용 후보로 확정.
+    앱의 검토 진입점(설계 검토·최적화·NG 보완)과 라이브 스크립트가 모두 이 함수를 쓴다 — runDesign/runConnections 를 따로 부르면 재사용되지 않음 */
+export function checkResults(b: Built, r: Results): { design: DesignResult; connections: ConnResult[] } {
+  const design = runDesign(b.spec, b.model, b.info, r)
+  const connections = runConnections(b.spec, b.model, b.info, r)
+  const src = origin.get(r)
+  if (src) src.checked = true
+  return { design, connections }
 }
 
 /** 이전 결과를 다시 써도 되는지 — 같은 모델·같은 해석 회차 + Gen 의 처마 변위 지문이 같음
@@ -87,7 +93,7 @@ export function markChecked(r: Results): void {
     표를 못 읽거나 형식이 다르면(Gen 결과 삭제 등) 재사용하지 않고 새로 회수하게 null — 취소·통신 오류는 그대로 전달 */
 export async function reusableResults(r: Results | null, b: Built, rev: number): Promise<Results | null> {
   const src = r && origin.get(r)
-  if (!r?.fingerprint || !src || src.built !== b || src.rev !== rev) return null
+  if (!r?.fingerprint || !src?.checked || src.built !== b || src.rev !== rev) return null
   const cb = r.combos.map((c) => `${c}(CB)`)
   const { eaves } = serviceNodes(b.spec, b.model)
   stage('st_results', Math.ceil(cb.length / caseBatchSize(eaves.map((n) => n.id))))
@@ -179,6 +185,6 @@ export async function fetchResults(b: Built): Promise<Results> {
   const results: Results = { beam, truss, sway, disp, combos, fingerprint: fingerprint(combos, dsum) }
   if (spec.code === 'KR') lateralSwayKr(results, columnTops.map((n) => n.id), b.info.seismic)
   validateDesignResults(spec, model, b.info, results)
-  fetched.set(results, { built: b, rev: S.analysisRev })
+  origin.set(results, { built: b, rev: S.analysisRev, checked: false })
   return results
 }

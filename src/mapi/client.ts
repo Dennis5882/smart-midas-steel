@@ -11,8 +11,11 @@ import { jobCall } from '../actions/job'
    Gen 강재 설계(DESIGN/…/CODE-ANAL·post/STEELCODECHECK — KR --gen-check)도 수 분이라 길게, 나머지(db 조회·전송, 화면)는 짧게 — Gen 에 대화상자가 떠 /db 호출이 막히면 15분 대신 1분 안에 실패를 알린다 */
 export const TIMEOUTS = { long: 15 * 60 * 1000, doc: 3 * 60 * 1000, short: 60 * 1000 } as const
 export function timeoutFor(endpoint: string): number {
-  if (endpoint === '/doc/anal' || endpoint === '/post/TABLE' || endpoint === '/post/STEELCODECHECK' || endpoint.startsWith('/DESIGN/')) return TIMEOUTS.long
-  if (endpoint.startsWith('/doc/')) return TIMEOUTS.doc
+  /* MAPI 경로는 대소문자 무관 (doc/ANAL·post/table 모두 같은 명령) — 쿼리·끝 '/' 는 떼고 비교.
+     강재 설계 실행·결과 표는 길게, 그 밖 /DESIGN 표 쓰기(DSTL·요소별 LENG·KFAC·MBTP — 큰 모델은 1분 넘을 수 있음)는 중간(대화상자도 3분 안에 알림) */
+  const p = endpoint.toLowerCase().replace(/[?#].*$/, '').replace(/\/+$/, '')
+  if (p === '/doc/anal' || p === '/post/table' || p === '/post/steelcodecheck' || /^\/design\/.+\/code-(anal|table)$/.test(p)) return TIMEOUTS.long
+  if (p.startsWith('/doc/') || p.startsWith('/design/')) return TIMEOUTS.doc
   return TIMEOUTS.short
 }
 

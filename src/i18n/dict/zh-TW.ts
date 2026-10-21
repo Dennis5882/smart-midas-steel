@@ -474,6 +474,7 @@ export const zhTW: Dict = {
   wp_opening_tip: "若大型出入口或鐵捲門在颱風時可能開啟，請選擇部分封閉式。內風壓增大，屋頂上揚力會明顯增加，下表會立即更新。",
   wp_opening_tip_KR: (field: string, a: string, b: string) => `若大型出入口或鐵捲門在強風時可能開啟，請在「${field}」選擇「${a}」或「${b}」。內風壓增大，屋頂上揚力會明顯增加，下表會立即更新。`,
   wp_unavailable: '目前的輸入無法產生風載重預覽 — 請先修正標示的輸入錯誤（含附加結構來源確認）。建立模型時，風載重會依所有風向與內風壓情形計算並施加。',
+  wp_calculating: '風載重預覽計算中…',
   wind_src_table: (v) => `表 2.4 本鄉鎮值 — ${v} m/s`,
   wind_src_user: (v) => `使用者輸入 — 表 2.4 值 ${v} m/s`,
   wind_src_none: '表 2.4 無此鄉鎮 — 使用者輸入',

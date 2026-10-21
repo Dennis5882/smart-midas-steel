@@ -474,6 +474,7 @@ export const zhCN: Dict = {
   wp_opening_tip: "若大型出入口或卷帘门在大风时可能开启，请选择部分封闭。内压增大，屋面上吸力明显增加，下表会立即更新。",
   wp_opening_tip_KR: (field: string, a: string, b: string) => `若大型出入口或卷帘门在大风时可能开启，请在“${field}”中选择“${a}”或“${b}”。内压增大，屋面上吸力明显增加，下表会立即更新。`,
   wp_unavailable: '当前输入无法生成风荷载预览 — 请先修正标出的输入错误（含附加结构来源确认）。建模时会按所有风向和内压工况计算并施加风荷载。',
+  wp_calculating: '风荷载预览计算中…',
   wind_src_table: (v) => `表 2.4 本乡镇值 — ${v} m/s`,
   wind_src_user: (v) => `用户输入 — 表 2.4 值 ${v} m/s`,
   wind_src_none: '表 2.4 无此乡镇 — 用户输入',
