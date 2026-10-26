@@ -14,6 +14,7 @@ const PLAN: Record<JobKind, I18nKey[]> = {
   docx: ['docx_start'],
   dwgpdf: ['dwg_pdf_start'],
   restore: ['st_restore'],
+  readback: ['st_sync', 'st_read'],
 }
 
 /** 지금 단계의 계획 내 위치 (-1 = 아직 시작 전) */

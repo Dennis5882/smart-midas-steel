@@ -2,11 +2,13 @@
 import { twFootings, type FootingResult } from '../domain/twFoundation'
 import { S } from './store'
 
-export type FootingState = { kind: 'result'; result: FootingResult } | { kind: 'unavailable' | 'additions' | 'invalid' | 'none' }
+export type FootingState = { kind: 'result'; result: FootingResult } | { kind: 'unavailable' | 'additions' | 'genLoads' | 'invalid' | 'none' }
 export function footingState(): FootingState {
   const b = S.built
   if (!b || b.spec.code !== 'TW' || !S.reactions?.length) return { kind: 'none' }
   if (b.info.additions) return { kind: 'additions' }
+  /* 공작하중 조합(2.11)은 앱 케이스 이름(EX·WX…) 기준 — 엔지니어 하중은 아직 지원 안 함 */
+  if (b.info.gen) return { kind: 'genLoads' }
   if (!S.baseReactions?.size) return { kind: 'unavailable' }
   const result = twFootings(b.spec, b.model, b.cases, b.info.wind.variants, S.baseReactions, S.footingInput)
   return result ? { kind: 'result', result } : { kind: 'invalid' }

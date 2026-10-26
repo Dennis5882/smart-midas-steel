@@ -13,24 +13,32 @@ import { scopeMsg } from '../components/ScopeBox'
 import { t, lt } from '../i18n'
 import { mapi, tableOf } from '../mapi/client'
 import { autoSave, autoSavePath } from './save'
-import { confirmAction } from '../components/ConfirmDialog'
+import { confirmAction, confirmChoice } from '../components/ConfirmDialog'
 import { beginJob, Cancelled, endJob, failMsg, stage } from './job'
 import { S, notify } from '../state/store'
 import { addMsg, draw3D, escapeHtml, log, tab } from '../state/ui'
 
-/** opts.modelOnly — [모델 + 자중만]: 형상·재료·단면·지점·단부 해제 + 자중(D) 만 Gen 에 (엔지니어가 하중을 직접 넣는 용도) */
+/** Gen 으로 보낼 내용은 생성 확인 창에서 고른다 — 정상 모델링 / [모델 + 자중만](형상·재료·단면·지점·단부 해제 + 자중 D, 엔지니어가 하중을 직접 넣는 용도).
+    opts.modelOnly = 창의 처음 선택값(직전 선택). 화면 없는 실행은 이 값으로 진행 */
 export async function buildFactory(spec: FactorySpec, opts: { modelOnly?: boolean } = {}): Promise<void> {
   if (S.busy) { addMsg('bot', lt('busy')); return }
   if (!S.mapiKey.trim()) { addMsg('bot', lt('need_key')); return }
   const scope = checkScope(spec)
   if (scope.blocked) { addMsg('bot', `${t('sc_blocked')}<br>${scope.issues.filter((i) => i.level === 'block').map((i) => `⛔ ${scopeMsg(i)}`).join('<br>')}`); return }
-  /* Gen 문서 교체 확인 (AlertDialog) — 열린 문서는 자동 백업, 생성 후 [이전 모델로 복원] 가능 */
+  /* Gen 문서 교체 확인 + 보낼 내용 선택 (현지 요청 2026-10-26: 최종 단계 화면의 선택은 눈에 잘 안 띔 → 생성할 때마다 창에서 고름).
+     열린 문서는 자동 백업, 생성 후 [이전 모델로 복원] 가능 */
+  const picked = await confirmChoice({ title: t('cfm_build_title'), body: t('cfm_build_body', escapeHtml(S.saveDir || 'C:/temp')), ok: t('cfm_build_ok'),
+    choice: { legend: t('mw_gen_content'), value: opts.modelOnly ? 'model' : 'full', options: [
+      { value: 'full', label: t('gc_full'), desc: t('gc_full_d') }, { value: 'model', label: t('gc_model'), desc: t('gc_model_d') }] } })
+  if (!picked) return
+  const modelOnly = picked === 'model'
+  /* 선택을 편집기에 기억 — 다음 생성 창의 처음 값, 모델 탭 미리보기 안내 */
+  if (S.activePlan) S.activePlan = { ...S.activePlan, modelOnly }
   /* 하중 페이로드(자중 케이스 포함)를 작업 시작·편집기 잠금(buildEpoch) 전에 확인 — Gen 을 건드리지 않은 실패로 편집기가 잠기지 않게 */
   try {
     const l = buildLoadPayloads(spec, buildPortal(spec))
-    if (opts.modelOnly) selfWeightOnly(l)
-  } catch (e) { addMsg('bot', failMsg(e, (m) => t('build_fail', m))); return }
-  if (!await confirmAction({ title: t('cfm_build_title'), body: t('cfm_build_body', escapeHtml(S.saveDir || 'C:/temp')), ok: t('cfm_build_ok'), skipKey: 'build' })) return
+    if (modelOnly) selfWeightOnly(l)
+  } catch (e) { addMsg('bot', failMsg(e, (m) => t('build_fail', m))); notify(); return }
   if (!beginJob('build')) return
   S.buildEpoch++ // 이전 카드 버튼 잠금
   notify()
@@ -38,11 +46,11 @@ export async function buildFactory(spec: FactorySpec, opts: { modelOnly?: boolea
   tab('logP')
   try {
     /* 복원 지점은 doc/new 가 사용자 문서를 지운 순간 기록 — 이후 전송 실패·취소에도 실패 카드에서 복원 가능 */
-    const model = await sendModel(spec, (backup) => { S.restorePoint = backup; notify() }, opts)
+    const model = await sendModel(spec, (backup) => { S.restorePoint = backup; notify() }, { modelOnly })
     const b = S.built!
-    addMsg('bot', opts.modelOnly ? lt('build_done_model_only', model.nodes.length, model.elements.length) : lt('build_done', model.nodes.length, model.elements.length, b.cases.length, b.combos))
+    addMsg('bot', modelOnly ? lt('build_done_model_only', model.nodes.length, model.elements.length) : lt('build_done', model.nodes.length, model.elements.length, b.cases.length, b.combos))
     /* 모델 + 자중만은 해석·검토가 막히므로 산출물(도면·물량·계산서)로 */
-    S.task = opts.modelOnly ? 'outputs' : 'analysis'
+    S.task = modelOnly ? 'outputs' : 'analysis'
     /* 생성 직후 3D 탭에서 ISO 전체 보기 — 미리보기에서 돌리거나 다른 시점이었어도 다시 맞춘다 (Gen 화면도 위에서 ISO) */
     S.cam = 'iso'; S.camReset++
     draw3D()

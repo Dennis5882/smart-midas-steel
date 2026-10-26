@@ -13,6 +13,7 @@ const SUITES = [
   ['Factory additions', 'verify-additions.ts'],
   ['Review regression', 'verify-review-fixes.ts'],
   ['RC pedestal', 'verify-pedestal.ts'],
+  ['Gen readback', 'verify-genloads.ts'],
   ['TW hand-calc + golden', 'verify-tw.ts'],
   ['TW cold-formed + Q', 'verify-tw-coldformed.ts'],
   ['TW foundation footing', 'verify-tw-foundation.ts'],

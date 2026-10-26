@@ -299,7 +299,7 @@ export function ResultsPanel() {
         </div>
       )}
       <SummaryCards />
-      {s.built && (s.design || !!s.connections?.length) && <StatusCard d={s.design} cs={s.connections} spec={s.built.spec} onJump={jumpToField} />}
+      {s.built && (s.design || !!s.connections?.length) && <StatusCard d={s.design} cs={s.connections} spec={s.built.spec} info={s.built.info} onJump={jumpToField} />}
       {s.opt && <OptTables o={s.opt} />}
       {s.design && <DesignTables d={s.design} />}
       {s.design && <MemberTable d={s.design} />}

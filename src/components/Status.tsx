@@ -3,7 +3,7 @@ import { systemSource } from '../codes/twSystems'
 import { profileOf, type CodeId } from '../codes'
 import { siteCoef, siteSource } from '../codes/twSites'
 import { windSource } from '../codes/twWind'
-import { checkScope } from '../domain/scope'
+import { checkScopeFor } from '../domain/scope'
 
 import type { FactorySpec } from '../domain/types'
 import type { ConnResult } from '../domain/connections'
@@ -31,9 +31,9 @@ export function statusLine(sum: StatusSummary): string {
 }
 
 /** onJump: 「확인할 것」 [수정] — 호출하는 화면이 넘긴다 (이 모듈은 계산서·작업 모듈도 쓰므로 agent/session 을 가져오지 않는다) */
-export function StatusCard({ d, cs, spec, onJump }: { d: DesignResult | null; cs: ConnResult[] | null; spec: FactorySpec; onJump?(field: string): void }) {
+export function StatusCard({ d, cs, spec, info, onJump }: { d: DesignResult | null; cs: ConnResult[] | null; spec: FactorySpec; info?: { gen?: unknown }; onJump?(field: string): void }) {
   const code: CodeId = spec.code
-  const scope = checkScope(spec)
+  const scope = checkScopeFor(spec, info)
   const sum = summarizeStatus(d, cs, scope)
   const items = actionItems(spec, d, cs, scope)
   const used = GRADES.filter((g) => sum.members[g] + sum.conns[g] > 0 || (g === 'fail' && sum.service.ng) || (g === 'expert' && sum.scopeWarn))

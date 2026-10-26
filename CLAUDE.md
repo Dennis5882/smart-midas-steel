@@ -14,7 +14,7 @@ MIDAS Gen NX 단층 강구조 공장 자동 모델링·해석·설계 검토 웹
 1. **MAPI-Key**: 코드·커밋·출력·명령 인자·다른 파일에 넣지 않는다. 앱은 메모리(state)에만. 라이브 스크립트는 gitignore 된 루트 `.env` 의 `MAPI_KEY=` 를 `scripts/mapi-key.ts` 로 읽는다(stdin → env → .env). 커밋 전 staged diff 키 검사.
 2. **커밋·푸시는 사용자가 명시적으로 요청할 때만.** 내가 만들지 않은 파일은 커밋하지 않는다 — 현재 `docs/china-market-steel-design-strategy.md`, `docs/taiwan_factory_steel_wizard_localization_review.md`, `docs/20230113024231-範例_天車梁移動載重模擬.pdf`.
 3. **버전**: 사용자에게 보이는 변경을 푸시할 때마다 묻지 않고 `npm run release -- patch --items N` → 같은 커밋에 4개 언어 릴리즈 노트(ko 먼저, en·zh-TW·zh-CN). **patch 만**, minor 는 먼저 상의, major 는 사용자가 말할 때만. version·노트 키를 손으로 만들지 않는다. 내부 변경(테스트·리팩터·문서)만이면 버전업 없음. 상세는 아래 「버전·릴리즈」.
-4. **커밋 전 `npm run verify`**(오프라인 33종, ~200 s, Gen·키 불필요) 통과.
+4. **커밋 전 `npm run verify`**(오프라인 34종, ~200 s, Gen·키 불필요) 통과.
 5. **라이브 Gen 안전**(사용자 PC 의 Gen 을 직접 조작):
    - 항상 `node --import tsx scripts/live-guarded.ts -- <스크립트> [인자]` — 열린 원본 문서를 저장하고 끝나면 다시 열어 12 DB 해시 일치를 확인한다. 결과에 "restored original: 12 DB hashes match" 가 없으면 사용자에게 보고.
    - **다른 작업이 Gen 을 쓰는 중이면 멈춘다**: `C:/temp` 에 최근 10분 안에 `sf_*`·`gen_rc_temp_*` 파일이 생겼으면 실행하지 않는다(사용자가 "지금 해도 됨"이라고 하면 진행). 긴 실행은 백그라운드로.
@@ -73,16 +73,16 @@ Vite 8 + TypeScript + React 19 + Tailwind v4(화면은 `src/styles/app.css` 클�
 
 ## 진행 중·계획 (2026-10-22)
 
-- **Gen 전송 내용 선택**: 7단계 `GenContentPicker` — 정상 / 모델 + 자중만(`selfWeightOnly` → STLD·BODF 만, 해석·검토·최적화 `flow_model_only` 차단, 산출물 허용). 라이브 확인 2026-10-22(기본·RC 받침 모두 통과). `runAnalysis`·`runDesignCheck`·`runOptimize` 진입점은 화면 버튼과 같은 `taskFlow.unavailable` 을 호출(규칙 출처 하나), 하중 페이로드·자중 케이스는 `buildEpoch` 올리기 전에 확인(실패해도 편집기 안 잠김), 모델 탭 `model_only_tag`(미리보기 중엔 `model_only_preview_tag`)·계산서 3·4장 안내, 선택은 편집기 메시지 + `S.activePlan.modelOnly`. 3D 시점: 사용자가 단계를 옮기면(오류 단계로 되돌아감 포함) `STEP_CAM`, 새 편집기는 첫 단계 시점, 재개·결과 [수정] 이동은 보던 시점 유지.
-- **Gen 엔지니어 하중 읽어 오기**: 계획만(`docs/reference/gen-readback-scope.md`, 대만 공유 번체 Word `output/taiwan/Gen讀回工程師載重_流程說明.docx`). 사용자 요청 없이 구현 시작하지 않는다.
+- **Gen 전송 내용 선택**: [Gen NX 에 모델 생성] 을 누르면 뜨는 생성 확인 창(`confirmChoice`, 매번 묻고 '다시 묻지 않기' 없음, 처음 값 = 직전 선택 `S.activePlan.modelOnly`)에서 정상 / 모델 + 자중만 — 2026-10-26 현지 요청으로 7단계 화면의 라디오(`GenContentPicker`)에서 옮김(`selfWeightOnly` → STLD·BODF 만, 해석·검토·최적화 `flow_model_only` 차단, 산출물 허용). 라이브 확인 2026-10-22(기본·RC 받침 모두 통과). `runAnalysis`·`runDesignCheck`·`runOptimize` 진입점은 화면 버튼과 같은 `taskFlow.unavailable` 을 호출(규칙 출처 하나), 하중 페이로드·자중 케이스는 `buildEpoch` 올리기 전에 확인(실패해도 편집기 안 잠김), 모델 탭 `model_only_tag`(미리보기 중엔 `model_only_preview_tag`)·계산서 3·4장 안내,  3D 시점: 사용자가 단계를 옮기면(오류 단계로 되돌아감 포함) `STEP_CAM`, 새 편집기는 첫 단계 시점, 재개·결과 [수정] 이동은 보던 시점 유지.
+- **Gen 엔지니어 하중 읽어 오기(F2)**: 1단계 구현(TW·추가 구조 없음) — 해석 단계 `GenReadPanel` → `actions/readback.ts`(형상 동일성 + 하중 읽기 → `S.genRead` 확인 → 확정 시 `Built.genLoads`·`info.gen`), 순수 요약 `domain/genLoads.ts`. 조합은 모두 basic, 지진 변위각·13장·ASD·기초는 scope warn `genLoads`, 최적화·NG 보완 막음(2단계에서 단면만 PUT). 라이브: 같은 하중이면 부재 강도비 완전 동일. 상세·한계 `docs/reference/gen-readback-scope.md`(대만 공유 번체 Word `output/taiwan/Gen讀回工程師載重_流程說明.docx` — 1단계 구현 전 작성).
 - 보류(사용자 결정): 케이스 결과만 회수해 앱에서 조합(속도), 동일성 검사 대상 확대(회의 F2 와 함께), RC 받침 + 추가 구조, Kzt 표 2.3 자동, FBLA 면 하중 옵션.
 
 ## 검증
 
-- `npm run verify`(`scripts/verify-all.mjs`, 33종, `--stack-size=500` 으로 브라우저 수준 스택). 개별 실행 `node --import tsx scripts/verify-<name>.ts`.
+- `npm run verify`(`scripts/verify-all.mjs`, 34종, `--stack-size=500` 으로 브라우저 수준 스택). 개별 실행 `node --import tsx scripts/verify-<name>.ts`.
 - 정답 세트(라이브 Gen 결과) `scripts/fixtures/{tw,cn,kr}-sample.json.gz` → `verify-tw.ts`/`verify-golden.ts`. 설계식을 의도적으로 바꾸면 `verify-tw.ts --update`, 형상·하중을 바꾸면 라이브 재캡처(`capture-tw-golden.ts [--code CN|KR]`, `live-gen-section-baseline.ts`).
 - 가짜 Gen 은 `scripts/fake-gen.ts`(fetch 대체). 화면 없는 실행은 `setConfirmHandler(() => true)`, Node 에서 i18n 을 import 하려면 먼저 `globalThis.document = { documentElement: { lang: 'ko', dataset: {} } }`.
-- 라이브 스크립트(`live-guarded.ts` 로 감싸서): `live-tw.ts`(`--frame mono|multi|gableCols|truss`, `--pedestal h,b,d`, `--optimize`, `--out`), `live-cn.ts`, `live-kr.ts`(`--gen-check`), `live-additions.ts --phase5|--phase6`, `live-tw-materials.ts`, `live-tw-options.ts`, `live-country-frames.ts`, `live-crane-movingload.ts`, `live-wind-floorload.ts`. 계산서 양식만 고칠 땐 `report-from-summary.ts <summary.json> <out.html> [lang]`.
+- 라이브 스크립트(`live-guarded.ts` 로 감싸서): `live-tw.ts`(`--frame mono|multi|gableCols|truss`, `--pedestal h,b,d`, `--optimize`, `--out`), `live-cn.ts`, `live-kr.ts`(`--gen-check`), `live-additions.ts --phase5|--phase6`, `live-tw-materials.ts`, `live-tw-options.ts`, `live-country-frames.ts`, `live-crane-movingload.ts`, `live-wind-floorload.ts`, `live-genloads.ts`. 계산서 양식만 고칠 땐 `report-from-summary.ts <summary.json> <out.html> [lang]`.
 - 화면 확인이 필요한 변경(입력·3D·대화상자)은 브라우저에서 직접 확인하고 확인한 범위를 보고한다.
 
 ## 개발 함정

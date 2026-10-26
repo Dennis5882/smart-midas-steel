@@ -17,6 +17,7 @@ export function FootingCard() {
     <div className="scard"><h3>{t('ft_title')}</h3>
       <p className="mw-note">{t('ft_note')}</p>
       {st.kind === 'additions' && <p className="mw-note" role="note">{t('ft_additions')}</p>}
+      {st.kind === 'genLoads' && <p className="mw-note" role="note">{t('ft_gen_loads')}</p>}
       {st.kind === 'unavailable' && <p className="mw-note" role="note">{t('ft_unavailable')}</p>}
       {(st.kind === 'result' || st.kind === 'invalid') && <>
         <div className="pe-grid">

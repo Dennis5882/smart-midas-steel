@@ -45,10 +45,11 @@ export type ChatMsg = { ts?: string } & (
 /** Gen 에 보낸 모델 — 스펙·형상·하중 요약 */
 /** sent = Gen 에 보낸 페이로드(DB → Assign) — 해석·검토 직전 Gen 동일성 비교(actions/genSync) */
 /** modelOnly: [모델 + 자중만] 으로 생성 — Gen 에 하중 케이스 D(자중 BODF)만, 마감·활·풍·지진 하중과 조합 없음 → 앱 해석·검토·최적화 불가(엔지니어가 Gen 에서 하중 입력) */
-export interface Built { spec: FactorySpec; model: FactoryModel; info: LoadInfo; cases: string[]; combos: number; comboNames: string[]; sent?: Record<string, Record<string, unknown>>; modelOnly?: boolean }
+/** genLoads: Gen 에서 읽어 확정한 엔지니어 하중(F2) — cases·comboNames·info 는 Gen 하중 기준, sent 의 하중 표 = 읽은 내용(이후 Gen 에서 또 바뀌면 동일성 검사가 잡음) */
+export interface Built { spec: FactorySpec; model: FactoryModel; info: LoadInfo; cases: string[]; combos: number; comboNames: string[]; sent?: Record<string, Record<string, unknown>>; modelOnly?: boolean; genLoads?: import('../domain/genLoads').GenLoadSummary }
 
 /** 진행 중 작업 — stage = 문구 키, step/total = 이 단계 MAPI 호출 수, iter = 최적화 반복 [n, 최대] */
-export type JobKind = 'build' | 'anal' | 'design' | 'opt' | 'pdf' | 'docx' | 'dwgpdf' | 'restore'
+export type JobKind = 'build' | 'anal' | 'design' | 'opt' | 'pdf' | 'docx' | 'dwgpdf' | 'restore' | 'readback'
 /** 파일 생성 작업 — Gen·결과를 바꾸지 않음 (결과 개정 유지, 취소 안내 문구 공통) */
 export const FILE_JOBS: ReadonlySet<JobKind> = new Set<JobKind>(['pdf', 'docx', 'dwgpdf'])
 export interface Job { kind: JobKind; stage: string; step: number; total: number; detail: string; t0: number; cancel: boolean; iter?: [number, number]; activityId?: number }
@@ -153,9 +154,11 @@ export const S = {
   /** 마지막 작업 실패·취소 (작업 흐름 띠의 다시 시도) — beginJob 이 비움 */
   /** Gen 모델 변경 감지 건수 (0 = 같음) — assertGenSync 가 갱신, sendModel 이 비움 */
   /** 확인 창 요청 (ConfirmDialog) */
-  confirm: null as (import('../components/ConfirmDialog').ConfirmReq & { resolve(ok: boolean): void }) | null,
+  confirm: null as (import('../components/ConfirmDialog').ConfirmReq & { resolve(ok: boolean, value?: string): void }) | null,
   /** 마지막 [공장 생성] 직전 Gen 문서 백업 (Gen PC 경로) — [이전 모델로 복원] 대상 */
   restorePoint: null as string | null,
+  /** Gen 에서 읽어 온 하중 — 확인 화면에서 확정 전 (F2). built = 읽을 때의 모델(바뀌면 무효) */
+  genRead: null as { summary: import('../domain/genLoads').GenLoadSummary; raw: Record<string, Record<string, unknown>>; built: Built } | null,
   theme: readTheme(),
   code: readCode(),
   cam: 'iso' as CamId,

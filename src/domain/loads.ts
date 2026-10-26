@@ -27,6 +27,8 @@ export interface LoadInfo {
   cn?: { verticalRatio: number; endZone: number }
   /** KR: KDS 중간값 (스펙트럼·가스트·적설 계수) — 계산서 표시 */
   kr?: KrLoadInfo
+  /** Gen 에서 읽어 온 엔지니어 하중(F2) — 있으면 조합·풍 변형은 Gen 것, 사용성 케이스는 Gen 하중 종류로. 앱 자동 하중 값(roofLive·wind.qh·seismic…)은 퍼린·거트 국부 검토용 앱 계산값 그대로 */
+  gen?: { liveCases: string[]; seismicCases: { name: string; dir: 'X' | 'Y' }[] }
   /** 지붕 활하중 (kN/m², 수평투영) */
   roofLive: number
   seismic: Record<'X' | 'Y', { T: number; c: number; cStar: number; cV: number; cMin: number; cM: number; gov: string; V: number; Fu: number; R: number; Mt: number }> & { W: number }

@@ -14,7 +14,7 @@ import { columnSpans, defaultTrussDepth, hasInteriorColumns, type FactorySpec } 
 
 export type ScopeKey =
   | 'additionInput' | 'additionReview' | 'craneAssumed' | 'siteAssumed' | 'crane' | 'mezzanine' | 'multiSpan' | 'opening' | 'openingCN'
-  | 'span' | 'eave' | 'eaveHigh' | 'slope' | 'bayRatio' | 'baySpacing' | 'length' | 'hnR' | 'cn' | 'monoTW' | 'multi' | 'gableCols' | 'craneInterior' | 'multiTW' | 'kr' | 'multiKR' | 'twMatSS' | 'twMatImported' | 'twZPurlin' | 'twAsd' | 'twAsdAdditions' | 'truss' | 'trussCode' | 'trussDepth' | 'twSystemSpecial' | 'interiorRigid' | 'interiorRigidCode' | 'siteEvidence' | 'pedestal' | 'pedestalCode' | 'pedestalAdditions' | 'pedestalHigh'
+  | 'span' | 'eave' | 'eaveHigh' | 'slope' | 'bayRatio' | 'baySpacing' | 'length' | 'hnR' | 'cn' | 'monoTW' | 'multi' | 'gableCols' | 'craneInterior' | 'multiTW' | 'kr' | 'multiKR' | 'twMatSS' | 'twMatImported' | 'twZPurlin' | 'twAsd' | 'twAsdAdditions' | 'truss' | 'trussCode' | 'trussDepth' | 'twSystemSpecial' | 'interiorRigid' | 'interiorRigidCode' | 'siteEvidence' | 'pedestal' | 'pedestalCode' | 'pedestalAdditions' | 'pedestalHigh' | 'genLoads'
 export interface ScopeIssue { key: ScopeKey; level: 'block' | 'warn'; args: (string | number)[] }
 export interface ScopeResult { issues: ScopeIssue[]; blocked: boolean }
 
@@ -115,4 +115,10 @@ export function checkScope(spec: FactorySpec, f: ScopeFeatures = spec.features ?
   const unique = out.filter((v,i)=>out.findIndex((x)=>x.key===v.key && x.level===v.level)===i)
   const issues = unique.filter((x) => !((x.key === 'cn' || x.key === 'kr') && dim))
   return { issues, blocked: issues.some((x) => x.level === 'block') }
+}
+
+/** 모델·하중 기준 적용범위 — 스펙 판정 + Gen 에서 읽어 온 엔지니어 하중(F2)이면 warn genLoads(내진 13장·ASD·지진 변위각 등 앱이 조합 용도를 몰라 검토 못 한 항목 → 전문가 검토) */
+export function checkScopeFor(spec: FactorySpec, info?: { gen?: unknown }): ScopeResult {
+  const r = checkScope(spec)
+  return info?.gen ? { ...r, issues: [...r.issues, { key: 'genLoads', level: 'warn', args: [] }] } : r
 }

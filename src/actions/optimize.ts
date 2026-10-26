@@ -3,7 +3,7 @@
 import { unavailable } from '../state/taskFlow'
 import type { ConnResult } from '../domain/connections'
 import { summarizeStatus } from '../domain/status'
-import { checkScope } from '../domain/scope'
+import { checkScopeFor } from '../domain/scope'
 import { statusLine } from '../components/Status'
 import type { DesignResult } from '../domain/design'
 import { pickBest, proposeSections, roleTons, steelWeight, type OptControl, type OptIter, type OptRow, type Sections } from '../domain/optimize'
@@ -114,7 +114,7 @@ export async function runOptimize(): Promise<void> {
     }
     S.ratioView = true
     const pct = wB > 0 ? ((wB - wA) / wB) * 100 : 0
-    addMsg('bot', t('opt_done', wB.toFixed(2), wA.toFixed(2), pct.toFixed(1), S.design.maxRatio.toFixed(2), statusLine(summarizeStatus(S.design, S.connections, checkScope(S.built!.spec))), iters.length)
+    addMsg('bot', t('opt_done', wB.toFixed(2), wA.toFixed(2), pct.toFixed(1), S.design.maxRatio.toFixed(2), statusLine(summarizeStatus(S.design, S.connections, checkScopeFor(S.built!.spec, S.built!.info))), iters.length)
       + (S.opt.ok ? '' : `<br>⚠ ${t('opt_no_valid')}`))
     draw3D()
     tab('resP')

@@ -11,10 +11,11 @@ export class GenChangedError extends Error {
   constructor(readonly diffs: SyncDiff[]) { super(diffs.map(diffText).join('; ')); this.name = 'GenChangedError' }
 }
 
-export async function assertGenSync(): Promise<void> {
+/** only — 이 DB 만 비교 (Gen 하중 읽어 오기는 형상 DB 만: 하중은 엔지니어가 바꾼 것을 읽으므로) */
+export async function assertGenSync(only?: readonly string[]): Promise<void> {
   const sent = S.built?.sent
   if (!sent) return
-  const dbs = SYNC_DBS.filter((db) => sent[db])
+  const dbs = SYNC_DBS.filter((db) => sent[db] && (!only || only.includes(db)))
   stage('st_sync', dbs.length)
   const diffs: SyncDiff[] = []
   const got: Record<string, any> = {}

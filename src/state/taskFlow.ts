@@ -17,7 +17,7 @@ export const TASKS: { id: Exclude<TaskId, 'history'>; label: I18nKey; hint: I18n
   { id: 'outputs', label: 'flow_outputs', hint: 'flow_outputs_hint' },
 ]
 type FlowState = Pick<AppState, 'busy' | 'confirm' | 'built' | 'analyzed' | 'design' | 'connections' | 'opt' | 'job' | 'lastFail' | 'genChanged' | 'draftSpec' | 'draftInvalid' | 'mapiKey' | 'activity' | 'modelRevision' | 'resultRevision'>
-export const taskOfJob = (kind: string): TaskId => ({ build: 'model', restore: 'model', anal: 'analysis', design: 'design', opt: 'optimize', pdf: 'outputs', docx: 'outputs', dwgpdf: 'outputs' }[kind] as TaskId ?? 'model')
+export const taskOfJob = (kind: string): TaskId => ({ build: 'model', restore: 'model', anal: 'analysis', readback: 'analysis', design: 'design', opt: 'optimize', pdf: 'outputs', docx: 'outputs', dwgpdf: 'outputs' }[kind] as TaskId ?? 'model')
 export const isStale = (s: Pick<FlowState, 'built' | 'genChanged' | 'draftSpec' | 'draftInvalid'>) => !!s.built && (s.genChanged > 0 || s.draftInvalid || specChanged(s.draftSpec, s.built.spec))
 
 export function unavailable(s: FlowState, task: TaskId): I18nKey | null {
@@ -34,6 +34,8 @@ export function unavailable(s: FlowState, task: TaskId): I18nKey | null {
   if (task === 'outputs') return blockedMembers(s.design) ? 'flow_invalid_design' : null
   /* [모델 + 자중만] 으로 만든 모델은 하중·조합이 없어 앱 해석·검토·최적화를 하지 않는다 */
   if (s.built.modelOnly) return 'flow_model_only'
+  /* 엔지니어 하중(F2 1단계): 최적화·NG 보완은 모델을 다시 생성(doc/new)해 엔지니어 하중을 지우므로 막는다 — 2단계에서 단면만 바꾸는 방식으로 */
+  if (task === 'optimize' && s.built.genLoads) return 'flow_gen_loads_opt'
   if (task !== 'analysis' && !s.analyzed) return 'need_anal'
   if (task === 'optimize' && (!s.design || !s.connections)) return 'flow_need_design'
   if (!s.mapiKey.trim()) return 'flow_need_connection'

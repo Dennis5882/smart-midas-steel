@@ -143,6 +143,15 @@ await p
 ok(!!S.built && lastBot() === t('job_cancelled') && !calls.some((c) => c.includes('TABLE')), 'cancel during analysis: waits, then stops; model kept')
 
 /* [모델 + 자중만] — 하중 케이스 D·자중만 보내고 마감·풍·지진 하중과 조합은 보내지 않음, 확인은 빈 표를 통과 */
+/* 생성 확인 창 = 보낼 내용 선택(정상 / 모델 + 자중만) — 매번 묻고(다시 묻지 않기 없음), 처음 값 = 직전 선택, 취소면 Gen 호출 없음 */
+{
+  let seen: any = null
+  setConfirmHandler((req) => { seen = req; return false })
+  reset(); await buildFactory(spec(), { modelOnly: true })
+  ok(seen?.choice?.options.map((o: any) => o.value).join() === 'full,model' && seen.choice.value === 'model' && !seen.skipKey && calls.length === 0,
+    'build confirm: content choice offered every time, preselected from the last choice, cancel sends nothing')
+  setConfirmHandler(() => true)
+}
 reset(); await buildFactory(spec(), { modelOnly: true })
 {
   const puts = calls.filter((c) => c.startsWith('PUT')).map((c) => c.split('/').pop())

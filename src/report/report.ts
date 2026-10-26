@@ -22,7 +22,7 @@ import { siteSourceText, windSourceText, rSourceText } from '../components/Statu
 import { dimsText } from './dims'
 import { actionText } from '../components/ScopeBox'
 import { ACTION_GROUPS, actionItems, type ActionItem } from '../domain/actionItems'
-import { checkScope } from '../domain/scope'
+import { checkScopeFor } from '../domain/scope'
 import { genSectionSource, sectionProps } from '../domain/sections'
 import { lengthText, ROLES, hasInteriorColumns } from '../domain/types'
 import { getLang, htmlLang, t, tc, type I18nKey } from '../i18n'
@@ -76,7 +76,7 @@ export function buildReport({ built, reactions, design, connections, opt, footin
   const h2 = (k: I18nKey) => parts.push(`<h2>${esc(tc(spec.code, k))}</h2>`)
 
   /* 검토 상태 요약 — 통과 근거 구분 + 계산 주체 (Gen NX 해석 / 앱 계산) */
-  const scope = checkScope(spec)
+  const scope = checkScopeFor(spec, built.info)
   const sum = summarizeStatus(design, connections, scope)
   const cnt = (c: Record<string, number>) => GRADES.filter((g) => c[g] > 0).map((g) => `${esc(t(`gr_${g}`))} ${c[g]}`).join(' · ') || '—'
   const used = GRADES.filter((g) => sum.members[g] + sum.conns[g] > 0 || (g === 'fail' && sum.service.ng) || (g === 'expert' && sum.scopeWarn))
@@ -159,6 +159,12 @@ export function buildReport({ built, reactions, design, connections, opt, footin
   /* 3. 하중 */
   h2('rep_s3')
   if (built.modelOnly) parts.push(`<p class="note">${esc(L('rep_model_only'))}</p>`)
+  /* 엔지니어 하중(F2) — Gen 에서 읽은 케이스 표가 이 모델의 하중. 아래 앱 자동 하중 설명은 퍼린·거트 국부 검토용 참고값 */
+  const gl = built.genLoads
+  if (gl) {
+    parts.push(`<p class="note">${esc(L('rep_gen_loads'))}</p>`)
+    parts.push(table([t('rb_case'), t('rb_type'), 'ΣFX (kN)', 'ΣFY (kN)', 'ΣFZ (kN)'], gl.cases.map((c) => [esc(c.name), esc(c.type), ...[c.sum.fx, c.sum.fy, c.sum.fz].map((v) => `${c.approx ? '≈' : ''}${f(v, 1)}`)])))
+  }
   parts.push(`<h3>${L('rep_dead')}</h3><p>${esc(t('rep_dead_txt', spec.roofDead, spec.wallDead))}</p>`)
   parts.push(`<h3>${L('rep_live')}</h3><p>${spec.code === 'CN' ? `GB 55001-2021 4.2.8 / GB 50009-2012 5.3: ${f(info.roofLive, 3)} kN/m²` : esc(tc(spec.code, 'rep_live_txt', f(info.roofLive, 3)))}</p>`)
   const kr = info.kr
@@ -229,10 +235,11 @@ export function buildReport({ built, reactions, design, connections, opt, footin
   h2('rep_s4')
   /* 모델 + 자중만은 조합을 보내지 않음 — 빈 표 대신 안내 */
   if (built.modelOnly) parts.push(`<p class="note">${esc(L('rep_model_only_combo'))}</p>`)
+  else if (gl) parts.push(table(['#', t('rd_combo'), t('rb_comp')], gl.combos.map((c, i) => [i + 1, esc(c.name), esc(c.parts.map((p) => `${p.f}·${p.lc}`).join(' + '))])))
   else parts.push(info.additions
     ? table(['#',t('rd_combo'),t('add_source')],built.comboNames.map((n,i)=>[i+1,esc(n),esc(info.additions!.combinationBasis?.[n]??'')]))
     : table(['#', t('rd_combo')], built.comboNames.map((n, i) => [i + 1, esc(n)])))
-  if (!built.modelOnly) parts.push(`<p class="note">${esc(tc(spec.code, 'rep_combo_txt'))}</p>`)
+  if (!built.modelOnly && !gl) parts.push(`<p class="note">${esc(tc(spec.code, 'rep_combo_txt'))}</p>`)
 
   /* 5. 해석 결과 */
   h2('rep_s5')

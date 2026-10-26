@@ -63,9 +63,12 @@ export function validateDesignResults(spec: FactorySpec, model: FactoryModel, in
   if (roles) return // Candidate sections use the already checked service result.
   const { nodes } = serviceNodes(spec, model)
   requireResult(nodes.length > 0, 'DISPLACEMENT', 'missing')
-  const cases = new Set([...(info.additions?.serviceCases ?? []), 'LR', 'EX', 'EY', ...(spec.code !== 'CN' ? ['ETX', 'ETY'] : ['D']), ...info.wind.variants.flatMap((w) => w.parts.map((p) => p.lc))])
+  /* 엔지니어 하중(F2)은 Gen 케이스 이름 — 사용성에 쓰는 L·LR·W·E 종류 케이스 */
+  const cases = info.gen
+    ? new Set([...info.gen.liveCases, ...info.gen.seismicCases.map((c) => c.name), ...info.wind.variants.flatMap((w) => w.parts.map((p) => p.lc))])
+    : new Set([...(info.additions?.serviceCases ?? []), 'LR', 'EX', 'EY', ...(spec.code !== 'CN' ? ['ETX', 'ETY'] : ['D']), ...info.wind.variants.flatMap((w) => w.parts.map((p) => p.lc))])
   // Snow cases are defined by the model's combinations, never by returned data.
-  for (const c of combos) for (const s of c.match(/S(?:N|V|H)\d*/g) ?? []) cases.add(s)
+  if (!info.gen) for (const c of combos) for (const s of c.match(/S(?:N|V|H)\d*/g) ?? []) cases.add(s)
   for (const c of cases) for (const n of nodes) {
     const v = res.disp.get(c)?.get(n.id)
     requireResult(v && [v.dx, v.dy, v.dz].every(Number.isFinite), 'DISPLACEMENT', 'missing', `${c} · ${n.id}`)

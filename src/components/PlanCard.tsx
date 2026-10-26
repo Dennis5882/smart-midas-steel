@@ -67,16 +67,6 @@ function Summary({ spec, tpl }: { spec: FactorySpec; tpl?: TemplateKey }) {
   )
 }
 
-/** Gen 으로 보낼 내용 선택 (라디오 2개) */
-function GenContentPicker({ name, value, onChange, disabled }: { name: string; value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
-  return <fieldset className="mw-group gen-content" disabled={disabled}>
-    <legend>{t('mw_gen_content')}</legend>
-    {([[false, 'gc_full', 'gc_full_d'], [true, 'gc_model', 'gc_model_d']] as const).map(([v, k, d]) => (
-      <label key={k} className="gc-opt"><input type="radio" name={name} checked={value === v} onChange={() => onChange(v)} /> <b>{t(k)}</b><span className="mw-note">{t(d)}</span></label>
-    ))}
-  </fieldset>
-}
-
 export function PlanCard({ msg }: { msg: PlanMsg }) {
   const s = useStore()
   const free = msg.mode === 'free'
@@ -89,14 +79,8 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
   const formId = useId()
   const [vals, setVals] = useState(() => initVals(msg.spec))
   const [individual, setIndividual] = useState(free || !!msg.spec.bayList?.length)
-  /* Gen 으로 보낼 내용 — 정상 모델링(하중·조합) / 모델 + 자중만 (현지 요청 2026-10-21: 엔지니어가 Gen 에서 하중을 직접 넣는 경우) */
-  /* 편집기 메시지(S.activePlan)에 같이 기억 — 시작 화면에 다녀와 편집기가 다시 마운트돼도 선택 유지 */
-  const [modelOnly, updateModelOnly] = useState(() => !!msg.modelOnly)
-  const setModelOnly = (v: boolean) => {
-    updateModelOnly(v)
-    msg.modelOnly = v // 이 카드의 메시지 — 활성 편집기가 아니어도 다시 마운트할 때 선택 유지
-    if (S.activePlan?.id === msg.id) { S.activePlan = { ...S.activePlan, modelOnly: v }; notify() } // 모델 탭 미리보기 표시도 갱신
-  }
+  /* Gen 으로 보낼 내용은 생성 확인 창에서 고른다 — 직전 선택(편집기 메시지)을 창의 처음 값으로 */
+  const modelOnly = !!(S.activePlan?.id === msg.id ? S.activePlan : msg).modelOnly
   const dirty = useRef(false)
   const [additions, setAdditions] = useState<FactoryAdditions | undefined>(()=>initializeAdditions(msg.spec))
   const [feat, updateFeat] = useState<ScopeFeatures>(() => msg.spec.features ?? NO_FEATURES)
@@ -328,8 +312,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
         <button className="btn btn-ghost" disabled={!live || s.busy} onClick={() => navigate(index + 1)}>{t('edit_btn')}</button>
         {groups.map((g) => { const subset = { ...g, fields: g.fields.filter((f) => fieldStep(f) === index + 1) }; return subset.fields.length ? <section className="mw-group" key={g.title}><h4>{t(g.title)}</h4>{fields(subset, true)}</section> : null })}
       </details>)}
-      <GenContentPicker name={`${formId}-gen-content`} value={modelOnly} onChange={setModelOnly} disabled={!live || s.busy} />
-      {!modelOnly && <p className="mw-note">{t('mw_build_note')}</p>}
+      <p className="mw-note">{t('mw_build_note')}</p>
     </>}
   </ModelWizard>
 
@@ -360,7 +343,6 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
         <div className="pe-tip">{tc(spec.code, 'plan_tip')}</div>
       </div>
       <StructureEditor idPrefix={`${formId}-additions`} spec={spec} onFeaturesChange={setFeat} onChange={(v)=>{dirty.current=true;setAdditions(v)}} disabled={!live || s.busy} attempted={showErrors}/>
-      {live && <GenContentPicker name={`${formId}-gen-content`} value={modelOnly} onChange={setModelOnly} disabled={s.busy} />}
       {live && errors.length > 0 && <p className="mw-error mw-alert" role="alert">{t('mw_invalid')}</p>}
       {live && (
         <div className="confirm-row">

@@ -382,7 +382,8 @@ function runFactoryDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
     service.push({ key, value: v / steelHeight(spec), limit: 0.005, ratio: v / steelHeight(spec) / 0.005, case: at, clause: '風力規範 4.2·2.12' })
   }
   /* 耐震規範 2.16.1: V* (I = 1) 지진력 아래 층간변위각 ≤ 0.005 — EX/EY 변위 × cStar/c */
-  for (const [key, comp, lc, d] of [['seisDriftX', 'dx', 'EX', 'X'], ['seisDriftY', 'dy', 'EY', 'Y']] as const) {
+  /* 엔지니어 지진 하중(F2)은 V 인지 V* 인지 앱이 모름 → 2.16.1 변위각은 검토하지 않고 전문가 검토(scope genLoads) */
+  for (const [key, comp, lc, d] of info.gen ? [] : [['seisDriftX', 'dx', 'EX', 'X'], ['seisDriftY', 'dy', 'EY', 'Y']] as const) {
     const s = info.seismic[d]
     /* 2.16.1 "計算位移時應計及平移與扭轉位移" — E ± ET */
     let v = 0
@@ -394,9 +395,10 @@ function runFactoryDesign(spec: FactorySpec, model: FactoryModel, info: LoadInfo
     service.push({ key, value: v / steelHeight(spec), limit: 0.005, ratio: v / steelHeight(spec) / 0.005, case: `${lc} × V*/V`, clause: '耐震規範 2.16.1' })
   }
   /* LRFD 11.5.3: 활하중 처짐 ≤ 스팬/360 — 지붕보: 마루 − 처마 평균 (LR), 퍼린: 단순보 5wL⁴/384EI */
-  const lr = res.disp.get('LR')
-  if (lr) {
-    service.push({ key: 'rafterDefl', ...roofDeflection(spec, model, res, ['LR'], 360), clause: 'LRFD 11.5.3' })
+  /* 엔지니어 하중은 L·LR 종류 케이스마다(최대) */
+  const liveCases = info.gen ? info.gen.liveCases : res.disp.get('LR') ? ['LR'] : []
+  if (liveCases.length) {
+    service.push({ key: 'rafterDefl', ...roofDeflection(spec, model, res, liveCases, 360), clause: 'LRFD 11.5.3' })
   }
   const Lp = spec.baySpacing
   const dPur = purlinDefl(spec, info, spec.sections.purlin)
