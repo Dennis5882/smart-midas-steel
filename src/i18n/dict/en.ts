@@ -655,6 +655,11 @@ export const en = {
   g_help_2: 'Release notes',
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_5_7_1: 'After [Create in Gen NX], choose what is sent to Gen (full model / model + self weight only) in the confirm dialog; it starts at your previous choice',
+  rn_v2_5_7_2: 'Taiwan: [Read loads from Gen] — reads the loads and combinations an engineer entered in Gen, shows them for review before analysis (case resultants, combination issues, missing-load notices) and, once confirmed, analyses and checks with them; reactions are compared per case after analysis',
+  rn_v2_5_7_3: 'Set a purpose for each read combination (basic / amplified seismic E′ / gravity 13.6.1 / ASD) — guessed from the name first, then corrected by the engineer; the seismic chapter 13 special checks use these purposes',
+  rn_v2_5_7_4: 'Section optimization and NG repair on an engineer-load model change only the sections instead of rebuilding the Gen model, so the engineer loads stay in place',
+  rn_v2_5_7_5: 'Sections an engineer changed in Gen (one section per role, from the app section list) are accepted on read and applied to the app model and editor; differing shear-deformation / warping options are noted',
   rn_v2_5_6_1: 'Crane runway shear: wheel positions just inside each support were added so the peak shear is captured (checked against a Gen moving-load analysis)',
   rn_v2_5_6_2: 'Taiwan wind: a table of wind pressure q(z) at girt, eave and ridge heights is shown in the preview and the report',
   rn_v2_5_6_3: 'Taiwan topographic factor Kzt can now be entered (default 1, applied to the wind pressure at every height)',
