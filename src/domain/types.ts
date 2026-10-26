@@ -5,7 +5,7 @@ import type { AdditionModel, AdditionUsage, FactoryAdditions } from './additionT
 
 /* 공장형 단경간 포털 프레임 입력 스펙. 단위: m, kN */
 export type FrameType = 'gable' | 'mono' | 'multi' | 'gableCols' | 'truss'
-export const FRAME_TYPES: FrameType[] = ['gable', 'gableCols', 'multi', 'mono', 'truss']
+export const FRAME_TYPES: FrameType[] = ['gable', 'gableCols', 'mono', 'multi', 'truss']
 /** 트러스 지붕 (TW, v2.4.9) — 박공 지붕선 = 상현재(rafter), 하현재(chord)·웨브(web) 추가. 박공 프레임은 지붕보 + 풍주 그대로 */
 export const isTruss = (spec: Pick<FactorySpec, 'frame'>) => spec.frame === 'truss'
 /** 트러스 기본 단면 (TW CNS2020) — 하현재 RH, 웨브 원형강관 */

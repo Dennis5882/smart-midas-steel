@@ -4,7 +4,7 @@ import { additionLabelKey } from '../domain/additionTypes'
    story 와 같은 정리: 범례 위쪽 가로, 표시 토글(주골조·2차부재·가새·지점·절점), 정투영(정면·측면·평면)은 시선 방향 축을 숨기고 화면을 채움.
    Plotly 아이콘 도구 막대(이미지·확대·이동·회전·홈)는 story 처럼 오른쪽 위 가로·투명, 우리 막대에는 아이콘에 없는 ＋/－ 와 [선 | 단면] (drawing/solid — 실제 단면 치수 입체).
    토글·표시 방식을 바꿔도 사용자가 돌린 시점은 유지(uirevision = 시점). */
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { solidMeshes } from '../drawing/solid'
 import { buildPortal, portalGeometry, risingAt } from '../domain/portal'
 import { ROLES, type ElementRole, type FactoryModel, type FactorySpec, isBaseNode } from '../domain/types'
@@ -36,11 +36,13 @@ function palette() {
 }
 type Pal = ReturnType<typeof palette>
 
+const T = 1e-3
 const CAMS: Record<CamId, { eye: { x: number; y: number; z: number }; up?: { x: number; y: number; z: number } }> = {
   iso: { eye: { x: 1.5, y: -1.7, z: 1.0 } },
-  front: { eye: { x: 0, y: -2.5, z: 0 } },  // 프레임 면(X–Z)
-  side: { eye: { x: 2.5, y: 0, z: 0 } },    // 길이 방향(Y–Z)
-  top: { eye: { x: 0, y: 0, z: 2.5 }, up: { x: 0, y: 1, z: 0 } },
+  /* 정투영은 눈에 안 보일 만큼(≈0.02°) 기울인다 — 정확히 축 방향이면 Plotly 가 눈금·축 이름 쪽을 동률로 골라 패널 크기가 바뀔 때 반대편으로 옮겨 겹친다(2026-10-27 캡처: 크기 변경 뒤 카메라 z −5.6e-16 → 0) */
+  front: { eye: { x: T, y: -2.5, z: -T } },  // 프레임 면(X–Z)
+  side: { eye: { x: 2.5, y: T, z: -T } },    // 길이 방향(Y–Z)
+  top: { eye: { x: T, y: -T, z: 2.5 }, up: { x: 0, y: 1, z: 0 } },
 }
 
 /** 범례 겸 표시 토글 — 부재 종류별 + 지점·절점 (Plotly 범례는 쓰지 않음: 같은 정보가 두 번 나오던 것 정리) */
@@ -53,19 +55,30 @@ const TOGGLES: [keyof Vis3D, string, I18nKey, Mark][] = [
 /** 정투영에서 시선 방향 축 — 한 점으로 눌려 제목·눈금이 겹침 → 전부 끈다 (story 와 같음) */
 const HIDDEN_AX = { visible: false, title: { text: '' }, showticklabels: false, showgrid: false, showline: false, zeroline: false, ticks: '', showbackground: false, showspikes: false }
 
+const extents = (m: FactoryModel) => {
+  const ext = (k: 'x' | 'y' | 'z') => { const v = m.nodes.map((n) => n[k]); return Math.max(...v) - Math.min(...v) || 1 }
+  return { x: ext('x'), y: ext('y'), z: ext('z') }
+}
+/** 정투영에서 화면 가로·세로에 놓이는 축 */
+const ORTHO_AX: Record<Exclude<CamId, 'iso'>, ['x' | 'y', 'y' | 'z']> = { front: ['x', 'z'], side: ['y', 'z'], top: ['x', 'y'] }
 /** 축 비율 — iso 는 data 비율, 정투영은 보이는 두 축으로 화면을 채움 × zoom (정투영은 카메라 거리를 무시) */
 function sceneOf(m: FactoryModel, c: CamId, zoom: number): Record<string, unknown> {
   if (c === 'iso') return { aspectmode: 'data' }
-  const ext = (k: 'x' | 'y' | 'z') => { const v = m.nodes.map((n) => n[k]); return Math.max(...v) - Math.min(...v) || 1 }
-  const d = { x: ext('x'), y: ext('y'), z: ext('z') }, k = 1.6 * zoom
-  const mx = c === 'front' ? Math.max(d.x, d.z) : c === 'side' ? Math.max(d.y, d.z) : Math.max(d.x, d.y)
+  const d = extents(m), k = 1.6 * zoom
+  const [h, v] = ORTHO_AX[c], mx = Math.max(d[h], d[v])
   return { aspectmode: 'manual', aspectratio: { x: (d.x / mx) * k, y: (d.y / mx) * k, z: (d.z / mx) * k } }
 }
+/** 패널 가로/세로 비 */
+const ratioOf = (el: HTMLElement) => el.clientWidth / Math.max(1, el.clientHeight) || 1.35
 /** ISO(원근) 기본 거리 — 패널이 정사각형·세로형이면 가로로 넘치므로 가로/세로 비에 맞춰 멀리 (1.22 에서 딱 맞음, 2026-10-15 캡처) */
-const isoFit = (el: HTMLElement) => {
-  const r = el.clientWidth / Math.max(1, el.clientHeight)
-  return 1 / Math.max(1.1, 1.35 / (r || 1.35))
+const isoFit = (el: HTMLElement) => 1 / Math.max(1.1, 1.35 / ratioOf(el))
+/** 정투영 맞춤 배율 — Plotly 정투영은 화면 높이 기준이라 패널이 좁아지면 가로가 넘친다 → 가로 축이 패널 너비에 들어가도록 줄임 (넓은 패널은 1 그대로). ORTHO_R0 0.95 = 가로 축이 패널 너비의 약 80% (2026-10-27 캡처: 배율 1 에서 가로/세로 1.1 일 때 69%) */
+const ORTHO_R0 = 0.95
+const orthoFit = (el: HTMLElement, m: FactoryModel, c: Exclude<CamId, 'iso'>) => {
+  const d = extents(m), [h, v] = ORTHO_AX[c]
+  return Math.min(1, ratioOf(el) / (ORTHO_R0 * (d[h] / Math.max(d[h], d[v]))))
 }
+const fitOf = (el: HTMLElement, m: FactoryModel, c: CamId) => (c === 'iso' ? isoFit(el) : orthoFit(el, m, c))
 const camOf = (c: CamId, zoom: number) => {
   const e = CAMS[c].eye
   return { eye: { x: e.x / zoom, y: e.y / zoom, z: e.z / zoom }, up: CAMS[c].up ?? { x: 0, y: 0, z: 1 }, projection: { type: c === 'iso' ? 'perspective' : 'orthographic' } }
@@ -145,6 +158,10 @@ export function View3D() {
   const s = useStore()
   const lang = useLang()
   const ref = useRef<HTMLDivElement>(null)
+  /** 지금 시점(rev)에 적용한 맞춤 배율 — 패널 크기가 바뀌면 이 값과의 비율만큼 고친다 */
+  const fitRef = useRef<{ rev: string; cam: CamId; fit: number }>({ rev: '', cam: 'iso', fit: 1 })
+  /** 정투영 패널 크기 변경 → 다시 그림 (축 비율만 relayout 하면 Plotly 가 축 이름·눈금을 반대편으로 옮겨 겹침, 2026-10-27 캡처) */
+  const [sized, setSized] = useState(0)
   const spec = s.preview ?? s.built?.spec ?? null
   const model = useMemo(() => (s.preview ? buildPortal(s.preview) : s.built?.model ?? null), [s.viewNonce, s.built])
   /* 강도비 색상 — 설계 검토 결과가 있고 미리보기가 아닐 때만 */
@@ -161,21 +178,25 @@ export function View3D() {
       const P = palette()
       const font = getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim() || 'monospace'
       const c = S.cam
+      /* 맞춤 배율 = 지금 패널 크기·모델 기준 (ISO 카메라는 시점 버튼·맞춤 때만 적용 — 토글·표시 방식 변경은 uirevision 이 사용자 시점 유지) */
+      const rev = `${c}:${S.camReset}`
+      const fit = fitOf(el, model, c)
+      fitRef.current = { rev, cam: c, fit }
       const ax = (hide: boolean, title: string) => (hide ? { ...axis(title, P, font), ...HIDDEN_AX } : axis(title, P, font))
       void Plotly.react(el, traces(model, spec, P, ratio, S.vis3d, solid, invalid), {
         paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', margin: { l: 0, r: 0, t: ratio ? 28 : 0, b: 0 },
         font: { family: font, color: P.txt }, showlegend: !!ratio,
         /* 시점 버튼·맞춤을 누를 때만 카메라를 다시 적용 — 토글·표시 방식 변경은 사용자 시점 유지 */
-        uirevision: `${c}:${S.camReset}`,
+        uirevision: rev,
         modebar: { orientation: 'h', bgcolor: 'rgba(0,0,0,0)', color: P.axis, activecolor: P.txt },
         /* 범례: 위쪽 가로 한 줄 (story) — 모델을 가리지 않음 */
         /* 강도비 보기에만 색 구간 범례 (부재 종류는 위 토글 줄이 범례) */
         legend: { orientation: 'h', x: 0, y: 1.03, itemclick: false, itemdoubleclick: false, bgcolor: P.legend, bordercolor: P.legendBd, borderwidth: 1, font: { size: 11, color: P.txt, family: font } },
         scene: {
-          ...sceneOf(model, c, 1),
+          ...sceneOf(model, c, c === 'iso' ? 1 : fit),
           /* 정투영은 시선 방향 축을 숨김 — 정면(X–Z) Y, 측면(Y–Z) X, 평면 Z */
           xaxis: ax(c === 'side', 'X (m)'), yaxis: ax(c === 'front', 'Y (m)'), zaxis: ax(c === 'top', 'Z (m)'),
-          camera: camOf(c, isoFit(el)),
+          camera: camOf(c, c === 'iso' ? fit : 1),
         },
       } as any, {
         responsive: true, displaylogo: false, displayModeBar: true, modeBarButtonsToRemove: ['resetCameraLastSave3d', 'hoverClosest3d'],
@@ -183,7 +204,31 @@ export function View3D() {
       } as any)
     })
     return () => { alive = false }
-  }, [model, spec, ratio, invalid, s.cam, s.camReset, s.theme, lang, s.vis3d, solid])
+  }, [model, spec, ratio, invalid, s.cam, s.camReset, s.theme, lang, s.vis3d, solid, sized])
+
+  /* 패널 크기가 바뀌면(창 크기·패널 경계 이동) 맞춤 배율이 바뀐 만큼만 고친다 — 사용자가 돌리거나 확대한 시점은 그대로, 모델 전체가 패널에 들어가게 */
+  useEffect(() => {
+    const el = ref.current as any
+    if (!el || !model) return
+    let timer = 0
+    const ro = new ResizeObserver(() => {
+      clearTimeout(timer)
+      timer = window.setTimeout(() => void loadPlotly().then((Plotly) => {
+        const sc = el._fullLayout?.scene, f0 = fitRef.current
+        if (!sc || !el.clientWidth || !f0.rev) return
+        const f1 = fitOf(el, model, f0.cam), q = f1 / f0.fit
+        if (Math.abs(q - 1) < 1e-3) return
+        fitRef.current = { ...f0, fit: f1 }
+        if (f0.cam !== 'iso') setSized((n) => n + 1)
+        else {
+          const e = sc.camera.eye
+          void Plotly.relayout(el, { 'scene.camera.eye': { x: e.x / q, y: e.y / q, z: e.z / q } } as any)
+        }
+      }), 120)
+    })
+    ro.observe(el)
+    return () => { clearTimeout(timer); ro.disconnect() }
+  }, [model])
 
   /** 확대·축소 — 지금 시점 기준 (원근: 카메라 거리, 정투영: 축 비율) */
   const zoom = (f: number) => void loadPlotly().then((Plotly) => {
