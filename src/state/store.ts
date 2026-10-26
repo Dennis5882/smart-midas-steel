@@ -45,8 +45,9 @@ export type ChatMsg = { ts?: string } & (
 /** Gen 에 보낸 모델 — 스펙·형상·하중 요약 */
 /** sent = Gen 에 보낸 페이로드(DB → Assign) — 해석·검토 직전 Gen 동일성 비교(actions/genSync) */
 /** modelOnly: [모델 + 자중만] 으로 생성 — Gen 에 하중 케이스 D(자중 BODF)만, 마감·활·풍·지진 하중과 조합 없음 → 앱 해석·검토·최적화 불가(엔지니어가 Gen 에서 하중 입력) */
-/** genLoads: Gen 에서 읽어 확정한 엔지니어 하중(F2) — cases·comboNames·info 는 Gen 하중 기준, sent 의 하중 표 = 읽은 내용(이후 Gen 에서 또 바뀌면 동일성 검사가 잡음) */
-export interface Built { spec: FactorySpec; model: FactoryModel; info: LoadInfo; cases: string[]; combos: number; comboNames: string[]; sent?: Record<string, Record<string, unknown>>; modelOnly?: boolean; genLoads?: import('../domain/genLoads').GenLoadSummary }
+/** genLoads: Gen 에서 읽어 확정한 엔지니어 하중(F2, 조합 용도 = 확정한 것) — cases·comboNames·info 는 Gen 하중 기준, sent 의 하중 표 = 읽은 내용(이후 Gen 에서 또 바뀌면 동일성 검사가 잡음).
+    genRaw: 읽은 하중 표 전부(합산하지 못하는 표 포함) — 단면 갱신 후 요약(자중 추정)을 다시 만들 때 */
+export interface Built { spec: FactorySpec; model: FactoryModel; info: LoadInfo; cases: string[]; combos: number; comboNames: string[]; sent?: Record<string, Record<string, unknown>>; modelOnly?: boolean; genLoads?: import('../domain/genLoads').GenLoadSummary; genRaw?: Record<string, Record<string, unknown>> }
 
 /** 진행 중 작업 — stage = 문구 키, step/total = 이 단계 MAPI 호출 수, iter = 최적화 반복 [n, 최대] */
 export type JobKind = 'build' | 'anal' | 'design' | 'opt' | 'pdf' | 'docx' | 'dwgpdf' | 'restore' | 'readback'
@@ -158,7 +159,7 @@ export const S = {
   /** 마지막 [공장 생성] 직전 Gen 문서 백업 (Gen PC 경로) — [이전 모델로 복원] 대상 */
   restorePoint: null as string | null,
   /** Gen 에서 읽어 온 하중 — 확인 화면에서 확정 전 (F2). built = 읽을 때의 모델(바뀌면 무효) */
-  genRead: null as { summary: import('../domain/genLoads').GenLoadSummary; raw: Record<string, Record<string, unknown>>; built: Built } | null,
+  genRead: null as { summary: import('../domain/genLoads').GenLoadSummary; raw: Record<string, Record<string, unknown>>; built: Built; kinds: Record<string, import('../codes').ComboKind>; sections?: { spec: FactorySpec; changes: import('../domain/genSections').SectionChange[] }; SECT: Record<string, unknown>; ELEM: Record<string, unknown>; sectionOptions: string[] } | null,
   theme: readTheme(),
   code: readCode(),
   cam: 'iso' as CamId,
@@ -193,6 +194,20 @@ export function nextId(): number { return ++idSeq }
 export function notify(): void {
   version++
   listeners.forEach((f) => f())
+}
+
+/** Gen 모델이 바뀌었거나 바뀌는 중 — 해석·검토·최적화·NG 보완 결과를 모두 비운다 (모델 재생성·단면 갱신·Gen 하중 확정·복원 공통) */
+export function clearResults(): void {
+  S.genChanged = 0
+  S.analyzed = false
+  S.reactions = null
+  S.baseReactions = null
+  S.results = null
+  S.design = null
+  S.connections = null
+  S.opt = null
+  S.repairPlan = null
+  S.repairComparison = null
 }
 
 /** 컴포넌트 구독 — version 이 바뀔 때마다 재렌더하고 S 를 그대로 돌려준다 */

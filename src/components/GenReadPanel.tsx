@@ -1,10 +1,12 @@
 /* Gen 하중 불러오기 (F2 1단계) — 해석 단계 화면. 불러오기 → 해석 전 확인(모델 동일·케이스·조합·안내) → 확정 → 해석 후 케이스별 반력 대조 */
 import { useState } from 'react'
-import { acceptGenLoads, acceptUnavailable, discardGenLoads, GEOMETRY_DBS, readbackUnavailable, readGenLoads } from '../actions/readback'
-import type { GenCase, GenCombo, GenLoadSummary } from '../domain/genLoads'
+import { acceptGenLoads, acceptUnavailable, discardGenLoads, readbackUnavailable, readGenLoads, setComboKind } from '../actions/readback'
+import type { ComboKind } from '../codes'
+import { GEN_GEOMETRY_DBS, WARN_ISSUES, type GenCase, type GenCombo, type GenLoadSummary } from '../domain/genLoads'
 import { t } from '../i18n'
 import { useStore } from '../state/store'
 
+const KINDS: ComboKind[] = ['basic', 'amplified', 'gravity', 'asd']
 const f1 = (x: number) => (Math.abs(x) < 0.05 ? '0.0' : x.toFixed(1))
 const comp = (c: GenCombo) => c.parts.map((p, i) => `${i ? (p.f < 0 ? ' − ' : ' + ') : p.f < 0 ? '−' : ''}${Math.abs(p.f) === 1 ? '' : Math.abs(p.f)}${p.lc}`).join('')
 
@@ -54,15 +56,27 @@ export function GenReadPanel() {
   const sm = read.summary, block = acceptUnavailable()
   return <section className="gen-read" aria-label={t('rb_title')}>
     <h3>{t('rb_confirm_title')}</h3>
-    <p className="task-success">✓ {t('rb_model_same', GEOMETRY_DBS.length)}</p>
+    <p className="task-success">✓ {t(read.sections ? 'rb_model_same_sect' : 'rb_model_same', GEN_GEOMETRY_DBS.length)}</p>
+    {read.sections && <>
+      <h4>{t('rb_sect_title', read.sections.changes.length)}</h4>
+      <table className="gr-table"><thead><tr><th>{t('rd_role')}</th><th>{t('rb_sect_from')}</th><th>{t('rb_sect_to')}</th><th>{t('rb_sect_count')}</th></tr></thead><tbody>
+        {read.sections.changes.map((c) => <tr key={c.role}><td>{t(`role_${c.role}`)}</td><td className="mono">{c.from}</td><td className="mono">{c.to}</td><td className="mono">{c.count}</td></tr>)}
+      </tbody></table>
+      <p className="mw-note">{t('rb_sect_note')}</p>
+    </>}
+    {read.sectionOptions.length > 0 && <p className="task-warning">{t('rb_sect_options', read.sectionOptions.join(', '))}</p>}
     <h4>{t('rb_cases', sm.cases.length)}</h4>
     <CaseTable s={sm} />
     {sm.cases.some((c) => c.approx || c.counts.self) && <p className="mw-note">{t('rb_sum_note')}</p>}
     <h4>{t('rb_combos', sm.combos.length)}</h4>
-    <table className="gr-table"><thead><tr><th>{t('rb_combo')}</th><th>{t('rb_comp')}</th><th></th></tr></thead><tbody>
+    <table className="gr-table"><thead><tr><th>{t('rb_combo')}</th><th>{t('rb_comp')}</th><th>{t('rb_kind')}</th><th></th></tr></thead><tbody>
       {sm.combos.map((c, i) => <tr key={`${c.name}-${i}`}><td className="mono">{c.name}</td><td className="mono">{comp(c)}</td>
-        <td>{c.issues.map((k) => <span key={k} className={`gr-badge ${k === 'zeroFactor' ? 'warn' : 'bad'}`}>{t(`rb_issue_${k}`)}</span>)}</td></tr>)}
+        <td><select aria-label={`${t('rb_kind')} ${c.name}`} value={read.kinds[c.name] ?? c.kind} disabled={s.busy} onChange={(e) => setComboKind(c.name, e.target.value as ComboKind)}>
+          {KINDS.map((k) => <option key={k} value={k}>{t(`rb_kind_${k}`)}</option>)}
+        </select></td>
+        <td>{c.issues.map((k) => <span key={k} className={`gr-badge ${WARN_ISSUES.has(k) ? 'warn' : 'bad'}`}>{t(`rb_issue_${k}`)}</span>)}</td></tr>)}
     </tbody></table>
+    <p className="mw-note">{t('rb_kind_note')}</p>
     {(sm.opaque.length > 0 || sm.notices.length > 0) && <ul className="gr-notes">
       {sm.opaque.length > 0 && <li>{t('rb_opaque', sm.opaque.join(', '))}</li>}
       {sm.notices.map((n) => <li key={n}>{n === 'unusedCase' ? t('rb_notice_unusedCase', sm.unused.join(', ')) : t(`rb_notice_${n}`)}</li>)}

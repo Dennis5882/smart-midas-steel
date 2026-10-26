@@ -30,7 +30,8 @@ function current(j: Pick<Job, 'kind' | 'stage' | 'detail'>): number {
     if (j.stage !== 'st_anal') return -1
     return /saveas/i.test(d) ? 1 : /\/doc\/anal/i.test(d) ? 2 : /\/post\//i.test(d) ? 3 : 1
   }
-  return PLAN[j.kind].indexOf(j.stage as I18nKey)
+  /* 엔지니어 하중 모델의 단면만 갱신(st_sections)은 재전송 단계와 같은 자리 */
+  return PLAN[j.kind].indexOf((j.stage === 'st_sections' ? 'st_send' : j.stage) as I18nKey)
 }
 
 export function jobSteps(j: Pick<Job, 'kind' | 'stage' | 'detail'>): { key: I18nKey; status: JobStepStatus }[] {

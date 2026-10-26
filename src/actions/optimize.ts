@@ -13,7 +13,7 @@ import { t, lt, ltc } from '../i18n'
 import { S, notify } from '../state/store'
 import { addMsg, draw3D, log, tab } from '../state/ui'
 import { analyzeCore } from './analysis'
-import { sendModel } from './build'
+import { resendModel } from './build'
 import { checkResults, fetchResults, reusableResults } from './results'
 import { assertGenSync } from './genSync'
 import { quantities } from '../domain/quantities'
@@ -82,7 +82,7 @@ export async function runOptimize(): Promise<void> {
       if (!p.changed) { converged = d.ng === 0 && !blockedMembers(d) && rec.connNg === 0; if (converged) break }
       if (!p.changed || iters.some((x) => key(x.sections) === key(p.sections))) break
       for (const r of p.rows) if (r.before !== r.after) log(`${t(`role_${r.role}`)}: ${r.before} → ${r.after} (${r.ratio.toFixed(2)})`, 'info')
-      await sendModel({ ...b.spec, sections: p.sections })
+      await resendModel({ ...b.spec, sections: p.sections })
       await analyzeCore()
     }
 
@@ -90,7 +90,7 @@ export async function runOptimize(): Promise<void> {
     const { best, valid } = pickBest(iters)
     if (key(best.sections) !== key(S.built!.spec.sections)) {
       log(t('log_opt_restore', best.it), 'info')
-      await sendModel({ ...start, sections: best.sections })
+      await resendModel({ ...start, sections: best.sections })
       await analyzeCore()
       S.results = await fetchResults(S.built!)
       ;({ design: d, connections: cs } = checkResults(S.built!, S.results))

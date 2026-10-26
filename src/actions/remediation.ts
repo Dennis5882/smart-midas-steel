@@ -6,7 +6,7 @@ import { createRepairPlan, previewRepair, repairMetrics, type RepairPlan } from 
 import { checkScope } from '../domain/scope'
 import { assertGenSync } from './genSync'
 import { beginJob, checkCancel, endJob, failMsg, stage } from './job'
-import { sendModel } from './build'
+import { resendModel } from './build'
 import { analyzeCore } from './analysis'
 import { checkResults, fetchResults } from './results'
 import { confirmAction } from '../components/ConfirmDialog'
@@ -51,7 +51,7 @@ export async function applyRepairs(selection:Record<string,string>):Promise<void
   try {
     await assertGenSync()
     checkCancel()
-    await sendModel(preview.spec,(backup)=>{S.restorePoint=backup;notify()})
+    await resendModel(preview.spec,(backup)=>{S.restorePoint=backup;notify()})
     await analyzeCore()
     const b=S.built!
     S.results=await fetchResults(b)

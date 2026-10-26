@@ -17,7 +17,7 @@ MIDAS Gen NX 단층 강구조 공장 자동 모델링·해석·설계 검토 웹
 4. **커밋 전 `npm run verify`**(오프라인 34종, ~200 s, Gen·키 불필요) 통과.
 5. **라이브 Gen 안전**(사용자 PC 의 Gen 을 직접 조작):
    - 항상 `node --import tsx scripts/live-guarded.ts -- <스크립트> [인자]` — 열린 원본 문서를 저장하고 끝나면 다시 열어 12 DB 해시 일치를 확인한다. 결과에 "restored original: 12 DB hashes match" 가 없으면 사용자에게 보고.
-   - **다른 작업이 Gen 을 쓰는 중이면 멈춘다**: `C:/temp` 에 최근 10분 안에 `sf_*`·`gen_rc_temp_*` 파일이 생겼으면 실행하지 않는다(사용자가 "지금 해도 됨"이라고 하면 진행). 긴 실행은 백그라운드로.
+   - **다른 작업이 Gen 을 쓰는 중이면 멈춘다**: `C:/temp` 에 최근 10분 안에 `sf_*`·`gen_rc_temp_*`·`midas-nx-live-gen*`(SDK Gen 라이브 시험) 파일이 생겼으면 실행하지 않는다 — Civil 은 키가 달라 무관(`midas-nx-live-civil-*` 는 무시, 사용자 확인 2026-10-26)(사용자가 "지금 해도 됨"이라고 하면 진행). 긴 실행은 백그라운드로(`run_in_background` — 앞에서 실행하다 백그라운드로 넘어가면 stdin 이 열린 채라 `mapi-key.ts` 가 키를 stdin 에서 기다리며 멈춘다, `< /dev/null` 로 막기).
    - `doc/new`·`doc/anal` 직전 항상 자동 저장(`actions/save.ts`), raw `doc/anal` 금지 — 저장 안 된 문서로 해석하면 Gen 대화상자가 떠 API 전체가 멈춘다.
 6. UI 문구는 `t('key')` 만(인라인 다국어 금지), 새 오류에 영어 문장 하드코딩 금지 — 식별자를 담은 오류 클래스 + `job.failText` 번역(`rv_*`·`q_invalid` 방식).
 7. 원문 근거가 없는 규범 값·해석은 만들지 않는다. 불확실하면 등급을 `expert`/`prelim` 으로 두고 사유를 남긴다. **'모두 OK' 문구 금지**(등급 요약).
@@ -74,7 +74,7 @@ Vite 8 + TypeScript + React 19 + Tailwind v4(화면은 `src/styles/app.css` 클�
 ## 진행 중·계획 (2026-10-22)
 
 - **Gen 전송 내용 선택**: [Gen NX 에 모델 생성] 을 누르면 뜨는 생성 확인 창(`confirmChoice`, 매번 묻고 '다시 묻지 않기' 없음, 처음 값 = 직전 선택 `S.activePlan.modelOnly`)에서 정상 / 모델 + 자중만 — 2026-10-26 현지 요청으로 7단계 화면의 라디오(`GenContentPicker`)에서 옮김(`selfWeightOnly` → STLD·BODF 만, 해석·검토·최적화 `flow_model_only` 차단, 산출물 허용). 라이브 확인 2026-10-22(기본·RC 받침 모두 통과). `runAnalysis`·`runDesignCheck`·`runOptimize` 진입점은 화면 버튼과 같은 `taskFlow.unavailable` 을 호출(규칙 출처 하나), 하중 페이로드·자중 케이스는 `buildEpoch` 올리기 전에 확인(실패해도 편집기 안 잠김), 모델 탭 `model_only_tag`(미리보기 중엔 `model_only_preview_tag`)·계산서 3·4장 안내,  3D 시점: 사용자가 단계를 옮기면(오류 단계로 되돌아감 포함) `STEP_CAM`, 새 편집기는 첫 단계 시점, 재개·결과 [수정] 이동은 보던 시점 유지.
-- **Gen 엔지니어 하중 읽어 오기(F2)**: 1단계 구현(TW·추가 구조 없음) — 해석 단계 `GenReadPanel` → `actions/readback.ts`(형상 동일성 + 하중 읽기 → `S.genRead` 확인 → 확정 시 `Built.genLoads`·`info.gen`), 순수 요약 `domain/genLoads.ts`. 조합은 모두 basic, 지진 변위각·13장·ASD·기초는 scope warn `genLoads`, 최적화·NG 보완 막음(2단계에서 단면만 PUT). 라이브: 같은 하중이면 부재 강도비 완전 동일. 상세·한계 `docs/reference/gen-readback-scope.md`(대만 공유 번체 Word `output/taiwan/Gen讀回工程師載重_流程說明.docx` — 1단계 구현 전 작성).
+- **Gen 엔지니어 하중 읽어 오기(F2)**: 1·2단계 구현(TW·추가 구조 없음) — 해석 단계 `GenReadPanel` → `actions/readback.ts`(형상 동일성 + 하중 읽기 → `S.genRead` 확인: 조합 용도 지정(`guessComboKind` 추정 + 수정)·Gen 에서 바꾼 단면(`domain/genSections.ts reviewGenSections` — 역할마다 한 단면·앱 목록·같은 정의면 받아들임, 해석 옵션 차이는 안내) → 확정 시 `Built.genLoads`·`info.gen`), 순수 요약 `domain/genLoads.ts`. 최적화·NG 보완은 `resendModel` → `updateSections`(SECT·ELEM 만 PUT, 엔지니어 하중 유지). 증폭 지진 추정은 이름 표시(′·'·Ω)로만(계수 > 1 은 일반 + 안내), 엔지니어 지진 케이스는 V/V* 를 몰라 지진 변위각·처마 θE 를 쓰지 않음, 기초도 미검토(scope warn `genLoads`). 결과 초기화는 `store.clearResults()` 한 곳. 라이브(2026-10-26): 같은 하중·조합이면 추정 용도·부재·접합 완전 동일, 엔지니어 하중 최적화도 정상 모델링과 같은 결과(doc/new 0회), Gen 에서 바꾼 기둥 단면 받아들여 부재 강도비 동일(옵션 같을 때). 상세 `docs/reference/gen-readback-scope.md`(대만 공유 번체 Word `output/taiwan/Gen讀回工程師載重_流程說明.docx` — 구현 전 작성).
 - 보류(사용자 결정): 케이스 결과만 회수해 앱에서 조합(속도), 동일성 검사 대상 확대(회의 F2 와 함께), RC 받침 + 추가 구조, Kzt 표 2.3 자동, FBLA 면 하중 옵션.
 
 ## 검증

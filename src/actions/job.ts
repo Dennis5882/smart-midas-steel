@@ -7,6 +7,7 @@ import { addMsg, recordActivity } from '../state/ui'
 import { ResultValidationError } from '../domain/resultValidation'
 import { QuantityError } from '../domain/quantities'
 import { SelfWeightError } from '../domain/loads'
+import { SectionReviewError, SectionUpdateError } from '../domain/genSections'
 import { GenChangedError } from './genSync'
 import { diffText } from '../domain/genSync'
 
@@ -85,5 +86,7 @@ function failText(e: unknown, failKey: (m: string) => string): string {
   if (e instanceof ResultValidationError) return failKey(t('results_invalid', [e.table, t(`rv_${e.issue}`), e.where].filter(Boolean).join(' · ')))
   if (e instanceof QuantityError) return failKey(t('q_invalid', e.where))
   if (e instanceof SelfWeightError) return failKey(t('sw_missing'))
+  if (e instanceof SectionReviewError) return failKey(t(`rb_sect_${e.reason}`, e.detail))
+  if (e instanceof SectionUpdateError) return failKey(t('rb_geometry'))
   return failKey(e instanceof Error ? e.message : String(e))
 }

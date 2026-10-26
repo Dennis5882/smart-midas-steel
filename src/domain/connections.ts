@@ -260,18 +260,23 @@ export function runConnections(spec: FactorySpec, model: FactoryModel, info: Loa
     const Mp = (raf.Zx * (profileOf(spec.code).fyAt?.(spec.material, Math.max(raf.tf, raf.tw)) ?? mat.fy)) / 1e6 // kN·m
     const Lh = G.rafterLen - col.d / 1000 // 처마~처마 기둥면 사이 지붕보 길이 (m)
     const grav = kneeEls.flatMap((e) => endForces(res, e.id, kneePart(e), (c) => kind(c) === 'gravity'))
-    const amp1 = kneeEls.flatMap((e) => endForces(res, e.id, kneePart(e), (c) => kind(c) === 'amplified' && c.includes('13.3-1')))
+    /* 엔지니어 조합(F2)은 이름으로 13.3-1 을 가릴 수 없어 증폭 지진 조합 전부 — V(13.3-1) 상한이 커져 보수적 */
+    const amp1 = kneeEls.flatMap((e) => endForces(res, e.id, kneePart(e), (c) => kind(c) === 'amplified' && (!!info.gen || c.includes('13.3-1'))))
     const Vg = Math.max(0, ...grav.map((f) => f.V)), V13 = Math.max(0, ...amp1.map((f) => f.V))
     const Vu = V13 > 0 ? Math.min(Vg + (2 * Mp) / Lh, V13) : Vg + (2 * Mp) / Lh
     const Pg = grav.length ? grav.reduce((a, f) => (f.P > a.P ? f : a)).P : 0
     kneeF.push({ elem: kneeEls[0].id, combo: '13.6.1 Mp', P: Pg, M: Mp, V: Vu, Vw: 0 })
-    /* 13.7.2-3a 소요 소성 회전각: min(0.01, 1.1(R − 1)θE), θE = 설계 지진 EX 처마 변위각 */
-    const ex = res.disp.get('EX')
-    const eave = model.nodes.filter(G.isEaveNode)
-    const thetaE = ex ? Math.max(0, ...eave.map((n) => Math.abs(ex.get(n.id)?.dx ?? 0))) / steelHeight(spec) : 0
-    const thetaP = Math.min(0.01, 1.1 * (info.seismic.X.R - 1) * thetaE)
     kneeDims.Mu = `Mp = ${Mp.toFixed(1)} kN·m, Vu = ${Vu.toFixed(1)} kN (13.6.1)`
-    kneeDims.thetaP = `θp,req = ${thetaP.toFixed(4)} rad (13.7.2-3a, θE = ${thetaE.toFixed(5)})`
+    /* 13.7.2-3a 소요 소성 회전각: min(0.01, 1.1(R − 1)θE), θE = 설계 지진 EX 처마 변위각.
+       엔지니어 지진 케이스(F2)는 V 인지 V* 인지 앱이 모름(design.ts 지진 변위각을 건너뛰는 것과 같은 이유) → θE 를 쓰지 않고 상한 0.01 rad 만 표시 */
+    if (info.gen) kneeDims.thetaP = `θp,req ≤ 0.0100 rad (13.7.2-3a)`
+    else {
+      const ex = res.disp.get('EX')
+      const eave = model.nodes.filter(G.isEaveNode)
+      const thetaE = ex ? Math.max(0, ...eave.map((n) => Math.abs(ex.get(n.id)?.dx ?? 0))) / steelHeight(spec) : 0
+      const thetaP = Math.min(0.01, 1.1 * (info.seismic.X.R - 1) * thetaE)
+      kneeDims.thetaP = `θp,req = ${thetaP.toFixed(4)} rad (13.7.2-3a, θE = ${thetaE.toFixed(5)})`
+    }
     kneeNotes.push('rotTest')
   }
   /* 마루: 마루 절점에 닿는 지붕보 끝 */

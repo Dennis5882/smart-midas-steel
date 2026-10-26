@@ -4,6 +4,8 @@
 import { profileOf } from '../codes'
 import { buildGenPayloads } from '../domain/gen'
 import { buildLoadPayloads, selfWeightOnly } from '../domain/loads'
+import { GEN_FIXED_DBS, genLoadInfo, summarizeGenLoads } from '../domain/genLoads'
+import { SectionUpdateError } from '../domain/genSections'
 import { buildPortal } from '../domain/portal'
 import type { FactorySpec } from '../domain/types'
 import { checkScope } from '../domain/scope'
@@ -15,7 +17,7 @@ import { mapi, tableOf } from '../mapi/client'
 import { autoSave, autoSavePath } from './save'
 import { confirmAction, confirmChoice } from '../components/ConfirmDialog'
 import { beginJob, Cancelled, endJob, failMsg, stage } from './job'
-import { S, notify } from '../state/store'
+import { S, clearResults, notify } from '../state/store'
 import { addMsg, draw3D, escapeHtml, log, tab } from '../state/ui'
 
 /** Gen 으로 보낼 내용은 생성 확인 창에서 고른다 — 정상 모델링 / [모델 + 자중만](형상·재료·단면·지점·단부 해제 + 자중 D, 엔지니어가 하중을 직접 넣는 용도).
@@ -107,11 +109,7 @@ export async function sendModel(spec: FactorySpec, onReplaced?: (backup: string)
   for (const [name, assign] of steps) await mapi('PUT', name, { Assign: assign }, String(Object.keys(assign).length))
   if (designCode) await mapi('PUT', 'DSTL', { Assign: { 1: { DGNCODE: designCode } } })
   await verifyCounts(Object.fromEntries(steps))
-  const sectionTable = await mapi<any>('POST', '/post/TABLE', { Argument: {
-    TABLE_NAME: 'SectionSource', TABLE_TYPE: 'SECTIONALL', UNIT: { FORCE:'KN', DIST:'MM', HEAT:'KJ', TEMP:'C' },
-  } }, 'Gen section source')
-  const sourceDifferences = sectionSourceDifferences(spec.code, p.SECT, tableOf(sectionTable))
-  if (sourceDifferences.length) throw new Error(t('section_source_mismatch', sourceDifferences.slice(0,4).join(', ')))
+  await checkSectionSource(spec, p.SECT)
   /* Gen 화면을 ISO 전체 보기로 (story 와 같은 각도, H 30·V 15). view/ANGLE 은 각도만 바꾸고 확대는 그대로라
      doc/new 직후 원점 근처가 크게 확대된 채 남는다. 맞춤(fit) 전용 API 는 없고, view/CAPTURE 의 ZOOM_LEVEL 100(Zoom Fit)이
      캡처 뒤에도 화면에 남는다 — 라이브 2026-10-19 확인 (view/ACTIVE All·doc/open 재열기는 효과 없음). 작은 PNG 하나가 저장 폴더에 남는다.
@@ -135,18 +133,69 @@ export async function sendModel(spec: FactorySpec, onReplaced?: (backup: string)
   return model
 }
 
+/** Gen 단면 성질(SECTIONALL A/I/J)이 앱 기준값과 같은지 — 다르면 완료 차단 */
+async function checkSectionSource(spec: FactorySpec, sect: Record<string, unknown>): Promise<void> {
+  const sectionTable = await mapi<any>('POST', '/post/TABLE', { Argument: {
+    TABLE_NAME: 'SectionSource', TABLE_TYPE: 'SECTIONALL', UNIT: { FORCE:'KN', DIST:'MM', HEAT:'KJ', TEMP:'C' },
+  } }, 'Gen section source')
+  const sourceDifferences = sectionSourceDifferences(spec.code, sect, tableOf(sectionTable))
+  if (sourceDifferences.length) throw new Error(t('section_source_mismatch', sourceDifferences.slice(0,4).join(', ')))
+}
+
+/** 단면이 바뀐 스펙을 Gen 에 반영 — 엔지니어 하중(F2)이 있으면 단면만(updateSections), 아니면 모델 재생성(sendModel). 최적화·NG 보완 공통 */
+export async function resendModel(spec: FactorySpec, onReplaced?: (backup: string) => void) {
+  return S.built?.genLoads ? updateSections(spec, onReplaced) : sendModel(spec, onReplaced)
+}
+
+/** 엔지니어 하중(F2 2단계)이 있는 모델의 단면만 바꾸기 — doc/new 없이 SECT·ELEM 만 PUT. 요소·절점 번호가 그대로라 Gen 의 엔지니어 하중(BMLD·CNLD·조합)이 유지되고,
+    자중(BODF)은 Gen 이 새 단면으로 다시 계산한다. 쓰지 않게 된 옛 단면 번호는 Gen 에 남는다(요소가 참조하지 않음 — 동일성 기준은 다시 읽은 SECT). */
+export async function updateSections(spec: FactorySpec, onBackup?: (backup: string) => void) {
+  const b = S.built
+  if (!b?.genLoads || !b.sent) throw new SectionUpdateError([])
+  const model = buildPortal(spec)
+  const p = buildGenPayloads(spec, model)
+  const designCode = profileOf(spec.code).gen.designCode
+  const want: Record<string, unknown> = { ...p, ...(designCode ? { DSTL: { 1: { DGNCODE: designCode } } } : {}) }
+  const same = (x: unknown, y: unknown) => JSON.stringify(x) === JSON.stringify(y)
+  const changed = GEN_FIXED_DBS.filter((db) => !same(want[db], b.sent![db]))
+  if (model.elements.length !== b.model.elements.length || changed.length) throw new SectionUpdateError(changed)
+  stage('st_sections', 4)
+  const backup = await autoSave('backup')
+  onBackup?.(backup)
+  /* 여기부터 Gen 단면은 이전 모델이 아니다 — 중간 실패·취소 때 이전 결과가 지금 모델의 결과로 남지 않게 먼저 비운다.
+     S.built 는 새 객체(최적화 실패 처리가 이전 결과를 되살리지 않게), 동일성 기준은 그대로 — 다음 해석 직전 검사가 차이를 잡고 [Gen 하중 불러오기]로 다시 맞춘다 */
+  S.built = { ...b }
+  clearResults()
+  notify()
+  await mapi('PUT', 'SECT', { Assign: p.SECT }, String(Object.keys(p.SECT).length))
+  await mapi('PUT', 'ELEM', { Assign: p.ELEM }, String(Object.keys(p.ELEM).length))
+  /* 확인 — 보낸 단면·요소가 그대로 들어갔는지 (SECT 는 남은 옛 번호를 허용) */
+  stage('st_verify', 3)
+  const gotSect = (await mapi<Record<string, unknown>>('GET', 'SECT', undefined, 'verify'))?.SECT
+  const gotElem = (await mapi<Record<string, unknown>>('GET', 'ELEM', undefined, 'verify'))?.ELEM
+  if (!isRecord(gotSect) || !isRecord(gotElem)) throw new Error(t('verify_fail', t('gen_bad_response')))
+  const bad = [...dbDifferences('SECT', p.SECT, gotSect, 3).filter((d) => d.added === undefined || d.removed), ...dbDifferences('ELEM', p.ELEM, gotElem, 3)]
+  if (bad.length) throw new Error(t('verify_fail', bad.map(diffText).join(', ')))
+  await checkSectionSource(spec, p.SECT)
+  const l = buildLoadPayloads(spec, model)
+  /* 요약은 읽은 하중 표 전부(합산 못 하는 표 포함)로 다시 — 자중 추정만 새 단면, 조합 용도는 확정한 것 */
+  const kinds = new Map(b.genLoads.combos.map((c) => [c.name, c.kind]))
+  const fresh = summarizeGenLoads(spec, model, b.genRaw ?? b.sent)
+  const summary = { ...fresh, combos: fresh.combos.map((c) => ({ ...c, kind: kinds.get(c.name) ?? c.kind })) }
+  S.built = { ...b, spec, model, info: genLoadInfo(l.info, summary), genLoads: summary, sent: { ...b.sent, SECT: gotSect, ELEM: p.ELEM } }
+  clearResults()
+  S.lastSpec = spec
+  S.draftSpec = spec
+  S.draftInvalid = false
+  S.modelRevision++
+  log(t('log_sections_updated', Object.keys(p.SECT).length), 'ok')
+  notify()
+  return model
+}
+
 function clearBuilt(): void {
   S.built = null
-  S.genChanged = 0
-  S.analyzed = false
-  S.reactions = null
-  S.baseReactions = null
-  S.results = null
-  S.design = null
-  S.connections = null
-  S.opt = null
-  S.repairPlan = null
-  S.repairComparison = null
+  clearResults()
   notify()
 }
 
