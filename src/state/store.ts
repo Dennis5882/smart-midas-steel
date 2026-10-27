@@ -47,7 +47,9 @@ export type ChatMsg = { ts?: string } & (
 /** modelOnly: [모델 + 자중만] 으로 생성 — Gen 에 하중 케이스 D(자중 BODF)만, 마감·활·풍·지진 하중과 조합 없음 → 앱 해석·검토·최적화 불가(엔지니어가 Gen 에서 하중 입력) */
 /** genLoads: Gen 에서 읽어 확정한 엔지니어 하중(F2, 조합 용도 = 확정한 것) — cases·comboNames·info 는 Gen 하중 기준, sent 의 하중 표 = 읽은 내용(이후 Gen 에서 또 바뀌면 동일성 검사가 잡음).
     genRaw: 읽은 하중 표 전부(합산하지 못하는 표 포함) — 단면 갱신 후 요약(자중 추정)을 다시 만들 때 */
-export interface Built { spec: FactorySpec; model: FactoryModel; info: LoadInfo; cases: string[]; combos: number; comboNames: string[]; sent?: Record<string, Record<string, unknown>>; modelOnly?: boolean; genLoads?: import('../domain/genLoads').GenLoadSummary; genRaw?: Record<string, Record<string, unknown>> }
+export interface Built { spec: FactorySpec; model: FactoryModel; info: LoadInfo; cases: string[]; combos: number; comboNames: string[]; sent?: Record<string, Record<string, unknown>>; modelOnly?: boolean; genLoads?: import('../domain/genLoads').GenLoadSummary; genRaw?: Record<string, Record<string, unknown>>
+  /** 앱이 Gen 에 보낸 단면 번호(지우지 못하고 남은 번호 포함) — 그 자리 갱신에서 쓰지 않게 된 번호만 지운다 (Gen 에서 다시 읽은 sent.SECT 에는 다른 번호가 섞일 수 있음) */
+  appSect?: string[] }
 
 /** 진행 중 작업 — stage = 문구 키, step/total = 이 단계 MAPI 호출 수, iter = 최적화 반복 [n, 최대] */
 export type JobKind = 'build' | 'anal' | 'design' | 'opt' | 'pdf' | 'docx' | 'dwgpdf' | 'restore' | 'readback'
@@ -141,13 +143,32 @@ export function syncBaseUrl(lang: Lang): void {
   if (cur !== next) { S.baseUrl = next; notify() }
 }
 
+/** MIDAS API 설정 — 설정 창 [저장] 때만 이 브라우저(localStorage)에 저장 (사용자 결정 2026-10-27: 새로고침마다 키·폴더를 다시 넣는 불편).
+    키는 [이 브라우저에 MAPI-Key 기억]을 켰을 때만. storage 가 막혀 있으면 이번 세션만 */
+const SETTINGS_KEY = 'sms_mapi'
+type MapiSettings = { baseUrl?: string; mapiKey?: string; saveDir?: string }
+function readSettings(): MapiSettings {
+  try {
+    const j = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}') as Record<string, unknown>
+    const str = (k: string) => typeof j?.[k] === 'string' && (j[k] as string).trim() ? (j[k] as string).trim() : undefined
+    return { baseUrl: str('baseUrl'), mapiKey: str('mapiKey'), saveDir: str('saveDir') }
+  } catch { return {} }
+}
+/** 지금 설정을 저장 — rememberKey 가 꺼져 있으면 저장된 키도 지운다 */
+export function saveSettings(rememberKey: boolean): void {
+  const key = S.mapiKey.trim()
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ baseUrl: S.baseUrl.trim(), saveDir: S.saveDir.trim(), ...(rememberKey && key ? { mapiKey: key } : {}) })) } catch { /* storage 차단 — 이번 세션만 */ }
+}
+export const keyRemembered = (): boolean => !!readSettings().mapiKey
+const saved = readSettings()
+
 export const S = {
   ...freshWorkState(),
-  /* MIDAS API — MAPI-Key 는 메모리에만(저장 금지) */
-  baseUrl: defaultBaseUrl(getLang()),
-  mapiKey: '',
+  /* MIDAS API — 저장한 설정이 있으면 그 값 (saveSettings) */
+  baseUrl: saved.baseUrl ?? defaultBaseUrl(getLang()),
+  mapiKey: saved.mapiKey ?? '',
   /** 자동 저장 폴더 (Gen NX 실행 PC 기준) — 확인 창 방지용 */
-  saveDir: 'C:/temp',
+  saveDir: saved.saveDir ?? 'C:/temp',
   connected: false,
   connErr: false,
   program: '',
@@ -162,7 +183,7 @@ export const S = {
   /** 마지막 [공장 생성] 직전 Gen 문서 백업 (Gen PC 경로) — [이전 모델로 복원] 대상 */
   restorePoint: null as string | null,
   /** Gen 에서 읽어 온 하중 — 확인 화면에서 확정 전 (F2). built = 읽을 때의 모델(바뀌면 무효) */
-  genRead: null as { summary: import('../domain/genLoads').GenLoadSummary; raw: Record<string, Record<string, unknown>>; built: Built; kinds: Record<string, import('../codes').ComboKind>; sections?: { spec: FactorySpec; changes: import('../domain/genSections').SectionChange[] }; SECT: Record<string, unknown>; ELEM: Record<string, unknown>; sectionOptions: string[] } | null,
+  genRead: null as { summary: import('../domain/genLoads').GenLoadSummary; raw: Record<string, Record<string, unknown>>; built: Built; kinds: Record<string, import('../codes').ComboKind>; sections?: { spec: FactorySpec; model: import('../domain/types').FactoryModel; changes: import('../domain/genSections').SectionChange[] }; SECT: Record<string, unknown>; ELEM: Record<string, unknown>; sectionOptions: string[] } | null,
   theme: readTheme(),
   code: readCode(),
   cam: 'iso' as CamId,

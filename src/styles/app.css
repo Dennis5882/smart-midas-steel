@@ -695,6 +695,8 @@ td.pos{color:var(--green)} td.neg{color:var(--red)}
 .drawer .body{padding:20px;overflow-y:auto;flex:1}
 .field{margin-bottom:18px}
 .field label{display:block;font-size:.74rem;color:var(--muted);margin-bottom:6px;font-family:var(--font-ui);letter-spacing:.5px}
+.field .field-check{display:flex;align-items:center;justify-content:flex-start;gap:7px;margin:9px 0 2px;color:var(--txt);letter-spacing:0;cursor:pointer}
+.field .field-check input{width:auto;flex:none;margin:0;padding:0}
 .field input,.field select{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--txt);
   border-radius:8px;padding:9px 11px;font-family:var(--font-ui);font-size:.82rem}
 .field input:focus,.field select:focus{outline:none;border-color:var(--cyan)}

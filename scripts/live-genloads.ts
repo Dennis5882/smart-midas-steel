@@ -50,7 +50,7 @@ if (!r) throw new Error(`readback failed: ${last()}`)
 console.log(`[${sec()}s] read: cases ${r.summary.cases.length} combos ${r.summary.combos.length} opaque [${r.summary.opaque}] notices [${r.summary.notices}] block ${acceptUnavailable()} · GET errors for absent tables ${absentErrors}`)
 const kindMiss = r.summary.combos.filter((c) => c.kind !== l.info.comboKind[c.name]).map((c) => c.name)
 console.log(`guessed combo purposes = app: ${kindMiss.length === 0} ${kindMiss.slice(0, 5)}`)
-acceptGenLoads()
+await acceptGenLoads()
 await runAnalysis()
 if (!S.analyzed) throw new Error(`analysis failed: ${last()}`)
 /* 해석 전 합산 vs 반력 (반력 = −하중) */

@@ -11,7 +11,8 @@ import { withTrussDefaults, type ElementRole, type FactoryModel, type FactorySpe
 
 /** 받아들일 수 없는 단면 변경 — 화면 문구는 job.failText 가 현재 언어로(rb_sect_<reason>) */
 export class SectionReviewError extends Error {
-  constructor(readonly reason: 'elements' | 'mixed' | 'unknown' | 'definition', readonly detail: string) { super(`Gen section change not accepted: ${reason} ${detail}`); this.name = 'SectionReviewError' }
+  /** role = 역할 식별자(화면에는 role_<id> 번역으로 — 영어 식별자를 문구에 넣지 않음) */
+  constructor(readonly reason: 'elements' | 'mixed' | 'unknown' | 'definition', readonly detail: string, readonly role?: ElementRole) { super(`Gen section change not accepted: ${reason} ${role ?? ''} ${detail}`); this.name = 'SectionReviewError' }
 }
 
 /** 엔지니어 하중 모델에서 단면만 바꿀 수 없음 (형상·재료·지점·단부 해제가 보낸 모델과 다름 — updateSections) — 화면 문구 rb_geometry */
@@ -22,8 +23,9 @@ export class SectionUpdateError extends Error {
 export interface SectionChange { role: ElementRole; from: string; to: string; count: number }
 export type SectionReview =
   /** options — 해석 옵션(전단변형·뒴)이 앱 기본과 다른 단면 이름 (Gen 설정대로 해석됨 — 확인 화면 안내) */
-  | { ok: true; spec: FactorySpec; changes: SectionChange[]; options: string[] }
-  | { ok: false; reason: 'elements' | 'mixed' | 'unknown' | 'definition'; detail: string }
+  /** model = 받아들인 스펙의 모델 (단면 변경이 없으면 넘겨받은 모델 그대로 — 호출부가 다시 만들지 않게) */
+  | { ok: true; spec: FactorySpec; model: FactoryModel; changes: SectionChange[]; options: string[] }
+  | { ok: false; reason: 'elements' | 'mixed' | 'unknown' | 'definition'; detail: string; role?: ElementRole }
 
 const squash = (s: string) => s.replace(/\s/g, '')
 
@@ -60,17 +62,18 @@ export function reviewGenSections(spec: FactorySpec, model: FactoryModel, gotSec
   const sent = withTrussDefaults(spec).sections
   for (const [role, names] of byRole) {
     const cur = sent[role as keyof FactorySpec['sections']] ?? ''
-    if (names.size > 1) return { ok: false, reason: 'mixed', detail: `${role}: ${[...names.keys()].join(' / ')}` }
+    if (names.size > 1) return { ok: false, reason: 'mixed', detail: [...names.keys()].join(' / '), role: role as ElementRole }
     const [genName, count] = [...names][0]
     if (squash(genName) === squash(cur)) continue
     const app = appNameOf(spec, role, genName)
-    if (!app) return { ok: false, reason: 'unknown', detail: `${role}: ${genName}` }
+    if (!app) return { ok: false, reason: 'unknown', detail: genName, role: role as ElementRole }
     ;(sections as Record<string, string>)[role] = app
     changes.push({ role, from: cur, to: app, count })
   }
   const next: FactorySpec = { ...spec, sections }
   /* 단면 정의 — 앱이 같은 이름으로 만드는 SECT 와 같아야 함 (사용자 정의·오프셋 변경 등은 받아들이지 않음) */
-  const p1 = changes.length ? buildGenPayloads(next, buildPortal(next)) : p0
+  const nextModel = changes.length ? buildPortal(next) : model
+  const p1 = changes.length ? buildGenPayloads(next, nextModel) : p0
   const want = new Map(Object.values(p1.SECT).map((r) => [squash(String((r as Record<string, unknown>).SECT_NAME)), r]))
   /* 앱 단면 성질(sectionProps — 이름 기준 Gen DB 값)과 연결되는 것만 비교: 형상·DB·DB 단면 이름·자료 형식·오프셋.
      전단변형·뒴 같은 해석 옵션은 Gen 이 그 설정으로 해석한 결과를 앱이 읽으므로 비교하지 않는다(엔지니어가 Gen 화면에서 만든 단면의 기본값이 앱과 달라도 받아들임) */
@@ -89,5 +92,21 @@ export function reviewGenSections(spec: FactorySpec, model: FactoryModel, gotSec
     const eb = (exp as Record<string, any>).SECT_BEFORE ?? {}, gb = (got as Record<string, any>).SECT_BEFORE ?? {}
     if (eb.USE_SHEAR_DEFORM !== gb.USE_SHEAR_DEFORM || eb.USE_WARPING_EFFECT !== gb.USE_WARPING_EFFECT) options.push(String(got!.SECT_NAME))
   }
-  return { ok: true, spec: next, changes, options }
+  return { ok: true, spec: next, model: nextModel, changes, options }
+}
+
+/** 엔지니어 하중 모델의 그 자리 단면 갱신 — 앱이 만든 단면 표에, Gen 에 같은 이름 단면이 있으면 그 해석 옵션(전단변형·뒴)을 이어 쓴다
+    (확인 화면 rb_sect_options 대로 Gen 설정 유지). TRUSS 요소가 쓰는 번호는 뒴 효과 끔(Gen 규칙). 같은 이름이 없는 새 단면은 앱 기본값 */
+export function keepGenSectionOptions(sect: Record<string, unknown>, gen: Record<string, unknown> | undefined, elem: Record<string, unknown>): Record<string, unknown> {
+  const opt = new Map<string, { USE_SHEAR_DEFORM?: unknown; USE_WARPING_EFFECT?: unknown }>()
+  for (const g of Object.values(gen ?? {})) {
+    const r = g as Record<string, any>
+    if (r?.SECT_NAME && r.SECT_BEFORE) opt.set(squash(String(r.SECT_NAME)), { USE_SHEAR_DEFORM: r.SECT_BEFORE.USE_SHEAR_DEFORM, USE_WARPING_EFFECT: r.SECT_BEFORE.USE_WARPING_EFFECT })
+  }
+  const truss = new Set(Object.values(elem).filter((e) => (e as { TYPE?: string }).TYPE === 'TRUSS').map((e) => String((e as { SECT?: number }).SECT)))
+  return Object.fromEntries(Object.entries(sect).map(([id, s]) => {
+    const r = s as Record<string, any>, o = opt.get(squash(String(r.SECT_NAME)))
+    if (!o || typeof o.USE_SHEAR_DEFORM !== 'boolean' || typeof o.USE_WARPING_EFFECT !== 'boolean') return [id, s]
+    return [id, { ...r, SECT_BEFORE: { ...r.SECT_BEFORE, USE_SHEAR_DEFORM: o.USE_SHEAR_DEFORM, USE_WARPING_EFFECT: truss.has(id) ? false : o.USE_WARPING_EFFECT } }]
+  }))
 }

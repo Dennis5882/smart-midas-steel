@@ -1,13 +1,20 @@
-/* 설정 드로어 — ⚙ MIDAS API. 키는 메모리에만. */
+/* 설정 드로어 — ⚙ MIDAS API. [저장] = 이 브라우저에 저장(키는 기억을 켰을 때만), [닫기] = 이번 세션만. */
 import { useEffect, useRef, useState } from 'react'
 import { testConn, type TestOut } from '../agent/session'
 import { getLang, t } from '../i18n'
-import { S, baseUrlOptions, notify, useStore } from '../state/store'
+import { S, baseUrlOptions, keyRemembered, notify, saveSettings, useStore } from '../state/store'
+
+/** 설정을 저장한 적이 있는지 — 없으면 키 기억 처음 값을 켬으로 */
+function localStorageHas(): boolean {
+  try { return localStorage.getItem('sms_mapi') !== null } catch { return false }
+}
 
 function MapiDrawer({ open, onClose }: { open: boolean; onClose(): void }) {
   const s = useStore()
   const [out, setOut] = useState<TestOut | null>(null)
   const [custom, setCustom] = useState(false)
+  /* 처음 값 = 켬 (저장한 적이 있으면 그때 선택) */
+  const [remember, setRemember] = useState(() => keyRemembered() || !localStorageHas())
   const servers = baseUrlOptions(getLang())
   const isCustom = custom || !servers.includes(s.baseUrl)
   const dialog = useRef<HTMLDialogElement>(null)
@@ -58,6 +65,7 @@ function MapiDrawer({ open, onClose }: { open: boolean; onClose(): void }) {
           <label htmlFor="mapi-key">MAPI-KEY</label>
           <input id="mapi-key" ref={firstInput} type="password" autoComplete="off" disabled={s.busy} value={s.mapiKey} placeholder={t('mapi_key_ph')}
             onChange={(e) => { S.mapiKey = e.target.value; notify() }} />
+          <label className="field-check"><input type="checkbox" checked={remember} disabled={s.busy} onChange={(e) => setRemember(e.target.checked)} /> {t('mapi_remember')}</label>
           <div className="hint" dangerouslySetInnerHTML={{ __html: t('mapi_hint_html') }} />
         </div>
         <div className="field">
@@ -69,7 +77,7 @@ function MapiDrawer({ open, onClose }: { open: boolean; onClose(): void }) {
         <button className="btn btn-c" disabled={s.busy} onClick={() => void onTest()}>{t('conn_test')}</button>
         {out && <div className={`test-out${out.cls ? ' ' + out.cls : ''}`} style={{ display: 'block' }}>{out.text}</div>}
         <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-          <button className="btn btn-c" onClick={onClose}>{t('save')}</button>
+          <button className="btn btn-c" onClick={() => { saveSettings(remember); onClose() }}>{t('save')}</button>
           <button className="btn btn-ghost" onClick={onClose}>{t('close')}</button>
         </div>
       </div>

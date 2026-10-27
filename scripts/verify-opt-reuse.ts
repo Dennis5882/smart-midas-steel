@@ -40,6 +40,7 @@ const json = (o: unknown) => Response.json(o)
   const db_ = path.replace('/db/', '')
   if (method === 'PUT') {
     if (db_ === 'SECT') calls.push('put SECT')
+    if (fault === 'elem' && db_ === 'ELEM') return Response.json({ message: 'failed' }, { status: 400 })
     const next = { ...db, [db_]: { ...db[db_], ...body.Assign } } as Record<string, Record<string, any>>
     /* Gen 처럼 — TRUSS 요소가 뒴 효과 단면을 참조하게 되는 PUT 은 거부. 이 시험의 최적화는 단면 번호가 밀려 옛 가새 번호에
        뒴 효과 단면이 오는 경우를 지난다(CN 라이브 2026-10-27 과 같은 오류 — updateSections 의 중간 단계가 없으면 실패) */
@@ -52,6 +53,7 @@ const json = (o: unknown) => Response.json(o)
   if (method === 'DELETE') {
     const [name, id] = db_.split('/')
     calls.push(`delete ${name}/${id}`)
+    if (fault === 'delete') return Response.json({ message: 'failed' }, { status: 400 })
     if (Object.values(db.ELEM ?? {}).some((e) => String(e.SECT) === id)) usedDeletes.push(id)
     const rec = db[name]?.[id]; delete db[name]?.[id]
     return json({ [name]: { [id]: rec } })
@@ -122,13 +124,39 @@ passed++
   const used = new Set(Object.values(db.ELEM as Record<string, any>).map((e) => String(e.SECT)))
   assert.ok(!calls.includes('doc/new') && calls.some((c) => c.startsWith('delete SECT/')) && Object.keys(db.SECT).length === n - 1, `merged sections: unused section removed in place (${calls.filter((c) => c.startsWith('delete')).join(', ')})`)
   assert.ok(Object.keys(db.SECT).every((id) => used.has(id)) && !usedDeletes.length, `no unused app section left, none in use deleted (${Object.keys(db.SECT)} / used ${[...used]} / ${usedDeletes})`)
-  passed += 2
+  /* 지우기 실패는 정리일 뿐 — 갱신은 성공하고, 남은 번호는 다음 갱신에서 다시 지운다 */
+  await resendModel({ ...base, sections: { ...base.sections, column: other } })
+  fault = 'delete'
+  await resendModel({ ...base, sections: { ...base.sections, column: base.sections.rafter } })
+  fault = ''
+  const leftover = Object.keys(db.SECT).filter((id) => !(id in S.built!.sent!.SECT) || !new Set(Object.values(db.ELEM as Record<string, any>).map((e) => String(e.SECT))).has(id))
+  assert.ok(S.built!.spec.sections.column === base.sections.rafter && leftover.length === 1 && S.log.some((x) => x.type === 'warn'), `failed DELETE: update still succeeds, one unused id left (${leftover})`)
+  /* 갱신 사이에 Gen 에서 추가한 단면(앱이 보내지 않은 번호)은 다시 읽은 SECT 에 섞여도 지우지 않는다 */
+  db.SECT[99] = { ...db.SECT[1], SECT_NAME: 'ENGINEER 99' }
+  calls.length = 0
+  await resendModel({ ...base, sections: { ...base.sections, column: base.sections.rafter, girt: base.sections.purlin } })
+  await resendModel({ ...base, sections: { ...base.sections, column: base.sections.rafter } })
+  assert.ok('99' in db.SECT && !calls.includes('delete SECT/99'), 'section added in Gen between updates is not deleted')
+  delete db.SECT[99]
+  passed++
+  assert.ok(calls.includes(`delete SECT/${leftover[0]}`) && !(leftover[0] in db.SECT), `leftover id removed on the next update (${calls.filter((c) => c.startsWith('delete'))})`)
+  passed += 4
 }
 /* 앱 하중 모델에서 형상 표가 달라지면 그 자리 갱신(엔지니어 하중용 거부)이 아니라 모델 재생성 — inPlacePlan 의 {ok:false} 를 갱신 가능으로 읽던 회귀 */
 {
   calls.length = 0
   await resendModel({ ...S.built!.spec, span: S.built!.spec.span + 2 })
   assert.ok(calls.includes('doc/new') && S.built!.spec.span === fx.spec.span + 2, `geometry change on an app-load model regenerates (${calls.slice(0, 6).join(', ')})`)
+  passed++
+}
+/* 앱 하중 모델의 그 자리 갱신이 중간에 실패하면 모델을 비운다 (Gen 에 새 단면이 일부 들어간 상태 — 재생성 실패와 같은 처리) */
+{
+  const base = S.built!.spec
+  fault = 'elem'
+  let err: unknown
+  try { await resendModel({ ...base, sections: { ...base.sections, column: base.sections.column === 'RH 500x200x10x16' ? 'RH 450x200x9x14' : 'RH 500x200x10x16' } }) } catch (e) { err = e }
+  fault = ''
+  assert.ok(err && S.built === null && !S.results && !S.design, `failed in-place update clears the app model (${err})`)
   passed++
 }
 console.log(`Optimizer result reuse: ${passed} checks passed (previous results kept when stopped before Gen changes; round 1 reuses results after a design check and after a previous optimization)`)

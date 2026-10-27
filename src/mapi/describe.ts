@@ -23,7 +23,7 @@ export function describeCall(method: string, ep: string, body: Body): (() => str
   if (!db) return null
   if (method === 'PUT') { const n = Object.keys(body?.Assign ?? {}).length; return () => t('ch_put', t('ch_db', db), n) }
   if (method === 'GET') return () => t('ch_get', t('ch_db', db))
-  /* DELETE /db/SECT/<id> — 한 번호만 (updateSections 의 쓰지 않는 단면) */
+  /* DELETE /db/<표>/<id> — 한 번호만 (용도는 호출의 note 에)*/
   if (method === 'DELETE' && db.includes('/')) { const [name, id] = db.split('/'); return () => t('ch_del', t('ch_db', name), id) }
   return null
 }

@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { acceptGenLoads, acceptUnavailable, discardGenLoads, readbackUnavailable, readGenLoads, setComboKind } from '../actions/readback'
 import type { ComboKind } from '../codes'
-import { GEN_GEOMETRY_DBS, WARN_ISSUES, type GenCase, type GenCombo, type GenLoadSummary } from '../domain/genLoads'
+import { GEN_FIXED_DBS, WARN_ISSUES, type GenCase, type GenCombo, type GenLoadSummary } from '../domain/genLoads'
 import { t } from '../i18n'
 import { useStore } from '../state/store'
 
@@ -56,7 +56,7 @@ export function GenReadPanel() {
   const sm = read.summary, block = acceptUnavailable()
   return <section className="gen-read" aria-label={t('rb_title')}>
     <h3>{t('rb_confirm_title')}</h3>
-    <p className="task-success">✓ {t(read.sections ? 'rb_model_same_sect' : 'rb_model_same', GEN_GEOMETRY_DBS.length)}</p>
+    <p className="task-success">✓ {t(read.sections ? 'rb_model_same_sect' : 'rb_model_same', GEN_FIXED_DBS.length)}</p>
     {read.sections && <>
       <h4>{t('rb_sect_title', read.sections.changes.length)}</h4>
       <table className="gr-table"><thead><tr><th>{t('rd_role')}</th><th>{t('rb_sect_from')}</th><th>{t('rb_sect_to')}</th><th>{t('rb_sect_count')}</th></tr></thead><tbody>
@@ -87,7 +87,7 @@ export function GenReadPanel() {
     <label className="cfm-skip"><input type="checkbox" checked={ok} onChange={(e) => setOk(e.target.checked)} /> {t('rb_check')}</label>
     <div className="cfm-row">
       <button className="btn btn-ghost" disabled={s.busy} onClick={discardGenLoads}>{t('cancel')}</button>
-      <button className="btn btn-c" disabled={!ok || !!block || s.busy} onClick={acceptGenLoads}>{t('rb_accept')}</button>
+      <button className="btn btn-c" disabled={!ok || !!block || s.busy} onClick={() => void acceptGenLoads()}>{t('rb_accept')}</button>
     </div>
   </section>
 }

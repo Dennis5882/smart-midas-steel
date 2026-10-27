@@ -13,7 +13,7 @@ export const GEN_LOAD_DBS = ['STLD', 'BODF', 'BMLD', 'CNLD', 'LCOM-GEN'] as cons
 /** 내용을 합산하지 못하는 하중 표 — 있으면 '해석 후 반력으로 확인' 안내 (Wind Pressure 메뉴는 API 가 없어 존재도 알 수 없음) */
 export const GEN_OPAQUE_DBS = ['FBLA', 'PRES', 'PNLA', 'SWIND', 'SSEIS', 'SDSP', 'ETMP', 'GTMP', 'BTMP', 'STMP', 'PSLT', 'MVLD', 'SPLC'] as const
 export type GenOpaqueDb = typeof GEN_OPAQUE_DBS[number]
-const LOAD_SET = new Set<string>(GEN_LOAD_DBS)
+export const LOAD_SET: ReadonlySet<string> = new Set<string>(GEN_LOAD_DBS)
 /** 형상 DB — 엔지니어 하중 모델의 동일성 확인 대상 (하중 표 제외) */
 export const GEN_GEOMETRY_DBS = SYNC_DBS.filter((db) => !LOAD_SET.has(db))
 /** 엔지니어 하중 모델에서 그대로여야 하는 표 — SECT·ELEM 은 단면 변경(Gen 에서 바꿈 = reviewGenSections, 앱이 바꿈 = updateSections)으로 따로 본다 */
@@ -170,11 +170,11 @@ export const blockingComboIssues = (s: GenLoadSummary) => s.combos.filter((c) =>
 const horizontalDir = (c: GenCase): 'X' | 'Y' => (Math.abs(c.sum.fx) >= Math.abs(c.sum.fy) ? 'X' : 'Y')
 
 /** 엔지니어 하중으로 해석·검토할 때의 하중 정보 — 앱 값(퍼린·거트 국부 검토용 roofLive·qh 등)은 유지하고
-    조합 용도는 확인 화면에서 엔지니어가 정한 것(kinds — 없으면 앱 추정 guessComboKind),
+    조합 용도는 요약의 kind(확인 화면에서 엔지니어가 정한 것을 호출부가 합쳐 넘김 — 처음 값은 앱 추정 guessComboKind),
     풍 변위각은 W 종류 케이스 각각(방향 = 수평 합력이 큰 축), 지붕 처짐은 L·LR 종류 케이스, 지진 변위각은 E 종류 케이스(앱이 V 인지 V* 인지 모름 → 검토 안 함) */
-export function genLoadInfo(app: LoadInfo, s: GenLoadSummary, kinds?: Record<string, ComboKind>): LoadInfo {
+export function genLoadInfo(app: LoadInfo, s: GenLoadSummary): LoadInfo {
   const wind = s.cases.filter((c) => isWind(c.type))
-  const kindOf = (c: GenCombo) => kinds?.[c.name] ?? c.kind
+  const kindOf = (c: GenCombo) => c.kind
   /* Ω (방향별) = 증폭 지진 조합의 E 종류 계수 절댓값 최대 — 계산서 13장 표시용 */
   const dirOf = new Map(s.cases.filter((c) => isSeismic(c.type)).map((c) => [c.name, horizontalDir(c)]))
   const omega = { X: 1, Y: 1 }

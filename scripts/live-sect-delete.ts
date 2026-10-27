@@ -41,7 +41,7 @@ if (process.argv.includes('--probe')) {
   await buildFactory(spec)
   if (!S.built) throw new Error(`build failed: ${last()}`)
   console.log(`[${sec()}s] build:`, await state())
-  const deletes = () => S.log.filter((x: any) => /DELETE/.test(String(x.html ?? x.text ?? ''))).length
+  const deletes = () => S.log.filter((x: any) => x.type === 'api' && /DELETE/.test(String(x.html))).length
   await resendModel({ ...spec, sections: { ...spec.sections, column: 'RH 500x200x10x16' } })
   console.log(`[${sec()}s] column split:`, await state(), 'DELETE calls', deletes())
   await resendModel({ ...spec, sections: { ...spec.sections, column: spec.sections.rafter } })

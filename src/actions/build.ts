@@ -4,8 +4,8 @@
 import { profileOf } from '../codes'
 import { buildGenPayloads } from '../domain/gen'
 import { buildLoadPayloads, selfWeightOnly } from '../domain/loads'
-import { GEN_FIXED_DBS, genLoadInfo, summarizeGenLoads } from '../domain/genLoads'
-import { SectionUpdateError } from '../domain/genSections'
+import { GEN_FIXED_DBS, GEN_LOAD_DBS, genLoadInfo, summarizeGenLoads } from '../domain/genLoads'
+import { keepGenSectionOptions, SectionUpdateError } from '../domain/genSections'
 import { buildPortal } from '../domain/portal'
 import type { FactorySpec } from '../domain/types'
 import { checkScope } from '../domain/scope'
@@ -124,7 +124,7 @@ export async function sendModel(spec: FactorySpec, onReplaced?: (backup: string)
   const combos = comboNames.length
   const sent: Record<string, Record<string, unknown>> = Object.fromEntries(steps)
   if (designCode) sent.DSTL = { 1: { DGNCODE: designCode } }
-  S.built = { spec, model, info: l.info, cases, combos, comboNames, sent, ...(opts.modelOnly ? { modelOnly: true } : {}) }
+  S.built = { spec, model, info: l.info, cases, combos, comboNames, sent, appSect: Object.keys(p.SECT), ...(opts.modelOnly ? { modelOnly: true } : {}) }
   S.lastSpec = spec
   S.draftSpec = spec
   S.draftInvalid = false
@@ -154,7 +154,7 @@ export async function resendModel(spec: FactorySpec, onReplaced?: (backup: strin
 }
 
 const same = (x: unknown, y: unknown) => JSON.stringify(x) === JSON.stringify(y)
-const APP_LOAD_DBS = ['STLD', 'BODF', 'BMLD', 'CNLD', 'LCOM-GEN'] as const
+const itemIds = (r: unknown) => { const items = (r as { ITEMS?: { ID?: unknown }[] } | undefined)?.ITEMS; return Array.isArray(items) ? items.map((i) => i?.ID).sort() : null }
 
 /** 그 자리에서 고칠 내용 — 형상 표(GEN_FIXED_DBS)가 보낸 것과 같아야 한다. 앱 하중 모델은 새 단면으로 다시 계산한 하중 표 중 값이 바뀐 것도 PUT
     (지진력 = 무게 기반 등). PUT 은 항목 번호별로 덮어쓰므로 번호 집합이 다르면(없어진 항목이 Gen 에 남음) 고칠 수 없다 → null(엔지니어 하중 모델은 changed 로 거부 사유) */
@@ -169,10 +169,12 @@ function inPlacePlan(b: Built, spec: FactorySpec) {
   if (b.genLoads) return { ok: true as const, model, p, loads: {} as Record<string, Record<string, unknown>>, l: buildLoadPayloads(spec, model) }
   const l = buildLoadPayloads(spec, model)
   const loads: Record<string, Record<string, unknown>> = {}
-  for (const db of APP_LOAD_DBS) {
+  for (const db of GEN_LOAD_DBS) {
     const was = b.sent[db] ?? {}
     if (same(l[db], was)) continue
     if (!same(Object.keys(l[db]).sort(), Object.keys(was).sort())) return null
+    /* 레코드 안 하중 항목(ITEMS)도 ID 집합이 같아야 — 항목이 줄면 Gen 에 옛 항목이 남을 수 있다 (PUT 이 레코드를 통째로 바꾸는지 라이브 미확인) → 재생성 */
+    if (Object.keys(was).some((id) => !same(itemIds(l[db][id]), itemIds(was[id])))) return null
     loads[db] = l[db]
   }
   return { ok: true as const, model, p, loads, l }
@@ -192,65 +194,79 @@ export async function updateSections(spec: FactorySpec, onBackup?: (backup: stri
   if (!b?.sent) throw new SectionUpdateError([])
   const plan = planned === undefined ? inPlacePlan(b, spec) : planned
   if (!plan?.ok) throw new SectionUpdateError(plan?.changed ?? [])
-  const { model, p, loads, l } = plan
-  /* 쓰지 않게 될 앱 단면 번호 — 이전 스펙으로 앱이 만든 번호·이름 그대로인데 새 단면 표에 없는 것 (단면 수가 줄거나 RC 받침 번호가 당겨질 때) */
-  const nameOf = (x: unknown) => (x as { SECT_NAME?: string } | undefined)?.SECT_NAME
-  const prevApp = buildGenPayloads(b.spec, b.model).SECT
-  const stale = Object.keys(prevApp).filter((id) => !(id in p.SECT) && nameOf(b.sent!.SECT?.[id]) === nameOf(prevApp[id]))
-  stage('st_sections', 5 + Object.keys(loads).length + (stale.length ? 1 + stale.length : 0))
+  const { model, loads, l } = plan
+  /* 엔지니어 하중 모델은 Gen 에서 받아들인 단면의 해석 옵션(전단변형·뒴)을 유지 — 앱 기본값으로 덮어쓰지 않는다 (같은 이름 단면만) */
+  const p = b.genLoads ? { ...plan.p, SECT: keepGenSectionOptions(plan.p.SECT, b.sent.SECT, plan.p.ELEM) as typeof plan.p.SECT } : plan.p
+  /* 쓰지 않게 될 단면 번호 (단면 수가 줄거나 RC 받침 번호가 당겨질 때) — 앱 하중 모델에서 앱이 보낸 번호(appSect)만. 다시 읽은 sent.SECT 는 쓰지 않는다
+     (최적화 회차 사이에 Gen 에서 추가한 단면이 섞일 수 있음). 엔지니어 하중 모델은 지우지 않는다 (엔지니어 단면·단면 번호에 묶은 데이터가 있을 수 있음) */
+  const stale = b.genLoads ? [] : (b.appSect ?? []).filter((id) => !(id in p.SECT))
+  stage('st_sections', 5 + Object.keys(loads).length)
   const backup = await autoSave('backup')
   onBackup?.(backup)
   /* 여기부터 Gen 단면은 이전 모델이 아니다 — 중간 실패·취소 때 이전 결과가 지금 모델의 결과로 남지 않게 먼저 비운다.
-     S.built 는 새 객체(최적화 실패 처리가 이전 결과를 되살리지 않게), 동일성 기준은 그대로 — 다음 해석 직전 검사가 차이를 잡고 [Gen 하중 불러오기]로 다시 맞춘다 */
+     S.built 는 새 객체(최적화 실패 처리가 이전 결과를 되살리지 않게), 동일성 기준은 그대로 — 실패 처리는 아래 catch */
   S.built = { ...b }
   clearResults()
   notify()
-  /* 단면 번호는 단면 이름이 처음 나온 순서라 단면이 바뀌면 번호가 밀린다 — 아직 옛 ELEM 의 TRUSS 요소가 쓰는 번호에 뒴 효과(7번째 자유도) 단면을
-     먼저 넣으면 Gen 이 거부한다(CN 라이브 2026-10-27 'Section property considering 7th DOF … only to the beam elements').
-     그 번호만 뒴 효과를 끈 채 넣고 → ELEM → 원래 값으로 다시 SECT */
-  const oldTruss = new Set(Object.values(b.sent.ELEM ?? {}).filter((e) => (e as { TYPE?: string }).TYPE === 'TRUSS').map((e) => String((e as { SECT?: number }).SECT)))
-  const clash = Object.keys(p.SECT).filter((id) => oldTruss.has(id) && (p.SECT[id] as { SECT_BEFORE?: { USE_WARPING_EFFECT?: boolean } }).SECT_BEFORE?.USE_WARPING_EFFECT)
-  const safe = clash.length ? Object.fromEntries(Object.entries(p.SECT).map(([id, s]) => [id, clash.includes(id) ? withoutWarping(s) : s])) : p.SECT
-  await mapi('PUT', 'SECT', { Assign: safe }, String(Object.keys(p.SECT).length))
-  await mapi('PUT', 'ELEM', { Assign: p.ELEM }, String(Object.keys(p.ELEM).length))
-  if (clash.length) await mapi('PUT', 'SECT', { Assign: Object.fromEntries(clash.map((id) => [id, p.SECT[id]])) }, String(clash.length))
-  for (const [db, assign] of Object.entries(loads)) await mapi('PUT', db, { Assign: assign }, String(Object.keys(assign).length))
-  const read = async (db: string) => {
-    const got = (await mapi<Record<string, unknown>>('GET', db, undefined, 'verify'))?.[db]
-    if (!isRecord(got)) throw new Error(t('verify_fail', `${db}: ${t('gen_bad_response')}`))
-    return got
+  try {
+    /* 단면 번호는 단면 이름이 처음 나온 순서라 단면이 바뀌면 번호가 밀린다 — 아직 옛 ELEM 의 TRUSS 요소가 쓰는 번호에 뒴 효과(7번째 자유도) 단면을
+       먼저 넣으면 Gen 이 거부한다(CN 라이브 2026-10-27 'Section property considering 7th DOF … only to the beam elements').
+       그 번호만 뒴 효과를 끈 채 넣고 → ELEM → 원래 값으로 다시 SECT */
+    const oldTruss = new Set(Object.values(b.sent.ELEM ?? {}).filter((e) => (e as { TYPE?: string }).TYPE === 'TRUSS').map((e) => String((e as { SECT?: number }).SECT)))
+    const clash = Object.keys(p.SECT).filter((id) => oldTruss.has(id) && (p.SECT[id] as { SECT_BEFORE?: { USE_WARPING_EFFECT?: boolean } }).SECT_BEFORE?.USE_WARPING_EFFECT)
+    const safe = clash.length ? Object.fromEntries(Object.entries(p.SECT).map(([id, s]) => [id, clash.includes(id) ? withoutWarping(s) : s])) : p.SECT
+    await mapi('PUT', 'SECT', { Assign: safe }, String(Object.keys(p.SECT).length))
+    await mapi('PUT', 'ELEM', { Assign: p.ELEM }, String(Object.keys(p.ELEM).length))
+    if (clash.length) await mapi('PUT', 'SECT', { Assign: Object.fromEntries(clash.map((id) => [id, p.SECT[id]])) }, String(clash.length))
+    for (const [db, assign] of Object.entries(loads)) await mapi('PUT', db, { Assign: assign }, String(Object.keys(assign).length))
+    const read = async (db: string) => {
+      const got = (await mapi<Record<string, unknown>>('GET', db, undefined, 'verify'))?.[db]
+      if (!isRecord(got)) throw new Error(t('verify_fail', `${db}: ${t('gen_bad_response')}`))
+      return got
+    }
+    /* 확인 — 보낸 표가 그대로 들어갔는지 (SECT 는 남은 다른 번호를 허용). ELEM 은 먼저 읽어 쓰지 않는 단면 고르기에도 쓴다 (DELETE 는 ELEM 을 바꾸지 않음) */
+    const gotElem = await read('ELEM')
+    /* Gen 은 부재가 쓰는 단면도 경고 없이 지운다(부재는 없는 번호를 가리킨 채 남음, 라이브 2026-10-27) — 아무 부재도 쓰지 않는 번호만.
+       DELETE /db/SECT/<id> 는 그 번호 하나 (번호 없는 /db/SECT DELETE 는 표 전체를 비운다) */
+    const used = new Set(Object.values(gotElem).map((e) => String((e as { SECT?: number }).SECT)))
+    const drop = stale.filter((id) => !used.has(id))
+    stage('st_verify', 2 + Object.keys(loads).length + drop.length)
+    /* 정리일 뿐이라 실패해도 갱신은 성공 — 남은 번호는 보낸 SECT(다시 읽은 값)에 남아 다음 갱신에서 다시 지운다 (취소는 그대로) */
+    const left: string[] = []
+    for (const id of drop) {
+      try { await mapi('DELETE', `/db/SECT/${id}`, undefined, 'unused') } catch (e) { if (e instanceof Cancelled) throw e; left.push(id) }
+    }
+    if (left.length) log(t('log_unused_sect_left', left.join(', ')), 'warn')
+    const gotSect = await read('SECT')
+    const bad = [...dbDifferences('SECT', p.SECT, gotSect, 3).filter((d) => d.added === undefined || d.removed), ...dbDifferences('ELEM', p.ELEM, gotElem, 3)]
+    for (const [db, assign] of Object.entries(loads)) bad.push(...dbDifferences(db, assign, await read(db), 3))
+    if (bad.length) throw new Error(t('verify_fail', bad.map(diffText).join(', ')))
+    await checkSectionSource(spec, p.SECT)
+    const sent = { ...b.sent, SECT: gotSect, ELEM: p.ELEM, ...loads }
+    const appSect = [...Object.keys(p.SECT), ...left]
+    if (b.genLoads) {
+      /* 요약은 읽은 하중 표 전부(합산 못 하는 표 포함)로 다시 — 자중 추정만 새 단면, 조합 용도는 확정한 것 */
+      const kinds = new Map(b.genLoads.combos.map((c) => [c.name, c.kind]))
+      const fresh = summarizeGenLoads(spec, model, b.genRaw ?? b.sent)
+      const summary = { ...fresh, combos: fresh.combos.map((c) => ({ ...c, kind: kinds.get(c.name) ?? c.kind })) }
+      S.built = { ...b, spec, model, info: genLoadInfo(l.info, summary), genLoads: summary, sent, appSect }
+    } else {
+      const names = (tbl: Record<string, unknown>) => Object.values(tbl).map((c) => (c as { NAME: string }).NAME)
+      S.built = { ...b, spec, model, info: l.info, cases: names(l.STLD), comboNames: names(l['LCOM-GEN']), combos: Object.keys(l['LCOM-GEN']).length, sent, appSect }
+    }
+    clearResults()
+    S.lastSpec = spec
+    S.draftSpec = spec
+    S.draftInvalid = false
+    S.modelRevision++
+    log(t('log_sections_updated', Object.keys(p.SECT).length, Object.keys(loads).length), 'ok')
+    notify()
+  } catch (e) {
+    /* 앱 하중 모델: Gen 에 새 단면이 일부 들어간 채 실패 — 예전 모델 재생성(doc/new 뒤 실패)과 같이 모델을 비운다 → [Gen NX 에 모델 생성]으로 다시.
+       엔지니어 하중 모델은 그대로 두고 [Gen 하중 불러오기]가 Gen 의 새 단면을 받아들이게 한다 (재생성하면 엔지니어 하중이 지워짐) */
+    if (!b.genLoads) clearBuilt()
+    throw e
   }
-  /* Gen 은 부재가 쓰는 단면도 경고 없이 지운다(부재는 없는 번호를 가리킨 채 남음, 라이브 2026-10-27) — Gen ELEM 을 다시 읽어 아무 부재도 쓰지 않는 번호만.
-     DELETE /db/SECT/<id> 는 그 번호 하나 (번호 없는 /db/SECT DELETE 는 표 전체를 비운다) */
-  if (stale.length) {
-    const used = new Set(Object.values(await read('ELEM')).map((e) => String((e as { SECT?: number }).SECT)))
-    for (const id of stale.filter((x) => !used.has(x))) await mapi('DELETE', `/db/SECT/${id}`, undefined, 'unused')
-  }
-  /* 확인 — 보낸 표가 그대로 들어갔는지 (SECT 는 엔지니어가 만든 다른 번호를 허용) */
-  stage('st_verify', 3 + Object.keys(loads).length)
-  const gotSect = await read('SECT')
-  const bad = [...dbDifferences('SECT', p.SECT, gotSect, 3).filter((d) => d.added === undefined || d.removed), ...dbDifferences('ELEM', p.ELEM, await read('ELEM'), 3)]
-  for (const [db, assign] of Object.entries(loads)) bad.push(...dbDifferences(db, assign, await read(db), 3))
-  if (bad.length) throw new Error(t('verify_fail', bad.map(diffText).join(', ')))
-  await checkSectionSource(spec, p.SECT)
-  const sent = { ...b.sent, SECT: gotSect, ELEM: p.ELEM, ...loads }
-  if (b.genLoads) {
-    /* 요약은 읽은 하중 표 전부(합산 못 하는 표 포함)로 다시 — 자중 추정만 새 단면, 조합 용도는 확정한 것 */
-    const kinds = new Map(b.genLoads.combos.map((c) => [c.name, c.kind]))
-    const fresh = summarizeGenLoads(spec, model, b.genRaw ?? b.sent)
-    const summary = { ...fresh, combos: fresh.combos.map((c) => ({ ...c, kind: kinds.get(c.name) ?? c.kind })) }
-    S.built = { ...b, spec, model, info: genLoadInfo(l.info, summary), genLoads: summary, sent }
-  } else {
-    const names = (tbl: Record<string, unknown>) => Object.values(tbl).map((c) => (c as { NAME: string }).NAME)
-    S.built = { ...b, spec, model, info: l.info, cases: names(l.STLD), comboNames: names(l['LCOM-GEN']), combos: Object.keys(l['LCOM-GEN']).length, sent }
-  }
-  clearResults()
-  S.lastSpec = spec
-  S.draftSpec = spec
-  S.draftInvalid = false
-  S.modelRevision++
-  log(t('log_sections_updated', Object.keys(p.SECT).length, Object.keys(loads).length), 'ok')
-  notify()
   return model
 }
 

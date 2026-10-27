@@ -52,7 +52,7 @@ await readGenLoads()
 const r = S.genRead
 if (!r) throw new Error(`readback failed: ${last()}`)
 console.log(`[${sec()}s] read: section changes ${JSON.stringify(r.sections?.changes ?? [])} · option notice [${r.sectionOptions}]`)
-acceptGenLoads()
+await acceptGenLoads()
 console.log(`accepted: spec column ${S.built!.spec.sections.column} · editor column ${S.activePlan?.spec.sections.column}`)
 await runAnalysis()
 await runDesignCheck()

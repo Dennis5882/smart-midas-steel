@@ -5,16 +5,16 @@
 import type { ComboKind } from '../codes'
 import { reviewGenSections, SectionReviewError } from '../domain/genSections'
 import { buildLoadPayloads } from '../domain/loads'
-import { buildPortal } from '../domain/portal'
-import { GEN_FIXED_DBS, GEN_LOAD_DBS, GEN_OPAQUE_DBS, blockingComboIssues, genLoadInfo, summarizeGenLoads } from '../domain/genLoads'
+import { GEN_FIXED_DBS, GEN_LOAD_DBS, GEN_OPAQUE_DBS, LOAD_SET, blockingComboIssues, genLoadInfo, summarizeGenLoads } from '../domain/genLoads'
 import { lt, t } from '../i18n'
 import { mapi } from '../mapi/client'
 import { S, clearResults, notify, type Built } from '../state/store'
 import { addMsg, addPlanMsg, draw3D, log, tab } from '../state/ui'
 import { assertGenSync } from './genSync'
+import { confirmAction } from '../components/ConfirmDialog'
+import { specChanged } from '../state/taskFlow'
 import { beginJob, Cancelled, endJob, failMsg, stage } from './job'
 
-const LOAD_SET = new Set<string>(GEN_LOAD_DBS)
 
 /** 읽어 오기를 할 수 없는 이유 (i18n 키) — 없으면 null */
 export function readbackUnavailable(b: Built | null): 'no_model' | 'rb_code' | 'rb_additions' | null {
@@ -39,8 +39,8 @@ export async function readGenLoads(): Promise<void> {
     const SECT = (await mapi<Record<string, unknown>>('GET', 'SECT', undefined, 'read'))?.SECT
     const ELEM = (await mapi<Record<string, unknown>>('GET', 'ELEM', undefined, 'read'))?.ELEM
     const review = reviewGenSections(b.spec, b.model, SECT, ELEM)
-    if (!review.ok) throw new SectionReviewError(review.reason, review.detail)
-    const spec = review.spec, model = review.changes.length ? buildPortal(spec) : b.model
+    if (!review.ok) throw new SectionReviewError(review.reason, review.detail, review.role)
+    const { spec, model } = review
     stage('st_read', GEN_LOAD_DBS.length + GEN_OPAQUE_DBS.length)
     /* 없는 표(엔지니어가 그 하중을 안 넣음)를 Gen 이 오류로 답해도 '없음' — 연결 문제는 앞의 형상 확인에서 이미 걸린다.
        합산하지 못하는 표(GEN_OPAQUE_DBS)는 있는지만 본다 */
@@ -55,7 +55,7 @@ export async function readGenLoads(): Promise<void> {
     const summary = summarizeGenLoads(spec, model, raw)
     /* 읽은 SECT·ELEM 은 단면 변경이 없어도 확정 때 동일성 기준으로 — 해석 옵션·같은 이름의 새 단면 번호 등 받아들인 차이가 다음 동일성 검사에서 막히지 않게 */
     S.genRead = { summary, raw, built: b, kinds: Object.fromEntries(summary.combos.map((c) => [c.name, c.kind])), sectionOptions: review.options,
-      SECT: SECT as Record<string, unknown>, ELEM: ELEM as Record<string, unknown>, ...(review.changes.length ? { sections: { spec, changes: review.changes } } : {}) }
+      SECT: SECT as Record<string, unknown>, ELEM: ELEM as Record<string, unknown>, ...(review.changes.length ? { sections: { spec, model, changes: review.changes } } : {}) }
     log(t('log_rb_read', summary.cases.length, summary.combos.length), 'ok')
     addMsg('bot', lt('rb_done', summary.cases.length, summary.combos.length))
     S.task = 'analysis'
@@ -67,26 +67,33 @@ export async function readGenLoads(): Promise<void> {
   }
 }
 
-/** 확정할 수 없는 이유 — 조합 이상·조합 없음·모델이 바뀜 */
-export function acceptUnavailable(): 'rb_stale' | 'rb_combo_issue' | 'rb_no_combos' | null {
+/** 확정할 수 없는 이유 — 조합 이상·조합 없음·기본 조합 없음·모델이 바뀜 */
+export function acceptUnavailable(): 'rb_stale' | 'rb_combo_issue' | 'rb_no_combos' | 'rb_no_basic' | null {
   const r = S.genRead
   if (!r || r.built !== S.built) return 'rb_stale'
   if (!r.summary.combos.length) return 'rb_no_combos'
+  /* 부재 검토는 기본(강도) 조합만 쓴다(가새만 증폭 지진도) — 기본이 하나도 없으면 기둥·보 검토가 통째로 빠져 강도비 0·NG 0 처럼 보인다 */
+  if (!r.summary.combos.some((c) => (r.kinds?.[c.name] ?? c.kind) === 'basic')) return 'rb_no_basic'
   if (blockingComboIssues(r.summary).length) return 'rb_combo_issue'
   return null
 }
 
 /** 확인한 Gen 하중으로 확정 — 이전 해석·검토 결과는 비운다 (Gen 호출 없음 — 해석 직전 동일성 검사가 이 하중을 기준으로 다시 확인) */
-export function acceptGenLoads(): void {
+export async function acceptGenLoads(): Promise<void> {
   const r = S.genRead
   if (!r || S.busy || acceptUnavailable()) return
+  /* Gen 단면을 받아들이면 편집기가 그 스펙으로 바뀐다 — 아직 Gen 에 보내지 않은 편집이 있으면 먼저 묻는다 */
+  if (r.sections && specChanged(S.draftSpec, r.built.spec)) {
+    if (!await confirmAction({ title: t('rb_accept'), body: t('rb_draft_lost'), ok: t('rb_accept'), danger: true })) return
+    if (S.genRead !== r || S.busy || acceptUnavailable()) return
+  }
   const b = r.built, sc = r.sections
   /* 요약의 조합 용도 = 확정한 것 (이후 단면 갱신·계산서도 이 값) */
   const s = { ...r.summary, combos: r.summary.combos.map((c) => ({ ...c, kind: r.kinds[c.name] ?? c.kind })) }
   const loads = Object.fromEntries(GEN_LOAD_DBS.filter((db) => Object.keys(r.raw[db] ?? {}).length).map((db) => [db, r.raw[db]]))
   const geometry = Object.fromEntries(Object.entries(b.sent ?? {}).filter(([db]) => !LOAD_SET.has(db)))
   /* Gen 에서 바꾼 단면을 받아들이면 앱 스펙·모델·하중 정보(앱 자동 하중 값은 새 단면 자중)도 새 단면으로, 동일성 기준 = 지금 Gen 의 SECT·ELEM */
-  const spec = sc ? sc.spec : b.spec, model = sc ? buildPortal(spec) : b.model
+  const spec = sc ? sc.spec : b.spec, model = sc ? sc.model : b.model
   const appInfo = sc ? buildLoadPayloads(spec, model).info : b.info
   S.built = {
     spec, model, info: genLoadInfo(appInfo, s),
@@ -98,6 +105,7 @@ export function acceptGenLoads(): void {
     const editor = S.activePlan
     S.lastSpec = spec; S.draftSpec = spec; S.draftInvalid = false
     S.buildEpoch++
+    S.modelRevision++ // 새 편집기가 지금 모델 개정을 갖게 (아래에서 다시 올리지 않음)
     addPlanMsg(structuredClone(spec), editor?.mode ?? 'free', editor?.tpl)
     S.preview = null
     S.task = 'analysis'
@@ -105,7 +113,7 @@ export function acceptGenLoads(): void {
   }
   S.genRead = null
   clearResults()
-  S.modelRevision++
+  if (!sc) S.modelRevision++
   addMsg('bot', lt('rb_accepted', s.cases.length, s.combos.length))
   tab('logP')
   notify()

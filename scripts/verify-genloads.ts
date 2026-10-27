@@ -155,8 +155,12 @@ db['LCOM-GEN'] = { 1: { NAME: '1.2D+1.6LR', ACTIVE: 'ACTIVE', iTYPE: 0, vCOMB: [
 await readGenLoads()
 ok(S.genRead && S.genRead.summary.cases.length === 3 && S.genRead.summary.combos.length === 2 && acceptUnavailable() === null, `read: ${S.genRead?.summary.cases.map((c) => c.name)}`)
 ok(S.genRead!.summary.notices.join() === 'noSeismic' && S.genRead!.summary.opaque.join() === 'SWIND', `notices ${S.genRead!.summary.notices}`)
+/* 일반(강도) 조합이 하나도 없으면 확정 불가 — 부재 검토가 통째로 빠져 NG 0 처럼 보이지 않게 */
+setComboKind('1.2D+1.6LR', 'gravity'); setComboKind('1.2D+1.6W', 'gravity')
+ok(acceptUnavailable() === 'rb_no_basic', `no strength combination blocks accept (${acceptUnavailable()})`)
+setComboKind('1.2D+1.6LR', 'basic')
 setComboKind('1.2D+1.6W', 'gravity') // 엔지니어가 고친 용도 — 단면 갱신 후에도 유지
-acceptGenLoads()
+await acceptGenLoads()
 const B = S.built!
 ok(B.genLoads && !B.modelOnly && B.comboNames.join() === '1.2D+1.6LR,1.2D+1.6W' && B.cases.join() === 'D,LIVE,WIND' && B.info.gen?.liveCases.join() === 'LIVE', 'accepted: built uses engineer cases and combos')
 ok(B.sent?.BMLD === undefined || Object.keys(B.sent!.BMLD).length === 2, 'sent load tables = what was read')
@@ -165,6 +169,8 @@ ok(unavailable(S, 'analysis') === null && unavailable({ ...S, analyzed: true, de
 /* 2단계: 단면만 바꾸기 — doc/new 없이 SECT·ELEM 만, 엔지니어 하중·번호 유지 */
 {
   const loadsBefore = JSON.stringify([db.BMLD, db['LCOM-GEN'], db.STLD]), newCol = 'RH 500x200x10x16'
+  /* 엔지니어가 Gen 에서 전단변형을 끈 단면을 받아들였다고 가정 — 그 자리 갱신이 앱 기본값(켬)으로 덮어쓰지 않아야 함 */
+  for (const t of [db.SECT, B.sent!.SECT!]) for (const v of Object.values(t) as any[]) v.SECT_BEFORE.USE_SHEAR_DEFORM = false
   calls.length = 0
   const next = { ...B.spec, sections: { ...B.spec.sections, column: newCol } }
   await resendModel(next)
@@ -174,6 +180,9 @@ ok(unavailable(S, 'analysis') === null && unavailable({ ...S, analyzed: true, de
   ok(!calls.some((c) => c.includes('/doc/new')) && calls.filter((c) => c.startsWith('PUT')).map((c) => c.split('/').pop()).join() === 'SECT,ELEM,SECT', `section-only update: PUT ${calls.filter((c) => c.startsWith('PUT'))}`)
   /* 기둥이 보와 다른 단면이 되면 뒤 단면 번호가 하나씩 밀려 옛 가새 번호(6)에 뒴 효과 단면(거트)이 온다 → 뒴 효과를 끈 SECT → ELEM → 원래 SECT */
   ok(db.SECT[6]?.SECT_BEFORE?.USE_WARPING_EFFECT === true && Object.values(db.ELEM).every((e: any) => e.TYPE !== 'TRUSS' || db.SECT[e.SECT]?.SECT_BEFORE?.USE_WARPING_EFFECT === false), 'shifted brace section number: final SECT restored, braces on non-warping sections')
+  const byName = (n: string) => Object.values(db.SECT).find((v: any) => v.SECT_NAME.replace(/\s/g, '') === n.replace(/\s/g, '')) as any
+  ok(byName('RH 600x200x11x17')?.SECT_BEFORE.USE_SHEAR_DEFORM === false && byName(newCol)?.SECT_BEFORE.USE_SHEAR_DEFORM === true, 'engineer section options kept for same-named sections, new section uses app defaults')
+  for (const t of [db.SECT, S.built!.sent!.SECT!]) for (const v of Object.values(t) as any[]) v.SECT_BEFORE.USE_SHEAR_DEFORM = true // 이후 시험은 앱 기본값 기준
   ok(JSON.stringify([db.BMLD, db['LCOM-GEN'], db.STLD]) === loadsBefore && B2.genLoads && B2.comboNames.join() === '1.2D+1.6LR,1.2D+1.6W', 'engineer loads and combos kept')
   ok(colSect && String(db.ELEM[colElem].SECT) === colSect && B2.spec.sections.column === newCol && !S.analyzed, `column element now ${newCol}, results cleared`)
   ok(B2.sent!.SECT === undefined || Object.keys(B2.sent!.SECT).length >= Object.keys(db.SECT).length - 0, 'sent SECT = read back (old ids allowed)')
@@ -204,7 +213,16 @@ ok(unavailable(S, 'analysis') === null && unavailable({ ...S, analyzed: true, de
   await readGenLoads()
   const ch = S.genRead?.sections?.changes ?? []
   ok(ch.length === 1 && ch[0].role === 'column' && ch[0].to === 'RH 600x200x11x17' && ch[0].count === cols.length, `engineer column change detected (${JSON.stringify(ch)})`)
-  acceptGenLoads()
+  /* 보내지 않은 편집이 있으면 먼저 묻고, 취소하면 아무것도 바꾸지 않는다 */
+  const draft = S.draftSpec, builtBefore = S.built
+  S.draftSpec = { ...S.built!.spec, span: S.built!.spec.span + 1 }
+  let asked = 0
+  setConfirmHandler(() => { asked++; return false })
+  await acceptGenLoads()
+  setConfirmHandler(() => true)
+  ok(asked === 1 && S.built === builtBefore && S.genRead !== null && S.draftSpec.span === builtBefore!.spec.span + 1, 'unsent editor changes: accept asks first, cancel keeps everything')
+  S.draftSpec = draft
+  await acceptGenLoads()
   ok(S.built!.spec.sections.column === 'RH 600x200x11x17' && S.built!.genLoads && S.activePlan?.spec.sections.column === 'RH 600x200x11x17' && unavailable(S, 'analysis') === null, 'accepted: app spec, editor and analysis use the engineer section')
   /* 같은 역할에서 섞임 → 막음 */
   db.ELEM[cols[0]].SECT = +sidOf('RH 500x200x10x16')!
@@ -225,17 +243,17 @@ ok(unavailable(S, 'analysis') === null && unavailable({ ...S, analyzed: true, de
   ok(S.genRead?.sections?.changes[0]?.to === 'RH 500x200x10x16' && S.genRead?.sectionOptions.join() === 'RH500x200x10x16', `analysis-option-only difference accepted and reported (${S.genRead?.sections?.changes.map((c) => c.to)} / ${S.genRead?.sectionOptions})`)
   db.ELEM = elemBak; db.SECT = sectBak
   /* 역할 단면은 그대로, 해석 옵션만 Gen 에서 바꿈 → 변경 없음 + 안내, 확정하면 읽은 SECT 가 동일성 기준 (다음 해석 직전 검사가 막지 않음) */
-  await readGenLoads(); acceptGenLoads() // 되돌린 Gen 단면(RH 500)을 먼저 받아들여 기준을 맞춤
+  await readGenLoads(); await acceptGenLoads() // 되돌린 Gen 단면(RH 500)을 먼저 받아들여 기준을 맞춤
   const colSid = String(db.ELEM[cols[0]].SECT)
   db.SECT[colSid] = { ...db.SECT[colSid], SECT_BEFORE: { ...db.SECT[colSid].SECT_BEFORE, USE_SHEAR_DEFORM: false } }
   await readGenLoads()
   ok(S.genRead && !S.genRead.sections && S.genRead.sectionOptions.length === 1, `options-only change without section change (${S.genRead?.sectionOptions})`)
-  acceptGenLoads()
+  await acceptGenLoads()
   let syncErr: unknown
   try { await assertGenSync() } catch (e) { syncErr = e }
   ok(!syncErr && S.genChanged === 0, `accepted Gen SECT/ELEM become the sync baseline (${syncErr})`)
   db.SECT = structuredClone(sectBak)
-  await readGenLoads(); acceptGenLoads()
+  await readGenLoads(); await acceptGenLoads()
 }
 /* Gen 에서 형상이 바뀌면 읽기를 막음 */
 const node = Object.keys(db.NODE)[0]
@@ -243,6 +261,6 @@ db.NODE[node] = { ...db.NODE[node], Z: db.NODE[node].Z + 0.5 }
 await readGenLoads()
 ok(S.genRead === null && S.genChanged > 0, 'geometry change in Gen blocks reading')
 ok(readbackUnavailable({ ...B, spec: { ...B.spec, code: 'CN' } }) === 'rb_code', 'TW only')
-ok(!usedDeletes.length, `no section in use was deleted (${usedDeletes})`)
+ok(!usedDeletes.length && !calls.some((c) => c.startsWith('DELETE')), `engineer-load model: no section deleted (${usedDeletes})`)
 
 console.log(`Gen readback: ${n} checks passed (summary sums, beam load forms, combo issues, notices, info, design, fake-Gen flow, section-only update)`)
