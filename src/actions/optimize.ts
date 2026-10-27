@@ -18,7 +18,7 @@ import { checkResults, fetchResults, reusableResults } from './results'
 import { assertGenSync } from './genSync'
 import { quantities } from '../domain/quantities'
 import { blockedMembers } from '../domain/validity'
-import { beginJob, endJob, failMsg, setIter } from './job'
+import { beginJob, endJob, failMsg, setIter, setRound } from './job'
 
 const MAX_ITER = 5
 const key = (s: Sections) => ROLES.map((r) => s[r]).join('|')
@@ -52,6 +52,7 @@ export async function runOptimize(): Promise<void> {
     let cs: ConnResult[] = []
     for (let it = 1; ; it++) {
       setIter(it, MAX_ITER)
+      setRound(it)
       const b = S.built!
       S.results = (it === 1 ? await reusableResults(prior, b, S.analysisRev) : null) ?? await fetchResults(b)
       ;({ design: d, connections: cs } = checkResults(b, S.results))
@@ -60,6 +61,7 @@ export async function runOptimize(): Promise<void> {
       const rec: OptIter = { it, sections: b.spec.sections, weight: steelWeight(b.spec, b.model), plateT: quantities(b.spec, b.model, cs).plateT,
         maxRatio: d.maxRatio, svcMax, ng: d.ng, invalid: blockedMembers(d), connMax: Math.max(0, ...cs.map((c) => c.ratio)), connNg: cs.filter((c) => c.ratio > 1).length }
       iters.push(rec)
+      setRound(it, { weight: rec.weight, maxRatio: d.maxRatio, ng: d.ng + rec.connNg + (rec.invalid ?? 0) })
       log(t('log_opt_iter', it, rec.weight.toFixed(2), d.maxRatio.toFixed(3), svcMax.toFixed(3), d.ng) + t('log_opt_conn', rec.connMax.toFixed(3), rec.connNg) + (rec.invalid ? ` · ${t('rs_applicability')}: ${rec.invalid}` : ''), d.ng || rec.connNg || rec.invalid ? 'warn' : 'ok')
       /* 재해석 NG 를 하한·금지로 기록 — 다음 제안이 같은(또는 더 가벼운) 단면으로 되돌아가지 않게 */
       for (const r of ROLES) {
@@ -81,6 +83,7 @@ export async function runOptimize(): Promise<void> {
       lastRows = p.rows
       if (!p.changed) { converged = d.ng === 0 && !blockedMembers(d) && rec.connNg === 0; if (converged) break }
       if (!p.changed || iters.some((x) => key(x.sections) === key(p.sections))) break
+      setRound(it, { next: p.rows.filter((r) => r.before !== r.after).map(({ role, before, after }) => ({ role, before, after })) })
       for (const r of p.rows) if (r.before !== r.after) log(`${t(`role_${r.role}`)}: ${r.before} → ${r.after} (${r.ratio.toFixed(2)})`, 'info')
       await resendModel({ ...b.spec, sections: p.sections })
       await analyzeCore()

@@ -168,7 +168,9 @@ ok(unavailable(S, 'analysis') === null && unavailable({ ...S, analyzed: true, de
   const B2 = S.built!
   const colSect = Object.entries(db.SECT).find(([, v]: any) => v.SECT_NAME.replace(/\s/g, '') === newCol.replace(/\s/g, ''))?.[0]
   const colElem = B2.model.elements.find((x) => x.role === 'column')!.id
-  ok(!calls.some((c) => c.includes('/doc/new')) && calls.filter((c) => c.startsWith('PUT')).map((c) => c.split('/').pop()).join() === 'SECT,ELEM', `section-only update: PUT ${calls.filter((c) => c.startsWith('PUT'))}`)
+  ok(!calls.some((c) => c.includes('/doc/new')) && calls.filter((c) => c.startsWith('PUT')).map((c) => c.split('/').pop()).join() === 'SECT,ELEM,SECT', `section-only update: PUT ${calls.filter((c) => c.startsWith('PUT'))}`)
+  /* 기둥이 보와 다른 단면이 되면 뒤 단면 번호가 하나씩 밀려 옛 가새 번호(6)에 뒴 효과 단면(거트)이 온다 → 뒴 효과를 끈 SECT → ELEM → 원래 SECT */
+  ok(db.SECT[6]?.SECT_BEFORE?.USE_WARPING_EFFECT === true && Object.values(db.ELEM).every((e: any) => e.TYPE !== 'TRUSS' || db.SECT[e.SECT]?.SECT_BEFORE?.USE_WARPING_EFFECT === false), 'shifted brace section number: final SECT restored, braces on non-warping sections')
   ok(JSON.stringify([db.BMLD, db['LCOM-GEN'], db.STLD]) === loadsBefore && B2.genLoads && B2.comboNames.join() === '1.2D+1.6LR,1.2D+1.6W', 'engineer loads and combos kept')
   ok(colSect && String(db.ELEM[colElem].SECT) === colSect && B2.spec.sections.column === newCol && !S.analyzed, `column element now ${newCol}, results cleared`)
   ok(B2.sent!.SECT === undefined || Object.keys(B2.sent!.SECT).length >= Object.keys(db.SECT).length - 0, 'sent SECT = read back (old ids allowed)')

@@ -484,6 +484,14 @@ dialog.rn::backdrop{background:var(--scrim);backdrop-filter:blur(2px)}
 .jobbar .jbs-done{color:var(--green)}.jobbar .jbs-now{color:var(--txt-hi);font-weight:700}.jobbar .jbs-todo{color:var(--dim)}
 .jobbar .jb-log{margin-left:8px;border:0;background:none;color:var(--cyan);cursor:pointer;font-size:.72rem;padding:0;text-decoration:underline}
 .jobbar .jb-detail{margin-top:4px;color:var(--dim);font-family:var(--font-ui);font-size:.72rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jobbar .jb-api{font-family:ui-monospace,Consolas,monospace;font-size:.7rem;color:var(--blue)}
+.jobbar .jb-rounds{list-style:none;margin:6px 0 0;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--panel);font-size:.75rem;font-variant-numeric:tabular-nums;max-height:9.5em;overflow-y:auto}
+.jobbar .jb-rounds li{display:flex;flex-wrap:wrap;gap:2px 10px;padding:1px 0}
+.jobbar .jb-rounds b{min-width:3.5em}
+.jobbar .jb-rounds .jr-now{color:var(--txt-hi)}.jobbar .jb-rounds .jr-ng b{color:var(--amber)}
+.jobbar .jr-wait{color:var(--cyan)}.jobbar .jr-next{color:var(--dim)}
+.jobbar .jb-hint{margin-left:8px;color:var(--txt-hi)}
+.jobbar .jb-hint::before{content:'— ';color:var(--dim)}
 .composer{border-top:1px solid var(--border);padding:14px 16px calc(20px + env(safe-area-inset-bottom));background:var(--panel2)}
 .composer .row{display:flex;gap:10px;align-items:flex-end}
 .composer textarea{

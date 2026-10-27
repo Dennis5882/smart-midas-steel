@@ -2,7 +2,7 @@
    진행: 단계(stage) = 문구 키 + 예상 MAPI 호출 수, mapi() 가 호출마다 step++·detail 갱신. 최적화는 iter 로 반복 수를 따로 표시.
    취소: 협조식 — 플래그만 세우고 다음 MAPI 호출 직전에 Cancelled 를 던진다. Gen 이 처리 중인 호출(해석 등)은 끝까지 기다린다(중단 API 없음). */
 import { t, type I18nKey, lt } from '../i18n'
-import { S, notify, type Job, type JobKind, FILE_JOBS } from '../state/store'
+import { S, notify, type Job, type JobKind, type OptRound, FILE_JOBS } from '../state/store'
 import { addMsg, recordActivity } from '../state/ui'
 import { ResultValidationError } from '../domain/resultValidation'
 import { QuantityError } from '../domain/quantities'
@@ -44,7 +44,7 @@ export function stage(key: I18nKey, total = 0): void {
   const j = S.job
   if (!j) return
   checkCancel()
-  Object.assign(j, { stage: key, step: 0, total, detail: '' } satisfies Partial<Job>)
+  Object.assign(j, { stage: key, step: 0, total, detail: '', hint: null } satisfies Partial<Job>)
   notify()
 }
 
@@ -52,12 +52,23 @@ export function setIter(n: number, max: number): void {
   if (S.job) { S.job.iter = [n, max]; notify() }
 }
 
+/** 최적화 회차 카드 — 그 회차 줄이 없으면 만들고 값을 덧붙인다 */
+export function setRound(it: number, patch: Partial<OptRound> = {}): void {
+  const j = S.job
+  if (!j) return
+  const rounds = j.rounds ??= []
+  const r = rounds.find((x) => x.it === it) ?? (rounds.push({ it }), rounds[rounds.length - 1])
+  Object.assign(r, patch)
+  notify()
+}
+
 /** mapi() 가 호출 직전에 부른다 */
-export function jobCall(detail: string): void {
+export function jobCall(detail: string, hint: (() => string) | null = null): void {
   const j = S.job
   if (!j) return
   checkCancel()
   j.detail = detail
+  j.hint = hint
   if (j.total) j.step = Math.min(j.step + 1, j.total)
   notify()
 }

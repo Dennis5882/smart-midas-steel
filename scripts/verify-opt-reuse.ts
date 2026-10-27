@@ -16,11 +16,14 @@ let db: Record<string, Record<string, unknown>> = {}
 const calls: string[] = []
 /** 'tables' = 결과 표를 빈 응답으로 (Gen 결과 없음) */
 let fault = ''
+/* 최적화 회차 카드 — 작업이 끝나면 S.job 이 사라지므로 Gen 호출 때마다 사본 */
+let rounds: any[] = []
 const json = (o: unknown) => Response.json(o)
 ;(globalThis as any).fetch = async (url: string, init?: RequestInit) => {
   const path = new URL(url).pathname.replace(/^\/gen/, '')
   const method = init?.method ?? 'GET'
   const body = init?.body ? JSON.parse(String(init.body)) : {}
+  if ((S as any)?.job?.rounds) rounds = structuredClone(S.job!.rounds)
   if (path === '/doc/saveas') return json({ message: 'MIDAS GEN NX command complete' })
   if (path === '/doc/new') { calls.push('doc/new'); db = {}; return json({}) }
   if (path === '/doc/anal') { calls.push('doc/anal'); return json({ message: 'ok' }) }
@@ -33,7 +36,16 @@ const json = (o: unknown) => Response.json(o)
   }
   if (path.startsWith('/doc/') || path.startsWith('/view/') || path.startsWith('/post/')) return json({})
   const db_ = path.replace('/db/', '')
-  if (method === 'PUT') { if (db_ === 'SECT') calls.push('put SECT'); db[db_] = { ...db[db_], ...body.Assign }; return json({ [db_]: body.Assign }) }
+  if (method === 'PUT') {
+    if (db_ === 'SECT') calls.push('put SECT')
+    const next = { ...db, [db_]: { ...db[db_], ...body.Assign } } as Record<string, Record<string, any>>
+    /* Gen 처럼 — TRUSS 요소가 뒴 효과 단면을 참조하게 되는 PUT 은 거부. 이 시험의 최적화는 단면 번호가 밀려 옛 가새 번호에
+       뒴 효과 단면이 오는 경우를 지난다(CN 라이브 2026-10-27 과 같은 오류 — updateSections 의 중간 단계가 없으면 실패) */
+    if (Object.values(next.ELEM ?? {}).some((e) => e.TYPE === 'TRUSS' && next.SECT?.[e.SECT]?.SECT_BEFORE?.USE_WARPING_EFFECT))
+      return Response.json({ message: `[Error] Section property considering 7th DOF can be assigned only to the beam elements.` }, { status: 400 })
+    db = next
+    return json({ [db_]: body.Assign })
+  }
   if (method === 'GET') return json({ [db_]: structuredClone(db[db_] ?? {}) })
   return json({})
 }
@@ -74,9 +86,14 @@ let passed = 0
 }
 let inPlace = false
 for (const label of ['after design check', 'after optimization']) {
-  calls.length = 0
+  calls.length = 0; rounds = []
   await runOptimize()
   assert.ok(S.opt && S.design, `optimize ${label}: ${lastBot()}`)
+  /* 회차 카드 — 회차마다 무게·최대 강도비, 단면을 바꾼 회차는 바꾼 단면 */
+  /* 마지막 사본은 마지막 Gen 호출 때라 마지막 회차 결과는 아직 없을 수 있다 */
+  assert.ok(rounds.length === S.opt.iters.length && rounds.every((r, i) => r.it === i + 1 && (r.weight === undefined ? i === rounds.length - 1 : Math.abs(r.weight - S.opt!.iters[i].weight) < 1e-9 && r.maxRatio === S.opt!.iters[i].maxRatio)), `${label}: round cards (${JSON.stringify(rounds)})`)
+  assert.ok(rounds.slice(0, -1).every((r) => r.next?.length && r.next.every((x: any) => x.before !== x.after)), `${label}: changed sections listed before the next round`)
+  passed += 2
   assert.ok(firstRound().includes('DISPLACEMENTG'), `${label}: fingerprint read`)
   assert.ok(!firstRound().includes('BEAMFORCE'), `${label}: round 1 re-fetched BEAMFORCE (${firstRound().join(', ')})`)
   /* 단면을 바꿔도 형상이 같으면 문서를 새로 만들지 않음 (그 자리에서 단면·바뀐 하중 표만) */

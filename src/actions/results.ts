@@ -143,7 +143,8 @@ export async function fetchResults(b: Built, opts: { mode?: 'auto' | 'combos' } 
 
   /* 보 부재력 */
   const beam = new Map<number, Map<string, ForcePt[]>>()
-  const batchSize = parts ? caseBatchSize(beamIds, 5) : spec.code === 'CN' ? Math.min(4,caseBatchSize(beamIds,5)) : model.additions ? Math.min(16,caseBatchSize(beamIds,5)) : cb.length
+  /* CN Gen 은 부재력 표를 4개씩만(china_code_implementation) — 케이스 표도 같은 한도 */
+  const batchSize = spec.code === 'CN' ? Math.min(4,caseBatchSize(beamIds,5)) : parts ? caseBatchSize(beamIds, 5) : model.additions ? Math.min(16,caseBatchSize(beamIds,5)) : cb.length
   stage('st_results', Math.ceil(cb.length / batchSize) + (trussIds.length ? Math.ceil(cb.length/caseBatchSize(trussIds)) : 0) + 1 + Math.ceil(cb.length/caseBatchSize(eaveNodes.map(n=>n.id))) + Math.ceil(svcCases.length/caseBatchSize(svcNodes.map(n=>n.id))))
   for (let offset = 0; offset < cb.length; offset += batchSize) {
     const bf = await table('BEAMFORCE', spec.code === 'CN' ? `F${offset}` : 'F', beamIds, cb.slice(offset, offset + batchSize), { PARTS: ['PartI', 'Part1/4', 'Part2/4', 'Part3/4', 'PartJ'] },

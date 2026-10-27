@@ -53,7 +53,10 @@ export interface Built { spec: FactorySpec; model: FactoryModel; info: LoadInfo;
 export type JobKind = 'build' | 'anal' | 'design' | 'opt' | 'pdf' | 'docx' | 'dwgpdf' | 'restore' | 'readback'
 /** 파일 생성 작업 — Gen·결과를 바꾸지 않음 (결과 개정 유지, 취소 안내 문구 공통) */
 export const FILE_JOBS: ReadonlySet<JobKind> = new Set<JobKind>(['pdf', 'docx', 'dwgpdf'])
-export interface Job { kind: JobKind; stage: string; step: number; total: number; detail: string; t0: number; cancel: boolean; iter?: [number, number]; activityId?: number }
+/** 최적화 회차 한 줄 — 결과(무게·최대 강도비·NG)는 검토가 끝나면, next 는 다음 회차로 바꿀 단면 */
+export interface OptRound { it: number; weight?: number; maxRatio?: number; ng?: number; next?: { role: ElementRole; before: string; after: string }[] }
+/** detail = 지금 MAPI 호출(API 코드), hint = 그 호출의 설명(그릴 때 현재 언어 — mapi/describe.ts), rounds = 최적화 회차 카드 */
+export interface Job { kind: JobKind; stage: string; step: number; total: number; detail: string; hint?: (() => string) | null; rounds?: OptRound[]; t0: number; cancel: boolean; iter?: [number, number]; activityId?: number }
 
 /** 반력 합계 (하중 케이스별) */
 export interface ReactionSum { lc: string; fx: number; fy: number; fz: number }

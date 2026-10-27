@@ -48,8 +48,19 @@ export function JobBar() {
           </li>
         ))}
       </ol>
+      {/* 최적화 회차 카드 — 회차마다 무게·최대 강도비·NG, 다음 회차로 바꿀 단면. 결과 전이면 지금 단계 */}
+      {!!j.rounds?.length && <ol className="jb-rounds" aria-label={t('jr_rounds')}>
+        {j.rounds.map((r) => <li key={r.it} className={r.weight === undefined ? 'jr-now' : r.ng ? 'jr-ng' : ''}>
+          <b>{t('jr_round', r.it)}</b>
+          {r.weight === undefined ? <span className="jr-wait">{label || t('jr_running')}…</span>
+            : <span>{t('jr_result', r.weight.toFixed(2), (r.maxRatio ?? 0).toFixed(3), r.ng ?? 0)}</span>}
+          {!!r.next?.length && <span className="jr-next">→ {r.next.map((x) => `${t(`role_${x.role}`)} ${x.before} → ${x.after}`).join(', ')}</span>}
+        </li>)}
+      </ol>}
+      {/* 지금 호출 — API 코드 + 사람이 읽는 설명 */}
       <div className="jb-detail">
-        {j.detail}
+        {j.detail && <code className="jb-api">{j.detail}</code>}
+        {j.hint && <span className="jb-hint">{j.hint()}</span>}
         <button className="jb-log" onClick={() => tab('logP')}>{t('job_log')}</button>
       </div>
     </div>

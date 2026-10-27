@@ -175,6 +175,12 @@ function inPlacePlan(b: Built, spec: FactorySpec) {
   return { ok: true as const, model, p, loads, l }
 }
 
+/** 같은 단면 정의에서 뒴 효과만 끔 — 그 자리 갱신의 중간 단계 (updateSections) */
+const withoutWarping = (s: unknown) => {
+  const x = s as { SECT_BEFORE: Record<string, unknown> }
+  return { ...x, SECT_BEFORE: { ...x.SECT_BEFORE, USE_WARPING_EFFECT: false } }
+}
+
 /** 문서를 새로 만들지 않고 단면 바꾸기 — SECT·ELEM(+ 앱 하중 모델은 값이 바뀐 하중 표)만 PUT. 요소·절점 번호가 그대로라 나머지는 유지되고
     (엔지니어 하중 모델은 Gen 의 엔지니어 하중·조합), 자중(BODF)은 Gen 이 새 단면으로 다시 계산한다. 쓰지 않게 된 옛 단면 번호는 Gen 에 남을 수 있다
     (요소가 참조하지 않음 — 동일성 기준은 다시 읽은 SECT). */
@@ -184,7 +190,7 @@ export async function updateSections(spec: FactorySpec, onBackup?: (backup: stri
   const plan = inPlacePlan(b, spec)
   if (!plan?.ok) throw new SectionUpdateError(plan?.changed ?? [])
   const { model, p, loads, l } = plan
-  stage('st_sections', 4 + Object.keys(loads).length)
+  stage('st_sections', 5 + Object.keys(loads).length)
   const backup = await autoSave('backup')
   onBackup?.(backup)
   /* 여기부터 Gen 단면은 이전 모델이 아니다 — 중간 실패·취소 때 이전 결과가 지금 모델의 결과로 남지 않게 먼저 비운다.
@@ -192,8 +198,15 @@ export async function updateSections(spec: FactorySpec, onBackup?: (backup: stri
   S.built = { ...b }
   clearResults()
   notify()
-  await mapi('PUT', 'SECT', { Assign: p.SECT }, String(Object.keys(p.SECT).length))
+  /* 단면 번호는 단면 이름이 처음 나온 순서라 단면이 바뀌면 번호가 밀린다 — 아직 옛 ELEM 의 TRUSS 요소가 쓰는 번호에 뒴 효과(7번째 자유도) 단면을
+     먼저 넣으면 Gen 이 거부한다(CN 라이브 2026-10-27 'Section property considering 7th DOF … only to the beam elements').
+     그 번호만 뒴 효과를 끈 채 넣고 → ELEM → 원래 값으로 다시 SECT */
+  const oldTruss = new Set(Object.values(b.sent.ELEM ?? {}).filter((e) => (e as { TYPE?: string }).TYPE === 'TRUSS').map((e) => String((e as { SECT?: number }).SECT)))
+  const clash = Object.keys(p.SECT).filter((id) => oldTruss.has(id) && (p.SECT[id] as { SECT_BEFORE?: { USE_WARPING_EFFECT?: boolean } }).SECT_BEFORE?.USE_WARPING_EFFECT)
+  const safe = clash.length ? Object.fromEntries(Object.entries(p.SECT).map(([id, s]) => [id, clash.includes(id) ? withoutWarping(s) : s])) : p.SECT
+  await mapi('PUT', 'SECT', { Assign: safe }, String(Object.keys(p.SECT).length))
   await mapi('PUT', 'ELEM', { Assign: p.ELEM }, String(Object.keys(p.ELEM).length))
+  if (clash.length) await mapi('PUT', 'SECT', { Assign: Object.fromEntries(clash.map((id) => [id, p.SECT[id]])) }, String(clash.length))
   for (const [db, assign] of Object.entries(loads)) await mapi('PUT', db, { Assign: assign }, String(Object.keys(assign).length))
   /* 확인 — 보낸 표가 그대로 들어갔는지 (SECT 는 남은 옛 번호를 허용) */
   stage('st_verify', 3 + Object.keys(loads).length)

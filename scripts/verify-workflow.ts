@@ -32,4 +32,22 @@ is(st('dwgpdf', 'dwg_pdf_start', ''), 'n', 'drawing PDF job shows its own step')
   is(parseCommand('計算書 PDF（含示意圖）').intent, 'pdf', 'report PDF with 圖 stays a report')
   is(parseCommand('도면').intent, 'drawings', 'plain drawing command is DXF')
 }
+/* 진행 막대의 호출 설명 — API 코드 옆 문구 (mapi/describe.ts) */
+{
+  ;(globalThis as any).document ??= { documentElement: { lang: 'ko', dataset: {} } }
+  const { describeCall } = await import('../src/mapi/describe')
+  const { setLang } = await import('../src/i18n')
+  setLang('ko')
+  const d = (m: string, ep: string, body?: any) => describeCall(m, ep, body)?.() ?? null
+  const tbl = (type: string, keys: number, loads: string[]) => ({ Argument: { TABLE_TYPE: type, NODE_ELEMS: { KEYS: Array(keys).fill(1) }, LOAD_CASE_NAMES: loads } })
+  is(d('POST', '/post/TABLE', tbl('BEAMFORCE', 410, Array(21).fill('D(ST)'))), '부재력 읽는 중 — 요소·절점 410개 × 하중 케이스 21개', 'case table read')
+  is(d('POST', '/post/TABLE', tbl('BEAMFORCE', 410, ['A(CB)', 'B(CB)'])), '부재력 읽는 중 — 요소·절점 410개 × 하중 조합 2개', 'combination table read')
+  is(d('PUT', '/db/SECT', { Assign: { 1: {}, 2: {} } }), 'Gen 에 단면 보내는 중 (2개)', 'PUT names the table and count')
+  is(d('GET', '/db/LCOM-GEN'), 'Gen 에서 하중 조합 다시 읽어 확인', 'GET is a readback check')
+  is(d('PUT', '/db/XYZ', { Assign: {} }), 'Gen 에 XYZ 보내는 중 (0개)', 'unknown table keeps its code')
+  is(d('POST', '/doc/anal/'), describeCall('POST', '/doc/anal', {})!(), 'trailing slash ignored')
+  is(d('POST', '/unknown'), null, 'unknown path → API code only')
+  setLang('en')
+  is(d('PUT', '/db/NODE', { Assign: { 1: {} } }), 'Sending nodes to Gen (1)', 'rendered in the current language')
+}
 console.log(`Spec change / job steps: ${n} checks passed`)

@@ -5,6 +5,7 @@ import { t } from '../i18n'
 import { S } from '../state/store'
 import { log } from '../state/ui'
 import { jobCall } from '../actions/job'
+import { describeCall } from './describe'
 
 /* 요청별 대기 한도 (대기만 중단 — Gen 이 받은 작업은 취소되지 않는다, SDK 안내).
    해석·결과 표는 수 분 걸릴 수 있어 길게(TW 박공 BEAMFORCE 155 조합 ≈ 105 s), 문서 저장·열기는 중간,
@@ -56,7 +57,7 @@ export function apiErrorMessage(e: unknown, endpoint = ''): string {
 
 export async function mapi<T = any>(method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, body?: Record<string, any>, note = ''): Promise<T> {
   const ep = path.startsWith('/') ? path : `/db/${path}`
-  jobCall(`${method} ${ep}`) // 취소됐으면 여기서 Cancelled — 보내기 전에 멈춘다
+  jobCall(`${method} ${ep}`, describeCall(method, ep, body)) // 취소됐으면 여기서 Cancelled — 보내기 전에 멈춘다
   log(`<span style="color:var(--blue)">${method}</span> ${ep}${note ? ` <span style="color:var(--dim)">· ${note}</span>` : ''}`, 'api')
   try {
     return (await getClient().request(method, ep, body as JsonObject | undefined, { timeout: timeoutFor(ep) })) as T
