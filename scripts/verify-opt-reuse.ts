@@ -54,7 +54,7 @@ const { S } = await import('../src/state/store')
 const { setConfirmHandler } = await import('../src/components/ConfirmDialog')
 setConfirmHandler(() => true)
 const { msgText } = await import('../src/state/ui')
-const { buildFactory } = await import('../src/actions/build')
+const { buildFactory, resendModel } = await import('../src/actions/build')
 const { runAnalysis } = await import('../src/actions/analysis')
 const { runDesignCheck } = await import('../src/actions/design')
 const { runOptimize } = await import('../src/actions/optimize')
@@ -103,4 +103,11 @@ for (const label of ['after design check', 'after optimization']) {
 }
 assert.ok(inPlace, 'an optimization round changed sections in place (SECT PUT)')
 passed++
+/* 앱 하중 모델에서 형상 표가 달라지면 그 자리 갱신(엔지니어 하중용 거부)이 아니라 모델 재생성 — inPlacePlan 의 {ok:false} 를 갱신 가능으로 읽던 회귀 */
+{
+  calls.length = 0
+  await resendModel({ ...S.built!.spec, span: S.built!.spec.span + 2 })
+  assert.ok(calls.includes('doc/new') && S.built!.spec.span === fx.spec.span + 2, `geometry change on an app-load model regenerates (${calls.slice(0, 6).join(', ')})`)
+  passed++
+}
 console.log(`Optimizer result reuse: ${passed} checks passed (previous results kept when stopped before Gen changes; round 1 reuses results after a design check and after a previous optimization)`)

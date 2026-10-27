@@ -68,6 +68,11 @@ function sceneOf(m: FactoryModel, c: CamId, zoom: number): Record<string, unknow
   const [h, v] = ORTHO_AX[c], mx = Math.max(d[h], d[v])
   return { aspectmode: 'manual', aspectratio: { x: (d.x / mx) * k, y: (d.y / mx) * k, z: (d.z / mx) * k } }
 }
+/** 정투영 사용자 확대 배율 — 마지막에 보낸 축 비율 대비 지금 값 (확대 버튼·휠이 축 비율을 바꾼다) */
+function orthoZoom(el: any, f: { zoom: number; sentX: number }): number {
+  const x = el?._fullLayout?.scene?.aspectratio?.x
+  return f.sentX > 0 && Number.isFinite(x) && x > 0 ? f.zoom * (x / f.sentX) : f.zoom
+}
 /** 패널 가로/세로 비 */
 const ratioOf = (el: HTMLElement) => el.clientWidth / Math.max(1, el.clientHeight) || 1.35
 /** ISO(원근) 기본 거리 — 패널이 정사각형·세로형이면 가로로 넘치므로 가로/세로 비에 맞춰 멀리 (1.22 에서 딱 맞음, 2026-10-15 캡처) */
@@ -158,8 +163,9 @@ export function View3D() {
   const s = useStore()
   const lang = useLang()
   const ref = useRef<HTMLDivElement>(null)
-  /** 지금 시점(rev)에 적용한 맞춤 배율 — 패널 크기가 바뀌면 이 값과의 비율만큼 고친다 */
-  const fitRef = useRef<{ rev: string; cam: CamId; fit: number }>({ rev: '', cam: 'iso', fit: 1 })
+  /** 지금 시점(rev)에 적용한 맞춤 배율 — 패널 크기가 바뀌면 이 값과의 비율만큼 고친다.
+      정투영은 사용자 확대(+/-·휠 = 축 비율)도 zoom 으로 기억 — 보낸 축 비율 sentX 와 지금 값의 비 */
+  const fitRef = useRef<{ rev: string; cam: CamId; fit: number; zoom: number; sentX: number }>({ rev: '', cam: 'iso', fit: 1, zoom: 1, sentX: 0 })
   /** 정투영 패널 크기 변경 → 다시 그림 (축 비율만 relayout 하면 Plotly 가 축 이름·눈금을 반대편으로 옮겨 겹침, 2026-10-27 캡처) */
   const [sized, setSized] = useState(0)
   const spec = s.preview ?? s.built?.spec ?? null
@@ -181,7 +187,11 @@ export function View3D() {
       /* 맞춤 배율 = 지금 패널 크기·모델 기준 (ISO 카메라는 시점 버튼·맞춤 때만 적용 — 토글·표시 방식 변경은 uirevision 이 사용자 시점 유지) */
       const rev = `${c}:${S.camReset}`
       const fit = fitOf(el, model, c)
-      fitRef.current = { rev, cam: c, fit }
+      /* 같은 시점이면 사용자 확대를 이어 간다 (다시 그려도 맞춤 배율로 돌아가지 않게) — 시점 버튼·맞춤이면 1 */
+      const f0 = fitRef.current
+      const zoom = f0.rev === rev && c !== 'iso' ? orthoZoom(el, f0) : 1
+      const scene = sceneOf(model, c, c === 'iso' ? 1 : fit * zoom)
+      fitRef.current = { rev, cam: c, fit, zoom, sentX: (scene.aspectratio as { x: number } | undefined)?.x ?? 0 }
       const ax = (hide: boolean, title: string) => (hide ? { ...axis(title, P, font), ...HIDDEN_AX } : axis(title, P, font))
       void Plotly.react(el, traces(model, spec, P, ratio, S.vis3d, solid, invalid), {
         paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', margin: { l: 0, r: 0, t: ratio ? 28 : 0, b: 0 },
@@ -193,7 +203,7 @@ export function View3D() {
         /* 강도비 보기에만 색 구간 범례 (부재 종류는 위 토글 줄이 범례) */
         legend: { orientation: 'h', x: 0, y: 1.03, itemclick: false, itemdoubleclick: false, bgcolor: P.legend, bordercolor: P.legendBd, borderwidth: 1, font: { size: 11, color: P.txt, family: font } },
         scene: {
-          ...sceneOf(model, c, c === 'iso' ? 1 : fit),
+          ...scene,
           /* 정투영은 시선 방향 축을 숨김 — 정면(X–Z) Y, 측면(Y–Z) X, 평면 Z */
           xaxis: ax(c === 'side', 'X (m)'), yaxis: ax(c === 'front', 'Y (m)'), zaxis: ax(c === 'top', 'Z (m)'),
           camera: camOf(c, c === 'iso' ? fit : 1),
@@ -218,9 +228,9 @@ export function View3D() {
         if (!sc || !el.clientWidth || !f0.rev) return
         const f1 = fitOf(el, model, f0.cam), q = f1 / f0.fit
         if (Math.abs(q - 1) < 1e-3) return
-        fitRef.current = { ...f0, fit: f1 }
-        if (f0.cam !== 'iso') setSized((n) => n + 1)
+        if (f0.cam !== 'iso') { fitRef.current = { ...f0, fit: f1, zoom: orthoZoom(el, f0), sentX: sc.aspectratio?.x ?? 0 }; setSized((n) => n + 1) }
         else {
+          fitRef.current = { ...f0, fit: f1 }
           const e = sc.camera.eye
           void Plotly.relayout(el, { 'scene.camera.eye': { x: e.x / q, y: e.y / q, z: e.z / q } } as any)
         }

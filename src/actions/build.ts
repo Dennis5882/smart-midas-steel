@@ -146,8 +146,11 @@ async function checkSectionSource(spec: FactorySpec, sect: Record<string, unknow
     엔지니어 하중(F2) 모델은 항상 그 방식(형상이 바뀌면 거부), 앱 하중 모델은 그 자리에서 고칠 수 없을 때만 모델 재생성(sendModel) */
 export async function resendModel(spec: FactorySpec, onReplaced?: (backup: string) => void) {
   const b = S.built
-  if (b?.genLoads) return updateSections(spec, onReplaced)
-  return b && !b.modelOnly && inPlacePlan(b, spec) ? updateSections(spec, onReplaced) : sendModel(spec, onReplaced)
+  if (!b?.sent || b.modelOnly && !b.genLoads) return sendModel(spec, onReplaced)
+  /* 계획은 한 번만 계산해 넘긴다 (모델·하중 페이로드와 큰 하중 표 비교가 회차마다 두 번 돌지 않게) */
+  const plan = inPlacePlan(b, spec)
+  if (b.genLoads || plan?.ok) return updateSections(spec, onReplaced, plan)
+  return sendModel(spec, onReplaced)
 }
 
 const same = (x: unknown, y: unknown) => JSON.stringify(x) === JSON.stringify(y)
@@ -184,10 +187,10 @@ const withoutWarping = (s: unknown) => {
 /** 문서를 새로 만들지 않고 단면 바꾸기 — SECT·ELEM(+ 앱 하중 모델은 값이 바뀐 하중 표)만 PUT. 요소·절점 번호가 그대로라 나머지는 유지되고
     (엔지니어 하중 모델은 Gen 의 엔지니어 하중·조합), 자중(BODF)은 Gen 이 새 단면으로 다시 계산한다. 쓰지 않게 된 옛 단면 번호는 Gen 에 남을 수 있다
     (요소가 참조하지 않음 — 동일성 기준은 다시 읽은 SECT). */
-export async function updateSections(spec: FactorySpec, onBackup?: (backup: string) => void) {
+export async function updateSections(spec: FactorySpec, onBackup?: (backup: string) => void, planned?: ReturnType<typeof inPlacePlan>) {
   const b = S.built
   if (!b?.sent) throw new SectionUpdateError([])
-  const plan = inPlacePlan(b, spec)
+  const plan = planned === undefined ? inPlacePlan(b, spec) : planned
   if (!plan?.ok) throw new SectionUpdateError(plan?.changed ?? [])
   const { model, p, loads, l } = plan
   stage('st_sections', 5 + Object.keys(loads).length)

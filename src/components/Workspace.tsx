@@ -51,7 +51,7 @@ export function Workspace({ guideCollapsed, onOpenGuide, onOpenMapi }: { guideCo
     {/* 시작 화면 = 모델링 위저드 1단계 — 위쪽 띠에서 설계기준, 기본 모델(템플릿) 고르고 [다음 단계] → 편집기 2단계. 자유 골조는 아래 */}
     <div className="ws-start" hidden={!!editing || s.task !== 'model'}>
       <ModelWizard spec={startSpec} step={0} visited={0} disabled={s.busy || restrictedCode} blocked={false} invalid={false} attempted={false}
-        onStep={() => startTemplate(pick)} onBuild={() => {}} codeControl={<CodeSelect />}>
+        onStep={(n) => { if (n > 0) startTemplate(pick) }} onBuild={() => {}} codeControl={<CodeSelect />}>
         {restrictedCode && <p className="mw-note" role="status">{t('project_code_existing_hint')}</p>}
         {plan?.spec.code === s.code && <button className="ws-resume-card" disabled={s.busy} onClick={openCurrentModel}><FolderOpen size={20} /><span><strong>{t('ws_resume')}</strong><small>{t('ws_resume_hint')}</small></span><ArrowRight size={16} /></button>}
         <h4 className="ws-section-label">{t('ws_templates')}</h4>
