@@ -654,6 +654,10 @@ export const en = {
   g_help_2: 'Release notes',
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_5_8_1: 'Faster design check and optimization: app-load models read load-case results and combine them in the app (same results; fetch time TW 102→9 s, KR 137→14 s, CN 51→8 s). Optimization changes sections in place without a new Gen document',
+  rn_v2_5_8_2: 'The progress bar shows the running API call with a plain description (e.g. reading beam forces — 410 elements × 21 load cases); optimization lists weight, max ratio, NG and changed sections for each round',
+  rn_v2_5_8_3: 'The start screen is now modeling step 1 (Start): pick the design code at the top, choose a basic model and press [Continue]. Choosing another template starts a new model',
+  rn_v2_5_8_4: 'The 3D preview shrinks with the window, and multi-span gable moved to fourth in the cross-section types',
   rn_v2_5_7_1: 'After [Create in Gen NX], choose what is sent to Gen (full model / model + self weight only) in the confirm dialog; it starts at your previous choice',
   rn_v2_5_7_2: 'Taiwan: [Read loads from Gen] — reads the loads and combinations an engineer entered in Gen, shows them for review before analysis (case resultants, combination issues, missing-load notices) and, once confirmed, analyses and checks with them; reactions are compared per case after analysis',
   rn_v2_5_7_3: 'Set a purpose for each read combination (basic / amplified seismic E′ / gravity 13.6.1 / ASD) — guessed from the name first, then corrected by the engineer; the seismic chapter 13 special checks use these purposes',
