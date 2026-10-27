@@ -17,7 +17,7 @@ import { mapi, tableOf } from '../mapi/client'
 import { autoSave, autoSavePath } from './save'
 import { confirmAction, confirmChoice } from '../components/ConfirmDialog'
 import { beginJob, Cancelled, endJob, failMsg, stage } from './job'
-import { S, clearResults, notify } from '../state/store'
+import { S, clearResults, notify, type Built } from '../state/store'
 import { addMsg, draw3D, escapeHtml, log, tab } from '../state/ui'
 
 /** Gen 으로 보낼 내용은 생성 확인 창에서 고른다 — 정상 모델링 / [모델 + 자중만](형상·재료·단면·지점·단부 해제 + 자중 D, 엔지니어가 하중을 직접 넣는 용도).
@@ -142,24 +142,49 @@ async function checkSectionSource(spec: FactorySpec, sect: Record<string, unknow
   if (sourceDifferences.length) throw new Error(t('section_source_mismatch', sourceDifferences.slice(0,4).join(', ')))
 }
 
-/** 단면이 바뀐 스펙을 Gen 에 반영 — 엔지니어 하중(F2)이 있으면 단면만(updateSections), 아니면 모델 재생성(sendModel). 최적화·NG 보완 공통 */
+/** 단면이 바뀐 스펙을 Gen 에 반영 (최적화·NG 보완 공통) — 형상이 같으면 문서를 새로 만들지 않고 그 자리에서 단면·바뀐 하중 표만 고친다(updateSections).
+    엔지니어 하중(F2) 모델은 항상 그 방식(형상이 바뀌면 거부), 앱 하중 모델은 그 자리에서 고칠 수 없을 때만 모델 재생성(sendModel) */
 export async function resendModel(spec: FactorySpec, onReplaced?: (backup: string) => void) {
-  return S.built?.genLoads ? updateSections(spec, onReplaced) : sendModel(spec, onReplaced)
+  const b = S.built
+  if (b?.genLoads) return updateSections(spec, onReplaced)
+  return b && !b.modelOnly && inPlacePlan(b, spec) ? updateSections(spec, onReplaced) : sendModel(spec, onReplaced)
 }
 
-/** 엔지니어 하중(F2 2단계)이 있는 모델의 단면만 바꾸기 — doc/new 없이 SECT·ELEM 만 PUT. 요소·절점 번호가 그대로라 Gen 의 엔지니어 하중(BMLD·CNLD·조합)이 유지되고,
-    자중(BODF)은 Gen 이 새 단면으로 다시 계산한다. 쓰지 않게 된 옛 단면 번호는 Gen 에 남는다(요소가 참조하지 않음 — 동일성 기준은 다시 읽은 SECT). */
-export async function updateSections(spec: FactorySpec, onBackup?: (backup: string) => void) {
-  const b = S.built
-  if (!b?.genLoads || !b.sent) throw new SectionUpdateError([])
+const same = (x: unknown, y: unknown) => JSON.stringify(x) === JSON.stringify(y)
+const APP_LOAD_DBS = ['STLD', 'BODF', 'BMLD', 'CNLD', 'LCOM-GEN'] as const
+
+/** 그 자리에서 고칠 내용 — 형상 표(GEN_FIXED_DBS)가 보낸 것과 같아야 한다. 앱 하중 모델은 새 단면으로 다시 계산한 하중 표 중 값이 바뀐 것도 PUT
+    (지진력 = 무게 기반 등). PUT 은 항목 번호별로 덮어쓰므로 번호 집합이 다르면(없어진 항목이 Gen 에 남음) 고칠 수 없다 → null(엔지니어 하중 모델은 changed 로 거부 사유) */
+function inPlacePlan(b: Built, spec: FactorySpec) {
+  if (!b.sent) return null
   const model = buildPortal(spec)
   const p = buildGenPayloads(spec, model)
   const designCode = profileOf(spec.code).gen.designCode
   const want: Record<string, unknown> = { ...p, ...(designCode ? { DSTL: { 1: { DGNCODE: designCode } } } : {}) }
-  const same = (x: unknown, y: unknown) => JSON.stringify(x) === JSON.stringify(y)
   const changed = GEN_FIXED_DBS.filter((db) => !same(want[db], b.sent![db]))
-  if (model.elements.length !== b.model.elements.length || changed.length) throw new SectionUpdateError(changed)
-  stage('st_sections', 4)
+  if (model.elements.length !== b.model.elements.length || changed.length) return { ok: false as const, changed }
+  if (b.genLoads) return { ok: true as const, model, p, loads: {} as Record<string, Record<string, unknown>>, l: buildLoadPayloads(spec, model) }
+  const l = buildLoadPayloads(spec, model)
+  const loads: Record<string, Record<string, unknown>> = {}
+  for (const db of APP_LOAD_DBS) {
+    const was = b.sent[db] ?? {}
+    if (same(l[db], was)) continue
+    if (!same(Object.keys(l[db]).sort(), Object.keys(was).sort())) return null
+    loads[db] = l[db]
+  }
+  return { ok: true as const, model, p, loads, l }
+}
+
+/** 문서를 새로 만들지 않고 단면 바꾸기 — SECT·ELEM(+ 앱 하중 모델은 값이 바뀐 하중 표)만 PUT. 요소·절점 번호가 그대로라 나머지는 유지되고
+    (엔지니어 하중 모델은 Gen 의 엔지니어 하중·조합), 자중(BODF)은 Gen 이 새 단면으로 다시 계산한다. 쓰지 않게 된 옛 단면 번호는 Gen 에 남을 수 있다
+    (요소가 참조하지 않음 — 동일성 기준은 다시 읽은 SECT). */
+export async function updateSections(spec: FactorySpec, onBackup?: (backup: string) => void) {
+  const b = S.built
+  if (!b?.sent) throw new SectionUpdateError([])
+  const plan = inPlacePlan(b, spec)
+  if (!plan?.ok) throw new SectionUpdateError(plan?.changed ?? [])
+  const { model, p, loads, l } = plan
+  stage('st_sections', 4 + Object.keys(loads).length)
   const backup = await autoSave('backup')
   onBackup?.(backup)
   /* 여기부터 Gen 단면은 이전 모델이 아니다 — 중간 실패·취소 때 이전 결과가 지금 모델의 결과로 남지 않게 먼저 비운다.
@@ -169,26 +194,36 @@ export async function updateSections(spec: FactorySpec, onBackup?: (backup: stri
   notify()
   await mapi('PUT', 'SECT', { Assign: p.SECT }, String(Object.keys(p.SECT).length))
   await mapi('PUT', 'ELEM', { Assign: p.ELEM }, String(Object.keys(p.ELEM).length))
-  /* 확인 — 보낸 단면·요소가 그대로 들어갔는지 (SECT 는 남은 옛 번호를 허용) */
-  stage('st_verify', 3)
-  const gotSect = (await mapi<Record<string, unknown>>('GET', 'SECT', undefined, 'verify'))?.SECT
-  const gotElem = (await mapi<Record<string, unknown>>('GET', 'ELEM', undefined, 'verify'))?.ELEM
-  if (!isRecord(gotSect) || !isRecord(gotElem)) throw new Error(t('verify_fail', t('gen_bad_response')))
-  const bad = [...dbDifferences('SECT', p.SECT, gotSect, 3).filter((d) => d.added === undefined || d.removed), ...dbDifferences('ELEM', p.ELEM, gotElem, 3)]
+  for (const [db, assign] of Object.entries(loads)) await mapi('PUT', db, { Assign: assign }, String(Object.keys(assign).length))
+  /* 확인 — 보낸 표가 그대로 들어갔는지 (SECT 는 남은 옛 번호를 허용) */
+  stage('st_verify', 3 + Object.keys(loads).length)
+  const read = async (db: string) => {
+    const got = (await mapi<Record<string, unknown>>('GET', db, undefined, 'verify'))?.[db]
+    if (!isRecord(got)) throw new Error(t('verify_fail', `${db}: ${t('gen_bad_response')}`))
+    return got
+  }
+  const gotSect = await read('SECT')
+  const bad = [...dbDifferences('SECT', p.SECT, gotSect, 3).filter((d) => d.added === undefined || d.removed), ...dbDifferences('ELEM', p.ELEM, await read('ELEM'), 3)]
+  for (const [db, assign] of Object.entries(loads)) bad.push(...dbDifferences(db, assign, await read(db), 3))
   if (bad.length) throw new Error(t('verify_fail', bad.map(diffText).join(', ')))
   await checkSectionSource(spec, p.SECT)
-  const l = buildLoadPayloads(spec, model)
-  /* 요약은 읽은 하중 표 전부(합산 못 하는 표 포함)로 다시 — 자중 추정만 새 단면, 조합 용도는 확정한 것 */
-  const kinds = new Map(b.genLoads.combos.map((c) => [c.name, c.kind]))
-  const fresh = summarizeGenLoads(spec, model, b.genRaw ?? b.sent)
-  const summary = { ...fresh, combos: fresh.combos.map((c) => ({ ...c, kind: kinds.get(c.name) ?? c.kind })) }
-  S.built = { ...b, spec, model, info: genLoadInfo(l.info, summary), genLoads: summary, sent: { ...b.sent, SECT: gotSect, ELEM: p.ELEM } }
+  const sent = { ...b.sent, SECT: gotSect, ELEM: p.ELEM, ...loads }
+  if (b.genLoads) {
+    /* 요약은 읽은 하중 표 전부(합산 못 하는 표 포함)로 다시 — 자중 추정만 새 단면, 조합 용도는 확정한 것 */
+    const kinds = new Map(b.genLoads.combos.map((c) => [c.name, c.kind]))
+    const fresh = summarizeGenLoads(spec, model, b.genRaw ?? b.sent)
+    const summary = { ...fresh, combos: fresh.combos.map((c) => ({ ...c, kind: kinds.get(c.name) ?? c.kind })) }
+    S.built = { ...b, spec, model, info: genLoadInfo(l.info, summary), genLoads: summary, sent }
+  } else {
+    const names = (tbl: Record<string, unknown>) => Object.values(tbl).map((c) => (c as { NAME: string }).NAME)
+    S.built = { ...b, spec, model, info: l.info, cases: names(l.STLD), comboNames: names(l['LCOM-GEN']), combos: Object.keys(l['LCOM-GEN']).length, sent }
+  }
   clearResults()
   S.lastSpec = spec
   S.draftSpec = spec
   S.draftInvalid = false
   S.modelRevision++
-  log(t('log_sections_updated', Object.keys(p.SECT).length), 'ok')
+  log(t('log_sections_updated', Object.keys(p.SECT).length, Object.keys(loads).length), 'ok')
   notify()
   return model
 }

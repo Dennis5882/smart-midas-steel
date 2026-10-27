@@ -1171,7 +1171,7 @@ export const en = {
   rb_accepted: (a: number, b: number) => `Confirmed the engineer loads from Gen (${a} cases · ${b} combinations). Now run the analysis.`,
   rb_geometry: 'Cannot change sections only — geometry, materials, supports or end releases differ from the model sent to Gen. Rebuild the model.',
   st_sections: 'Updating sections (engineer loads kept)',
-  log_sections_updated: (a: number) => `Sections updated only — ${a} sections, engineer loads kept`,
+  log_sections_updated: (a: number, b: number) => `Gen model updated in place (no new document) — ${a} sections, ${b} changed load tables`,
   ft_gen_loads: 'Not evaluated: foundation working-load combinations (2.11) are not yet supported for engineer loads read from Gen.',
   sc_genLoads: 'Engineer loads read from Gen — combination purposes were set by the engineer (app guess, then checked); seismic drift (2.16.1) and the footing check were not performed. Without amplified seismic combinations the seismic chapter 13 special checks are not performed either (expert review).',
   rb_active: (a: number, b: number) => `Analysing with the engineer loads from Gen — ${a} cases · ${b} combinations`,

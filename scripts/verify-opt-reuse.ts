@@ -33,7 +33,7 @@ const json = (o: unknown) => Response.json(o)
   }
   if (path.startsWith('/doc/') || path.startsWith('/view/') || path.startsWith('/post/')) return json({})
   const db_ = path.replace('/db/', '')
-  if (method === 'PUT') { db[db_] = { ...db[db_], ...body.Assign }; return json({ [db_]: body.Assign }) }
+  if (method === 'PUT') { if (db_ === 'SECT') calls.push('put SECT'); db[db_] = { ...db[db_], ...body.Assign }; return json({ [db_]: body.Assign }) }
   if (method === 'GET') return json({ [db_]: structuredClone(db[db_] ?? {}) })
   return json({})
 }
@@ -49,8 +49,8 @@ const { runOptimize } = await import('../src/actions/optimize')
 S.mapiKey = 'offline-opt-reuse'
 S.code = 'TW'
 const lastBot = () => { const m = [...S.msgs].reverse().find((x) => x.role === 'bot' && x.kind === 'html'); return m ? msgText(m) : '' }
-/** 첫 재전송(doc/new) 전까지 = 1회차 — 그 안에 BEAMFORCE 가 없어야 재사용 */
-const firstRound = () => { const i = calls.indexOf('doc/new'); return i < 0 ? calls : calls.slice(0, i) }
+/** 첫 재전송(단면 PUT — 그 자리 갱신이든 doc/new 재생성이든) 전까지 = 1회차 — 그 안에 BEAMFORCE 가 없어야 재사용 */
+const firstRound = () => { const i = calls.findIndex((c) => c === 'doc/new' || c === 'put SECT'); return i < 0 ? calls : calls.slice(0, i) }
 
 await buildFactory(structuredClone(fx.spec))
 await runAnalysis()
@@ -72,12 +72,18 @@ let passed = 0
   fault = ''
   passed += 3
 }
+let inPlace = false
 for (const label of ['after design check', 'after optimization']) {
   calls.length = 0
   await runOptimize()
   assert.ok(S.opt && S.design, `optimize ${label}: ${lastBot()}`)
   assert.ok(firstRound().includes('DISPLACEMENTG'), `${label}: fingerprint read`)
   assert.ok(!firstRound().includes('BEAMFORCE'), `${label}: round 1 re-fetched BEAMFORCE (${firstRound().join(', ')})`)
-  passed += 2
+  /* 단면을 바꿔도 형상이 같으면 문서를 새로 만들지 않음 (그 자리에서 단면·바뀐 하중 표만) */
+  assert.ok(!calls.includes('doc/new'), `${label}: sections updated in place without doc/new`)
+  inPlace ||= calls.includes('put SECT')
+  passed += 3
 }
+assert.ok(inPlace, 'an optimization round changed sections in place (SECT PUT)')
+passed++
 console.log(`Optimizer result reuse: ${passed} checks passed (previous results kept when stopped before Gen changes; round 1 reuses results after a design check and after a previous optimization)`)

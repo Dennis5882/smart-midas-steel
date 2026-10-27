@@ -66,7 +66,10 @@ try {
   console.log(`[${sec()}] drift: ` + S.design.service.filter((v) => /Drift/.test(v.key)).map((v) => `${v.key} 1/${Math.round(1 / v.value)} (${v.case})`).join(', ') + `; column max ${S.design.byRole.column?.ratio.toFixed(3)} (${S.design.byRole.column?.combo})`)
   console.log(`[${sec()}] baseline: max ${S.design.maxRatio.toFixed(3)} NG ${S.design.ng} status ${st().overall}; conns ${S.connections.map((c) => `${c.type} ${c.ratio.toFixed(3)}`).join(', ')}`)
   if (process.argv.includes('--optimize')) {
+    const mark = S.log.length, t0 = Date.now()
     await runOptimize()
+    const optLog = S.log.slice(mark).map((x: any) => String(x.text ?? x.html ?? x.msg ?? ''))
+    console.log(`[${sec()}] optimize took ${((Date.now() - t0) / 1000).toFixed(0)} s · doc/new ${optLog.filter((x) => /\/doc\/new/.test(x)).length} · in-place section updates ${optLog.filter((x) => /Gen 모델을 그 자리에서 갱신/.test(x)).length}`)
     if (!S.opt) { for (const l of S.log.slice(-25)) console.log('  log', JSON.stringify(l).slice(0, 260)); throw new Error('optimization failed: ' + JSON.stringify(S.msgs.at(-1))) }
     console.log(`[${sec()}] optimized: ${S.opt.weightBefore.toFixed(2)} -> ${S.opt.weightAfter.toFixed(2)} t, iters ${S.opt.iters.length}, max ${S.design!.maxRatio.toFixed(3)} NG ${S.design!.ng} status ${st().overall}`)
   }

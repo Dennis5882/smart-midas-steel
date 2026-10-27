@@ -24,8 +24,10 @@ export interface Results {
   /** 사용 하중 케이스 → 절점 → 변위 (m) */
   disp: Map<string, Map<number, { dx: number; dy: number; dz: number }>>
   combos: string[]
-  /** 처마 절점 조합 변위 합(원시값) — 같은 해석의 결과인지 다시 확인할 때 비교 (KR 은 sway 를 고쳐 쓰므로 따로 보관) */
+  /** 처마 절점 변위 합(원시값) — 같은 해석의 결과인지 다시 확인할 때 비교 (KR 은 sway 를 고쳐 쓰므로 따로 보관) */
   fingerprint?: string
+  /** 지문을 만든 표 — 요청 이름(`D(ST)`·`조합(CB)`)과 행 이름. 없으면 조합(CB) */
+  fpSource?: { loads: string[]; labels: string[] }
 }
 
 const num = (s: unknown) => resultNumber(s, 'TABLE')
@@ -74,6 +76,23 @@ async function eaveDisplacements(ids: number[], cb: string[], comboSet: Set<stri
 
 const fingerprint = (combos: string[], dsum: Map<string, number[]>) => combos.map((c) => (dsum.get(c) ?? []).join(',')).join(';')
 
+type ComboParts = Map<string, { lc: string; f: number }[]>
+/** 순정 모드(앱이 만든 하중·조합) — 조합 = 정적 케이스의 선형 합(iTYPE 0, ANAL ST)이고 선형 정적 해석이라 케이스 결과에 계수를 곱해 더하면
+    Gen 조합 결과와 같다(표 소수 5자리 반올림 차이만). 조합 표(155 개 등) 대신 케이스 표(21 개 등)만 읽어 결과 회수 시간을 줄인다.
+    엔지니어 하중(F2) 모델이거나 형식이 하나라도 다르면 null → Gen 조합 결과를 그대로 읽는다 */
+export function caseCombination(b: Built): ComboParts | null {
+  const lcom = b.sent?.['LCOM-GEN']
+  if (b.genLoads || !lcom) return null
+  const cases = new Set(b.cases), out: ComboParts = new Map()
+  for (const r of Object.values(lcom) as { NAME?: string; iTYPE?: number; vCOMB?: { ANAL?: string; LCNAME?: string; FACTOR?: number }[] }[]) {
+    if (!r?.NAME || (r.iTYPE ?? 0) !== 0 || out.has(r.NAME)) return null
+    const parts = (r.vCOMB ?? []).map((p) => ({ anal: p.ANAL ?? 'ST', lc: String(p.LCNAME), f: Number(p.FACTOR) }))
+    if (!parts.length || parts.some((p) => p.anal !== 'ST' || !cases.has(p.lc) || !Number.isFinite(p.f))) return null
+    out.set(r.NAME, parts.map(({ lc, f }) => ({ lc, f })))
+  }
+  return out.size === b.comboNames.length && b.comboNames.every((c) => out.has(c)) ? out : null
+}
+
 /* 결과의 출처 — fetchResults 가 전체 검증을 통과한 결과에 기록(어느 경로에서 회수했든 같음, checked: false).
    checkResults 가 부재·접합 검토를 끝내면 checked = true (검토 중 예외로 멈춘 결과는 재사용하지 않음). 같은 모델(S.built)·같은 해석 회차에서만 재사용 */
 const origin = new WeakMap<Results, { built: Built; rev: number; checked: boolean }>()
@@ -94,33 +113,37 @@ export function checkResults(b: Built, r: Results): { design: DesignResult; conn
 export async function reusableResults(r: Results | null, b: Built, rev: number): Promise<Results | null> {
   const src = r && origin.get(r)
   if (!r?.fingerprint || !src?.checked || src.built !== b || src.rev !== rev) return null
-  const cb = r.combos.map((c) => `${c}(CB)`)
+  const fp = r.fpSource ?? { loads: r.combos.map((c) => `${c}(CB)`), labels: r.combos }
   const { eaves } = serviceNodes(b.spec, b.model)
-  stage('st_results', Math.ceil(cb.length / caseBatchSize(eaves.map((n) => n.id))))
+  stage('st_results', Math.ceil(fp.loads.length / caseBatchSize(eaves.map((n) => n.id))))
   try {
-    const { dsum } = await eaveDisplacements(eaves.map((n) => n.id), cb, new Set(r.combos))
-    return fingerprint(r.combos, dsum) === r.fingerprint ? r : null
+    const { dsum } = await eaveDisplacements(eaves.map((n) => n.id), fp.loads, new Set(fp.labels))
+    return fingerprint(fp.labels, dsum) === r.fingerprint ? r : null
   } catch (e) {
     if (e instanceof ResultValidationError) return null
     throw e
   }
 }
 
-export async function fetchResults(b: Built): Promise<Results> {
+/** mode 'combos' — 순정 모드에서도 Gen 조합 결과를 그대로 읽음 (케이스 조합과 대조하는 시험용) */
+export async function fetchResults(b: Built, opts: { mode?: 'auto' | 'combos' } = {}): Promise<Results> {
   const { model, spec } = b
   const combos = b.comboNames
   requireResult(combos.length > 0 && new Set(combos).size === combos.length, 'COMBINATIONS', 'invalid')
-  const cb = combos.map((c) => `${c}(CB)`)
+  const parts = opts.mode === 'combos' ? null : caseCombination(b)
+  /* 읽을 표 — 순정 모드는 조합에 쓰인 케이스(ST), 아니면 조합(CB). 행의 Load 열은 접미사 없는 이름 */
+  const labels = parts ? [...new Set([...parts.values()].flatMap((ps) => ps.map((p) => p.lc)))] : combos
+  const cb = parts ? labels.map((c) => `${c}(ST)`) : combos.map((c) => `${c}(CB)`)
   const beamIds = model.elements.filter((e) => !isAxialRole(e.role)).map((e) => e.id)
   const trussIds = model.elements.filter((e) => isAxialRole(e.role)).map((e) => e.id)
   const { eaves: eaveNodes, tops: columnTops, nodes: svcNodes } = serviceNodes(spec, model)
   const svcCases = b.cases.filter((c) => spec.code === 'CN' || !!b.info.additions || c !== 'D')
   /* 행 검증은 Set 조회 — 배열 includes 는 11만 행 × 410 요소로 화면 스레드에서 수천만 번 비교 */
-  const comboSet = new Set(combos), beamSet = new Set(beamIds), trussSet = new Set(trussIds)
+  const comboSet = new Set(labels), beamSet = new Set(beamIds), trussSet = new Set(trussIds)
 
   /* 보 부재력 */
   const beam = new Map<number, Map<string, ForcePt[]>>()
-  const batchSize = spec.code === 'CN' ? Math.min(4,caseBatchSize(beamIds,5)) : model.additions ? Math.min(16,caseBatchSize(beamIds,5)) : cb.length
+  const batchSize = parts ? caseBatchSize(beamIds, 5) : spec.code === 'CN' ? Math.min(4,caseBatchSize(beamIds,5)) : model.additions ? Math.min(16,caseBatchSize(beamIds,5)) : cb.length
   stage('st_results', Math.ceil(cb.length / batchSize) + (trussIds.length ? Math.ceil(cb.length/caseBatchSize(trussIds)) : 0) + 1 + Math.ceil(cb.length/caseBatchSize(eaveNodes.map(n=>n.id))) + Math.ceil(svcCases.length/caseBatchSize(svcNodes.map(n=>n.id))))
   for (let offset = 0; offset < cb.length; offset += batchSize) {
     const bf = await table('BEAMFORCE', spec.code === 'CN' ? `F${offset}` : 'F', beamIds, cb.slice(offset, offset + batchSize), { PARTS: ['PartI', 'Part1/4', 'Part2/4', 'Part3/4', 'PartJ'] },
@@ -140,14 +163,14 @@ export async function fetchResults(b: Built): Promise<Results> {
     }
   }
 
-  /* 가새 축력 — 인장 +, I·J 중 절댓값 큰 쪽 */
-  const truss = new Map<number, Map<string, number>>()
+  /* 가새 축력 — 인장 +, I·J 중 절댓값 큰 쪽 (케이스 조합은 I·J 를 각각 합한 뒤 고름) */
+  const trussIJ = new Map<number, Map<string, [number, number]>>()
   if (trussIds.length) {
     for await (const [, el, lc, fi, fj] of tableRows('TRUSSFORCE','T',trussIds,cb)) {
-      const m = truss.get(+el) ?? new Map<string, number>()
+      const m = trussIJ.get(+el) ?? new Map<string, [number, number]>()
       requireResult(trussSet.has(+el) && comboSet.has(lc) && !m.has(lc), 'TRUSSFORCE', m.has(lc) ? 'duplicate' : 'unexpected', `${el} · ${lc}`)
-      truss.set(+el, m)
-      m.set(lc, Math.abs(num(fi)) > Math.abs(num(fj)) ? num(fi) : num(fj))
+      trussIJ.set(+el, m)
+      m.set(lc, [num(fi), num(fj)])
     }
   }
 
@@ -161,11 +184,36 @@ export async function fetchResults(b: Built): Promise<Results> {
     requireResult(comboSet.has(lc) && !sums.has(lc), 'REACTIONG', sums.has(lc) ? 'duplicate' : 'unexpected', lc)
     sums.set(lc, [num(fx), num(fy), num(fz)])
   }
-  const { dsum, seenU } = await eaveDisplacements(eaveNodes.map((n) => n.id), cb, comboSet)
+  const { dsum: dsumRead, seenU } = await eaveDisplacements(eaveNodes.map((n) => n.id), cb, comboSet)
+  for (const c of labels) requireResult(sums.has(c) && dsumRead.get(c)?.[2] === eaveNodes.length && eaveNodes.every((n) => seenU.has(`${c}:${n.id}`)), 'SWAY', 'missing', c)
+  /* 조합별로 — 순정 모드는 케이스 값 × 계수의 합 (부재력·축력 I/J·반력 합·처마 변위 합 모두 선형) */
+  const lin = (c: string, at: (lc: string) => number[]) => {
+    if (!parts) return at(c)
+    let acc: number[] | null = null
+    for (const { lc, f } of parts.get(c)!) { const v = at(lc); acc = acc ? acc.map((a, i) => a + f * v[i]) : v.map((x) => f * x) }
+    return acc!
+  }
+  if (parts) for (const [id, m] of [...beam]) {
+    const out = new Map<string, ForcePt[]>()
+    for (const c of combos) out.set(c, STATIONS.map((st, i) => {
+      const [P, Vy, Vz, My, Mz] = lin(c, (lc) => { const q = m.get(lc)?.[i]; requireResult(q, 'BEAMFORCE', 'missing', `${id} · ${lc} · ${st}`); return [q.P, q.Vy, q.Vz, q.My, q.Mz] })
+      return { P, Vy, Vz, My, Mz }
+    }))
+    beam.set(id, out)
+  }
+  const truss = new Map<number, Map<string, number>>()
+  for (const [id, m] of trussIJ) {
+    const out = new Map<string, number>()
+    for (const c of combos) {
+      const [fi, fj] = lin(c, (lc) => { const v = m.get(lc); requireResult(v, 'TRUSSFORCE', 'missing', `${id} · ${lc}`); return v })
+      out.set(c, Math.abs(fi) > Math.abs(fj) ? fi : fj)
+    }
+    truss.set(id, out)
+  }
   const sway = new Map<string, Record<'X' | 'Y', { sumPu: number; drift: number; sumH: number }>>()
   for (const c of combos) {
-    const s = sums.get(c), d = dsum.get(c)
-    requireResult(s && d && d[2] === eaveNodes.length && eaveNodes.every((n) => seenU.has(`${c}:${n.id}`)), 'SWAY', 'missing', c)
+    const s = lin(c, (lc) => sums.get(lc)!), d = lin(c, (lc) => dsumRead.get(lc)!)
+    d[2] = eaveNodes.length
     sway.set(c, {
       X: { sumPu: Math.abs(s[2]), drift: Math.abs(d[0] / d[2]), sumH: Math.abs(s[0]) },
       Y: { sumPu: Math.abs(s[2]), drift: Math.abs(d[1] / d[2]), sumH: Math.abs(s[1]) },
@@ -182,7 +230,7 @@ export async function fetchResults(b: Built): Promise<Results> {
     m.set(+nd, { dx: num(dx), dy: num(dy), dz: num(dz) })
   }
   for (const c of svcCases) for (const n of svcNodes) requireResult(disp.get(c)?.has(n.id), 'DISPLACEMENTG', 'missing', `${n.id} · ${c}`)
-  const results: Results = { beam, truss, sway, disp, combos, fingerprint: fingerprint(combos, dsum) }
+  const results: Results = { beam, truss, sway, disp, combos, fingerprint: fingerprint(labels, dsumRead), ...(parts ? { fpSource: { loads: cb, labels } } : {}) }
   if (spec.code === 'KR') lateralSwayKr(results, columnTops.map((n) => n.id), b.info.seismic)
   validateDesignResults(spec, model, b.info, results)
   origin.set(results, { built: b, rev: S.analysisRev, checked: false })

@@ -6,6 +6,17 @@ import { genSectionRecord } from '../src/domain/sections'
 /** 결과 표 종류 — U = 처마 조합 변위(B2·지문), S = 사용 하중 변위 */
 export type ResultTableKind = 'BEAMFORCE' | 'TRUSSFORCE' | 'REACTIONG' | 'U' | 'S'
 
+/** 정답 세트에 없는 이름(케이스 결과 — 앱이 순정 모드에서 케이스(ST)를 읽어 조합)은 첫 조합 값 × CASE_SCALE 로 합성한다.
+    흐름 시험용 값(조합 = 앱이 계수로 합한 값) — 수치 대조는 라이브(live-results-speed.ts) */
+const CASE_SCALE = 1 / 8
+function pick<T>(m: Map<string, T>, c: string, scale: (v: T, k: number) => T): T {
+  const v = m.get(c)
+  return v !== undefined ? v : scale(m.values().next().value as T, CASE_SCALE)
+}
+const scalePts = (v: { P: number; Vy: number; Vz: number; My: number; Mz: number }[], k: number) => v.map((p) => ({ P: p.P * k, Vy: p.Vy * k, Vz: p.Vz * k, My: p.My * k, Mz: p.Mz * k }))
+const scaleSway = (v: Record<'X' | 'Y', { sumPu: number; drift: number; sumH: number }>, k: number) =>
+  ({ X: { sumPu: v.X.sumPu * k, drift: v.X.drift * k, sumH: v.X.sumH * k }, Y: { sumPu: v.Y.sumPu * k, drift: v.Y.drift * k, sumH: v.Y.sumH * k } })
+
 /** 결과 표 응답 — edit 로 행을 오염시켜 파서 검증을 시험한다. 결과 표가 아니면 null */
 export function resultTable(results: Results, a: any, edit?: (kind: ResultTableKind, data: unknown[][]) => void): Record<string, unknown> | null {
   const type = a.TABLE_TYPE as string, name = a.TABLE_NAME as string
@@ -14,17 +25,17 @@ export function resultTable(results: Results, a: any, edit?: (kind: ResultTableK
   let kind: ResultTableKind
   if (type === 'BEAMFORCE') {
     kind = 'BEAMFORCE'
-    for (const id of keys) for (const c of loads) for (const [i, p] of results.beam.get(id)!.get(c)!.entries()) data.push(['0', String(id), c, ['I[1]', '1/4', '2/4', '3/4', 'J[2]'][i], p.P, p.Vy, p.Vz, p.My, p.Mz])
+    for (const id of keys) for (const c of loads) for (const [i, p] of pick(results.beam.get(id)!, c, scalePts).entries()) data.push(['0', String(id), c, ['I[1]', '1/4', '2/4', '3/4', 'J[2]'][i], p.P, p.Vy, p.Vz, p.My, p.Mz])
   } else if (type === 'TRUSSFORCE') {
     kind = 'TRUSSFORCE'
-    for (const id of keys) for (const c of loads) data.push(['0', id, c, results.truss.get(id)!.get(c), results.truss.get(id)!.get(c)])
+    for (const id of keys) for (const c of loads) { const f = pick(results.truss.get(id)!, c, (v, k) => v * k); data.push(['0', id, c, f, f]) }
   } else if (type === 'REACTIONG' && name !== 'Reaction') {
-    for (const c of loads) { const s = results.sway.get(c)!; data.push([c, s.X.sumH, s.Y.sumH, s.X.sumPu]) }
+    for (const c of loads) { const s = pick(results.sway, c, scaleSway); data.push([c, s.X.sumH, s.Y.sumH, s.X.sumPu]) }
     edit?.('REACTIONG', data)
     return { [name]: { SUB_TABLES: [{ 'SUMMATION OF REACTION FORCES PRINTOUT': { DATA: data } }] } }
   } else if (type === 'DISPLACEMENTG' && name === 'U') {
     kind = 'U'
-    for (const id of keys) for (const c of loads) { const s = results.sway.get(c)!; data.push(['0', id, c, s.X.drift, s.Y.drift, 0]) }
+    for (const id of keys) for (const c of loads) { const s = pick(results.sway, c, scaleSway); data.push(['0', id, c, s.X.drift, s.Y.drift, 0]) }
   } else if (type === 'DISPLACEMENTG') {
     kind = 'S'
     for (const id of keys) for (const c of loads) { const v = results.disp.get(c)!.get(id)!; data.push(['0', id, c, v.dx, v.dy, v.dz]) }
