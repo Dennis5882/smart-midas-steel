@@ -185,15 +185,19 @@ const withoutWarping = (s: unknown) => {
 }
 
 /** 문서를 새로 만들지 않고 단면 바꾸기 — SECT·ELEM(+ 앱 하중 모델은 값이 바뀐 하중 표)만 PUT. 요소·절점 번호가 그대로라 나머지는 유지되고
-    (엔지니어 하중 모델은 Gen 의 엔지니어 하중·조합), 자중(BODF)은 Gen 이 새 단면으로 다시 계산한다. 쓰지 않게 된 옛 단면 번호는 Gen 에 남을 수 있다
-    (요소가 참조하지 않음 — 동일성 기준은 다시 읽은 SECT). */
+    (엔지니어 하중 모델은 Gen 의 엔지니어 하중·조합), 자중(BODF)은 Gen 이 새 단면으로 다시 계산한다. 쓰지 않게 된 앱 단면 번호는 지운다
+    (엔지니어가 Gen 에서 만든 단면은 남김 — 동일성 기준은 다시 읽은 SECT). */
 export async function updateSections(spec: FactorySpec, onBackup?: (backup: string) => void, planned?: ReturnType<typeof inPlacePlan>) {
   const b = S.built
   if (!b?.sent) throw new SectionUpdateError([])
   const plan = planned === undefined ? inPlacePlan(b, spec) : planned
   if (!plan?.ok) throw new SectionUpdateError(plan?.changed ?? [])
   const { model, p, loads, l } = plan
-  stage('st_sections', 5 + Object.keys(loads).length)
+  /* 쓰지 않게 될 앱 단면 번호 — 이전 스펙으로 앱이 만든 번호·이름 그대로인데 새 단면 표에 없는 것 (단면 수가 줄거나 RC 받침 번호가 당겨질 때) */
+  const nameOf = (x: unknown) => (x as { SECT_NAME?: string } | undefined)?.SECT_NAME
+  const prevApp = buildGenPayloads(b.spec, b.model).SECT
+  const stale = Object.keys(prevApp).filter((id) => !(id in p.SECT) && nameOf(b.sent!.SECT?.[id]) === nameOf(prevApp[id]))
+  stage('st_sections', 5 + Object.keys(loads).length + (stale.length ? 1 + stale.length : 0))
   const backup = await autoSave('backup')
   onBackup?.(backup)
   /* 여기부터 Gen 단면은 이전 모델이 아니다 — 중간 실패·취소 때 이전 결과가 지금 모델의 결과로 남지 않게 먼저 비운다.
@@ -211,13 +215,19 @@ export async function updateSections(spec: FactorySpec, onBackup?: (backup: stri
   await mapi('PUT', 'ELEM', { Assign: p.ELEM }, String(Object.keys(p.ELEM).length))
   if (clash.length) await mapi('PUT', 'SECT', { Assign: Object.fromEntries(clash.map((id) => [id, p.SECT[id]])) }, String(clash.length))
   for (const [db, assign] of Object.entries(loads)) await mapi('PUT', db, { Assign: assign }, String(Object.keys(assign).length))
-  /* 확인 — 보낸 표가 그대로 들어갔는지 (SECT 는 남은 옛 번호를 허용) */
-  stage('st_verify', 3 + Object.keys(loads).length)
   const read = async (db: string) => {
     const got = (await mapi<Record<string, unknown>>('GET', db, undefined, 'verify'))?.[db]
     if (!isRecord(got)) throw new Error(t('verify_fail', `${db}: ${t('gen_bad_response')}`))
     return got
   }
+  /* Gen 은 부재가 쓰는 단면도 경고 없이 지운다(부재는 없는 번호를 가리킨 채 남음, 라이브 2026-10-27) — Gen ELEM 을 다시 읽어 아무 부재도 쓰지 않는 번호만.
+     DELETE /db/SECT/<id> 는 그 번호 하나 (번호 없는 /db/SECT DELETE 는 표 전체를 비운다) */
+  if (stale.length) {
+    const used = new Set(Object.values(await read('ELEM')).map((e) => String((e as { SECT?: number }).SECT)))
+    for (const id of stale.filter((x) => !used.has(x))) await mapi('DELETE', `/db/SECT/${id}`, undefined, 'unused')
+  }
+  /* 확인 — 보낸 표가 그대로 들어갔는지 (SECT 는 엔지니어가 만든 다른 번호를 허용) */
+  stage('st_verify', 3 + Object.keys(loads).length)
   const gotSect = await read('SECT')
   const bad = [...dbDifferences('SECT', p.SECT, gotSect, 3).filter((d) => d.added === undefined || d.removed), ...dbDifferences('ELEM', p.ELEM, await read('ELEM'), 3)]
   for (const [db, assign] of Object.entries(loads)) bad.push(...dbDifferences(db, assign, await read(db), 3))

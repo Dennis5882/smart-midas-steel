@@ -10,6 +10,7 @@ let db: Db = {}
 const calls: string[] = []
 /** 이 표 PUT 을 실패로 답함 (단면 갱신 중간 실패) */
 let failPut = ''
+const usedDeletes: string[] = []
 const { sectionAllTable } = await import('./fake-gen')
 const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200, headers: { 'content-type': 'application/json' } })
 ;(globalThis as any).fetch = async (url: string, init?: RequestInit) => {
@@ -25,6 +26,8 @@ const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200, head
   if (method === 'PUT') { db[name] = { ...db[name], ...body.Assign }; return json({ [name]: body.Assign }) }
   /* 없는 표는 오류로 답하는 Gen 도 가정 — 읽기는 '없음'으로 처리해야 함 */
   if (method === 'GET') return db[name] ? json({ [name]: structuredClone(db[name]) }) : new Response(JSON.stringify({ message: 'not found' }), { status: 400 })
+  /* Gen 처럼 번호 하나 삭제 — 부재가 쓰는 번호도 지워 버리므로 앱이 그런 DELETE 를 보내면 기록 */
+  if (method === 'DELETE') { const [n, id] = name.split('/'); if (Object.values(db.ELEM ?? {}).some((e: any) => String(e.SECT) === id)) usedDeletes.push(id); delete db[n]?.[id]; return json({}) }
   return json({})
 }
 
@@ -240,5 +243,6 @@ db.NODE[node] = { ...db.NODE[node], Z: db.NODE[node].Z + 0.5 }
 await readGenLoads()
 ok(S.genRead === null && S.genChanged > 0, 'geometry change in Gen blocks reading')
 ok(readbackUnavailable({ ...B, spec: { ...B.spec, code: 'CN' } }) === 'rb_code', 'TW only')
+ok(!usedDeletes.length, `no section in use was deleted (${usedDeletes})`)
 
 console.log(`Gen readback: ${n} checks passed (summary sums, beam load forms, combo issues, notices, info, design, fake-Gen flow, section-only update)`)

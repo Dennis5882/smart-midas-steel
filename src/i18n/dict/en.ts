@@ -1096,6 +1096,7 @@ export const en = {
   ch_view: 'Setting the Gen view',
   ch_put: (what: string, n: number) => `Sending ${what} to Gen (${n})`,
   ch_get: (what: string) => `Reading ${what} back from Gen to check`,
+  ch_del: (what: string, id: string) => `Removing unused ${what} ${id}`,
   ch_table: (what: string, keys: number, n: number, combos: boolean) => `Reading ${what}${keys ? ` — ${keys} elements/nodes` : ''}${n ? ` × ${n} ${combos ? 'combinations' : 'load cases'}` : ''}`,
   ch_tbl: (type: string) => ({ BEAMFORCE: 'beam forces', TRUSSFORCE: 'brace axial forces', REACTIONG: 'reactions', DISPLACEMENTG: 'displacements', SECTIONALL: 'section properties' } as Record<string, string>)[type] ?? type,
   ch_db: (db: string) => ({ UNIT: 'units', MATL: 'materials', SECT: 'sections', NODE: 'nodes', ELEM: 'elements', FRLS: 'end releases', CONS: 'supports', STLD: 'load cases', BODF: 'self-weight', BMLD: 'beam loads', CNLD: 'nodal loads', 'LCOM-GEN': 'load combinations', DSTL: 'design code', PRES: 'pressure loads', FBLA: 'floor loads', MVLD: 'moving loads' } as Record<string, string>)[db] ?? db,

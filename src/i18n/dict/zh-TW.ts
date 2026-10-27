@@ -1076,6 +1076,7 @@ export const zhTW: Dict = {
   ch_view: '設定 Gen 視角',
   ch_put: (what, n) => `傳送${what}到 Gen（${n} 筆）`,
   ch_get: (what) => `從 Gen 讀回${what}核對`,
+  ch_del: (what, id) => `刪除未使用的${what} ${id}`,
   ch_table: (what, keys, n, combos) => `讀取${what}${keys ? ` — 構件·節點 ${keys} 個` : ''}${n ? ` × ${combos ? '載重組合' : '載重工況'} ${n} 個` : ''}`,
   ch_tbl: (type) => ({ BEAMFORCE: '構件內力', TRUSSFORCE: '斜撐軸力', REACTIONG: '反力', DISPLACEMENTG: '位移', SECTIONALL: '斷面性質' } as Record<string, string>)[type] ?? type,
   ch_db: (db) => ({ UNIT: '單位', MATL: '材料', SECT: '斷面', NODE: '節點', ELEM: '構件', FRLS: '端部釋放', CONS: '支承', STLD: '載重工況', BODF: '自重', BMLD: '梁載重', CNLD: '節點載重', 'LCOM-GEN': '載重組合', DSTL: '設計規範', PRES: '壓力載重', FBLA: '面載重', MVLD: '移動載重' } as Record<string, string>)[db] ?? db,

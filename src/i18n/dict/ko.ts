@@ -1078,6 +1078,7 @@ export const ko: Dict = {
   ch_view: 'Gen 화면 시점 맞추기',
   ch_put: (what, n) => `Gen 에 ${what} 보내는 중 (${n}개)`,
   ch_get: (what) => `Gen 에서 ${what} 다시 읽어 확인`,
+  ch_del: (what, id) => `쓰지 않는 ${what} ${id}번 지우기`,
   ch_table: (what, keys, n, combos) => `${what} 읽는 중${keys ? ` — 요소·절점 ${keys}개` : ''}${n ? ` × ${combos ? '하중 조합' : '하중 케이스'} ${n}개` : ''}`,
   ch_tbl: (type) => ({ BEAMFORCE: '부재력', TRUSSFORCE: '가새 축력', REACTIONG: '반력', DISPLACEMENTG: '변위', SECTIONALL: '단면 성질' } as Record<string, string>)[type] ?? type,
   ch_db: (db) => ({ UNIT: '단위', MATL: '재료', SECT: '단면', NODE: '절점', ELEM: '요소', FRLS: '단부 해제', CONS: '지점', STLD: '하중 케이스', BODF: '자중', BMLD: '보 하중', CNLD: '절점 하중', 'LCOM-GEN': '하중 조합', DSTL: '설계 기준', PRES: '압력 하중', FBLA: '면 하중', MVLD: '이동하중' } as Record<string, string>)[db] ?? db,

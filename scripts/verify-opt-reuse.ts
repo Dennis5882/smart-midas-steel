@@ -14,6 +14,8 @@ const results = decodeResults(fx.results)
 
 let db: Record<string, Record<string, unknown>> = {}
 const calls: string[] = []
+/** 부재가 쓰는 단면을 지운 DELETE (Gen 은 경고 없이 지우고 부재는 없는 번호를 가리킨 채 남음 — 라이브 2026-10-27) */
+const usedDeletes: string[] = []
 /** 'tables' = 결과 표를 빈 응답으로 (Gen 결과 없음) */
 let fault = ''
 /* 최적화 회차 카드 — 작업이 끝나면 S.job 이 사라지므로 Gen 호출 때마다 사본 */
@@ -47,6 +49,13 @@ const json = (o: unknown) => Response.json(o)
     return json({ [db_]: body.Assign })
   }
   if (method === 'GET') return json({ [db_]: structuredClone(db[db_] ?? {}) })
+  if (method === 'DELETE') {
+    const [name, id] = db_.split('/')
+    calls.push(`delete ${name}/${id}`)
+    if (Object.values(db.ELEM ?? {}).some((e) => String(e.SECT) === id)) usedDeletes.push(id)
+    const rec = db[name]?.[id]; delete db[name]?.[id]
+    return json({ [name]: { [id]: rec } })
+  }
   return json({})
 }
 
@@ -103,6 +112,18 @@ for (const label of ['after design check', 'after optimization']) {
 }
 assert.ok(inPlace, 'an optimization round changed sections in place (SECT PUT)')
 passed++
+/* 단면 수가 줄면(기둥을 지붕보와 같은 단면으로) 쓰지 않게 된 앱 단면 번호를 지운다 — 부재가 쓰는 번호는 지우지 않음 */
+{
+  const base = S.built!.spec, other = base.sections.rafter === 'RH 500x200x10x16' ? 'RH 450x200x9x14' : 'RH 500x200x10x16'
+  await resendModel({ ...base, sections: { ...base.sections, column: other } })
+  const n = Object.keys(db.SECT).length
+  calls.length = 0
+  await resendModel({ ...base, sections: { ...base.sections, column: base.sections.rafter } })
+  const used = new Set(Object.values(db.ELEM as Record<string, any>).map((e) => String(e.SECT)))
+  assert.ok(!calls.includes('doc/new') && calls.some((c) => c.startsWith('delete SECT/')) && Object.keys(db.SECT).length === n - 1, `merged sections: unused section removed in place (${calls.filter((c) => c.startsWith('delete')).join(', ')})`)
+  assert.ok(Object.keys(db.SECT).every((id) => used.has(id)) && !usedDeletes.length, `no unused app section left, none in use deleted (${Object.keys(db.SECT)} / used ${[...used]} / ${usedDeletes})`)
+  passed += 2
+}
 /* 앱 하중 모델에서 형상 표가 달라지면 그 자리 갱신(엔지니어 하중용 거부)이 아니라 모델 재생성 — inPlacePlan 의 {ok:false} 를 갱신 가능으로 읽던 회귀 */
 {
   calls.length = 0

@@ -1076,6 +1076,7 @@ export const zhCN: Dict = {
   ch_view: '设置 Gen 视角',
   ch_put: (what, n) => `向 Gen 发送${what}（${n} 条）`,
   ch_get: (what) => `从 Gen 读回${what}核对`,
+  ch_del: (what, id) => `删除未使用的${what} ${id}`,
   ch_table: (what, keys, n, combos) => `读取${what}${keys ? ` — 单元·节点 ${keys} 个` : ''}${n ? ` × ${combos ? '荷载组合' : '荷载工况'} ${n} 个` : ''}`,
   ch_tbl: (type) => ({ BEAMFORCE: '构件内力', TRUSSFORCE: '支撑轴力', REACTIONG: '反力', DISPLACEMENTG: '位移', SECTIONALL: '截面特性' } as Record<string, string>)[type] ?? type,
   ch_db: (db) => ({ UNIT: '单位', MATL: '材料', SECT: '截面', NODE: '节点', ELEM: '单元', FRLS: '端部释放', CONS: '支座', STLD: '荷载工况', BODF: '自重', BMLD: '梁荷载', CNLD: '节点荷载', 'LCOM-GEN': '荷载组合', DSTL: '设计规范', PRES: '压力荷载', FBLA: '面荷载', MVLD: '移动荷载' } as Record<string, string>)[db] ?? db,
