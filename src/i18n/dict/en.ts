@@ -655,6 +655,10 @@ export const en = {
   g_help_2: 'Release notes',
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_5_9_1: 'Pressing [Save] in the MIDAS API settings now keeps the auto-save folder and a non-default server address in this browser across reloads. Turn on [Remember the MAPI-Key in this browser] to keep the key too; turn it off on shared PCs',
+  rn_v2_5_9_2: 'When optimization or NG remediation updates sections in place, sections no longer used are removed from the Gen model (app-created ones only). A change in geometry or load items rebuilds the model, and a failed update clears it so you can create it again',
+  rn_v2_5_9_3: 'Gen engineer-load readback: it cannot be accepted without at least one basic (strength) combination, Gen section analysis options (shear deformation, warping) are kept during optimization, and you are asked before accepting Gen sections if there are unsent edits',
+  rn_v2_5_9_4: 'The 3D preview keeps its zoom when the window is resized, and section deletions are described clearly in the activity log',
   rn_v2_5_8_1: 'Faster design check and optimization: app-load models read load-case results and combine them in the app (same results; fetch time TW 102→9 s, KR 137→14 s, CN 51→8 s). Optimization changes sections in place without a new Gen document',
   rn_v2_5_8_2: 'The progress bar shows the running API call with a plain description (e.g. reading beam forces — 410 elements × 21 load cases); optimization lists weight, max ratio, NG and changed sections for each round',
   rn_v2_5_8_3: 'The start screen is now modeling step 1 (Start): pick the design code at the top, choose a basic model and press [Continue]. Choosing another template starts a new model',
