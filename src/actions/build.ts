@@ -89,10 +89,10 @@ export async function restoreBackup(): Promise<void> {
 
 /** 전송 본체 (busy·메시지 없음) — 단면 최적화 반복에서도 사용. 성공하면 S.built 갱신, 이전 결과 초기화.
     onReplaced: doc/new 직후 백업 경로 — [공장 생성]만 복원 지점으로 쓴다(최적화 반복의 백업은 앱이 만든 모델) */
-export async function sendModel(spec: FactorySpec, onReplaced?: (backup: string) => void, opts: { modelOnly?: boolean } = {}) {
-  const model = buildPortal(spec)
-  const p = buildGenPayloads(spec, model)
-  const l = buildLoadPayloads(spec, model)
+export async function sendModel(spec: FactorySpec, onReplaced?: (backup: string) => void, opts: { modelOnly?: boolean; built?: Prebuilt } = {}) {
+  const model = opts.built?.model ?? buildPortal(spec)
+  const p = opts.built?.p ?? buildGenPayloads(spec, model)
+  const l = opts.built?.l ?? buildLoadPayloads(spec, model)
   /* 모델 + 자중만: 자중 케이스와 BODF 만 — 마감 하중(BMLD)·절점 하중·조합 표는 보내지도 확인하지도 않는다.
      정상 모델링은 빈 표도 예전처럼 PUT·확인한다 */
   const loads = opts.modelOnly ? selfWeightOnly(l) : { STLD: l.STLD, BODF: l.BODF, BMLD: l.BMLD, CNLD: l.CNLD, 'LCOM-GEN': l['LCOM-GEN'] }
@@ -150,8 +150,12 @@ export async function resendModel(spec: FactorySpec, onReplaced?: (backup: strin
   /* 계획은 한 번만 계산해 넘긴다 (모델·하중 페이로드와 큰 하중 표 비교가 회차마다 두 번 돌지 않게) */
   const plan = inPlacePlan(b, spec)
   if (b.genLoads || plan?.ok) return updateSections(spec, onReplaced, plan)
-  return sendModel(spec, onReplaced)
+  /* 재생성 — 계획에서 이미 만든 모델·페이로드를 그대로 쓴다 */
+  return sendModel(spec, onReplaced, { built: plan ?? undefined })
 }
+
+/** 스펙에서 만든 모델·Gen 페이로드·하중 페이로드 (inPlacePlan → sendModel 재사용) */
+type Prebuilt = { model: ReturnType<typeof buildPortal>; p: ReturnType<typeof buildGenPayloads>; l: ReturnType<typeof buildLoadPayloads> }
 
 const same = (x: unknown, y: unknown) => JSON.stringify(x) === JSON.stringify(y)
 const itemIds = (r: unknown) => { const items = (r as { ITEMS?: { ID?: unknown }[] } | undefined)?.ITEMS; return Array.isArray(items) ? items.map((i) => i?.ID).sort() : null }
@@ -165,16 +169,16 @@ function inPlacePlan(b: Built, spec: FactorySpec) {
   const designCode = profileOf(spec.code).gen.designCode
   const want: Record<string, unknown> = { ...p, ...(designCode ? { DSTL: { 1: { DGNCODE: designCode } } } : {}) }
   const changed = GEN_FIXED_DBS.filter((db) => !same(want[db], b.sent![db]))
-  if (model.elements.length !== b.model.elements.length || changed.length) return { ok: false as const, changed }
-  if (b.genLoads) return { ok: true as const, model, p, loads: {} as Record<string, Record<string, unknown>>, l: buildLoadPayloads(spec, model) }
   const l = buildLoadPayloads(spec, model)
+  if (model.elements.length !== b.model.elements.length || changed.length) return { ok: false as const, changed, model, p, l }
   const loads: Record<string, Record<string, unknown>> = {}
+  if (b.genLoads) return { ok: true as const, model, p, loads, l }
   for (const db of GEN_LOAD_DBS) {
     const was = b.sent[db] ?? {}
     if (same(l[db], was)) continue
-    if (!same(Object.keys(l[db]).sort(), Object.keys(was).sort())) return null
+    if (!same(Object.keys(l[db]).sort(), Object.keys(was).sort())) return { ok: false as const, changed: [], model, p, l }
     /* 레코드 안 하중 항목(ITEMS)도 ID 집합이 같아야 — 항목이 줄면 Gen 에 옛 항목이 남을 수 있다 (PUT 이 레코드를 통째로 바꾸는지 라이브 미확인) → 재생성 */
-    if (Object.keys(was).some((id) => !same(itemIds(l[db][id]), itemIds(was[id])))) return null
+    if (Object.keys(was).some((id) => !same(itemIds(l[db][id]), itemIds(was[id])))) return { ok: false as const, changed: [], model, p, l }
     loads[db] = l[db]
   }
   return { ok: true as const, model, p, loads, l }
@@ -243,7 +247,9 @@ export async function updateSections(spec: FactorySpec, onBackup?: (backup: stri
     if (bad.length) throw new Error(t('verify_fail', bad.map(diffText).join(', ')))
     await checkSectionSource(spec, p.SECT)
     const sent = { ...b.sent, SECT: gotSect, ELEM: p.ELEM, ...loads }
-    const appSect = [...Object.keys(p.SECT), ...left]
+    /* 지운 번호만 빠진다 — DELETE 실패·아직 부재가 쓰는 번호는 앱 번호로 남겨 다음 갱신에서 다시 */
+    const deleted = new Set(drop.filter((id) => !left.includes(id)))
+    const appSect = [...Object.keys(p.SECT), ...stale.filter((id) => !deleted.has(id))]
     if (b.genLoads) {
       /* 요약은 읽은 하중 표 전부(합산 못 하는 표 포함)로 다시 — 자중 추정만 새 단면, 조합 용도는 확정한 것 */
       const kinds = new Map(b.genLoads.combos.map((c) => [c.name, c.kind]))

@@ -2,19 +2,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { testConn, type TestOut } from '../agent/session'
 import { getLang, t } from '../i18n'
-import { S, baseUrlOptions, keyRemembered, notify, saveSettings, useStore } from '../state/store'
-
-/** 설정을 저장한 적이 있는지 — 없으면 키 기억 처음 값을 켬으로 */
-function localStorageHas(): boolean {
-  try { return localStorage.getItem('sms_mapi') !== null } catch { return false }
-}
+import { S, baseUrlOptions, hasSavedSettings, keyRemembered, notify, saveSettings, useStore } from '../state/store'
 
 function MapiDrawer({ open, onClose }: { open: boolean; onClose(): void }) {
   const s = useStore()
   const [out, setOut] = useState<TestOut | null>(null)
   const [custom, setCustom] = useState(false)
   /* 처음 값 = 켬 (저장한 적이 있으면 그때 선택) */
-  const [remember, setRemember] = useState(() => keyRemembered() || !localStorageHas())
+  const [remember, setRemember] = useState(() => keyRemembered() || !hasSavedSettings())
   const servers = baseUrlOptions(getLang())
   const isCustom = custom || !servers.includes(s.baseUrl)
   const dialog = useRef<HTMLDialogElement>(null)

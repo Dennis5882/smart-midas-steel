@@ -11,7 +11,7 @@ MIDAS Gen NX 단층 강구조 공장 자동 모델링·해석·설계 검토 웹
 
 ## 반드시 지킬 규칙
 
-1. **MAPI-Key**: 코드·커밋·출력·명령 인자·다른 파일에 넣지 않는다. 앱은 설정 창 [저장] 때만 이 브라우저 localStorage `sms_mapi` 에(키는 [이 브라우저에 MAPI-Key 기억]을 켰을 때만, 사용자 결정 2026-10-27 — 주소·폴더도 함께), 그 밖엔 메모리. 라이브 스크립트는 gitignore 된 루트 `.env` 의 `MAPI_KEY=` 를 `scripts/mapi-key.ts` 로 읽는다(stdin → env → .env). 커밋 전 staged diff 키 검사.
+1. **MAPI-Key**: 코드·커밋·출력·명령 인자·다른 파일에 넣지 않는다. 앱은 설정 창 [저장] 때만 이 브라우저 localStorage `sms_mapi` 에(키는 [이 브라우저에 MAPI-Key 기억]을 켰을 때만, 사용자 결정 2026-10-27 — 폴더도 함께, 주소는 언어 기본 서버와 다를 때만 저장하고 저장한 주소는 언어를 바꿔도 유지), 그 밖엔 메모리. 라이브 스크립트는 gitignore 된 루트 `.env` 의 `MAPI_KEY=` 를 `scripts/mapi-key.ts` 로 읽는다(stdin → env → .env). 커밋 전 staged diff 키 검사.
 2. **커밋·푸시는 사용자가 명시적으로 요청할 때만.** 내가 만들지 않은 파일은 커밋하지 않는다 — 현재 `docs/china-market-steel-design-strategy.md`, `docs/taiwan_factory_steel_wizard_localization_review.md`, `docs/20230113024231-範例_天車梁移動載重模擬.pdf`.
 3. **버전**: 사용자에게 보이는 변경을 푸시할 때마다 묻지 않고 `npm run release -- patch --items N` → 같은 커밋에 4개 언어 릴리즈 노트(ko 먼저, en·zh-TW·zh-CN). **patch 만**, minor 는 먼저 상의, major 는 사용자가 말할 때만. version·노트 키를 손으로 만들지 않는다. 내부 변경(테스트·리팩터·문서)만이면 버전업 없음. 상세는 아래 「버전·릴리즈」.
 4. **커밋 전 `npm run verify`**(오프라인 35종, ~200 s, Gen·키 불필요) 통과.

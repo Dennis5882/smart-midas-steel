@@ -135,10 +135,10 @@ export const BASE_URLS = { com: 'https://moa-engineers.midasit.com:443/gen', cn:
 export const defaultBaseUrl = (lang: Lang): string => lang === 'zh-CN' ? BASE_URLS.cn : BASE_URLS.com
 /** 드롭다운 순서 — 언어 기본 서버가 먼저 (간체 .cn → .com, 그 외 .com → .cn) */
 export const baseUrlOptions = (lang: Lang): string[] => lang === 'zh-CN' ? [BASE_URLS.cn, BASE_URLS.com] : [BASE_URLS.com, BASE_URLS.cn]
-/** 언어를 바꿀 때 — 주소가 기본값 그대로이고 연결·작업 중이 아니면 새 언어의 기본 서버로. 직접 고친 주소·연결된 세션은 유지 */
+/** 언어를 바꿀 때(시작 포함) — 주소가 기본값 그대로이고 연결·작업 중이 아니면 새 언어의 기본 서버로. 직접 고친 주소·저장한 주소·연결된 세션은 유지 */
 export function syncBaseUrl(lang: Lang): void {
   const cur = S.baseUrl.trim().replace(/\/$/, '')
-  if (S.connected || S.busy || !(Object.values(BASE_URLS) as string[]).includes(cur)) return
+  if (S.connected || S.busy || readSettings().baseUrl || !(Object.values(BASE_URLS) as string[]).includes(cur)) return
   const next = defaultBaseUrl(lang)
   if (cur !== next) { S.baseUrl = next; notify() }
 }
@@ -154,12 +154,17 @@ function readSettings(): MapiSettings {
     return { baseUrl: str('baseUrl'), mapiKey: str('mapiKey'), saveDir: str('saveDir') }
   } catch { return {} }
 }
-/** 지금 설정을 저장 — rememberKey 가 꺼져 있으면 저장된 키도 지운다 */
+/** 지금 설정을 저장 — rememberKey 가 꺼져 있으면 저장된 키도 지운다. 주소는 지금 언어의 기본 서버와 다를 때만
+    (기본 서버면 저장하지 않아 언어를 바꾸면 그 언어의 기본 서버로 — syncBaseUrl) */
 export function saveSettings(rememberKey: boolean): void {
-  const key = S.mapiKey.trim()
-  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ baseUrl: S.baseUrl.trim(), saveDir: S.saveDir.trim(), ...(rememberKey && key ? { mapiKey: key } : {}) })) } catch { /* storage 차단 — 이번 세션만 */ }
+  const key = S.mapiKey.trim(), url = S.baseUrl.trim()
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...(url && url.replace(/\/$/, '') !== defaultBaseUrl(getLang()) ? { baseUrl: url } : {}), saveDir: S.saveDir.trim(), ...(rememberKey && key ? { mapiKey: key } : {}) })) } catch { /* storage 차단 — 이번 세션만 */ }
 }
 export const keyRemembered = (): boolean => !!readSettings().mapiKey
+/** 설정을 저장한 적이 있는지 (설정 창의 키 기억 처음 값) */
+export function hasSavedSettings(): boolean {
+  try { return localStorage.getItem(SETTINGS_KEY) !== null } catch { return false }
+}
 const saved = readSettings()
 
 export const S = {
