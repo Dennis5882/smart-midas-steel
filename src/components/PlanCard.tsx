@@ -252,7 +252,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
   if (!free) return <ModelWizard spec={spec} step={step} visited={visited} disabled={!live || s.busy}
     onStep={navigate} blocked={checkScope(spec).issues.some((i)=>i.level==='block' && i.key!=='additionInput')} invalid={errors.length > 0} attempted={attempted}
     onBuild={() => { if (errors.length || blocked) { setAttempted(true); return }; void buildFactory(spec, { modelOnly }) }}
-    onCancel={closeEditor} onChangeCode={closeEditor} codeLocked={s.busy || !!s.confirm}>
+    onChangeCode={closeEditor} codeLocked={s.busy || !!s.confirm}>
     {step === 0 && <>
       <div className="mw-templates">{TEMPLATE_KEYS.map((key) => <button type="button" key={key} aria-pressed={selectedTpl === key}
         disabled={!live || s.busy} onClick={() => { setSelectedTpl(key); setIndividual(false); invalidateAdditions(); if (S.activePlan?.id === msg.id) S.activePlan = { ...S.activePlan, tpl: key }; dirty.current = true; setVals((old) => ({ ...old, ...Object.fromEntries(Object.entries(TEMPLATES[key]).map(([k, v]) => [k, String(v)])), bayList: Array.from({ length: TEMPLATES[key].bays }, () => TEMPLATES[key].baySpacing).join(', ') })); notify() }}>

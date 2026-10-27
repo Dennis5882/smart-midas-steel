@@ -1,13 +1,15 @@
 import { ArrowRight, Building2, ChevronLeft, FolderOpen, Frame, Pencil } from 'lucide-react'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { executeAction, openCurrentModel, setCode } from '../agent/session'
 import { CODE_IDS, PROFILES, type CodeId } from '../codes'
-import { TEMPLATES, TEMPLATE_KEYS } from '../domain/templates'
+import { TEMPLATES, TEMPLATE_KEYS, type TemplateKey } from '../domain/templates'
+import { defaultSpecFor } from '../domain/types'
 import { t, useLang } from '../i18n'
 import { S, codeForLang, notify, savedCode, useStore } from '../state/store'
 import { draw3D } from '../state/ui'
 import { JobBar } from './JobBar'
 import { PlanCard } from './PlanCard'
+import { ModelWizard } from './ModelWizard'
 import { NoticeCenter } from './ActivityViews'
 import { TaskStage } from './TaskStage'
 import { TASKS } from '../state/taskFlow'
@@ -27,8 +29,12 @@ export function Workspace({ guideCollapsed, onOpenGuide, onOpenMapi }: { guideCo
   const editing = s.task === 'model' && s.workspaceView === 'model' && plan?.spec.code === s.code
   const locked = !!plan && (plan.epoch !== s.buildEpoch || !!(s.opt && (plan.modelRevision ?? 0) < s.modelRevision))
   const root = useRef<HTMLElement>(null)
+  /* 시작 화면(위저드 1단계)의 기본 모델 선택 — 처음 값은 지금 편집기 템플릿 */
+  const [pick, setPick] = useState<TemplateKey>(plan?.tpl ?? 'general')
+  const startSpec = s.lastSpec.code === s.code ? s.lastSpec : defaultSpecFor(s.code)
+  const startTemplate = (tpl: TemplateKey) => void executeAction({ intent: 'new', mode: 'template', tpl, params: {} })
   useEffect(() => {
-    const target = s.task !== 'model' ? root.current?.querySelector<HTMLElement>('.task-heading h2') : editing ? root.current?.querySelector<HTMLElement>('.mw-stage-heading h3, .ws-free-editor input') : root.current?.querySelector<HTMLElement>('.ws-hero h2')
+    const target = s.task !== 'model' ? root.current?.querySelector<HTMLElement>('.task-heading h2') : editing ? root.current?.querySelector<HTMLElement>('.mw-stage-heading h3, .ws-free-editor input') : root.current?.querySelector<HTMLElement>('.ws-start .mw-stage-heading h3')
     target?.focus({ preventScroll: true })
   }, [editing, s.task])
   const home = () => { S.workspaceView = 'start'; if (S.preview) draw3D(); notify() }
@@ -41,24 +47,21 @@ export function Workspace({ guideCollapsed, onOpenGuide, onOpenMapi }: { guideCo
       </div>
     </div>
     <NoticeCenter />
+    {/* 시작 화면 = 모델링 위저드 1단계 — 맨 위 설계기준, 기본 모델(템플릿) 고르고 [다음 단계] → 편집기 2단계(fromStart). 자유 골조는 아래 */}
     <div className="ws-start" hidden={!!editing || s.task !== 'model'}>
-      <div className="ws-hero"><h2 tabIndex={-1}>{t('project_start_title')}</h2><p>{t('project_start_hint')}</p></div>
-      <section className="project-code" aria-labelledby="project-code-heading"><h3 id="project-code-heading" className="ws-section-label">{t('code_label')}</h3><select aria-label={t('code_label')} value={restrictedCode ? '' : s.code} disabled={s.busy || !!s.confirm} onChange={(e) => void setCode(e.target.value as CodeId)}>{restrictedCode && <option value="" disabled>{t('project_code_existing')}</option>}{availableCodes.map((id) => <option key={id} value={id}>{t(PROFILES[id].selectLabelKey ?? PROFILES[id].labelKey)}</option>)}</select>{restrictedCode && <p role="status">{t('project_code_existing_hint')}</p>}</section>
-      {plan?.spec.code === s.code && <button className="ws-resume-card" disabled={s.busy} onClick={openCurrentModel}><FolderOpen size={20} /><span><strong>{t('ws_resume')}</strong><small>{t('ws_resume_hint')}</small></span><ArrowRight size={16} /></button>}
-      <h3 className="ws-section-label">{t('ws_templates')}</h3>
-      <p className="ws-tpl-note">{t('ws_tpl_note')}</p>
-      <div className="ws-template-grid">{TEMPLATE_KEYS.map((key) => {
-        const geometry=TEMPLATES[key]
-        return <button className="ws-template" key={key} disabled={s.busy || restrictedCode} onClick={() => void executeAction({ intent: 'new', mode: 'template', tpl: key, params: {} })}>
-          <strong>{t(`tpl_${key}`)}</strong>
-          <span className="ws-template-specs">{([
-            ['f_span',geometry.span],['kv_length',geometry.bays*geometry.baySpacing],['f_eave',geometry.eaveHeight],
-          ] as const).map(([label,value])=><span key={label}><small>{t(label)}</small><span>{value}<small>m</small></span></span>)}</span>
-          <span className="ws-template-meta"><span>{t('f_bays')} <b>{geometry.bays}</b></span><span>{t('f_baySpacing')} <b>{geometry.baySpacing} m</b></span></span>
-        </button>
-      })}</div>
-      <button className="ws-free" disabled={s.busy || restrictedCode} onClick={() => void executeAction({ intent: 'new', mode: 'free', params: {} })}><Frame size={19} /><span><strong>{t('g_model_5')}</strong><small>{t('ws_free_hint')}</small></span></button>
-      <p className="ws-start-note">{t('ws_local_note')}</p>
+      <ModelWizard spec={startSpec} step={0} visited={0} disabled={s.busy || restrictedCode} blocked={false} invalid={false} attempted={false}
+        onStep={() => startTemplate(pick)} onBuild={() => {}}>
+        <section className="project-code" aria-labelledby="project-code-heading"><h4 id="project-code-heading" className="ws-section-label">{t('code_label')}</h4><select aria-label={t('code_label')} value={restrictedCode ? '' : s.code} disabled={s.busy || !!s.confirm} onChange={(e) => void setCode(e.target.value as CodeId)}>{restrictedCode && <option value="" disabled>{t('project_code_existing')}</option>}{availableCodes.map((id) => <option key={id} value={id}>{t(PROFILES[id].selectLabelKey ?? PROFILES[id].labelKey)}</option>)}</select>{restrictedCode && <p role="status">{t('project_code_existing_hint')}</p>}</section>
+        {plan?.spec.code === s.code && <button className="ws-resume-card" disabled={s.busy} onClick={openCurrentModel}><FolderOpen size={20} /><span><strong>{t('ws_resume')}</strong><small>{t('ws_resume_hint')}</small></span><ArrowRight size={16} /></button>}
+        <h4 className="ws-section-label">{t('ws_templates')}</h4>
+        <div className="mw-templates">{TEMPLATE_KEYS.map((key) => <button type="button" key={key} aria-pressed={pick === key} disabled={s.busy || restrictedCode}
+          onClick={() => setPick(key)} onDoubleClick={() => startTemplate(key)}>
+          <strong>{t(`tpl_${key}`)}</strong><span>{TEMPLATES[key].span} m · {TEMPLATES[key].bays * TEMPLATES[key].baySpacing} m</span>
+        </button>)}</div>
+        <p className="mw-note">{t('mw_template_note')}</p>
+        <button className="ws-free" disabled={s.busy || restrictedCode} onClick={() => void executeAction({ intent: 'new', mode: 'free', params: {} })}><Frame size={19} /><span><strong>{t('g_model_5')}</strong><small>{t('ws_free_hint')}</small></span></button>
+        <p className="ws-start-note">{t('ws_local_note')}</p>
+      </ModelWizard>
     </div>
     {plan && <div className={`ws-editor${plan.mode === 'free' ? ' ws-free-editor' : ''}`} hidden={!editing}>
       {plan.mode === 'free' && <div className="project-code-summary"><span>{t('code_label')} · <strong>{t(PROFILES[plan.spec.code].labelKey)}</strong></span><button className="btn btn-ghost" disabled={s.busy || !!s.confirm} onClick={home}>{t('project_code_change')}</button></div>}

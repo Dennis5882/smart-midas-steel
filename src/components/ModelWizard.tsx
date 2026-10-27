@@ -61,10 +61,10 @@ function GeometrySketch({ spec, plan }: { spec: FactorySpec; plan: boolean }) {
 
 interface Props {
   spec: FactorySpec; step: number; visited: number; disabled: boolean; blocked: boolean; invalid: boolean; attempted: boolean
-  onStep(step: number): void; onBuild(): void; onCancel(): void; onChangeCode?(): void; codeLocked?: boolean; children: ReactNode
+  onStep(step: number): void; onBuild(): void; onChangeCode?(): void; codeLocked?: boolean; children: ReactNode
 }
 
-export function ModelWizard({ spec, step, visited, disabled, blocked, invalid, attempted, onStep, onBuild, onCancel, onChangeCode, codeLocked, children }: Props) {
+export function ModelWizard({ spec, step, visited, disabled, blocked, invalid, attempted, onStep, onBuild, onChangeCode, codeLocked, children }: Props) {
   const heading = useRef<HTMLHeadingElement>(null)
   const content = useRef<HTMLDivElement>(null)
   const mounted = useRef(false)
@@ -100,7 +100,8 @@ export function ModelWizard({ spec, step, visited, disabled, blocked, invalid, a
     </div>
     <footer className="mw-footer">
       <div className="mw-footer-actions">
-        <button className="btn btn-ghost" disabled={disabled} onClick={step ? () => onStep(step - 1) : onCancel}>{step ? <ArrowLeft size={14} /> : null}{t(step ? 'mw_back' : 'ws_home')}</button>
+        {/* 1단계가 시작 화면이라 되돌아갈 곳 없음 — 설계기준 변경은 위쪽 [변경] */}
+        {step ? <button className="btn btn-ghost" disabled={disabled} onClick={() => onStep(step - 1)}><ArrowLeft size={14} />{t('mw_back')}</button> : <span />}
         {step < REVIEW_STEP ? <button className="btn btn-c" disabled={disabled} onClick={() => onStep(step + 1)}>{t(step === REVIEW_STEP - 1 ? 'mw_to_review' : 'mw_next')}<ArrowRight size={14} /></button>
           : <button className="btn btn-c" disabled={disabled || blocked || invalid} onClick={onBuild}><Send size={14} />{t('mw_build')}</button>}
       </div>
