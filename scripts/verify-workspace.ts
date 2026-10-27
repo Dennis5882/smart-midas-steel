@@ -119,11 +119,25 @@ assert.equal(S.code, 'TW', 'reset keeps the design code')
 assert.equal(S.mapiKey, 'test-only', 'reset keeps the connection key')
 assert.equal(S.baseUrl, 'https://example.invalid/gen', 'reset keeps the connection URL')
 assert.equal(S.lastSpec.material, defaultSpecFor('TW').material, 'new work starts from the code defaults')
-/* 템플릿 단계 건너뛰기: 사용자가 템플릿을 고른 새 편집기만 (설계기준 변경으로 열린 편집기는 아님) */
+/* 시작 화면 = 위저드 1단계: 거기서 설계기준을 바꾸면 시작 화면에 머물고(고른 템플릿 유지), 편집기에서 바꾸면 편집기 */
 await executeAction({ intent: 'new', mode: 'template', tpl: 'small', params: {} })
-assert.equal(S.activePlan?.fromStart, true, 'start-screen template opens past the template step')
+assert.equal(S.workspaceView, 'model', 'a template from the start screen opens the editor')
+const smallId = S.activePlan!.id
+S.workspaceView = 'start'
+await executeAction({ intent: 'new', mode: 'template', tpl: 'small', params: {} })
+assert.equal(S.activePlan!.id, smallId, 'same template from the start screen continues the editor')
+S.workspaceView = 'start'
+await executeAction({ intent: 'new', mode: 'template', tpl: 'long', params: {} })
+assert.ok(S.activePlan!.id !== smallId && S.activePlan!.spec.span === TEMPLATES.long.span, 'another template starts a new model')
+S.workspaceView = 'start'
 await setCode('CN')
-assert.equal(S.activePlan?.fromStart, undefined, 'a code-change editor starts at the template step')
+assert.equal(S.workspaceView, 'start', 'changing the code on the start screen stays on step 1')
+assert.equal(S.activePlan!.tpl, 'long', 'the picked template is kept')
+await setCode('TW')
+assert.equal(S.workspaceView, 'start')
+S.workspaceView = 'model'
+await setCode('CN')
+assert.equal(S.workspaceView, 'model', 'changing the code in the editor stays in the editor')
 await setCode('TW')
 S.mapiKey = ''
 setConfirmHandler(null)

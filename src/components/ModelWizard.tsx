@@ -61,10 +61,10 @@ function GeometrySketch({ spec, plan }: { spec: FactorySpec; plan: boolean }) {
 
 interface Props {
   spec: FactorySpec; step: number; visited: number; disabled: boolean; blocked: boolean; invalid: boolean; attempted: boolean
-  onStep(step: number): void; onBuild(): void; onChangeCode?(): void; codeLocked?: boolean; children: ReactNode
+  onStep(step: number): void; onBuild(): void; codeControl?: ReactNode; children: ReactNode
 }
 
-export function ModelWizard({ spec, step, visited, disabled, blocked, invalid, attempted, onStep, onBuild, onChangeCode, codeLocked, children }: Props) {
+export function ModelWizard({ spec, step, visited, disabled, blocked, invalid, attempted, onStep, onBuild, codeControl, children }: Props) {
   const heading = useRef<HTMLHeadingElement>(null)
   const content = useRef<HTMLDivElement>(null)
   const mounted = useRef(false)
@@ -77,8 +77,8 @@ export function ModelWizard({ spec, step, visited, disabled, blocked, invalid, a
   return <div className="model-wizard">
     <header className="mw-banner">
       <div className="mw-brand"><Building2 size={18} /><span>{t('mw_title')}</span>
-        <span className="mw-code-info"><span className="mw-code" title={t('code_label')}>{spec.code}</span><span className="mw-code-label" title={t(PROFILES[spec.code].labelKey)}>{t(PROFILES[spec.code].labelKey)}</span>
-          {onChangeCode && <button type="button" className="btn btn-ghost mw-code-change" disabled={codeLocked} onClick={onChangeCode}>{t('project_code_change')}</button>}</span></div>
+        <span className="mw-code-info"><span className="mw-code" title={t('code_label')}>{spec.code}</span>{/* 설계기준은 위쪽에서 바로 바꾼다 (CodeSelect) — 없으면 이름만 */}
+          {codeControl ?? <span className="mw-code-label" title={t(PROFILES[spec.code].labelKey)}>{t(PROFILES[spec.code].labelKey)}</span>}</span></div>
       <div className="mw-progress-text"><span>{t('mw_process')}</span><strong>{String(step + 1).padStart(2, '0')} / {String(WIZARD_STEPS.length).padStart(2, '0')}</strong></div>
       <div className="mw-progress" role="progressbar" aria-label={t('mw_process')} aria-valuemin={1} aria-valuemax={WIZARD_STEPS.length} aria-valuenow={step + 1}><span style={{ width: `${(step + 1) / WIZARD_STEPS.length * 100}%` }} /></div>
     </header>
@@ -100,7 +100,7 @@ export function ModelWizard({ spec, step, visited, disabled, blocked, invalid, a
     </div>
     <footer className="mw-footer">
       <div className="mw-footer-actions">
-        {/* 1단계가 시작 화면이라 되돌아갈 곳 없음 — 설계기준 변경은 위쪽 [변경] */}
+        {/* 1단계가 시작 화면이라 되돌아갈 곳 없음 — 설계기준은 위쪽에서 */}
         {step ? <button className="btn btn-ghost" disabled={disabled} onClick={() => onStep(step - 1)}><ArrowLeft size={14} />{t('mw_back')}</button> : <span />}
         {step < REVIEW_STEP ? <button className="btn btn-c" disabled={disabled} onClick={() => onStep(step + 1)}>{t(step === REVIEW_STEP - 1 ? 'mw_to_review' : 'mw_next')}<ArrowRight size={14} /></button>
           : <button className="btn btn-c" disabled={disabled || blocked || invalid} onClick={onBuild}><Send size={14} />{t('mw_build')}</button>}

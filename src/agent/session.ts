@@ -61,9 +61,9 @@ export async function executeAction(c: Intent): Promise<void> {
       const base: FactorySpec = { ...defaultSpecFor(S.code), ...(previous.code === S.code ? previous : {}) }
       const geo = c.mode === 'template' ? { ...TEMPLATES[c.tpl ?? 'general'], bayList: undefined } : {}
       const spec = normalizeBays({ ...base, ...geo, ...c.params, code: S.code })
-      addPlanMsg(spec, c.mode, c.tpl, c.mode === 'template' && !!c.tpl)
-      /* 새 기본 모델링 편집기 = 첫 단계의 3D 시점 (STEP_CAM, 이후는 사용자가 단계를 옮길 때 PlanCard 가) */
-      if (c.mode === 'template') { S.cam = STEP_CAM[c.tpl ? 1 : 0]; S.camReset++ }
+      addPlanMsg(spec, c.mode, c.tpl)
+      /* 새 기본 모델링 편집기 = 2단계(횡단면)의 3D 시점 — 1단계는 시작 화면 (STEP_CAM, 이후는 사용자가 단계를 옮길 때 PlanCard 가) */
+      if (c.mode === 'template') { S.cam = STEP_CAM[1]; S.camReset++ }
       tab('viewP')
       previewSpec(spec)
       break
@@ -161,7 +161,9 @@ export async function setCode(id: CodeId, opts: { auto?: boolean } = {}): Promis
   S.lastSpec = previous ? { ...defaults, span: previous.span, bays: previous.bays, baySpacing: previous.baySpacing, bayList: previous.bayList?.slice(), eaveHeight: previous.eaveHeight, roofSlope: previous.roofSlope, baseFixity: previous.baseFixity, purlinSpacing: previous.purlinSpacing, girtSpacing: previous.girtSpacing, postSpacing: previous.postSpacing, sagRods: previous.sagRods, features: previous.features && { ...previous.features } } : defaults
   if (previous) {
     S.lastSpec.restraints = previous.restraints && { ...previous.restraints }
+    const view = S.workspaceView
     addPlanMsg(S.lastSpec, plan?.mode ?? (previous.bayList ? 'free' : 'template'), plan?.tpl ?? 'general')
+    if (view === 'start') S.workspaceView = 'start' // 시작 화면(1단계)에서 바꾸면 그대로 — 고른 템플릿으로 [다음 단계]
     previewSpec(S.lastSpec)
     tab('viewP')
   }

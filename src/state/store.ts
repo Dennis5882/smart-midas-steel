@@ -39,7 +39,7 @@ export interface LogEntry { id: number; ts: string; type: LogType; html: string 
 export type ChatMsg = { ts?: string } & (
   | { id: number; role: 'user' | 'bot'; kind: 'html'; html: string | LText }
   | { id: number; role: 'bot'; kind: 'thinking' }
-  | { id: number; role: 'bot'; kind: 'plan'; spec: FactorySpec; epoch: number; mode: BuildMode; tpl?: TemplateKey; modelRevision?: number; fromStart?: true; modelOnly?: boolean }
+  | { id: number; role: 'bot'; kind: 'plan'; spec: FactorySpec; epoch: number; mode: BuildMode; tpl?: TemplateKey; modelRevision?: number; modelOnly?: boolean }
 )
 
 /** Gen 에 보낸 모델 — 스펙·형상·하중 요약 */

@@ -334,7 +334,8 @@ dialog.rn::backdrop{background:var(--scrim);backdrop-filter:blur(2px)}
 .mw-brand svg{color:var(--cyan)}
 .mw-code-info{display:flex;align-items:center;justify-content:flex-end;flex:1 1 220px;gap:8px;min-width:0;font-size:.72rem;font-weight:500;color:var(--muted)}
 .mw-code-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;color:var(--txt)}
-.mw-code-change{padding:4px 10px;font-size:.7rem;white-space:nowrap;flex:none}
+.mw-code-select{min-width:0;max-width:100%;flex:0 1 auto;padding:5px 26px 5px 9px;border:1px solid var(--border);border-radius:6px;background:var(--panel);color:var(--txt-hi);font:inherit;font-size:.72rem;cursor:pointer;text-overflow:ellipsis}
+.mw-code-select:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}.mw-code-select:disabled{opacity:.55;cursor:default}
 .mw-brand>span:first-of-type{white-space:nowrap}
 .mw-code{font-size:.64rem;letter-spacing:1px;color:var(--cyan);border:1px solid color-mix(in srgb,var(--cyan) 30%,var(--border));border-radius:5px;padding:2px 7px}
 .mw-progress-text{display:flex;justify-content:space-between;font-size:.67rem;margin:15px 0 7px;color:var(--muted)}

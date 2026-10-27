@@ -14,7 +14,7 @@ import { nearFaultRows } from '../codes/twNearFault'
 import { NearFaultInput } from './NearFaultInput'
 import { regionZoneKR, ZONE_Z } from '../codes/krLateral'
 import type { TemplateKey } from '../domain/templates'
-import { TEMPLATES, TEMPLATE_KEYS } from '../domain/templates'
+import { CodeSelect } from './CodeSelect'
 import { ModelWizard, WIZARD_STEPS } from './ModelWizard'
 import { StructureEditor, StructureSummary } from './StructureEditor'
 import { WindLoadInfo } from './WindPreview'
@@ -71,11 +71,12 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
   const s = useStore()
   const free = msg.mode === 'free'
   /* 시작 화면에서 템플릿을 이미 골랐으면 같은 선택을 다시 묻지 않고 횡단면부터 (시작 단계는 되돌아가 바꿀 수 있음) */
-  const opened = msg.fromStart ? 1 : 0
+  /* 기본 모델링 1단계(템플릿)는 시작 화면 — 편집기는 2단계부터, 1단계로 가면 시작 화면으로 */
+  const opened = free ? 0 : 1
   const [step, setStep] = useState(opened)
   const [visited, setVisited] = useState(opened)
   const [attempted, setAttempted] = useState(false)
-  const [selectedTpl, setSelectedTpl] = useState(msg.tpl ?? 'general')
+  const selectedTpl = msg.tpl ?? 'general'
   const formId = useId()
   const [vals, setVals] = useState(() => initVals(msg.spec))
   const [individual, setIndividual] = useState(free || !!msg.spec.bayList?.length)
@@ -219,6 +220,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
 
   function navigate(target: number) {
     if (!live || s.busy) return
+    if (target === 0) { closeEditor(); return }
     if (target > step) {
       const first = errors.filter((f) => fieldStep(f) < target).sort((a,b)=>fieldStep(a)-fieldStep(b))[0]
       if (first) {
@@ -252,14 +254,7 @@ export function PlanCard({ msg }: { msg: PlanMsg }) {
   if (!free) return <ModelWizard spec={spec} step={step} visited={visited} disabled={!live || s.busy}
     onStep={navigate} blocked={checkScope(spec).issues.some((i)=>i.level==='block' && i.key!=='additionInput')} invalid={errors.length > 0} attempted={attempted}
     onBuild={() => { if (errors.length || blocked) { setAttempted(true); return }; void buildFactory(spec, { modelOnly }) }}
-    onChangeCode={closeEditor} codeLocked={s.busy || !!s.confirm}>
-    {step === 0 && <>
-      <div className="mw-templates">{TEMPLATE_KEYS.map((key) => <button type="button" key={key} aria-pressed={selectedTpl === key}
-        disabled={!live || s.busy} onClick={() => { setSelectedTpl(key); setIndividual(false); invalidateAdditions(); if (S.activePlan?.id === msg.id) S.activePlan = { ...S.activePlan, tpl: key }; dirty.current = true; setVals((old) => ({ ...old, ...Object.fromEntries(Object.entries(TEMPLATES[key]).map(([k, v]) => [k, String(v)])), bayList: Array.from({ length: TEMPLATES[key].bays }, () => TEMPLATES[key].baySpacing).join(', ') })); notify() }}>
-        <strong>{t(`tpl_${key}`)}</strong><span>{TEMPLATES[key].span} m · {TEMPLATES[key].bays * TEMPLATES[key].baySpacing} m</span>
-      </button>)}</div>
-      <p className="mw-note">{t('mw_template_note')}</p>
-    </>}
+    codeControl={<CodeSelect />}>
     {step === 2 && <section className="mw-group">
       <h4>{t('bay_spacing_title')}</h4>
       <BaySpacingEditor id={`${formId}-bayList`} individual={individual} raw={vals.bayList} disabled={!live || s.busy}
