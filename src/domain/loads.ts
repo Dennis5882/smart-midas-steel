@@ -17,6 +17,7 @@ import { additionErrors, factoryOnly } from './additions'
 import { ASD_COMBOS } from '../codes/twAsd'
 import { buildAdditionLoads } from './additionLoads'
 import type { AdditionModel, AdditionFactors } from './additionTypes'
+import { addBeamLoad, addNodalLoad } from './loadItems'
 
 export interface LoadInfo {
   additions?: { sources: AdditionModel['sources']; craneCases: AdditionModel['craneCases']; serviceCases: string[]; factors?: AdditionFactors; combinationBasis?: Record<string,string>; preliminary: true }
@@ -77,6 +78,8 @@ export function selfWeightOnly(l: LoadPayloads): Pick<LoadPayloads, 'STLD' | 'BO
 }
 
 type Dir = 'GX' | 'GY' | 'GZ'
+/** 보 하중 방향 → 절점 하중 성분 (문 하중 전달) */
+const DIR_FORCE: Record<Dir, 'FX' | 'FY' | 'FZ'> = { GX: 'FX', GY: 'FY', GZ: 'FZ' }
 /** 조합 변형 — parts: (케이스, 계수) 목록 */
 interface Variant { parts: { lc: string; f: number }[]; tag: string }
 
@@ -106,10 +109,7 @@ export function buildLoadPayloads(spec: FactorySpec, model: FactoryModel): LoadP
     for(const it of items) {
       if(it.TYPE!=='UNILOAD' || it.P[0]!==it.P[1] || !['GX','GY','GZ'].includes(it.DIRECTION)) throw new Error('Unsupported door load transfer')
       for(const id of [e.n1,e.n2]) {
-        const rec=(load.CNLD[id] ??= {ITEMS:[]}) as {ITEMS:any[]}
-        let item=rec.ITEMS.find((v)=>v.LCNAME===it.LCNAME)
-        if(!item){item={ID:rec.ITEMS.length+1,LCNAME:it.LCNAME,GROUP_NAME:'',FX:0,FY:0,FZ:0,MX:0,MY:0,MZ:0};rec.ITEMS.push(item)}
-        item[{GX:'FX',GY:'FY',GZ:'FZ'}[it.DIRECTION as 'GX'|'GY'|'GZ']]+=it.P[0]*L/2
+        addNodalLoad(load.CNLD,id,it.LCNAME,{[DIR_FORCE[it.DIRECTION as Dir]]:it.P[0]*L/2})
       }
     }
   }
@@ -155,11 +155,7 @@ function buildFactoryLoads(spec: FactorySpec, model: FactoryModel): LoadPayloads
     if (dir === 'GX') t.x += w * elLen(elemId)
     if (dir === 'GY') t.y += w * elLen(elemId)
     total.set(lc, t)
-    const items = (BMLD[elemId] ??= { ITEMS: [] }).ITEMS
-    items.push({
-      ID: items.length + 1, LCNAME: lc, GROUP_NAME: '', CMD: 'BEAM', TYPE: 'UNILOAD', DIRECTION: dir,
-      USE_PROJECTION: false, USE_ECCEN: false, D: [0, 1, 0, 0], P: [w, w, 0, 0],
-    })
+    addBeamLoad(BMLD, elemId, lc, dir, w)
   }
   const addDead = (id: number, w: number) => { addLine(id, 'D', 'GZ', -w); deadLine.set(id, (deadLine.get(id) ?? 0) + w) }
 
@@ -204,8 +200,7 @@ function buildFactoryLoads(spec: FactorySpec, model: FactoryModel): LoadPayloads
       let F = denom > 0 ? ((V - Ft) * w * (n.z - G.baseZ)) / denom : 0
       if (Ft > 0 && n.z === zTop && topW > 0) F += (Ft * w) / topW
       if (F === 0) continue
-      const items = (CNLD[n.id] ??= { ITEMS: [] }).ITEMS
-      items.push({ ID: items.length + 1, LCNAME: `E${dir}`, GROUP_NAME: '', FX: dir === 'X' ? F : 0, FY: dir === 'Y' ? F : 0, FZ: 0, MX: 0, MY: 0, MZ: 0 })
+      addNodalLoad(CNLD, n.id, `E${dir}`, dir === 'X' ? { FX: F } : { FY: F })
     }
     /* cStar 는 I = 1.0 으로 재계산 (2.16.1 — 용도계수 > 1 건물도 I = 1 로 변위 산정 가능) */
     const cStar1 = lat.seismicCoef({ SDS: si.SDS, SD1: si.SD1, basin, I: 1.0, R: dir === 'X' ? si.Rx : si.Ry, T }).cStar

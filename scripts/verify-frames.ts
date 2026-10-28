@@ -326,4 +326,27 @@ for (const base of [DEFAULT_SPEC, CN_DEFAULT_SPEC]) {
   ok([tw, { w: kr }].every(({ w }) => w.rows.filter((r) => r.kind === 'main' && r.dir!.endsWith('Y')).every((r) => r.roofCp !== null)), 'wind preview TW·KR: Y-direction cases show the applied roof Cp too')
 }
 
+/* 하중 항목 필드 — Gen 은 항목이 있는 레코드에 PUT 하면 빠진 필드를 첫 항목 값으로 채운다(midas-nx 2.10.4) → 모든 항목이 같은 필드 전부 (loadItems) */
+{
+  const { addNodalLoad, addBeamLoad } = await import('../src/domain/loadItems')
+  const { KR_DEFAULT_SPEC } = await import('../src/domain/types')
+  const CN_KEYS = 'ID,LCNAME,GROUP_NAME,FX,FY,FZ,MX,MY,MZ'
+  const BM_KEYS = 'ID,LCNAME,GROUP_NAME,CMD,TYPE,DIRECTION,USE_PROJECTION,USE_ECCEN,USE_ADDITIONAL,ADDITIONAL_I_END,USE_ADDITIONAL_J_END,ADDITIONAL_J_END,D,P'
+  for (const base of [DEFAULT_SPEC, CN_DEFAULT_SPEC, KR_DEFAULT_SPEC]) {
+    const spec = structuredClone(base), loads: any = buildLoadPayloads(spec, buildPortal(spec))
+    const items = (t: any) => Object.values(t).flatMap((r: any) => r.ITEMS)
+    ok(items(loads.CNLD).length > 0 && items(loads.CNLD).every((x: any) => Object.keys(x).join() === CN_KEYS), `${base.code}: every CNLD item carries GROUP_NAME + FX..MZ`)
+    ok(items(loads.BMLD).length > 0 && items(loads.BMLD).every((x: any) => Object.keys(x).join() === BM_KEYS && !x.USE_ECCEN && !x.USE_ADDITIONAL), `${base.code}: every BMLD item carries the additional-load fields (off), eccentricity off`)
+    ok(Object.values(loads.CNLD).every((r: any) => new Set(r.ITEMS.map((x: any) => x.LCNAME)).size === r.ITEMS.length), `${base.code}: one CNLD item per node and case`)
+  }
+  const t: Record<string, unknown> = {}
+  addNodalLoad(t, 5, 'EX', { FX: 2 }); addNodalLoad(t, 5, 'EX', { FX: 1, FZ: -3 }); addNodalLoad(t, 5, 'EY', { FY: 0 }); addNodalLoad(t, 6, 'EX', {})
+  const r5 = (t[5] as any).ITEMS
+  ok(r5.length === 1 && r5[0].FX === 3 && r5[0].FZ === -3 && r5[0].MY === 0 && !(6 in t), 'addNodalLoad: same case summed, all-zero item not created')
+  ok((() => { try { addNodalLoad(t, 7, 'D', { FZ: NaN }); return false } catch { return true } })(), 'addNodalLoad: non-numeric component is an error, not 0')
+  const b: Record<string, unknown> = {}
+  addBeamLoad(b, 3, 'D', 'GZ', -1.5); addBeamLoad(b, 3, 'L', 'GZ', -2)
+  ok((b[3] as any).ITEMS.map((x: any) => `${x.ID}:${x.LCNAME}:${x.P[0]}`).join() === '1:D:-1.5,2:L:-2', 'addBeamLoad: items numbered in order')
+}
+
 console.log(`Frames: ${n} checks passed (mono-slope + multi-span + TW 表2.8: geometry, releases, loads, wind, snow, scope, quantities, inputs)`)

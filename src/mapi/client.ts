@@ -41,7 +41,7 @@ export function getClient(): MidasClient {
 }
 
 export function apiErrorMessage(e: unknown, endpoint = ''): string {
-  /* 대기 한도 초과 — SDK 는 MidasConnectionError('… failed', cause: 'Timed out after Nms') 로 알린다 (2.10.2) */
+  /* 대기 한도 초과 — SDK 는 MidasConnectionError('… failed', cause: 'Timed out after Nms') 로 알린다 (2.10.4 — 2.10.3·2.10.4 변경 기록에 해당 없음) */
   if (e instanceof MidasConnectionError) {
     const m = /Timed out after (\d+)ms/.exec(String((e as { cause?: unknown }).cause instanceof Error ? ((e as { cause?: Error }).cause!.message) : (e as { cause?: unknown }).cause ?? ''))
     if (m) return t('gen_timeout', Math.round(+m[1] / 1000), endpoint || e.message.replace(/ failed$/, ''))

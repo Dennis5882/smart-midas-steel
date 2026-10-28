@@ -1,6 +1,7 @@
 import type { FactoryModel, FactorySpec } from './types'
 import type { LoadPayloads } from './loads'
 import { activeCrane, activePlatform, additionErrors } from './additions'
+import { addBeamLoad, addNodalLoad } from './loadItems'
 
 /** Source loads are summed by (node, case): Gen keeps only one CNLD entry per case/node. */
 export function buildAdditionLoads(s: FactorySpec, m: FactoryModel, load: LoadPayloads): LoadPayloads {
@@ -8,18 +9,14 @@ export function buildAdditionLoads(s: FactorySpec, m: FactoryModel, load: LoadPa
   if (!a) return load
   const errors = additionErrors(s)
   if (errors.length) throw new Error(`Unconfirmed/invalid additions: ${errors.map((e) => e.path).join(', ')}`)
-  const nodeLoads = load.CNLD as Record<string, { ITEMS: any[] }>, beamLoads = load.BMLD as Record<string, { ITEMS: any[] }>
   for (const n of a.nodal) {
-    if (['fx','fy','fz','mx','my','mz'].every((k)=>n[k as 'fx']===0)) continue
-    const items = (nodeLoads[n.node] ??= { ITEMS: [] }).ITEMS
-    let item = items.find((v) => v.LCNAME === n.case)
-    if (!item) { item = { ID: items.length + 1, LCNAME: n.case, GROUP_NAME: '', FX: 0, FY: 0, FZ: 0, MX: 0, MY: 0, MZ: 0 }; items.push(item) }
-    for (const k of ['fx', 'fy', 'fz', 'mx', 'my', 'mz'] as const) item[k.toUpperCase()] += n[k]
+    /* 성분이 빠진 옛 저장 데이터는 0 으로 보내지 않고 실패 (addNodalLoad 는 빠진 성분을 0 으로 본다) */
+    if ((['fx', 'fy', 'fz', 'mx', 'my', 'mz'] as const).some((k) => typeof n[k] !== 'number')) throw new Error(`invalid nodal load at node ${n.node} (${n.case})`)
+    addNodalLoad(load.CNLD, n.node, n.case, { FX: n.fx, FY: n.fy, FZ: n.fz, MX: n.mx, MY: n.my, MZ: n.mz })
   }
   for (const b of a.beam) {
     if (!b.q) continue
-    const items = (beamLoads[b.element] ??= { ITEMS: [] }).ITEMS
-    items.push({ ID: items.length + 1, LCNAME: b.case, GROUP_NAME: '', CMD: 'BEAM', TYPE: 'UNILOAD', DIRECTION: 'GZ', USE_PROJECTION: false, USE_ECCEN: false, D: [0, 1, 0, 0], P: [-b.q, -b.q, 0, 0] })
+    addBeamLoad(load.BMLD, b.element, b.case, 'GZ', -b.q)
   }
   let sid = Object.keys(load.STLD).length, cid = Object.keys(load['LCOM-GEN']).length
   const combinationBasis:Record<string,string>={}

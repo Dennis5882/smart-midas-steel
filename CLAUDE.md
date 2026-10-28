@@ -56,7 +56,7 @@ Vite 8 + TypeScript + React 19 + Tailwind v4(화면은 `src/styles/app.css` 클�
 - 대기 한도 `timeoutFor`: `/doc/anal`·`/post/TABLE`·KDS 강재 설계 실행/표 15분, 그 밖 `/doc/*`·`/DESIGN/*` 3분, 나머지 1분(경로 대소문자·끝 '/'·쿼리 무관). 초과는 `gen_timeout`(Gen 대화상자 확인 안내).
 - 결과 표 본문은 `tableOf(응답)` — Gen 이 최상위 키를 TABLE_NAME 대신 'Result Table'·'empty' 로 줄 때가 있다. 큰 배열에 `push(...arr)`·`Math.max(...arr)` 금지(브라우저 스택 초과 — BEAMFORCE 10만+ 행), 조회는 Set.
 - 전송 후 11개 DB 를 다시 읽어 개수·ID·보낸 필드 값 비교(`domain/genSync`, 허용오차 1e-9, Gen 이 붙이는 필드·ELEM NODE 0 채움·ITEMS 순서 허용). 해석·검토·최적화 직전 13개 DB 동일성 검사(`assertGenSync`) — 다르면 막고 차이 목록, 자동 재생성 안 함. 단면 A/I/J 는 SECTIONALL 표와 대조(다르면 생성 차단).
-- 페이로드 규칙: TRUSS 단면 `USE_WARPING_EFFECT:false`, **TRUSS 요소에 보 하중 불가**(절점으로), **한 절점·같은 케이스 CNLD 항목은 합산해 하나로**, **조합 이름 ≤ 20자**, `db/CONS` 의 `GROUP_NAME` 생략, 재료 등급 접미사 거부(SN400B → 프로필 `gen` 매핑), 립 C `SHAPE 'CC'`, 사각 RC `SHAPE 'SB'` `vSIZE` 10칸.
+- 페이로드 규칙: TRUSS 단면 `USE_WARPING_EFFECT:false`, **TRUSS 요소에 보 하중 불가**(절점으로), **한 절점·같은 케이스 CNLD 항목은 합산해 하나로**, **하중 항목은 필드 전부** — 항목이 있는 레코드에 PUT 하면 Gen 이 빠진 필드를 첫 항목 값으로 조용히 채운다(CNLD·BMLD 는 `domain/loadItems.ts` 로만 만든다, BMLD 편심 값은 `USE_ECCEN:false` 면 Gen 이 저장 안 해 보내지 않음), **조합 이름 ≤ 20자**, `db/CONS` 의 `GROUP_NAME` 생략, 재료 등급 접미사 거부(SN400B → 프로필 `gen` 매핑), 립 C `SHAPE 'CC'`, 사각 RC `SHAPE 'SB'` `vSIZE` 10칸.
 - 설계 API: TW 미지원(404) → 앱 자체 검토. CN 은 구판이라 DSTL 안 보냄. KR KDS(`DESIGN/STEEL/DSTL`·`post/STEELCODECHECK`)는 **라이브 대조용만**(`live-kr.ts --gen-check`).
 - 화면: 생성 후 `view/ANGLE`(H30·V15) + `view/CAPTURE ZOOM_LEVEL 100`(맞춤 전용 API 없음), 해석 후 `view/RESULTGRAPHIC` 반력 표시. 실패해도 생성은 성공.
 - 이동하중: `MVCD TAIWAN` 거부 → `AASHTO STANDARD` + 사용자 차량. 면 풍압(Wind Pressure 메뉴)·`SWIND` Taiwan 은 API 없음, `PNLA` 는 판 요소 전용 → 보에는 `FBLD`/`FBLA`(경계가 모두 보여야 함). 상세: implementation-log 「Gen 이동하중」「Gen 면 풍압」.

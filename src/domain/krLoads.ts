@@ -19,6 +19,7 @@ import type { LoadInfo, LoadPayloads } from './loads'
 import { portalGeometry } from './portal'
 import { sectionProps } from './sections'
 import { nodeWeights } from './weights'
+import { addBeamLoad, addNodalLoad } from './loadItems'
 import { baySpans, columnSpans, frameSpans, type Face, type FactoryModel, type FactorySpec, type Node } from './types'
 
 /** 계산서·결과 탭 표시용 KDS 중간값 */
@@ -74,8 +75,7 @@ export function buildKrLoads(spec: FactorySpec, model: FactoryModel): LoadPayloa
   const elLen = (id: number) => { const [a, b] = ends(elById.get(id)!); return Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z) }
   const add = (id: number, lc: string, dir: Dir, w: number) => {
     if (Math.abs(w) < 1e-12) return
-    const items = (BMLD[id] ??= { ITEMS: [] }).ITEMS
-    items.push({ ID: items.length + 1, LCNAME: lc, GROUP_NAME: '', CMD: 'BEAM', TYPE: 'UNILOAD', DIRECTION: dir, USE_PROJECTION: false, USE_ECCEN: false, D: [0, 1, 0, 0], P: [w, w, 0, 0] })
+    addBeamLoad(BMLD, id, lc, dir, w)
     const t = total[lc] ??= { x: 0, y: 0 }
     if (dir === 'GX') t.x += w * elLen(id)
     if (dir === 'GY') t.y += w * elLen(id)
@@ -155,8 +155,7 @@ export function buildKrLoads(spec: FactorySpec, model: FactoryModel): LoadPayloa
     for (const n of model.nodes) {
       const F = denom > 0 ? V * (weights.get(n.id) ?? 0) * n.z ** kk / denom : 0
       if (!F) continue
-      const items = (CNLD[n.id] ??= { ITEMS: [] }).ITEMS
-      items.push({ ID: items.length + 1, LCNAME: `E${d}`, GROUP_NAME: '', FX: d === 'X' ? F : 0, FY: d === 'Y' ? F : 0, FZ: 0, MX: 0, MY: 0, MZ: 0 })
+      addNodalLoad(CNLD, n.id, `E${d}`, d === 'X' ? { FX: F } : { FY: F })
     }
     /* 7.2.6.4 우발비틀림 M_ta = 0.05 × 직각 평면치수 × V */
     const Mt = V * 0.05 * (d === 'X' ? length : span)
@@ -273,13 +272,8 @@ export function buildKrLoads(spec: FactorySpec, model: FactoryModel): LoadPayloa
         /* 가새 = Gen TRUSS — 보 하중 불가("Beam Loads cannot be entered", 라이브 2026-10-16) → 양 끝 절점에 반씩 */
         const F = 0.002 * w * elLen(e.id) / 2
         if (Math.abs(F) < 1e-12) continue
-        /* 한 절점에 같은 케이스 항목이 둘이면 Gen 은 하나만 남긴다(라이브 2026-10-16) → 합산 */
-        for (const nid of [e.n1, e.n2]) {
-          const items = (CNLD[nid] ??= { ITEMS: [] }).ITEMS as { LCNAME: string; FX: number; FY: number }[]
-          const prev = items.find((it) => it.LCNAME === name)
-          if (prev) { prev.FX += d === 'X' ? F : 0; prev.FY += d === 'Y' ? F : 0 }
-          else items.push({ ID: items.length + 1, LCNAME: name, GROUP_NAME: '', FX: d === 'X' ? F : 0, FY: d === 'Y' ? F : 0, FZ: 0, MX: 0, MY: 0, MZ: 0 } as never)
-        }
+        /* 한 절점에 같은 케이스 항목이 둘이면 Gen 은 하나만 남긴다(라이브 2026-10-16) → 합산 (addNodalLoad) */
+        for (const nid of [e.n1, e.n2]) addNodalLoad(CNLD, nid, name, d === 'X' ? { FX: F } : { FY: F })
         const t = total[name] ??= { x: 0, y: 0 }
         if (d === 'X') t.x += 2 * F; else t.y += 2 * F
       }

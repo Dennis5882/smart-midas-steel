@@ -12,6 +12,7 @@ import { portalGeometry, type Geometry } from './portal'
 import { nodeWeights } from './weights'
 import { baySpans, columnSpans, frameSpans, type FactoryModel, type FactorySpec, type Face, type Node } from './types'
 import { sectionProps } from './sections'
+import { addBeamLoad, addNodalLoad } from './loadItems'
 
 export function validateCnSpec(spec: FactorySpec): void {
   const c = spec.china
@@ -83,8 +84,7 @@ export function buildCnLoads(spec: FactorySpec, model: FactoryModel): LoadPayloa
   const total: Record<string, { x: number; y: number }> = {}
   const add = (id: number, lc: string, dir: 'GX' | 'GY' | 'GZ', w: number) => {
     if (Math.abs(w) < 1e-12) return
-    const items = (BMLD[id] ??= { ITEMS: [] }).ITEMS
-    items.push({ ID: items.length + 1, LCNAME: lc, GROUP_NAME: '', CMD: 'BEAM', TYPE: 'UNILOAD', DIRECTION: dir, USE_PROJECTION: false, USE_ECCEN: false, D: [0, 1, 0, 0], P: [w, w, 0, 0] })
+    addBeamLoad(BMLD, id, lc, dir, w)
     const e = model.elements.find((x) => x.id === id)!, [a, b] = ends(e)
     const L = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z)
     const t = total[lc] ??= { x: 0, y: 0 }
@@ -119,10 +119,6 @@ export function buildCnLoads(spec: FactorySpec, model: FactoryModel): LoadPayloa
   const W = [...weights.values()].reduce((a, b) => a + b, 0)
   const denom = model.nodes.reduce((s, n) => s + (weights.get(n.id) ?? 0) * n.z, 0)
   const seismic = { W } as LoadInfo['seismic']
-  const node = (id: number, lc: string, F: [number, number, number]) => {
-    const items = (CNLD[id] ??= { ITEMS: [] }).ITEMS
-    items.push({ ID: items.length + 1, LCNAME: lc, GROUP_NAME: '', FX: F[0], FY: F[1], FZ: F[2], MX: 0, MY: 0, MZ: 0 })
-  }
   for (const d of ['X', 'Y'] as const) {
     const T = d === 'X' ? c.Tx : c.Ty
     const sa = spectrum(T, c.alphaMax, c.Tg, c.damping), minimum = .2 * c.alphaMax
@@ -130,12 +126,12 @@ export function buildCnLoads(spec: FactorySpec, model: FactoryModel): LoadPayloa
     seismic[d] = { T, c: coef, cV: sa, cStar: coef, cMin: minimum, cM: 0, gov: sa >= minimum ? 'GB/T 50011 5.1.5' : 'GB/T 50011 5.2.5', V, Fu: 1, R: 1, Mt: 0 }
     for (const n of model.nodes) {
       const F = denom > 0 ? V * (weights.get(n.id) ?? 0) * n.z / denom : 0
-      if (F) node(n.id, `E${d}`, [d === 'X' ? F : 0, d === 'Y' ? F : 0, 0])
+      if (F) addNodalLoad(CNLD, n.id, `E${d}`, d === 'X' ? { FX: F } : { FY: F })
     }
   }
   /* GB 51022 4.4.2-3 수직지진 — 8도·9도: 중력 대표값의 10%(0.20g)·15%(0.30g)·20%(9도), 아래 방향 + */
   const vRatio = verticalRatioCN(c.alphaMax)
-  if (vRatio > 0) for (const n of model.nodes) { const w = weights.get(n.id) ?? 0; if (w) node(n.id, 'EV', [0, 0, -vRatio * w]) }
+  if (vRatio > 0) for (const n of model.nodes) { const w = weights.get(n.id) ?? 0; if (w) addNodalLoad(CNLD, n.id, 'EV', { FZ: -vRatio * w }) }
 
   /* GB 51022 4.2 — wk = β·μw·μz·w0, β 1.1 (주골조), μz 는 10 m 미만이면 10 m 값, h = 평균 지붕 높이 */
   const hRef = G.hMean, B = spec.span, minDim = Math.min(B, length)
