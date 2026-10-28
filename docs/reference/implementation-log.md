@@ -272,3 +272,8 @@ Vite 8 + TypeScript + React 19 + Tailwind v4 + shadcn/ui(new-york) + **Vercel Fu
 - MAPI 설정 창: [저장] 때 주소·자동 저장 폴더를 localStorage `sms_mapi` 에, [이 브라우저에 MAPI-Key 기억](처음 값 켬)을 켜면 키도. 끄고 저장하면 저장된 키 삭제, [닫기] 는 저장 안 함. 브라우저 확인: 저장 → 새로고침 후 키·폴더 복원, 끄고 저장 → 키만 비움.
 - 라이브(같은 날, 회사 PC Gen): `live-genloads.ts` — 읽기 21 케이스·155 조합, 추정 용도 = 앱, 부재 강도비 |Δ| 3.8e-7(최대 0.8747 동일), 접합 동일, 엔지니어 하중 최적화 47.14 → 42.78 t 2회 0.900(정상 모델링과 같음, doc/new 0, 엔지니어 하중 그대로). `live-gensections.ts`(Gen 기본 옵션 = 전단변형·뒴 끔) — 기둥 RH500 변경 감지·확정, 옵션 안내, 강도비 차이 1.9e-2(옵션이 달라 예상된 차이). 두 실행 API 오류 0, 원본 12 DB 복원 일치.
 - 다시 리뷰(같은 날) 수정: 시작할 때 `syncBaseUrl` 이 저장한 .cn/.com 주소를 언어 기본 서버로 되돌리던 것 — 주소는 언어 기본 서버와 다를 때만 저장하고, 저장한 주소가 있으면 언어 동기화를 건너뜀(Node 확인: ko 에서 .cn 저장 유지, 기본 서버는 저장 안 함 → zh-CN 에서 .cn). 그 자리 갱신에서 지우지 못한 쓰지 않는 번호(부재가 아직 씀)도 `appSect` 에 남겨 다음에 다시, 재생성 때 `inPlacePlan` 의 모델·페이로드를 `sendModel` 이 재사용, 저장 여부 확인 `hasSavedSettings()` 를 store 로. 보류: 키 기억 처음 값(켬), 단면 번호 고정(이름별 기존 번호 재사용).
+
+## 2026-10-28 midas-nx 2.10.4
+
+- SDK 2.10.2 → 2.10.4. 2.10.4 는 SDK `nodalLoad`/`beamLoad` 헬퍼가 빠진 ITEMS 필드를 기본값으로 채움 — Gen 은 항목이 있는 레코드에 PUT 하면 빠진 필드를 첫 항목 값으로 조용히 채운다(SDK 변경 기록). 앱은 `client.request` 직접 호출이라 무관하고, CNLD 는 GROUP_NAME·FX~MZ, BMLD 는 GROUP_NAME·USE_PROJECTION·USE_ECCEN 을 항목마다 보내며 모두 같은 종류(등분포·편심 없음)라 영향 없음. 오프라인 verify 35종 통과.
+- 라이브(집 PC Gen): `live-tw.ts` — 절점 219·요소 410·케이스 21·조합 155, 평형 최대 0.000%, 최대 0.875 NG 0(expert), 접합 base 0.983·knee 0.962·apex 0.949·brace 0.463, API 오류 0, 원본 12 DB 복원 일치.
