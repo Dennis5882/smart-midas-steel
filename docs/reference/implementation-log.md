@@ -280,3 +280,27 @@ Vite 8 + TypeScript + React 19 + Tailwind v4 + shadcn/ui(new-york) + **Vercel Fu
 - 같은 날 `live-cn.ts`·`live-kr.ts`(집 PC, SDK 2.10.4): CN 케이스 17, 부재 최대 0.858 NG 0, 접합 base 0.942·knee 0.961·apex 0.945·brace 0.998 / KR 케이스 31, 부재 최대 0.846 NG 0, 접합 base 0.951·knee 0.937·apex 0.887·brace 0.185. 두 실행 API 오류 0, 원본 12 DB 복원 일치. 평형 수치는 출력 끝부분만 받아 미확인.
 - 하중 항목 공용화(같은 날, 리뷰 2회): 앱의 CNLD·BMLD 항목은 모두 `domain/loadItems.ts` — `addNodalLoad`(GROUP_NAME·FX~MZ 전부, 같은 절점·케이스 합산, 모두 0 이면 만들지 않음, 숫자 아닌 성분은 오류 — 추가 구조의 성분 빠진 옛 데이터도 실패), `addBeamLoad`(USE_ADDITIONAL·ADDITIONAL_I_END·USE_ADDITIONAL_J_END·ADDITIONAL_J_END 를 끈 값으로 명시 → 동일성 검사가 엔지니어가 Gen 에서 넣은 추가 하중을 잡고 그 자리 갱신이 덮어씀). 라이브 확인: Gen 은 BMLD 의 ADDITIONAL 4필드는 항상 돌려주지만 편심 값(ECCEN_TYPE·I_END·USE_J_END·J_END)은 `USE_ECCEN:false` 면 저장하지 않는다 — 처음 그것까지 보냈다가 4개 라이브 모두 전송 확인 실패(`ECCEN_TYPE: 0 → none`) → 편심 값은 보내지 않음. `verify-frames` 6검사(세 기준 항목 필드·합산·0 건너뜀·NaN 오류).
 - 라이브(집 PC): `live-tw.ts --optimize` 절점 219·요소 410·21·155, 평형 0.000%, 0.875 NG 0, 접합 동일, 최적화 47.14 → 42.78 t 2회 0.900(33 s, doc/new 0·그 자리 갱신 1) / `live-cn.ts` 17·87, 평형 0.000%, 0.858 NG 0 / `live-kr.ts` 31·204, 평형 0.027%, 0.846 NG 0 / `live-additions.ts --phase6` TW·CN·KR PASS(평형 0.0003·0.0006·0.0291%, 샘플 NG 26·4·40 — v2.2.0 기록과 NG 동일). 모두 API 오류 0, 원본 12 DB 복원 일치.
+
+## 2026-10-28 US 기준 준비 — Gen NX 미국 재료·단면·설계코드 확인
+
+- 근거: 설치 폴더 `E:/MIDAS PROGRAM/MIDAS GEN NX` — `Dbase/*.sdb`(단면 DB), `DgnBase_MBCS.dll`(재료 규격·강종 목록), `wg_db.dll`·`wg_acs.dll`(설계코드·단면 DB 이름) 문자열 → 라이브 시험 PUT `scripts/live-us-probe.ts`(live-guarded, 원본 12 DB 복원 일치, 거부된 후보 외 오류 없음).
+- 재료(MATL STEEL, `PARAM.STANDARD`/`DB`): `ASTM(S)` — A36·A992·A572-42/50·A529-50·A588-50·A500-46/50·A53 수용, A500-B/C·A913-50·A1011-* 거부. `ASTM09(S)` — A36·A992·A572-50·A500-46/50·A913-50·A1011-33/50/55·A847 수용(A500 은 Gr.B=46·Gr.C=50 ksi 로 표기). Gen 은 E 만 채움(199,948 MPa = 29,000 ksi). **재료 이름 ≤ 16자**(넘으면 거부).
+- 단면 DB(SECT DBUSER `SECT_I.DB_NAME`): `AISC10(SI)`·`AISC10(US)` 수용 — W(SHAPE `H`), 각형 HSS(`B`), 원형 HSS(`P`), C(`C`), L(`L`), SI 이름 `W310X38.7`·`HSS203.2X203.2X9.5`·`HSS168.3X7.1`, US 이름 `W12X26`(같은 단면 값 동일). `Pipe150STD` 는 AISC10(SI) 에서 거부(이름 형식 미확인). **`AISC16(SI/US)` 는 설치 폴더에 파일이 있어도 API 거부**(wg_db.dll 의 DB 이름 목록에 AISC16 없음 — AISC10/05/2K 만). `AISI08(US)` 냉간 Z(Z·ZS·ZU 90종, SHAPE `Z`) 수용 — 립 C 는 이 DB 에 없음.
+- 설계코드(DSTL `DGNCODE`): `AISC(16th)-LRFD22`·`AISC(16th)-ASD22`·`AISC(15th)-LRFD16`·`AISC(15th)-ASD16`·`AISC(14th)-LRFD10`·`AISI-CFSD08` 수용(`AISC-LRFD22`·`AISC360-22` 형식은 거부). RC: `ACI318-19`·`ACI318M-19`·`ACI318-25` 문자열 있음(미시험). 하중: 풍·지진 `ASCE7(2016)`·`ASCE7(2022)`·`IBC2024(ASCE7-22)` 문자열 있음(미시험).
+
+## 2026-11-03 Gen NX 2026 v2.2 (빌드 2026-10-30) 간헐 크래시 — 제품 쪽
+
+- 증상: 앱에서 모델 전송 중 Gen 종료 → "Failed to disconnect the work session" 창(크래시 뒤 라이선스 세션 정리 실패, 2차 증상).
+- Windows 이벤트 로그(GenNX.exe 26.09.23.1001):
+  - 12:53:42·12:54:11 앱 모델 전송 중 — `BCGCBPRO3330u141.dll`(33.30.0.0, Gen UI 라이브러리) 오프셋 0x4407ab, `0xc0000005` → `0xc000041d`. WER `fa26f5be-3ccc-44fa-8d1a-e32742aa0e25`, `2f542ddf-55f4-4cab-8a57-9b06690a58c1`.
+  - 12:57:59 `live-tw.ts` 해석 뒤 결과 표(BEAMFORCE 다음 TRUSSFORCE 요청) — `ntdll.dll` `0xc0000374` 힙 손상. WER `99201ec5-49c1-4d1d-83bb-ce71e39c09c5`.
+- 재현 4회(모두 live-guarded): ① live-tw(Gen 재시작 직후) 크래시(복원 불가 — 원본 백업 C:/temp/sms_guard_backup_1793678234017.mgbx) ② `scripts/live-truss-probe.ts` 단계별 TRUSSFORCE 5단계 정상 ③ `--app`(BEAMFORCE 394×21×5 = 41,370행 → TRUSSFORCE, Gen 1,318→1,402 MB) 정상 ④ live-tw 정상(최대 0.875 NG 0, API 오류 0). ②~④ 12 DB 복원 일치.
+- 판단: 앱 요청 거부·오류가 아니라 Gen 프로세스 내부 크래시, 같은 요청 재시도는 통과 → 간헐 메모리 손상(제품 버그). 앱 쪽 변경 없음. 두 번 다 Gen 시작 뒤 첫 작업이었으나 표본이 적어 미확인.
+- Gen 재설치 뒤 같은 PC 에서도 MAPI-Key 가 새로 발급됨(옛 키 `client does not exist`) — `.env` 집 키 교체.
+
+
+## 2026-11-08 midas-nx 2.10.4 → 2.11.1, 해석 실패 문구
+
+- SDK 변경 중 앱 해당분: 2.10.6 응답 본문 읽기까지 대기 한도 적용(멈춘 본문 → `MidasConnectionError` → `gen_timeout`), 소문자 "delete" 전체 표 DELETE 차단(앱은 번호별 DELETE 만), 오류 메시지 개선. 앱은 `request()`·오류 클래스·`unwrapTable` 만 써서 그 밖(`plan.*`, 리소스 검증, `doc.analyze()`)은 무관.
+- 2.10.5 가 측정한 doc/anal HTTP 200 거부 문구 중 "Analysis failed."·Civil "error status" 를 앱이 성공으로 처리하던 빈틈 → `analysis.ts` `NOT_ALLOWED` 에 `failed`·`error status` 추가, `verify-job` 사례 추가. `npm run verify` 35종 통과(224 s).
+- 참고(미사용): 2.10.8 레거시 `/db/WIND`·`/db/SEIS` = 해외 기준(ASCE7 등) 자동 풍·지진의 유일한 API 경로, `staticWindLoad`·`staticSeismicLoad` 는 KDS·USER 만. 2.11.1 하중 `ITEMS` 는 PUT 이 ID 별 병합만(항목 삭제 불가, `ITEMS: []` 무변화) — 앱의 'ITEMS ID 집합이 바뀌면 재생성' 규칙과 일치.

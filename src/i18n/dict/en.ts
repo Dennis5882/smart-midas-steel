@@ -655,6 +655,8 @@ export const en = {
   g_help_2: 'Release notes',
   g_help_2_cmd: 'release notes',
   /* @release-notes — scripts/release.mjs 가 이 줄 아래에 새 버전 키 rn_<id>_<n> 을 넣는다 (손으로 버전·키 추가 금지) */
+  rn_v2_6_0_1: '[Create in Gen NX] no longer stops at the backup save when Gen NX has just started with no project open; it builds the new model. With no document to back up, no restore point is created in that case',
+  rn_v2_6_0_2: 'When Gen reports that the analysis failed (Analysis failed), the app now stops with an analysis failure instead of marking the analysis done and failing later while reading results',
   rn_v2_5_9_1: 'Pressing [Save] in the MIDAS API settings now keeps the auto-save folder and a non-default server address in this browser across reloads. Turn on [Remember the MAPI-Key in this browser] to keep the key too; turn it off on shared PCs',
   rn_v2_5_9_2: 'When optimization or NG remediation updates sections in place, sections no longer used are removed from the Gen model (app-created ones only). A change in geometry or load items rebuilds the model, and a failed update clears it so you can create it again',
   rn_v2_5_9_3: 'Gen engineer-load readback: it cannot be accepted without at least one basic (strength) combination, Gen section analysis options (shear deformation, warping) are kept during optimization, and you are asked before accepting Gen sections if there are unsent edits',

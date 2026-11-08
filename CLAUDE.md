@@ -34,7 +34,7 @@ MIDAS Gen NX 단층 강구조 공장 자동 모델링·해석·설계 검토 웹
 
 ## 스택·구조
 
-Vite 8 + TypeScript + React 19 + Tailwind v4(화면은 `src/styles/app.css` 클래스·테마 토큰) + Vercel Functions(`api/`, Gen 무관 작업). **MAPI 호출은 브라우저가 직접**(`midas-nx` 2.10.4) — 서버는 사용자 PC 의 Gen 에 접근 불가. 별칭 `@/` = `src/`.
+Vite 8 + TypeScript + React 19 + Tailwind v4(화면은 `src/styles/app.css` 클래스·테마 토큰) + Vercel Functions(`api/`, Gen 무관 작업). **MAPI 호출은 브라우저가 직접**(`midas-nx` 2.11.1) — 서버는 사용자 PC 의 Gen 에 접근 불가. 별칭 `@/` = `src/`.
 
 | 위치 | 역할 |
 |---|---|

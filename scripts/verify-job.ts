@@ -22,10 +22,11 @@ const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200, head
     if (fault === 'save-http') return new Response(JSON.stringify({ error: { message: 'save failed' } }), { status: 400 })
     if (fault === 'save-message') return json({ message: 'Save not allowed' })
     if (fault === 'save-unknown') return json({})
+    if (fault === 'no-project') return json({ error: { message: 'The project is not opened' } }) // 막 켠 Gen (라이브 2026-11-03)
     return json({ message: 'MIDAS GEN NX command complete' })
   }
   if (path === '/doc/new') { db = {}; return json({}) }
-  if (path === '/doc/anal') { if (analDelay) await new Promise((r) => setTimeout(r, analDelay)); return json({ message: 'ok' }) }
+  if (path === '/doc/anal') { if (analDelay) await new Promise((r) => setTimeout(r, analDelay)); return json({ message: fault === 'anal-failed' ? 'MIDAS GEN NX Analysis failed.' : 'ok' }) }
   if (path === '/post/TABLE' && body.Argument?.TABLE_TYPE === 'SECTIONALL')
     return json(sectionAllTable(db.SECT as Record<string, any>, body.Argument.TABLE_NAME, (n) => (n.startsWith('RH') || n.startsWith('CC') ? 'TW' : 'CN'), fault === 'section-source' ? 1 : 0))
   if (path.startsWith('/doc/') || path.startsWith('/post/')) return json({})
@@ -87,7 +88,20 @@ for (const f of ['save-http', 'save-message', 'save-unknown']) {
   ok(S.restorePoint === rp, `${f}: restore point unchanged (Gen document untouched)`)
   ok(!S.busy && S.job === null, `${f}: job cleaned up`)
 }
+/* 열린 프로젝트가 없는 Gen(막 켬): 백업할 문서가 없으니 건너뛰고 doc/new 로 생성, 복원 지점 없음 */
+S.restorePoint = 'C:/temp/old.mgbx'
+reset(); fault = 'no-project'
+await buildFactory(spec())
+ok(!!S.built && calls.includes('POST /doc/new') && S.restorePoint === null, 'no open project: backup skipped, model built, no restore point')
+/* 해석 직전 저장은 그대로 엄격 — 같은 응답이면 해석하지 않는다 */
+reset(); fault = 'no-project'
+await runAnalysis()
+ok(!calls.includes('POST /doc/anal'), 'no open project before analysis: analysis blocked')
 reset(); await buildFactory(spec())
+/* HTTP 200 'Analysis failed.' 는 성공이 아니다 — 해석 완료로 표시하지 않고 결과를 읽지 않는다 */
+reset(); fault = 'anal-failed'
+await runAnalysis()
+ok(calls.at(-1) === 'POST /doc/anal' && !S.analyzed && !S.reactions, 'Gen "Analysis failed." message: analysis not marked done, no results read')
 /* 저장 실패 → 해석 안 함 + 이전 결과 보존 (해석하지 않았으니 결과는 여전히 현재 모델의 것) */
 const prevDesign = {} as NonNullable<typeof S.design>
 S.analyzed = true; S.design = prevDesign; S.connections = []

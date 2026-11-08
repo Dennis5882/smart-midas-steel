@@ -10,8 +10,9 @@ import { autoSave } from './save'
 import { beginJob, Cancelled, endJob, failMsg, stage } from './job'
 import { assertGenSync } from './genSync'
 
-/* doc/anal 은 거부 시 HTTP 200 + message 로 회신(에러 필드 아님) → 메시지 직접 점검 */
-const NOT_ALLOWED = /not allowed|not permitted|허용되지|許可/i
+/* doc/anal 은 거부·실패 시 HTTP 200 + message 로 회신(에러 필드 아님) → 메시지 직접 점검.
+   Gen "... Analysis failed."·"Analysis is not allowed.", Civil "error status" (midas-nx 2.10.5 측정) */
+const NOT_ALLOWED = /not allowed|not permitted|failed|error status|허용되지|許可/i
 
 export async function runAnalysis(): Promise<void> {
   if (S.busy) { addMsg('bot', lt('busy')); return }

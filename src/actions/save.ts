@@ -19,16 +19,37 @@ export function autoSavePath(tag: string): string {
   return `${dir || 'C:/temp'}/sms_${tag}_${stamp()}.mgbx`
 }
 
+async function saveAs(path: string): Promise<void> {
+  const res = await mapi<{ message?: string }>('POST', '/doc/saveas', { Argument: path }, path)
+  // HTTP 200 alone is insufficient: Gen also returns command refusals as messages.
+  if (res?.message !== 'MIDAS GEN NX command complete') throw new Error(String(res?.message ?? t('gen_bad_response')))
+}
+
 /** 저장한 경로를 돌려준다 (Gen PC 기준) */
 export async function autoSave(tag: 'backup' | 'model'): Promise<string> {
   const path = autoSavePath(tag)
   try {
-    const res = await mapi<{ message?: string }>('POST', '/doc/saveas', { Argument: path }, path)
-    // HTTP 200 alone is insufficient: Gen also returns command refusals as messages.
-    if (res?.message !== 'MIDAS GEN NX command complete') throw new Error(String(res?.message ?? t('gen_bad_response')))
+    await saveAs(path)
     return path
   } catch (e) {
     if (e instanceof Cancelled) throw e
     throw new Error(t('save_failed', path, e instanceof Error ? e.message : String(e)))
+  }
+}
+
+/** Gen 응답 문구 — 막 켠 Gen 처럼 열린 프로젝트가 없을 때 (라이브 2026-11-03, Gen NX 2026 v2.2) */
+const NO_PROJECT = /project is not opened/i
+
+/** doc/new 직전 백업. 열린 프로젝트가 없으면 지킬 문서도 doc/new 의 "저장할까요?" 창도 없으므로 건너뛰고 null (doc/new 는 그 상태에서도 된다) */
+export async function backupBeforeNew(): Promise<string | null> {
+  const path = autoSavePath('backup')
+  try {
+    await saveAs(path)
+    return path
+  } catch (e) {
+    if (e instanceof Cancelled) throw e
+    const msg = e instanceof Error ? e.message : String(e)
+    if (NO_PROJECT.test(msg)) return null
+    throw new Error(t('save_failed', path, msg))
   }
 }

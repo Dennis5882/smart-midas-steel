@@ -14,7 +14,7 @@ import { sectionSourceDifferences } from '../domain/genSectionSync'
 import { scopeMsg } from '../components/ScopeBox'
 import { t, lt } from '../i18n'
 import { mapi, tableOf } from '../mapi/client'
-import { autoSave, autoSavePath } from './save'
+import { autoSave, autoSavePath, backupBeforeNew } from './save'
 import { confirmAction, confirmChoice } from '../components/ConfirmDialog'
 import { beginJob, Cancelled, endJob, failMsg, stage } from './job'
 import { S, clearResults, notify, type Built } from '../state/store'
@@ -88,8 +88,8 @@ export async function restoreBackup(): Promise<void> {
 }
 
 /** 전송 본체 (busy·메시지 없음) — 단면 최적화 반복에서도 사용. 성공하면 S.built 갱신, 이전 결과 초기화.
-    onReplaced: doc/new 직후 백업 경로 — [공장 생성]만 복원 지점으로 쓴다(최적화 반복의 백업은 앱이 만든 모델) */
-export async function sendModel(spec: FactorySpec, onReplaced?: (backup: string) => void, opts: { modelOnly?: boolean; built?: Prebuilt } = {}) {
+    onReplaced: doc/new 직후 백업 경로 — [공장 생성]만 복원 지점으로 쓴다(최적화 반복의 백업은 앱이 만든 모델). 열린 프로젝트가 없었으면 null(복원할 문서 없음) */
+export async function sendModel(spec: FactorySpec, onReplaced?: (backup: string | null) => void, opts: { modelOnly?: boolean; built?: Prebuilt } = {}) {
   const model = opts.built?.model ?? buildPortal(spec)
   const p = opts.built?.p ?? buildGenPayloads(spec, model)
   const l = opts.built?.l ?? buildLoadPayloads(spec, model)
@@ -99,8 +99,8 @@ export async function sendModel(spec: FactorySpec, onReplaced?: (backup: string)
   const steps = Object.entries({ UNIT: p.UNIT, MATL: p.MATL, SECT: p.SECT, NODE: p.NODE, ELEM: p.ELEM, FRLS: p.FRLS, CONS: p.CONS, ...loads }) as [string, Record<string, unknown>][]
   const designCode = profileOf(spec.code).gen.designCode
   stage('st_send', 2 + steps.length + (designCode ? 1 : 0))
-  /* 열린 문서를 먼저 임시 저장 → doc/new 가 "저장할까요?" 창을 띄우지 않게 (사용자 원본 파일은 건드리지 않음) */
-  const backup = await autoSave('backup')
+  /* 열린 문서를 먼저 임시 저장 → doc/new 가 "저장할까요?" 창을 띄우지 않게 (사용자 원본 파일은 건드리지 않음). 막 켠 Gen 처럼 열린 프로젝트가 없으면 건너뜀 */
+  const backup = await backupBeforeNew()
   /* 전체 문서를 doc/new 로 초기화 — 항목별 DELETE 의 경고·잔여 데이터 방지 (story 와 같은 방식) */
   await mapi('POST', '/doc/new', {})
   onReplaced?.(backup)
@@ -144,7 +144,7 @@ async function checkSectionSource(spec: FactorySpec, sect: Record<string, unknow
 
 /** 단면이 바뀐 스펙을 Gen 에 반영 (최적화·NG 보완 공통) — 형상이 같으면 문서를 새로 만들지 않고 그 자리에서 단면·바뀐 하중 표만 고친다(updateSections).
     엔지니어 하중(F2) 모델은 항상 그 방식(형상이 바뀌면 거부), 앱 하중 모델은 그 자리에서 고칠 수 없을 때만 모델 재생성(sendModel) */
-export async function resendModel(spec: FactorySpec, onReplaced?: (backup: string) => void) {
+export async function resendModel(spec: FactorySpec, onReplaced?: (backup: string | null) => void) {
   const b = S.built
   if (!b?.sent || b.modelOnly && !b.genLoads) return sendModel(spec, onReplaced)
   /* 계획은 한 번만 계산해 넘긴다 (모델·하중 페이로드와 큰 하중 표 비교가 회차마다 두 번 돌지 않게) */
